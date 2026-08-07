@@ -2,8 +2,9 @@ import { Drawer } from "vaul";
 import { cn } from "@/lib/utils";
 
 /**
- * Bottom sheet, not a centred modal — this is the mobile-app gesture users
- * expect for forms and sub-menus. Drag-to-dismiss comes from Vaul.
+ * Right-side drawer, floated off the screen edges like the sidebar rather
+ * than flush against them — same glass-sidebar treatment, same rounding.
+ * Drag-to-dismiss (toward the right edge) comes from Vaul.
  */
 export function Sheet({
   open,
@@ -21,17 +22,16 @@ export function Sheet({
   className?: string;
 }) {
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange}>
+    <Drawer.Root open={open} onOpenChange={onOpenChange} direction="right">
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
         <Drawer.Content
           className={cn(
-            "glass fixed inset-x-0 bottom-0 z-50 mt-24 flex max-h-[92vh] flex-col rounded-t-2xl border-t border-border outline-none",
+            "glass-sidebar fixed inset-y-2 right-2 z-50 flex w-[calc(100%-1rem)] max-w-sm flex-col rounded-2xl outline-none",
             className,
           )}
         >
-          <div className="mx-auto mt-3 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/40" />
-          <div className="px-5 pb-2 pt-4">
+          <div className="px-5 pb-2 pt-5">
             <Drawer.Title className="text-lg font-semibold">{title}</Drawer.Title>
             {description ? (
               <Drawer.Description className="text-sm text-muted-foreground">

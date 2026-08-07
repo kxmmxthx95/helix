@@ -59,6 +59,17 @@ export function parseCsv(text: string): string[][] {
   return rows;
 }
 
+/** Triggers a browser download of `text` as a CSV file. BOM so Excel opens Thai as UTF-8. */
+export function downloadCsv(filename: string, text: string) {
+  const blob = new Blob(["﻿" + text], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export type CsvColumn = { key: string; header: string; required?: boolean };
 
 export type CsvIssue = { row: number; message: string };

@@ -118,7 +118,7 @@ export function ImportSheet({
 
         {parsed && (
           <>
-            {me && isOrgWide(me.role) && (
+            {me && isOrgWide(me.roles) && (
               <Field label="นำเข้าไปยังแผนก">
                 <Select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
                   <option value="">เลือกแผนก</option>

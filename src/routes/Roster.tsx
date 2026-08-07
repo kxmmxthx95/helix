@@ -1,10 +1,10 @@
-import { Plus, Search, SlidersHorizontal, Upload } from "@/components/icons";
+import { KeyIcon, Plus, Search, SlidersHorizontal, Upload } from "@/components/icons";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
-import { useDepartments } from "@/hooks/useProfiles";
+import { useDepartments, useInviteUsers, type UserInvite } from "@/hooks/useProfiles";
 import {
   useSaveStudent,
   useStudents,
@@ -12,7 +12,7 @@ import {
   type StudentFilters,
 } from "@/hooks/useStudents";
 import type { Student, StudentStatus } from "@/lib/database.types";
-import { canManage, isOrgWide } from "@/lib/roles";
+import { canManage, canManageUsers, isOrgWide } from "@/lib/roles";
 
 const EMPTY: StudentFilters = { search: "", departmentId: "", status: "" };
 
@@ -29,12 +29,14 @@ export function Roster() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<Student | "new" | null>(null);
+  const [creatingLoginFor, setCreatingLoginFor] = useState<Student | null>(null);
 
   const { data: departments = [] } = useDepartments();
   const { data: rows, isLoading, error } = useStudents(filters);
 
   const deptName = useMemo(() => new Map(departments.map((d) => [d.id, d.name])), [departments]);
-  const mayEdit = me ? canManage(me.role) : false;
+  const mayEdit = me ? canManage(me.roles) : false;
+  const mayManageUsers = me ? canManageUsers(me.roles) : false;
 
   const activeFilterCount = [filters.departmentId, filters.status].filter(Boolean).length;
 
@@ -103,6 +105,7 @@ export function Roster() {
                 <th className="px-3 py-2 font-medium">แผนก</th>
                 <th className="px-3 py-2 font-medium">ชั้น</th>
                 <th className="px-3 py-2 font-medium">สถานะ</th>
+                {mayManageUsers && <th className="px-3 py-2 font-medium">บัญชี</th>}
               </tr>
             </thead>
             <tbody>
@@ -135,6 +138,25 @@ export function Roster() {
                       {STATUS_LABEL[row.status]}
                     </span>
                   </td>
+                  {mayManageUsers && (
+                    <td className="px-3 py-3">
+                      {row.profile_id ? (
+                        <span className="text-xs text-muted-foreground">มีบัญชีแล้ว</span>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCreatingLoginFor(row);
+                          }}
+                        >
+                          <KeyIcon className="h-3.5 w-3.5" />
+                          สร้างบัญชี
+                        </Button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -144,7 +166,7 @@ export function Roster() {
 
       <Sheet open={filtersOpen} onOpenChange={setFiltersOpen} title="ตัวกรอง">
         <div className="space-y-4">
-          {me && isOrgWide(me.role) && (
+          {me && isOrgWide(me.roles) && (
             <Field label="แผนก">
               <Select
                 value={filters.departmentId}
@@ -193,6 +215,7 @@ export function Roster() {
 
       <EditStudentSheet target={editing} onClose={() => setEditing(null)} />
       <ImportSheet open={importOpen} onOpenChange={setImportOpen} />
+      <CreateStudentLoginSheet student={creatingLoginFor} onClose={() => setCreatingLoginFor(null)} />
     </div>
   );
 }
@@ -282,7 +305,7 @@ function EditStudentSheet({
               value={current.department_id}
               onChange={(e) => setDraft({ ...current, department_id: e.target.value })}
               required
-              disabled={!me || !isOrgWide(me.role)}
+              disabled={!me || !isOrgWide(me.roles)}
             >
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -354,4 +377,124 @@ function pickDraft(s: Student): StudentDraft {
     guardian_name: s.guardian_name,
     guardian_phone: s.guardian_phone,
   };
+}
+
+type StudentLoginDraft = {
+  password: string;
+  national_id: string;
+  date_of_birth: string;
+};
+
+function blankStudentLoginDraft(s: Student): StudentLoginDraft {
+  return { password: "", national_id: s.national_id ?? "", date_of_birth: "" };
+}
+
+/**
+ * Creates a login for an existing roster row — student_code becomes the
+ * login id, name/department come straight from the roster (fix those there,
+ * not here). super_admin-only, same as every other account-creation path.
+ */
+function CreateStudentLoginSheet({
+  student,
+  onClose,
+}: {
+  student: Student | null;
+  onClose: () => void;
+}) {
+  const invite = useInviteUsers();
+  const [draft, setDraft] = useState<StudentLoginDraft | null>(null);
+  const [failReason, setFailReason] = useState<string | null>(null);
+
+  const current = draft ?? (student ? blankStudentLoginDraft(student) : null);
+
+  function close() {
+    setDraft(null);
+    setFailReason(null);
+    onClose();
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!student || !current) return;
+    setFailReason(null);
+
+    const payload: UserInvite = {
+      kind: "student",
+      loginId: student.student_code,
+      password: current.password,
+      prefix: null,
+      first_name: student.first_name,
+      last_name: student.last_name,
+      email: null,
+      national_id: current.national_id || null,
+      date_of_birth: current.date_of_birth || null,
+      department_id: student.department_id,
+      roles: [],
+      positionTitleIds: [],
+      studentRowId: student.id,
+    };
+
+    const outcome = await invite.mutateAsync([payload]);
+    if (outcome.inserted > 0) {
+      close();
+    } else {
+      setFailReason(outcome.skipped[0]?.reason ?? "สร้างบัญชีไม่สำเร็จ");
+    }
+  }
+
+  return (
+    <Sheet
+      open={student !== null}
+      onOpenChange={(open) => !open && close()}
+      title="สร้างบัญชีเข้าใช้"
+      description={student ? `${student.first_name} ${student.last_name}` : undefined}
+    >
+      {student && current && (
+        <form onSubmit={submit} className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            รหัสนักเรียน <span className="font-mono">{student.student_code}</span>{" "}
+            จะเป็นรหัสผู้ใช้เข้าระบบ
+          </p>
+
+          <Field label="รหัสผ่าน">
+            <Input
+              type="password"
+              value={current.password}
+              onChange={(e) => setDraft({ ...current, password: e.target.value })}
+              minLength={8}
+              required
+            />
+          </Field>
+
+          <Field label="เลขบัตรประชาชน (ใช้ยืนยันตอนลืมรหัสผ่าน)">
+            <Input
+              value={current.national_id}
+              onChange={(e) => setDraft({ ...current, national_id: e.target.value })}
+              required
+            />
+          </Field>
+
+          <Field label="วันเดือนปีเกิด">
+            <Input
+              type="date"
+              value={current.date_of_birth}
+              onChange={(e) => setDraft({ ...current, date_of_birth: e.target.value })}
+              required
+            />
+          </Field>
+
+          {failReason && <p className="text-sm text-destructive">{failReason}</p>}
+
+          <div className="flex gap-2 pt-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={close}>
+              ยกเลิก
+            </Button>
+            <Button type="submit" className="flex-1" disabled={invite.isPending}>
+              {invite.isPending ? <Spinner /> : "สร้างบัญชี"}
+            </Button>
+          </div>
+        </form>
+      )}
+    </Sheet>
+  );
 }

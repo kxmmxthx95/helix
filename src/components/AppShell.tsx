@@ -17,7 +17,8 @@ import { useAuth } from "@/auth/AuthProvider";
 import { useTheme } from "@/components/ThemeProvider";
 import { Avatar, Button } from "@/components/ui";
 import { useOutboxSync } from "@/hooks/useOutboxSync";
-import { canManageUsers, ROLE_LABEL } from "@/lib/roles";
+import { profileFullName } from "@/lib/database.types";
+import { canManageUsers, roleLabels } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -36,6 +37,7 @@ const SIDEBAR_KEY = "helix-sidebar-collapsed";
  */
 export function AppShell() {
   const { profile, signOut } = useAuth();
+  const displayName = profile ? profileFullName(profile) : "Helix";
   const { preference, cycle } = useTheme();
   const { online } = useOutboxSync();
   const location = useLocation();
@@ -55,7 +57,7 @@ export function AppShell() {
     }
   }, [collapsed]);
 
-  const tabs = TABS.filter((t) => !t.managerOnly || (profile && canManageUsers(profile.role)));
+  const tabs = TABS.filter((t) => !t.managerOnly || (profile && canManageUsers(profile.roles)));
 
   const themeButton = (
     <Button
@@ -83,9 +85,9 @@ export function AppShell() {
 
   const userLabel = (
     <div className="min-w-0">
-      <p className="truncate text-sm font-semibold">{profile?.full_name ?? "Helix"}</p>
+      <p className="truncate text-sm font-semibold">{displayName}</p>
       {profile && (
-        <p className="truncate text-xs text-muted-foreground">{ROLE_LABEL[profile.role]}</p>
+        <p className="truncate text-xs text-muted-foreground">{roleLabels(profile.roles)}</p>
       )}
     </div>
   );
@@ -154,10 +156,10 @@ export function AppShell() {
           )}
         >
           {collapsed ? (
-            <Avatar name={profile?.full_name ?? "Helix"} className="h-8 w-8 text-[10px]" />
+            <Avatar name={displayName} className="h-8 w-8 text-[10px]" />
           ) : (
             <div className="mb-2 flex items-center gap-3 px-1">
-              <Avatar name={profile?.full_name ?? "Helix"} />
+              <Avatar name={displayName} />
               {userLabel}
             </div>
           )}
@@ -173,7 +175,7 @@ export function AppShell() {
         <header className="glass sticky top-0 z-20 shrink-0 border-b border-border pt-safe lg:hidden">
           <div className={cn("flex h-12 items-center justify-between", "px-3")}>
             <div className="flex min-w-0 items-center gap-3">
-              <Avatar name={profile?.full_name ?? "Helix"} className="h-8 w-8 text-[10px]" />
+              <Avatar name={displayName} className="h-8 w-8 text-[10px]" />
               {userLabel}
             </div>
             <div className="flex items-center gap-1">

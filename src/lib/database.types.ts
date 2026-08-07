@@ -9,18 +9,42 @@ export type Department = {
   created_at: string;
 };
 
+export type PositionTitle = {
+  id: string;
+  code: string;
+  name: string;
+  created_at: string;
+};
+
 export type Profile = {
   id: string;
-  role: Role;
   department_id: string | null;
-  full_name: string;
-  email: string | null;
-  phone: string | null;
+  prefix: string | null;
+  first_name: string;
+  last_name: string;
+  email: string | null; // contact only — never the login identity
+  phone: string | null; // also the login id for non-student roles
+  national_id: string | null;
+  date_of_birth: string | null;
   line_user_id: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
 };
+
+export const profileFullName = (p: Pick<Profile, "prefix" | "first_name" | "last_name">) =>
+  `${p.prefix ?? ""}${p.first_name} ${p.last_name}`.trim();
+
+export type ProfileRole = {
+  id: string;
+  profile_id: string;
+  role: Role;
+  position_title_id: string | null;
+  created_at: string;
+};
+
+/** A profile plus the role names it holds — enough for every permission check. */
+export type ProfileWithRoles = Profile & { roles: Role[] };
 
 export type Student = {
   id: string;
@@ -60,12 +84,38 @@ export type Database = {
   public: {
     Tables: {
       departments: Table<Department, InsertOf<Department, never>>;
+      position_titles: Table<PositionTitle, InsertOf<PositionTitle, never>>;
       // profiles.id is the auth.users id, so it is supplied, not generated.
       profiles: Table<
         Profile,
-        Omit<Profile, "created_at" | "updated_at" | "department_id" | "email" | "phone" | "line_user_id" | "is_active"> &
-          Partial<Pick<Profile, "department_id" | "email" | "phone" | "line_user_id" | "is_active">>
+        Omit<
+          Profile,
+          | "created_at"
+          | "updated_at"
+          | "department_id"
+          | "prefix"
+          | "email"
+          | "phone"
+          | "national_id"
+          | "date_of_birth"
+          | "line_user_id"
+          | "is_active"
+        > &
+          Partial<
+            Pick<
+              Profile,
+              | "department_id"
+              | "prefix"
+              | "email"
+              | "phone"
+              | "national_id"
+              | "date_of_birth"
+              | "line_user_id"
+              | "is_active"
+            >
+          >
       >;
+      profile_roles: Table<ProfileRole, InsertOf<ProfileRole, "position_title_id">>;
       students: Table<
         Student,
         InsertOf<
@@ -82,7 +132,7 @@ export type Database = {
       audit_logs: Table<{
         id: number;
         actor_id: string | null;
-        actor_role: Role;
+        actor_roles: Role[];
         action: string;
         table_name: string;
         record_id: string;
