@@ -1,0 +1,44 @@
+---
+description: Helix work loop — keep Cursor/Claude tasks systematic
+alwaysApply: true
+---
+
+# Helix workflow
+
+One outcome per task. Default coding mode: ponytail (see `AGENTS.md`). Policy edits only in `AGENTS.md`.
+
+## Loop
+
+```
+pull → set mode → one slice → test → commit (if asked) → next
+```
+
+1. Understand the flow before editing.
+2. Change the shared call site; fewest files.
+3. After logic changes: `npm run test`. Before large wrap-up: `npm run build`.
+4. Commit / push / PR only when the user asks.
+
+## Harness
+
+| Need | Where |
+|------|--------|
+| Helix policy | `AGENTS.md` |
+| Project skills | `.agents/skills/` |
+| Personal cross-repo | Cursor User Rules / `~/.claude/skills/` |
+
+Do not put Helix policy in `.claude/` (local/gitignored).
+
+## DB / Supabase
+
+Schema/migration → types/client → UI. Use project skills `supabase` and `supabase-postgres-best-practices` when touching SQL, RLS, indexes, or pooling.
+
+## Modes
+
+- Decisions / grilling: `/grill-me` — normal prose, no caveman.
+- Heavy visual/3D: ask once whether to `stop ponytail`, then honor it.
+- Reset: `normal mode` / `stop caveman` / `stop ponytail`.
+
+## Done check
+
+- Know what `git status` still has.
+- No accidental `.env` or `.claude/` dumps in commits.
