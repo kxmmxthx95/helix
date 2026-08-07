@@ -3,5 +3,8 @@ dist
 .env.local
 .env
 dev-dist
-.claude/skills/
+
+# Claude Code local only (settings, vendor skill dumps).
+# Helix policy lives in AGENTS.md / CLAUDE.md / .cursor/rules/.
+# Project skills live in .agents/skills/ (tracked).
 .claude/

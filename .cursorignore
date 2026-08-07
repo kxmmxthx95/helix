@@ -1,0 +1,63 @@
+# Dependencies & build
+node_modules/
+dist/
+dev-dist/
+coverage/
+.turbo/
+.cache/
+*.tsbuildinfo
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Lockfiles (noise for AI)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lockb
+
+# Tooling / deploy junk
+.vercel/
+supabase/.temp/
+.DS_Store
+*.log
+*.local
+
+# Binary / media noise
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.ico
+*.mp4
+*.mov
+*.zip
+*.tar
+*.gz
+*.pdf
+
+# --- Skills (readable by Cursor) ---
+# Helix .gitignore hides .claude/; override so Agent can load skills.
+!.claude/
+!.claude/skills/
+!.claude/skills/**
+!.agents/
+!.agents/skills/
+!.agents/skills/**
+
+# Noise inside vendor skill dumps (keep SKILL.md / references)
+.claude/skills/.git/
+.claude/skills/node_modules/
+.claude/skills/package-lock.json
+.claude/skills/package.json
+.claude/skills/CHANGELOG.md
+.claude/skills/LICENSE
+.claude/skills/docs/
+.claude/skills/.changeset/
+.claude/skills/.claude-plugin/
+.claude/skills/.github/
+.claude/skills/.out-of-scope/
+.claude/skills/scripts/

@@ -1,0 +1,10 @@
+---
+description: Helix hybrid agent policy (ponytail default, caveman opt-in)
+alwaysApply: true
+---
+
+Follow the Helix policy in `AGENTS.md` at the repo root.
+
+Defaults: ponytail **full** on for coding; caveman **full** only when opted in.
+During grilling sessions: normal prose, no caveman.
+For primarily visual/3D/motion work: ask once per task whether to `stop ponytail`, then honor that.
