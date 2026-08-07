@@ -118,7 +118,7 @@ export function Login() {
           </div>
 
           <p className="mt-6 text-center text-xs text-white/45">
-            Designed & Developed by Team Aadh tech.
+            Designed & Developed by Team Adah tech.
           </p>
         </motion.div>
       </div>
