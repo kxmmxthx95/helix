@@ -17,6 +17,7 @@ import Options from "react-ionicons/lib/Options";
 import People from "react-ionicons/lib/People";
 import IonSearch from "react-ionicons/lib/Search";
 import School from "react-ionicons/lib/School";
+import IonSettings from "react-ionicons/lib/Settings";
 import Sunny from "react-ionicons/lib/Sunny";
 import Warning from "react-ionicons/lib/Warning";
 
@@ -67,3 +68,4 @@ export const Monitor = wrap(Desktop);
 export const AppsIcon = wrap(Apps);
 export const ChevronBack = wrap(IonChevronBack);
 export const ChevronForward = wrap(IonChevronForward);
+export const SettingsIcon = wrap(IonSettings);

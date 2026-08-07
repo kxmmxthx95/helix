@@ -6,6 +6,7 @@ import { Spinner } from "@/components/ui";
 import { Dashboard } from "@/routes/Dashboard";
 import { Login } from "@/routes/Login";
 import { Roster } from "@/routes/Roster";
+import { Settings } from "@/routes/Settings";
 import { Users } from "@/routes/Users";
 
 function Gate() {
@@ -27,6 +28,7 @@ function Gate() {
         <Route index element={<Dashboard />} />
         <Route path="users" element={<Users />} />
         <Route path="roster" element={<Roster />} />
+        <Route path="settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

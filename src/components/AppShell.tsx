@@ -9,16 +9,17 @@ import {
   LogOut,
   Monitor,
   Moon,
+  SettingsIcon,
   Sun,
   Users,
 } from "@/components/icons";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { useTheme } from "@/components/ThemeProvider";
 import { Avatar, Button } from "@/components/ui";
 import { useOutboxSync } from "@/hooks/useOutboxSync";
 import { profileFullName } from "@/lib/database.types";
-import { canManageUsers, roleLabels } from "@/lib/roles";
+import { canManageUsers, isOrgWide, roleLabels } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -41,6 +42,8 @@ export function AppShell() {
   const { preference, cycle } = useTheme();
   const { online } = useOutboxSync();
   const location = useLocation();
+  const navigate = useNavigate();
+  const maySeeSettings = !!profile && (isOrgWide(profile.roles) || profile.roles.includes("dept_head"));
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_KEY) === "1";
@@ -74,6 +77,19 @@ export function AppShell() {
       ) : (
         <Moon className="h-4 w-4" />
       )}
+    </Button>
+  );
+
+  const settingsButton = maySeeSettings && (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => navigate("/settings")}
+      aria-label="ตั้งค่าระบบ"
+      title="ตั้งค่าระบบ"
+      className={location.pathname === "/settings" ? "text-foreground" : "text-muted-foreground"}
+    >
+      <SettingsIcon className="h-4 w-4" />
     </Button>
   );
 
@@ -164,6 +180,7 @@ export function AppShell() {
             </div>
           )}
           <div className={cn("flex items-center gap-1", collapsed && "flex-col")}>
+            {settingsButton}
             {themeButton}
             {signOutButton}
           </div>

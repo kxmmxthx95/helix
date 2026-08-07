@@ -35,6 +35,26 @@ export type Profile = {
 export const profileFullName = (p: Pick<Profile, "prefix" | "first_name" | "last_name">) =>
   `${p.prefix ?? ""}${p.first_name} ${p.last_name}`.trim();
 
+/** Singleton row (id is always 1) — header branding, shown app-wide. */
+export type SchoolSettings = {
+  id: 1;
+  name_th: string;
+  name_en: string | null;
+  logo_path: string | null; // object path in the school-assets storage bucket
+  academic_year: number; // พ.ศ.
+  updated_at: string;
+};
+
+/** One row per department, always present — see migration 0002 seed trigger. */
+export type DepartmentSettings = {
+  department_id: string;
+  semester1_start: string | null;
+  semester1_end: string | null;
+  semester2_start: string | null;
+  semester2_end: string | null;
+  updated_at: string;
+};
+
 export type ProfileRole = {
   id: string;
   profile_id: string;
@@ -129,6 +149,8 @@ export type Database = {
         >
       >;
       guardianships: Table<{ parent_id: string; student_id: string }>;
+      school_settings: Table<SchoolSettings>;
+      department_settings: Table<DepartmentSettings>;
       audit_logs: Table<{
         id: number;
         actor_id: string | null;
