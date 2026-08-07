@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CloudOff, GraduationCap, LayoutDashboard, LogOut, Monitor, Moon, Sun, Users } from "lucide-react";
+import { CloudOff, GraduationCap, LayoutDashboard, LogOut, Monitor, Moon, Sun, Users } from "@/components/icons";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { useTheme } from "@/components/ThemeProvider";

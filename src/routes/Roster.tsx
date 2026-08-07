@@ -1,4 +1,4 @@
-import { Plus, Search, SlidersHorizontal, Upload } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, Upload } from "@/components/icons";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";

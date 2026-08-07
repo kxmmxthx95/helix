@@ -1,4 +1,4 @@
-import { AlertTriangle, FileUp } from "lucide-react";
+import { AlertTriangle, FileUp } from "@/components/icons";
 import { useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
