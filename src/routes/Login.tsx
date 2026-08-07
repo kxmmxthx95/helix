@@ -41,15 +41,6 @@ export function Login() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden overscroll-none">
-      <div
-        className="pointer-events-none absolute inset-0 opacity-60"
-        style={{
-          background:
-            theme === "dark"
-              ? "radial-gradient(60% 40% at 50% 0%, rgba(0,112,243,.18), transparent)"
-              : "radial-gradient(60% 40% at 50% 0%, rgba(0,112,243,.12), transparent)",
-        }}
-      />
       <div className="relative flex flex-1 items-center justify-center px-5">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
