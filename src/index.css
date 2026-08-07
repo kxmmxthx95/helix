@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Sukhumvit+Set:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -67,7 +69,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: Inter, "Noto Sans Thai", system-ui, sans-serif;
+    font-family: "Sukhumvit Set", Inter, system-ui, sans-serif;
     /* Kill the web tells: no rubber-band, no tap flash, no accidental select */
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
