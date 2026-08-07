@@ -14,10 +14,10 @@ const button = cva(
         destructive: "bg-destructive text-destructive-foreground hover:opacity-90",
       },
       size: {
-        default: "h-11 px-4",
-        sm: "h-9 px-3 text-xs",
-        lg: "h-12 px-6 text-base",
-        icon: "h-10 w-10",
+        default: "h-9 px-3.5",
+        sm: "h-8 px-2.5 text-xs",
+        lg: "h-10 px-5 text-sm",
+        icon: "h-8 w-8",
       },
     },
     defaultVariants: { variant: "default", size: "default" },
@@ -39,7 +39,7 @@ export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTML
     <input
       ref={ref}
       className={cn(
-        "flex h-11 w-full rounded-lg border border-input bg-background px-3 text-base outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring disabled:opacity-50",
+        "flex h-9 w-full rounded-lg border border-input bg-background px-3 text-base outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring disabled:opacity-50 md:text-sm",
         className,
       )}
       {...props}
@@ -57,7 +57,7 @@ export const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<H
     <select
       ref={ref}
       className={cn(
-        "h-11 w-full appearance-none rounded-lg border border-input bg-background px-3 text-base outline-none focus-visible:border-ring disabled:opacity-50",
+        "h-9 w-full appearance-none rounded-lg border border-input bg-background px-3 text-base outline-none focus-visible:border-ring disabled:opacity-50 md:text-sm",
         className,
       )}
       {...props}
@@ -106,3 +106,26 @@ export function Spinner({ className }: { className?: string }) {
     />
   );
 }
+
+function initialsFromName(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return (parts[0]!.slice(0, 2) || "?").toUpperCase();
+  return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
+}
+
+/** Initials avatar — no photo column on profiles yet. */
+export function Avatar({ name, className }: { name: string; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/20 text-[11px] font-semibold tracking-wide text-accent ring-1 ring-accent/25",
+        className,
+      )}
+      aria-hidden
+    >
+      {initialsFromName(name)}
+    </div>
+  );
+}
+

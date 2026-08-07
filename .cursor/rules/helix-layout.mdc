@@ -1,0 +1,20 @@
+---
+description: Helix adaptive layout breakpoints for AppShell and pages
+alwaysApply: true
+---
+
+# Helix layout
+
+Adapt at the shell — do not invent per-page chrome.
+
+| Breakpoint | Chrome | Edge gutter |
+|------------|--------|-------------|
+| `< lg` | Top header + bottom tabs | Content / header use `px-3` |
+| `lg+` | Framed sidebar + unframed main slot | Outer `p-2` + `gap-2` (equal all sides) |
+
+- Main pane on `lg+`: no glass/border card — work area is the content column.
+- Page column: `max-w-6xl` + `px-3` + `py-4` (same on every route).
+- Desktop header title sits inside the same `max-w-6xl` column as page content.
+- Use `h-dvh` for full-height frames (not `h-screen`).
+- Login stays full-bleed cinematic — no sidebar.
+- Tables: horizontal scroll on small screens; widen inside the content column on desktop.

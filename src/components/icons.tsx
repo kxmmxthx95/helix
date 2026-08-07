@@ -1,29 +1,48 @@
 import type React from "react";
-import {
-  Add,
-  Apps,
-  CloudOffline,
-  CloudUpload,
-  Desktop,
-  DocumentAttach,
-  Grid,
-  LogOut as IonLogOut,
-  Moon as IonMoon,
-  Options,
-  People,
-  Search as IonSearch,
-  School,
-  Sunny,
-  Warning,
-} from "react-ionicons";
+// Deep imports — the package barrel pulls every icon into the main chunk.
+import Add from "react-ionicons/lib/Add";
+import Apps from "react-ionicons/lib/Apps";
+import IonChevronBack from "react-ionicons/lib/ChevronBack";
+import IonChevronForward from "react-ionicons/lib/ChevronForward";
+import CloudOffline from "react-ionicons/lib/CloudOffline";
+import CloudUpload from "react-ionicons/lib/CloudUpload";
+import Desktop from "react-ionicons/lib/Desktop";
+import DocumentAttach from "react-ionicons/lib/DocumentAttach";
+import Grid from "react-ionicons/lib/Grid";
+import IonLogOut from "react-ionicons/lib/LogOut";
+import IonMoon from "react-ionicons/lib/Moon";
+import Options from "react-ionicons/lib/Options";
+import People from "react-ionicons/lib/People";
+import IonSearch from "react-ionicons/lib/Search";
+import School from "react-ionicons/lib/School";
+import Sunny from "react-ionicons/lib/Sunny";
+import Warning from "react-ionicons/lib/Warning";
 
 interface IconProps {
   className?: string;
+  /** Pixel size — overrides Tailwind h-* when set. Default 16. */
+  size?: number;
+}
+
+/** Map Tailwind `h-*` (spacing scale) to px for ionicons width/height props. */
+function sizeFromClass(className?: string): number {
+  if (!className) return 16;
+  const match = className.match(/(?:^|\s)h-(\d+(?:\.\d+)?)(?:\s|$)/);
+  if (!match?.[1]) return 16;
+  return Math.round(Number.parseFloat(match[1]) * 4);
 }
 
 function wrap(Ion: (props: Record<string, unknown>) => React.JSX.Element) {
-  return function Icon({ className }: IconProps) {
-    return <Ion color="currentColor" cssClasses={className} />;
+  return function Icon({ className, size }: IconProps) {
+    const px = size ?? sizeFromClass(className);
+    return (
+      <Ion
+        color="currentColor"
+        width={`${px}px`}
+        height={`${px}px`}
+        cssClasses={className}
+      />
+    );
   };
 }
 
@@ -42,3 +61,5 @@ export const Plus = wrap(Add);
 export const Upload = wrap(CloudUpload);
 export const Monitor = wrap(Desktop);
 export const AppsIcon = wrap(Apps);
+export const ChevronBack = wrap(IonChevronBack);
+export const ChevronForward = wrap(IonChevronForward);

@@ -60,7 +60,7 @@ export function Users() {
 
       {isLoading && (
         <div className="flex justify-center py-12">
-          <Spinner className="h-6 w-6 text-muted-foreground" />
+          <Spinner className="h-5 w-5 text-muted-foreground" />
         </div>
       )}
 

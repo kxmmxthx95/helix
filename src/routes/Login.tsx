@@ -41,7 +41,7 @@ export function Login() {
 
   return (
     // Login is always dark — Beams + glass; ignores app ThemeProvider.
-    <div className="dark relative flex h-screen flex-col overflow-hidden overscroll-none bg-black">
+    <div className="dark relative flex h-dvh flex-col overflow-hidden overscroll-none bg-black">
       <div className="pointer-events-none absolute inset-0" aria-hidden>
         <Suspense fallback={null}>
           <Beams
