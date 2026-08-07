@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git clone *)",
+      "Bash(sed 's/\\\\.md$//')",
+      "Bash(curl -s \"https://api.github.com/repos/kxmmxthx95/ERP-PMV/contents\")",
+      "Bash(curl -s \"https://api.github.com/repos/kxmmxthx95/ERP-PMV/contents/src\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/kxmmxthx95/ERP-PMV/main/database.rules.json\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/kxmmxthx95/ERP-PMV/main/src/firestore.rules\")",
+      "Bash(curl -s \"https://api.github.com/repos/kxmmxthx95/ERP-PMV/contents/src/types\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/kxmmxthx95/ERP-PMV/main/src/types/rolePermission.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/kxmmxthx95/ERP-PMV/main/src/types/user.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/kxmmxthx95/ERP-PMV/main/src/types/student.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/kxmmxthx95/ERP-PMV/main/src/types/teacher.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/kxmmxthx95/ERP-PMV/main/src/types/class.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/kxmmxthx95/ERP-PMV/main/src/types/exam.ts\")",
+      "Bash(curl -s \"https://api.github.com/repos/kxmmxthx95/ERP-PMV/contents/src/store\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/kxmmxthx95/ERP-PMV/main/src/store/authStore.ts\")",
+      "Bash(curl -s \"https://api.github.com/repos/kxmmxthx95/ERP-PMV/contents/src/features\")",
+      "Bash(curl -s \"https://api.github.com/repos/kxmmxthx95/ERP-PMV/contents/src/features/auth\")",
+      "Bash(curl -s \"https://api.github.com/repos/kxmmxthx95/ERP-PMV/contents/src/features/roles\")",
+      "Bash(curl -s \"https://api.github.com/repos/kxmmxthx95/ERP-PMV/contents/src/hooks\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/kxmmxthx95/ERP-PMV/main/src/hooks/useMyPermissions.ts\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/kxmmxthx95/ERP-PMV/main/src/test.rules\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/kxmmxthx95/ERP-PMV/main/CLAUDE.md\")",
+      "Bash(npx vitest *)",
+      "Bash(echo \"--- exit: $? ---\")",
+      "Bash(echo \"--- exit $? ---\")",
+      "Bash(git commit -m 'initial: Helix v1 scaffold *)"
+    ]
+  }
+}

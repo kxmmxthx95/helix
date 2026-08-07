@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Vercel / Geist light */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 4%;
+    --primary: 0 0% 4%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 4%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 212 100% 48%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 100% 47%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 130 41% 46%;
+    --warning: 38 91% 55%;
+    --border: 0 0% 92%;
+    --input: 0 0% 92%;
+    --ring: 212 100% 48%;
+    --radius: 0.75rem;
+    /* Glass surfaces — bottom nav + cards/modals only */
+    --glass: 0 0% 100%;
+    --glass-alpha: 0.72;
+  }
+
+  .dark {
+    /* Vercel / Geist dark */
+    --background: 0 0% 0%;
+    --foreground: 0 0% 93%;
+    --card: 0 0% 4%;
+    --card-foreground: 0 0% 93%;
+    --primary: 0 0% 93%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 10%;
+    --secondary-foreground: 0 0% 93%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 63%;
+    --accent: 212 100% 52%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 91% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 130 45% 52%;
+    --warning: 38 91% 60%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 212 100% 52%;
+    --glass: 0 0% 4%;
+    --glass-alpha: 0.72;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: Inter, "Noto Sans Thai", system-ui, sans-serif;
+    /* Kill the web tells: no rubber-band, no tap flash, no accidental select */
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* Text the user genuinely needs to copy stays selectable */
+  input,
+  textarea,
+  [data-selectable] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* iOS zooms the page when a font-size < 16px input is focused */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@layer components {
+  .glass {
+    background-color: hsl(var(--glass) / var(--glass-alpha));
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    backdrop-filter: blur(16px) saturate(180%);
+  }
+
+  /* Every tappable surface sinks under the finger */
+  .tappable {
+    @apply transition-transform duration-100 active:scale-95;
+  }
+}
+
+/* Safe-area helpers for the fixed shell */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
