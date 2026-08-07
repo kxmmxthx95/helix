@@ -38,6 +38,11 @@ Schema/migration → types/client → UI. Use project skills `supabase` and `sup
 - Heavy visual/3D: ask once whether to `stop ponytail`, then honor it.
 - Reset: `normal mode` / `stop caveman` / `stop ponytail`.
 
+## Theme
+
+- Login: always dark (Beams). Do not wire to ThemeProvider.
+- Authenticated app: `light` → `dark` → `system` via header cycle. Prefer CSS tokens (`bg-background`, etc.).
+
 ## Done check
 
 - Know what `git status` still has.

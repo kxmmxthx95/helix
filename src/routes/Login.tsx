@@ -1,14 +1,14 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { useTheme } from "@/components/ThemeProvider";
-import { Button, Card, Field, Input, Spinner } from "@/components/ui";
+import { Button, Field, Input, Spinner } from "@/components/ui";
+
+const Beams = lazy(() => import("@/components/Beams/Beams"));
 
 type Mode = "signin" | "reset";
 
 export function Login() {
   const { signIn, resetPassword } = useAuth();
-  const { theme } = useTheme();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,22 +40,38 @@ export function Login() {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden overscroll-none">
-      <div className="relative flex flex-1 items-center justify-center px-5">
+    // Login is always dark — Beams + glass; ignores app ThemeProvider.
+    <div className="dark relative flex h-screen flex-col overflow-hidden overscroll-none bg-black">
+      <div className="pointer-events-none absolute inset-0" aria-hidden>
+        <Suspense fallback={null}>
+          <Beams
+            beamWidth={2.2}
+            beamHeight={18}
+            beamNumber={14}
+            lightColor="#ffffff"
+            speed={1.6}
+            noiseIntensity={1.6}
+            scale={0.18}
+            rotation={28}
+          />
+        </Suspense>
+      </div>
+
+      <div className="relative z-10 flex flex-1 items-center justify-center px-5">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
           className="w-full max-w-sm"
         >
           <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold tracking-tight">Helix</h1>
-            <p className="mt-1 text-sm text-muted-foreground">ระบบจัดการสถานศึกษา</p>
+            <h1 className="text-4xl font-bold tracking-tight text-white">Helix</h1>
+            <p className="mt-2 text-sm text-white/65">Academic Enterprise Resource Planning</p>
           </div>
 
-          <Card className="space-y-4">
+          <div className="glass-panel space-y-4 rounded-2xl p-5 text-card-foreground">
             <form onSubmit={submit} className="space-y-4">
-              <Field label="อีเมล">
+              <Field label="Email">
                 <Input
                   type="email"
                   value={email}
@@ -63,17 +79,19 @@ export function Login() {
                   autoComplete="email"
                   inputMode="email"
                   required
+                  className="border-white/20 bg-white/5 text-white shadow-inner placeholder:text-white/40 focus-visible:border-white/40"
                 />
               </Field>
 
               {mode === "signin" && (
-                <Field label="รหัสผ่าน">
+                <Field label="Password">
                   <Input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="current-password"
                     required
+                    className="border-white/20 bg-white/5 text-white shadow-inner placeholder:text-white/40 focus-visible:border-white/40"
                   />
                 </Field>
               )}
@@ -88,7 +106,7 @@ export function Login() {
 
             <button
               type="button"
-              className="tappable w-full text-center text-sm text-muted-foreground"
+              className="tappable w-full text-center text-sm text-white/55 hover:text-white/80"
               onClick={() => {
                 setMode(mode === "signin" ? "reset" : "signin");
                 setError(undefined);
@@ -97,10 +115,10 @@ export function Login() {
             >
               {mode === "signin" ? "ลืมรหัสผ่าน?" : "กลับไปเข้าสู่ระบบ"}
             </button>
-          </Card>
+          </div>
 
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            บัญชีสร้างโดยผู้ดูแลระบบเท่านั้น
+          <p className="mt-6 text-center text-xs text-white/45">
+            Designed & Developed by Team Aadh tech.
           </p>
         </motion.div>
       </div>

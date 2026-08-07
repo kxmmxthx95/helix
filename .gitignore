@@ -8,3 +8,5 @@ dev-dist
 # Helix policy lives in AGENTS.md / CLAUDE.md / .cursor/rules/.
 # Project skills live in .agents/skills/ (tracked).
 .claude/
+
+*.tsbuildinfo

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { CloudOff, LayoutDashboard, LogOut, Moon, Sun, Users, GraduationCap } from "lucide-react";
+import { CloudOff, GraduationCap, LayoutDashboard, LogOut, Monitor, Moon, Sun, Users } from "lucide-react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { useTheme } from "@/components/ThemeProvider";
@@ -20,7 +20,7 @@ const TABS = [
  */
 export function AppShell() {
   const { profile, signOut } = useAuth();
-  const { theme, toggle } = useTheme();
+  const { preference, cycle } = useTheme();
   const { online } = useOutboxSync();
   const location = useLocation();
 
@@ -37,8 +37,20 @@ export function AppShell() {
             )}
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={toggle} aria-label="สลับธีม">
-              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={cycle}
+              aria-label={`Theme: ${preference}. Tap to cycle.`}
+              title={`Theme: ${preference}`}
+            >
+              {preference === "system" ? (
+                <Monitor className="h-5 w-5" />
+              ) : preference === "dark" ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
             </Button>
             <Button variant="ghost" size="icon" onClick={signOut} aria-label="ออกจากระบบ">
               <LogOut className="h-5 w-5" />
