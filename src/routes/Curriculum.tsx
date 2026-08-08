@@ -129,9 +129,9 @@ export function Curriculum() {
             ))}
           </div>
           {mayEdit && !addingKgYear && (
-            <Button variant="ghost" size="sm" onClick={() => setAddingKgYear(true)}>
+            <Button variant="ghost" size="sm" className="text-white hover:bg-transparent hover:text-white" onClick={() => setAddingKgYear(true)}>
               <Plus className="h-3.5 w-3.5" />
-              ปีอื่น
+              ปีการศึกษา
             </Button>
           )}
           {mayEdit && addingKgYear && (
@@ -166,20 +166,20 @@ export function Curriculum() {
       )}
 
       {(isKg || pickedCohort) && gradeLevels.length > 0 && (
-        <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
+        <div className="flex h-8 w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
           {gradeLevels.map((g) => (
             <button
               key={g.id}
               type="button"
               onClick={() => setPickedGradeLevel(g.id)}
               className={cn(
-                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                "inline-flex h-full min-w-0 flex-1 items-center justify-center rounded-md px-2 text-xs font-medium transition-colors",
                 pickedGradeLevel === g.id
                   ? "bg-foreground/10 text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
-              {g.name}
+              <span className="truncate">{g.name}</span>
             </button>
           ))}
         </div>
@@ -290,9 +290,9 @@ function CohortPicker({
           ))}
         </div>
         {mayEdit && !addingYear && (
-          <Button variant="ghost" size="sm" onClick={() => setAddingYear(true)}>
+          <Button variant="ghost" size="sm" className="text-white hover:bg-transparent hover:text-white" onClick={() => setAddingYear(true)}>
             <Plus className="h-3.5 w-3.5" />
-            ปีอื่น
+            ปีการศึกษา
           </Button>
         )}
         {mayEdit && addingYear && (
@@ -356,9 +356,9 @@ function CohortPicker({
           </div>
         ))}
         {mayEdit && (
-          <Button variant="outline" size="sm" onClick={() => setCreating(true)}>
+          <Button variant="ghost" size="sm" className="text-white hover:bg-transparent hover:text-white" onClick={() => setCreating(true)}>
             <Plus className="h-3.5 w-3.5" />
-            สร้างหลักสูตรรุ่นใหม่
+            สร้างหลักสูตร
           </Button>
         )}
       </div>
@@ -366,7 +366,7 @@ function CohortPicker({
       <Sheet
         open={creating}
         onOpenChange={(open) => !open && closeCreating()}
-        title="สร้างหลักสูตรรุ่นใหม่"
+        title="สร้างหลักสูตร"
         footer={
           <div className="flex gap-2">
             <Button type="button" variant="outline" className="flex-1" onClick={closeCreating}>
@@ -471,7 +471,7 @@ function CreateCohortForm({
 
 // ------------------------------------------------------------ SEC / PRI
 
-const TERM_LABEL: Record<number, string> = { 1: "เทอม 1", 2: "เทอม 2" };
+const TERM_LABEL: Record<number, string> = { 1: "ภาคเรียน 1", 2: "ภาคเรียน 2" };
 
 function SubjectPanel({
   gradeLevelId,
@@ -515,31 +515,34 @@ function SubjectPanel({
 
   return (
     <div className="space-y-3">
-      {splitsByTerm && (
-        <div className="flex h-8 gap-1 rounded-lg border border-border p-0.5">
-          {[1, 2].map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTerm(t as 1 | 2)}
-              className={cn(
-                "flex h-full flex-1 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                term === t
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              {TERM_LABEL[t]}
-            </button>
-          ))}
+      {(splitsByTerm || mayEdit) && (
+        <div className="flex items-center gap-2">
+          {mayEdit && (
+            <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              เพิ่มวิชา
+            </Button>
+          )}
+          {splitsByTerm && (
+            <div className="ml-auto inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
+              {[1, 2].map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTerm(t as 1 | 2)}
+                  className={cn(
+                    "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                    term === t
+                      ? "bg-foreground/10 text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {TERM_LABEL[t]}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-      )}
-
-      {mayEdit && (
-        <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
-          <Plus className="h-3.5 w-3.5" />
-          เพิ่มวิชา
-        </Button>
       )}
 
       {isLoading && (

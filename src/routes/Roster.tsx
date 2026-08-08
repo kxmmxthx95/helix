@@ -99,10 +99,11 @@ export function Roster() {
 
       {rows && rows.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[36rem] text-sm">
+          <table className="w-full min-w-[40rem] text-sm">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">รหัส</th>
+                <th className="px-3 py-2 font-medium">คำนำหน้า</th>
                 <th className="px-3 py-2 font-medium">ชื่อ-นามสกุล</th>
                 <th className="px-3 py-2 font-medium">แผนก</th>
                 <th className="px-3 py-2 font-medium">ชั้น</th>
@@ -122,6 +123,7 @@ export function Roster() {
                   }
                 >
                   <td className="px-3 py-3 font-mono text-xs">{row.student_code}</td>
+                  <td className="px-3 py-3 text-muted-foreground">{row.prefix ?? "—"}</td>
                   <td className="px-3 py-3 font-medium">
                     {row.first_name} {row.last_name}
                   </td>
