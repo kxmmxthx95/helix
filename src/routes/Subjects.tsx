@@ -74,14 +74,14 @@ export function Subjects() {
   return (
     <div className="space-y-4">
       {orgWide && pickableDepartments.length > 0 && (
-        <div className="flex gap-1 overflow-x-auto rounded-lg border border-border p-1">
+        <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
           {pickableDepartments.map((d) => (
             <button
               key={d.id}
               type="button"
               onClick={() => setPickedDept(d.id)}
               className={cn(
-                "inline-flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
                 pickedDept === d.id
                   ? "bg-foreground/10 text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -209,7 +209,21 @@ export function Subjects() {
         </div>
       )}
 
-      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen} title="ตัวกรอง">
+      <Sheet
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        title="ตัวกรอง"
+        footer={
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setFilters({ ...EMPTY, search: filters.search })}>
+              ล้างตัวกรอง
+            </Button>
+            <Button className="flex-1" onClick={() => setFiltersOpen(false)}>
+              ดูผลลัพธ์
+            </Button>
+          </div>
+        }
+      >
         <div className="space-y-4">
           <Field label="กลุ่มสาระการเรียนรู้">
             <Select
@@ -248,15 +262,6 @@ export function Subjects() {
               <option value="all">ทั้งหมด (รวมปิดใช้งาน)</option>
             </Select>
           </Field>
-
-          <div className="flex gap-2 pt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setFilters({ ...EMPTY, search: filters.search })}>
-              ล้างตัวกรอง
-            </Button>
-            <Button className="flex-1" onClick={() => setFiltersOpen(false)}>
-              ดูผลลัพธ์
-            </Button>
-          </div>
         </div>
       </Sheet>
 
@@ -357,12 +362,31 @@ function EditSubjectSheet({
   }
 
   return (
-    <Sheet open={target !== null} onOpenChange={(open) => !open && close()} title={isNew ? "เพิ่มรายวิชา" : "แก้ไขรายวิชา"}>
+    <Sheet
+      open={target !== null}
+      onOpenChange={(open) => !open && close()}
+      title={isNew ? "เพิ่มรายวิชา" : "แก้ไขรายวิชา"}
+      footer={
+        current ? (
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={close}>
+              ยกเลิก
+            </Button>
+            <Button type="submit" form="edit-subject" className="flex-1" disabled={save.isPending}>
+              {save.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
+            </Button>
+          </div>
+        ) : undefined
+      }
+    >
       {current && (
-        <form onSubmit={submit} className="space-y-4">
-          <Field label="แผนก">
-            <p className="flex h-7 items-center text-sm font-medium">{departmentName}</p>
-          </Field>
+        <form id="edit-subject" onSubmit={submit} className="space-y-4">
+          <div className="flex h-8 items-center justify-between gap-2 text-sm">
+            <span className="text-xs font-medium text-muted-foreground">แผนก</span>
+            <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+              {departmentName}
+            </span>
+          </div>
 
           <Field label="รหัสวิชา">
             <Input value={current.code} onChange={(e) => setDraft({ ...current, code: e.target.value })} required />
@@ -507,15 +531,6 @@ function EditSubjectSheet({
               </Select>
             </Field>
           )}
-
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={close}>
-              ยกเลิก
-            </Button>
-            <Button type="submit" className="flex-1" disabled={save.isPending}>
-              {save.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
-            </Button>
-          </div>
         </form>
       )}
     </Sheet>

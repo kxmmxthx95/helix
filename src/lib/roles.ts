@@ -34,6 +34,8 @@ export const roleLabels = (roles: Role[]): string =>
   roles.length ? roles.map((r) => ROLE_LABEL[r]).join(", ") : "—";
 
 export const PREFIXES = ["นาย", "นาง", "นางสาว", "ดร."];
+/** Roster / student name titles — primary + secondary Thai school norms. */
+export const STUDENT_PREFIXES = ["เด็กชาย", "เด็กหญิง", "นาย", "นางสาว"];
 
 const ORG_WIDE: readonly Role[] = ["super_admin", "director", "staff"];
 const MANAGERS: readonly Role[] = ["super_admin", "director", "staff", "dept_head"];

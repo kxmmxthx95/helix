@@ -175,6 +175,22 @@ export function ImportSubjectsSheet({
       }}
       title="นำเข้ารายวิชา"
       description={`ไฟล์ CSV — export จาก Google Sheet ได้เลย (File → Download → CSV) — นำเข้าไปยังแผนก${departmentName ? ` "${departmentName}"` : ""}`}
+      footer={
+        parsed ? (
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={reset}>
+              เลือกไฟล์ใหม่
+            </Button>
+            <Button className="flex-1" onClick={confirm} disabled={ready.length === 0 || importSubjects.isPending}>
+              {importSubjects.isPending ? <Spinner /> : `นำเข้า ${ready.length} วิชา`}
+            </Button>
+          </div>
+        ) : outcome ? (
+          <Button className="w-full" onClick={() => onOpenChange(false)}>
+            เสร็จสิ้น
+          </Button>
+        ) : undefined
+      }
     >
       <div className="space-y-4">
         {!parsed && !outcome && (
@@ -280,32 +296,18 @@ export function ImportSubjectsSheet({
             )}
 
             {failed && <p className="text-sm text-destructive">นำเข้าไม่สำเร็จ ลองใหม่อีกครั้ง</p>}
-
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={reset}>
-                เลือกไฟล์ใหม่
-              </Button>
-              <Button className="flex-1" onClick={confirm} disabled={ready.length === 0 || importSubjects.isPending}>
-                {importSubjects.isPending ? <Spinner /> : `นำเข้า ${ready.length} วิชา`}
-              </Button>
-            </div>
           </>
         )}
 
         {outcome && (
-          <>
-            <Card className="space-y-1">
-              <p className="text-lg font-semibold text-success">นำเข้าสำเร็จ {outcome.inserted} วิชา</p>
-              {outcome.skipped.length > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  ข้าม {outcome.skipped.length} วิชา เพราะรหัสวิชาซ้ำกับที่มีอยู่แล้วในแผนกนี้: {outcome.skipped.join(", ")}
-                </p>
-              )}
-            </Card>
-            <Button className="w-full" onClick={() => onOpenChange(false)}>
-              เสร็จสิ้น
-            </Button>
-          </>
+          <Card className="space-y-1">
+            <p className="text-lg font-semibold text-success">นำเข้าสำเร็จ {outcome.inserted} วิชา</p>
+            {outcome.skipped.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                ข้าม {outcome.skipped.length} วิชา เพราะรหัสวิชาซ้ำกับที่มีอยู่แล้วในแผนกนี้: {outcome.skipped.join(", ")}
+              </p>
+            )}
+          </Card>
         )}
       </div>
     </Sheet>

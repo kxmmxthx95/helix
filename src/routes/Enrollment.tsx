@@ -48,14 +48,14 @@ export function Enrollment() {
   return (
     <div className="space-y-4">
       {orgWide && departments.length > 0 && (
-        <div className="flex gap-1 overflow-x-auto rounded-lg border border-border p-1">
+        <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
           {departments.map((d) => (
             <button
               key={d.id}
               type="button"
               onClick={() => setPickedDept(d.id)}
               className={cn(
-                "inline-flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
                 pickedDept === d.id
                   ? "bg-foreground/10 text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -187,17 +187,17 @@ function CohortEnrollmentPanel({
                 </div>
                 {mayEdit && (
                   <Button
-                    variant="ghost"
-                    size="icon"
+                    variant="outline"
+                    size="sm"
                     onClick={() => {
                       if (confirm(`ลบนักเรียน "${studentName.get(e.student_id)}" ออกจากรุ่นนี้?`)) {
                         deleteEnrollment.mutate(e.id);
                       }
                     }}
                     disabled={deleteEnrollment.isPending}
-                    aria-label="ลบ"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-3 w-3" />
+                    ลบ
                   </Button>
                 )}
               </li>

@@ -13,7 +13,7 @@ import {
   type StudentFilters,
 } from "@/hooks/useStudents";
 import type { Student, StudentStatus } from "@/lib/database.types";
-import { canManage, canManageUsers, isOrgWide } from "@/lib/roles";
+import { canManage, canManageUsers, isOrgWide, STUDENT_PREFIXES } from "@/lib/roles";
 
 const EMPTY: StudentFilters = { search: "", departmentId: "", status: "" };
 
@@ -48,21 +48,8 @@ export function Roster() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        {mayEdit && (
-          <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={() => setImportOpen(true)} aria-label="นำเข้า CSV">
-              <Upload className="h-3 w-3" />
-            </Button>
-            <Button size="icon" onClick={() => setEditing("new")} aria-label="เพิ่มนักเรียน">
-              <Plus className="h-3 w-3" />
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={filters.search}
@@ -75,7 +62,7 @@ export function Roster() {
         <Button
           variant="outline"
           size="icon"
-          className="relative"
+          className="relative shrink-0"
           onClick={() => setFiltersOpen(true)}
           aria-label="ตัวกรอง"
         >
@@ -86,6 +73,16 @@ export function Roster() {
             </span>
           )}
         </Button>
+        {mayEdit && (
+          <>
+            <Button variant="outline" size="icon" className="shrink-0" onClick={() => setImportOpen(true)} aria-label="นำเข้า CSV">
+              <Upload className="h-3 w-3" />
+            </Button>
+            <Button size="icon" className="shrink-0" onClick={() => setEditing("new")} aria-label="เพิ่มนักเรียน">
+              <Plus className="h-3 w-3" />
+            </Button>
+          </>
+        )}
       </div>
 
       {isLoading && (
@@ -171,7 +168,25 @@ export function Roster() {
         </div>
       )}
 
-      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen} title="ตัวกรอง">
+      <Sheet
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        title="ตัวกรอง"
+        footer={
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setFilters({ ...EMPTY, search: filters.search })}
+            >
+              ล้างตัวกรอง
+            </Button>
+            <Button className="flex-1" onClick={() => setFiltersOpen(false)}>
+              ดูผลลัพธ์
+            </Button>
+          </div>
+        }
+      >
         <div className="space-y-4">
           {me && isOrgWide(me.roles) && (
             <Field label="แผนก">
@@ -204,19 +219,6 @@ export function Roster() {
               ))}
             </Select>
           </Field>
-
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => setFilters({ ...EMPTY, search: filters.search })}
-            >
-              ล้างตัวกรอง
-            </Button>
-            <Button className="flex-1" onClick={() => setFiltersOpen(false)}>
-              ดูผลลัพธ์
-            </Button>
-          </div>
         </div>
       </Sheet>
 
@@ -230,6 +232,7 @@ export function Roster() {
 function blankDraft(departmentId: string): StudentDraft {
   return {
     student_code: "",
+    prefix: null,
     first_name: "",
     last_name: "",
     department_id: departmentId,
@@ -280,15 +283,41 @@ function EditStudentSheet({
       open={target !== null}
       onOpenChange={(open) => !open && close()}
       title={isNew ? "เพิ่มนักเรียน" : "แก้ไขข้อมูลนักเรียน"}
+      footer={
+        current ? (
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={close}>
+              ยกเลิก
+            </Button>
+            <Button type="submit" form="edit-student" className="flex-1">
+              บันทึก
+            </Button>
+          </div>
+        ) : undefined
+      }
     >
       {current && (
-        <form onSubmit={submit} className="space-y-4">
+        <form id="edit-student" onSubmit={submit} className="space-y-4">
           <Field label="รหัสนักเรียน">
             <Input
               value={current.student_code}
               onChange={(e) => setDraft({ ...current, student_code: e.target.value })}
               required
             />
+          </Field>
+
+          <Field label="คำนำหน้า">
+            <Select
+              value={current.prefix ?? ""}
+              onChange={(e) => setDraft({ ...current, prefix: e.target.value || null })}
+            >
+              <option value="">— ไม่ระบุ —</option>
+              {STUDENT_PREFIXES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </Select>
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -367,15 +396,6 @@ function EditStudentSheet({
               onChange={(e) => setDraft({ ...current, guardian_phone: e.target.value || null })}
             />
           </Field>
-
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={close}>
-              ยกเลิก
-            </Button>
-            <Button type="submit" className="flex-1">
-              บันทึก
-            </Button>
-          </div>
         </form>
       )}
     </Sheet>
@@ -385,6 +405,7 @@ function EditStudentSheet({
 function pickDraft(s: Student): StudentDraft {
   return {
     student_code: s.student_code,
+    prefix: s.prefix,
     first_name: s.first_name,
     last_name: s.last_name,
     department_id: s.department_id,
@@ -439,7 +460,7 @@ function CreateStudentLoginSheet({
       kind: "student",
       loginId: student.student_code,
       password: current.password,
-      prefix: null,
+      prefix: student.prefix,
       first_name: student.first_name,
       last_name: student.last_name,
       email: null,
@@ -465,9 +486,21 @@ function CreateStudentLoginSheet({
       onOpenChange={(open) => !open && close()}
       title="สร้างบัญชีเข้าใช้"
       description={student ? `${student.first_name} ${student.last_name}` : undefined}
+      footer={
+        student && current ? (
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={close}>
+              ยกเลิก
+            </Button>
+            <Button type="submit" form="create-student-login" className="flex-1" disabled={invite.isPending}>
+              {invite.isPending ? <Spinner /> : "สร้างบัญชี"}
+            </Button>
+          </div>
+        ) : undefined
+      }
     >
       {student && current && (
-        <form onSubmit={submit} className="space-y-4">
+        <form id="create-student-login" onSubmit={submit} className="space-y-4">
           <p className="text-sm text-muted-foreground">
             รหัสนักเรียน <span className="font-mono">{student.student_code}</span>{" "}
             จะเป็นรหัสผู้ใช้เข้าระบบ
@@ -501,15 +534,6 @@ function CreateStudentLoginSheet({
           </Field>
 
           {failReason && <p className="text-sm text-destructive">{failReason}</p>}
-
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={close}>
-              ยกเลิก
-            </Button>
-            <Button type="submit" className="flex-1" disabled={invite.isPending}>
-              {invite.isPending ? <Spinner /> : "สร้างบัญชี"}
-            </Button>
-          </div>
         </form>
       )}
     </Sheet>

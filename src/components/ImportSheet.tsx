@@ -72,6 +72,7 @@ export function ImportSheet({
     if (!parsed || !departmentId) return;
     const drafts: StudentDraft[] = parsed.rows.map((r) => ({
       student_code: r.student_code!,
+      prefix: null,
       first_name: r.first_name!,
       last_name: r.last_name!,
       department_id: departmentId,
@@ -101,6 +102,26 @@ export function ImportSheet({
       }}
       title="นำเข้ารายชื่อนักเรียน"
       description="ไฟล์ CSV — ตรวจสอบตัวอย่างก่อนยืนยัน"
+      footer={
+        parsed ? (
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={reset}>
+              เลือกไฟล์ใหม่
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={confirm}
+              disabled={parsed.rows.length === 0 || !departmentId || importStudents.isPending}
+            >
+              {importStudents.isPending ? <Spinner /> : `ยืนยันนำเข้า ${parsed.rows.length} คน`}
+            </Button>
+          </div>
+        ) : outcome ? (
+          <Button className="w-full" onClick={() => onOpenChange(false)}>
+            เสร็จสิ้น
+          </Button>
+        ) : undefined
+      }
     >
       <div className="space-y-4">
         {!parsed && !outcome && (
@@ -194,40 +215,18 @@ export function ImportSheet({
             )}
 
             {failed && <p className="text-sm text-destructive">นำเข้าไม่สำเร็จ ลองใหม่อีกครั้ง</p>}
-
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={reset}>
-                เลือกไฟล์ใหม่
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={confirm}
-                disabled={
-                  parsed.rows.length === 0 || !departmentId || importStudents.isPending
-                }
-              >
-                {importStudents.isPending ? <Spinner /> : `ยืนยันนำเข้า ${parsed.rows.length} คน`}
-              </Button>
-            </div>
           </>
         )}
 
         {outcome && (
-          <>
-            <Card className="space-y-1">
-              <p className="text-lg font-semibold text-success">
-                นำเข้าสำเร็จ {outcome.inserted} คน
+          <Card className="space-y-1">
+            <p className="text-lg font-semibold text-success">นำเข้าสำเร็จ {outcome.inserted} คน</p>
+            {outcome.skipped.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                ข้าม {outcome.skipped.length} คน เพราะรหัสนักเรียนซ้ำกับที่มีอยู่แล้ว
               </p>
-              {outcome.skipped.length > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  ข้าม {outcome.skipped.length} คน เพราะรหัสนักเรียนซ้ำกับที่มีอยู่แล้ว
-                </p>
-              )}
-            </Card>
-            <Button className="w-full" onClick={() => onOpenChange(false)}>
-              เสร็จสิ้น
-            </Button>
-          </>
+            )}
+          </Card>
         )}
       </div>
     </Sheet>

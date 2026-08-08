@@ -159,6 +159,22 @@ export function ImportUsersSheet({
       }}
       title="นำเข้ารายชื่อผู้ใช้งาน"
       description="ไฟล์ CSV — export จาก Google Sheet ได้เลย (File → Download → CSV)"
+      footer={
+        parsed ? (
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={reset}>
+              เลือกไฟล์ใหม่
+            </Button>
+            <Button className="flex-1" onClick={confirm} disabled={ready.length === 0 || invite.isPending}>
+              {invite.isPending ? <Spinner /> : `สร้างบัญชี ${ready.length} คน`}
+            </Button>
+          </div>
+        ) : outcome ? (
+          <Button className="w-full" onClick={() => onOpenChange(false)}>
+            เสร็จสิ้น
+          </Button>
+        ) : undefined
+      }
     >
       <div className="space-y-4">
         {!parsed && !outcome && (
@@ -266,37 +282,23 @@ export function ImportUsersSheet({
             )}
 
             {failed && <p className="text-sm text-destructive">นำเข้าไม่สำเร็จ ลองใหม่อีกครั้ง</p>}
-
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={reset}>
-                เลือกไฟล์ใหม่
-              </Button>
-              <Button className="flex-1" onClick={confirm} disabled={ready.length === 0 || invite.isPending}>
-                {invite.isPending ? <Spinner /> : `สร้างบัญชี ${ready.length} คน`}
-              </Button>
-            </div>
           </>
         )}
 
         {outcome && (
-          <>
-            <Card className="space-y-1">
-              <p className="text-lg font-semibold text-success">สร้างบัญชีสำเร็จ {outcome.inserted} คน</p>
-              {outcome.skipped.length > 0 && (
-                <div className="space-y-0.5 text-sm text-muted-foreground">
-                  <p>ข้าม {outcome.skipped.length} คน:</p>
-                  <ul className="space-y-0.5 text-xs">
-                    {outcome.skipped.map((s, i) => (
-                      <li key={i}>{s}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </Card>
-            <Button className="w-full" onClick={() => onOpenChange(false)}>
-              เสร็จสิ้น
-            </Button>
-          </>
+          <Card className="space-y-1">
+            <p className="text-lg font-semibold text-success">สร้างบัญชีสำเร็จ {outcome.inserted} คน</p>
+            {outcome.skipped.length > 0 && (
+              <div className="space-y-0.5 text-sm text-muted-foreground">
+                <p>ข้าม {outcome.skipped.length} คน:</p>
+                <ul className="space-y-0.5 text-xs">
+                  {outcome.skipped.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Card>
         )}
       </div>
     </Sheet>

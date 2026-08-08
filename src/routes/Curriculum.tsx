@@ -87,7 +87,7 @@ export function Curriculum() {
   return (
     <div className="space-y-4">
       {orgWide && departments.length > 0 && (
-        <div className="flex gap-1 overflow-x-auto rounded-lg border border-border p-1">
+        <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
           {departments.map((d) => (
             <button
               key={d.id}
@@ -97,7 +97,7 @@ export function Curriculum() {
                 setPickedGradeLevel("");
               }}
               className={cn(
-                "inline-flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
                 pickedDept === d.id
                   ? "bg-foreground/10 text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -111,21 +111,23 @@ export function Curriculum() {
 
       {isKg && kgAcademicYear !== null && (
         <div className="flex flex-wrap items-center gap-2">
-          {kgYearTabs.map((y) => (
-            <button
-              key={y}
-              type="button"
-              onClick={() => setKgAcademicYear(y)}
-              className={cn(
-                "inline-flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                kgAcademicYear === y
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              ปี {y}
-            </button>
-          ))}
+          <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
+            {kgYearTabs.map((y) => (
+              <button
+                key={y}
+                type="button"
+                onClick={() => setKgAcademicYear(y)}
+                className={cn(
+                  "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                  kgAcademicYear === y
+                    ? "bg-foreground/10 text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                ปี {y}
+              </button>
+            ))}
+          </div>
           {mayEdit && !addingKgYear && (
             <Button variant="ghost" size="sm" onClick={() => setAddingKgYear(true)}>
               <Plus className="h-3.5 w-3.5" />
@@ -164,14 +166,14 @@ export function Curriculum() {
       )}
 
       {(isKg || pickedCohort) && gradeLevels.length > 0 && (
-        <div className="flex gap-1 overflow-x-auto rounded-lg border border-border p-1">
+        <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
           {gradeLevels.map((g) => (
             <button
               key={g.id}
               type="button"
               onClick={() => setPickedGradeLevel(g.id)}
               className={cn(
-                "inline-flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
                 pickedGradeLevel === g.id
                   ? "bg-foreground/10 text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -266,25 +268,27 @@ function CohortPicker({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        {years.map((y) => (
-          <button
-            key={y}
-            type="button"
-            onClick={() => {
-              userPickedYear.current = true;
-              setPickedYear(y);
-              if (pickedCohort && !cohorts.some((c) => c.id === pickedCohort && c.entry_year === y)) onPick("");
-            }}
-            className={cn(
-              "inline-flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-              pickedYear === y
-                ? "bg-foreground/10 text-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
-            )}
-          >
-            ปี {y}
-          </button>
-        ))}
+        <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
+          {years.map((y) => (
+            <button
+              key={y}
+              type="button"
+              onClick={() => {
+                userPickedYear.current = true;
+                setPickedYear(y);
+                if (pickedCohort && !cohorts.some((c) => c.id === pickedCohort && c.entry_year === y)) onPick("");
+              }}
+              className={cn(
+                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                pickedYear === y
+                  ? "bg-foreground/10 text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              ปี {y}
+            </button>
+          ))}
+        </div>
         {mayEdit && !addingYear && (
           <Button variant="ghost" size="sm" onClick={() => setAddingYear(true)}>
             <Plus className="h-3.5 w-3.5" />
@@ -359,7 +363,21 @@ function CohortPicker({
         )}
       </div>
 
-      <Sheet open={creating} onOpenChange={(open) => !open && closeCreating()} title="สร้างหลักสูตรรุ่นใหม่">
+      <Sheet
+        open={creating}
+        onOpenChange={(open) => !open && closeCreating()}
+        title="สร้างหลักสูตรรุ่นใหม่"
+        footer={
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={closeCreating}>
+              ยกเลิก
+            </Button>
+            <Button type="submit" form="create-cohort" className="flex-1" disabled={save.isPending}>
+              {save.isPending ? <Spinner className="h-3 w-3" /> : "สร้างรุ่น"}
+            </Button>
+          </div>
+        }
+      >
         <CreateCohortForm
           departmentId={departmentId}
           gradeLevels={gradeLevels}
@@ -379,8 +397,6 @@ function CohortPicker({
                 ),
             });
           }}
-          onCancel={closeCreating}
-          pending={save.isPending}
         />
       </Sheet>
     </div>
@@ -392,15 +408,11 @@ function CreateCohortForm({
   gradeLevels,
   entryYear,
   onSubmit,
-  onCancel,
-  pending,
 }: {
   departmentId: string;
   gradeLevels: { id: string; name: string; code: string; is_entry_point: boolean }[];
   entryYear: number;
   onSubmit: (draft: CohortDraft, resetForm: () => void) => void;
-  onCancel: () => void;
-  pending: boolean;
 }) {
   const [entryGradeLevelId, setEntryGradeLevelId] = useState("");
   const [name, setName] = useState("");
@@ -412,6 +424,7 @@ function CreateCohortForm({
 
   return (
     <form
+      id="create-cohort"
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
@@ -428,7 +441,7 @@ function CreateCohortForm({
       }}
     >
       <Field label="ปีการศึกษาที่เข้า (พ.ศ.)">
-        <p className="flex h-7 items-center text-sm font-medium">{entryYear}</p>
+        <p className="flex h-8 items-center text-sm font-medium">{entryYear}</p>
       </Field>
 
       <Field label="ระดับชั้นที่เข้า (จุดเริ่มรุ่น)">
@@ -452,23 +465,6 @@ function CreateCohortForm({
           required
         />
       </Field>
-
-      <div className="flex gap-2 pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="flex-1"
-          onClick={() => {
-            reset();
-            onCancel();
-          }}
-        >
-          ยกเลิก
-        </Button>
-        <Button type="submit" className="flex-1" disabled={pending}>
-          {pending ? <Spinner className="h-3 w-3" /> : "สร้างรุ่น"}
-        </Button>
-      </div>
     </form>
   );
 }
@@ -520,14 +516,14 @@ function SubjectPanel({
   return (
     <div className="space-y-3">
       {splitsByTerm && (
-        <div className="flex gap-1 rounded-lg border border-border p-1">
+        <div className="flex h-8 gap-1 rounded-lg border border-border p-0.5">
           {[1, 2].map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTerm(t as 1 | 2)}
               className={cn(
-                "flex h-7 flex-1 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                "flex h-full flex-1 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
                 term === t
                   ? "bg-foreground/10 text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -728,8 +724,22 @@ function AddCurriculumSubjectSheet({
   }
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && close()} title="เพิ่มวิชาเข้าโครงสร้างหลักสูตร">
-      <form onSubmit={submit} className="space-y-4">
+    <Sheet
+      open={open}
+      onOpenChange={(o) => !o && close()}
+      title="เพิ่มวิชาเข้าโครงสร้างหลักสูตร"
+      footer={
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={close}>
+            ยกเลิก
+          </Button>
+          <Button type="submit" form="add-curriculum-subject" className="flex-1" disabled={save.isPending}>
+            {save.isPending ? <Spinner className="h-3 w-3" /> : "เพิ่ม"}
+          </Button>
+        </div>
+      }
+    >
+      <form id="add-curriculum-subject" onSubmit={submit} className="space-y-4">
         <Field label="รายวิชา">
           <div className="space-y-1.5">
             <Input
@@ -818,15 +828,6 @@ function AddCurriculumSubjectSheet({
               />
             </Field>
           </div>
-        </div>
-
-        <div className="flex gap-2 pt-2">
-          <Button type="button" variant="outline" className="flex-1" onClick={close}>
-            ยกเลิก
-          </Button>
-          <Button type="submit" className="flex-1" disabled={save.isPending}>
-            {save.isPending ? <Spinner className="h-3 w-3" /> : "เพิ่ม"}
-          </Button>
         </div>
       </form>
     </Sheet>
@@ -967,7 +968,21 @@ function KgPanel({
         ))}
       </Card>
 
-      <Sheet open={addingUnit} onOpenChange={(o) => !o && setAddingUnit(false)} title="เพิ่มหน่วยการเรียนรู้">
+      <Sheet
+        open={addingUnit}
+        onOpenChange={(o) => !o && setAddingUnit(false)}
+        title="เพิ่มหน่วยการเรียนรู้"
+        footer={
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setAddingUnit(false)}>
+              ยกเลิก
+            </Button>
+            <Button type="submit" form="add-unit" className="flex-1">
+              เพิ่ม
+            </Button>
+          </div>
+        }
+      >
         <UnitForm
           gradeLevelId={gradeLevelId}
           academicYear={academicYear}
@@ -976,7 +991,6 @@ function KgPanel({
             saveUnit.mutate(draft);
             setAddingUnit(false);
           }}
-          onCancel={() => setAddingUnit(false)}
         />
       </Sheet>
 
@@ -984,6 +998,18 @@ function KgPanel({
         open={addingTopicDomain !== null}
         onOpenChange={(o) => !o && setAddingTopicDomain(null)}
         title={`เพิ่มหัวข้อประเมิน — ${addingTopicDomain ? DOMAIN_LABEL[addingTopicDomain] : ""}`}
+        footer={
+          addingTopicDomain ? (
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setAddingTopicDomain(null)}>
+                ยกเลิก
+              </Button>
+              <Button type="submit" form="add-topic" className="flex-1">
+                เพิ่ม
+              </Button>
+            </div>
+          ) : undefined
+        }
       >
         {addingTopicDomain && (
           <TopicForm
@@ -995,7 +1021,6 @@ function KgPanel({
               saveTopic.mutate(draft);
               setAddingTopicDomain(null);
             }}
-            onCancel={() => setAddingTopicDomain(null)}
           />
         )}
       </Sheet>
@@ -1008,18 +1033,17 @@ function UnitForm({
   academicYear,
   nextSortOrder,
   onSubmit,
-  onCancel,
 }: {
   gradeLevelId: string;
   academicYear: number;
   nextSortOrder: number;
   onSubmit: (draft: LearningUnitDraft) => void;
-  onCancel: () => void;
 }) {
   const [nameTh, setNameTh] = useState("");
 
   return (
     <form
+      id="add-unit"
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
@@ -1036,14 +1060,6 @@ function UnitForm({
       <Field label="ชื่อหน่วยการเรียนรู้">
         <Input value={nameTh} onChange={(e) => setNameTh(e.target.value)} required autoFocus />
       </Field>
-      <div className="flex gap-2 pt-2">
-        <Button type="button" variant="outline" className="flex-1" onClick={onCancel}>
-          ยกเลิก
-        </Button>
-        <Button type="submit" className="flex-1">
-          เพิ่ม
-        </Button>
-      </div>
     </form>
   );
 }
@@ -1054,19 +1070,18 @@ function TopicForm({
   domain,
   nextSortOrder,
   onSubmit,
-  onCancel,
 }: {
   gradeLevelId: string;
   academicYear: number;
   domain: DevelopmentDomain;
   nextSortOrder: number;
   onSubmit: (draft: KgAssessmentTopicDraft) => void;
-  onCancel: () => void;
 }) {
   const [nameTh, setNameTh] = useState("");
 
   return (
     <form
+      id="add-topic"
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
@@ -1083,14 +1098,6 @@ function TopicForm({
       <Field label="หัวข้อการประเมิน">
         <Input value={nameTh} onChange={(e) => setNameTh(e.target.value)} required autoFocus />
       </Field>
-      <div className="flex gap-2 pt-2">
-        <Button type="button" variant="outline" className="flex-1" onClick={onCancel}>
-          ยกเลิก
-        </Button>
-        <Button type="submit" className="flex-1">
-          เพิ่ม
-        </Button>
-      </div>
     </form>
   );
 }

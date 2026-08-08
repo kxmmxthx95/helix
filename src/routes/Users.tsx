@@ -53,21 +53,8 @@ export function Users() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        {mayManage && (
-          <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={() => setImporting(true)} aria-label="นำเข้า CSV">
-              <Upload className="h-3 w-3" />
-            </Button>
-            <Button size="icon" onClick={() => setCreating(true)} aria-label="เพิ่มผู้ใช้งาน">
-              <Plus className="h-3 w-3" />
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={filters.search}
@@ -77,7 +64,13 @@ export function Users() {
             type="search"
           />
         </div>
-        <Button variant="outline" size="icon" onClick={() => setFiltersOpen(true)} aria-label="ตัวกรอง">
+        <Button
+          variant="outline"
+          size="icon"
+          className="relative shrink-0"
+          onClick={() => setFiltersOpen(true)}
+          aria-label="ตัวกรอง"
+        >
           <SlidersHorizontal className="h-3 w-3" />
           {activeFilterCount > 0 && (
             <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] text-accent-foreground">
@@ -85,6 +78,16 @@ export function Users() {
             </span>
           )}
         </Button>
+        {mayManage && (
+          <>
+            <Button variant="outline" size="icon" className="shrink-0" onClick={() => setImporting(true)} aria-label="นำเข้า CSV">
+              <Upload className="h-3 w-3" />
+            </Button>
+            <Button size="icon" className="shrink-0" onClick={() => setCreating(true)} aria-label="เพิ่มผู้ใช้งาน">
+              <Plus className="h-3 w-3" />
+            </Button>
+          </>
+        )}
       </div>
 
       {isLoading && (
@@ -157,7 +160,25 @@ export function Users() {
         </div>
       )}
 
-      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen} title="ตัวกรอง">
+      <Sheet
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        title="ตัวกรอง"
+        footer={
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setFilters({ ...EMPTY, search: filters.search })}
+            >
+              ล้างตัวกรอง
+            </Button>
+            <Button className="flex-1" onClick={() => setFiltersOpen(false)}>
+              ดูผลลัพธ์
+            </Button>
+          </div>
+        }
+      >
         <div className="space-y-4">
           {me && isOrgWide(me.roles) && (
             <Field label="แผนก">
@@ -201,19 +222,6 @@ export function Users() {
               <option value="false">ปิด</option>
             </Select>
           </Field>
-
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => setFilters({ ...EMPTY, search: filters.search })}
-            >
-              ล้างตัวกรอง
-            </Button>
-            <Button className="flex-1" onClick={() => setFiltersOpen(false)}>
-              ดูผลลัพธ์
-            </Button>
-          </div>
         </div>
       </Sheet>
 
@@ -353,6 +361,18 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
       onOpenChange={(open) => !open && close()}
       title="แก้ไขผู้ใช้งาน"
       description={profile ? profileFullName(profile) : undefined}
+      footer={
+        profile && current ? (
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={close}>
+              ยกเลิก
+            </Button>
+            <Button className="flex-1" onClick={save}>
+              บันทึก
+            </Button>
+          </div>
+        ) : undefined
+      }
     >
       {profile && current && (
         <div className="space-y-4">
@@ -423,15 +443,6 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
               className="h-6 w-6 accent-[hsl(var(--accent))]"
             />
           </label>
-
-          <div className="flex gap-2 pt-2">
-            <Button variant="outline" className="flex-1" onClick={close}>
-              ยกเลิก
-            </Button>
-            <Button className="flex-1" onClick={save}>
-              บันทึก
-            </Button>
-          </div>
         </div>
       )}
     </Sheet>
@@ -503,8 +514,18 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
       onOpenChange={(next) => !next && close()}
       title="เพิ่มผู้ใช้งาน"
       description="เบอร์โทรเป็นรหัสผู้ใช้เข้าระบบ — ตั้งรหัสผ่านให้ตรงนี้เลย"
+      footer={
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={close}>
+            ยกเลิก
+          </Button>
+          <Button type="submit" form="create-user" className="flex-1" disabled={invite.isPending}>
+            {invite.isPending ? <Spinner /> : "สร้างบัญชี"}
+          </Button>
+        </div>
+      }
     >
-      <form onSubmit={submit} className="space-y-4">
+      <form id="create-user" onSubmit={submit} className="space-y-4">
         <Field label="เบอร์โทร (รหัสผู้ใช้)">
           <Input
             type="tel"
@@ -581,15 +602,6 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
         )}
 
         {failReason && <p className="text-sm text-destructive">{failReason}</p>}
-
-        <div className="flex gap-2 pt-2">
-          <Button type="button" variant="outline" className="flex-1" onClick={close}>
-            ยกเลิก
-          </Button>
-          <Button type="submit" className="flex-1" disabled={invite.isPending}>
-            {invite.isPending ? <Spinner /> : "สร้างบัญชี"}
-          </Button>
-        </div>
       </form>
     </Sheet>
   );

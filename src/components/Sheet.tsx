@@ -12,6 +12,7 @@ export function Sheet({
   title,
   description,
   children,
+  footer,
   className,
 }: {
   open: boolean;
@@ -19,6 +20,8 @@ export function Sheet({
   title: string;
   description?: string;
   children: React.ReactNode;
+  /** Sticky actions below the scroll body (cancel / save, etc.). */
+  footer?: React.ReactNode;
   className?: string;
 }) {
   return (
@@ -42,9 +45,19 @@ export function Sheet({
               <Drawer.Description className="sr-only">{title}</Drawer.Description>
             )}
           </div>
-          <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-6 pb-safe">
+          <div
+            className={cn(
+              "flex-1 overflow-y-auto overscroll-contain px-3",
+              footer ? "pb-3" : "pb-6 pb-safe",
+            )}
+          >
             {children}
           </div>
+          {footer ? (
+            <div className="shrink-0 border-t border-border px-3 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+              {footer}
+            </div>
+          ) : null}
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

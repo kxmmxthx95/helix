@@ -14,10 +14,10 @@ const button = cva(
         destructive: "bg-destructive text-destructive-foreground hover:opacity-90",
       },
       size: {
-        default: "h-8 pxาม-2.5 text-xs",
-        sm: "h-7 px-2 text-xs",
+        default: "h-8 px-2.5 text-xs",
+        sm: "h-8 px-2 text-xs",
         lg: "h-8 px-3 text-xs",
-        icon: "h-7 w-7",
+        icon: "h-8 w-8",
       },
     },
     defaultVariants: { variant: "default", size: "default" },
@@ -39,7 +39,7 @@ export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTML
     <input
       ref={ref}
       className={cn(
-        "flex h-7 w-full rounded-lg border border-input bg-background px-2.5 text-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring disabled:opacity-50",
+        "flex h-8 w-full rounded-lg border border-input bg-background px-2.5 text-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring disabled:opacity-50",
         className,
       )}
       {...props}
@@ -57,7 +57,7 @@ export const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<H
     <select
       ref={ref}
       className={cn(
-        "h-7 w-full appearance-none rounded-lg border border-input bg-background px-2.5 text-xs outline-none focus-visible:border-ring disabled:opacity-50",
+        "h-8 w-full appearance-none rounded-lg border border-input bg-background px-2.5 text-xs outline-none focus-visible:border-ring disabled:opacity-50",
         className,
       )}
       {...props}
@@ -87,7 +87,7 @@ export function Field({
 }) {
   return (
     <label className="block space-y-1">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <span className="text-xs font-medium">{label}</span>
       {children}
       {error && <span className="block text-xs text-destructive">{error}</span>}
     </label>

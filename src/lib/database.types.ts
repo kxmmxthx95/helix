@@ -73,6 +73,7 @@ export type Student = {
   id: string;
   student_code: string;
   national_id: string | null;
+  prefix: string | null;
   first_name: string;
   last_name: string;
   department_id: string;
@@ -263,6 +264,7 @@ export type Database = {
           | "status"
           | "profile_id"
           | "national_id"
+          | "prefix"
           | "grade_level_id"
           | "guardian_name"
           | "guardian_phone"

@@ -11,6 +11,7 @@ export type StudentFilters = {
 export type StudentDraft = Pick<
   Student,
   | "student_code"
+  | "prefix"
   | "first_name"
   | "last_name"
   | "department_id"
