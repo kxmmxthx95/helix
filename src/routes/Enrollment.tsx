@@ -234,7 +234,7 @@ function EnrollStudentsSheet({
   }
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && close()} title="ลงทะเบียนนักเรียนเข้ารุ่น">
+    <Sheet open={open} onOpenChange={(o) => !o && close()} title="ลงทะเบียนนักเรียนเข้าหลักสูตร">
       <form onSubmit={submit} className="space-y-4">
         {studyPlans.length > 0 && (
           <Field label="แผนการเรียน (ใช้กับทุกคนที่เลือก)">
