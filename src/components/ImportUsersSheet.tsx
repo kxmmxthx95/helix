@@ -238,7 +238,7 @@ export function ImportUsersSheet({
                 <p className="text-sm text-muted-foreground">
                   จะสร้างบัญชี {ready.length} คน — ตัวอย่าง {preview.length} แถวแรก
                 </p>
-                <div className="overflow-x-auto rounded-xl border border-border">
+                <div className="overflow-x-auto rounded-lg border border-border">
                   <table className="w-full min-w-[28rem] text-xs">
                     <thead className="bg-muted text-left text-muted-foreground">
                       <tr>

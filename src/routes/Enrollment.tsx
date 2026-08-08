@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Plus } from "@/components/icons";
+import { Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, Field, Select, Spinner } from "@/components/ui";
 import {
-  useAllGradeLevels,
   useCohortStudyPlans,
   useCohorts,
   useCurrentEnrollments,
+  useDeleteEnrollment,
   useEnrollStudents,
+  useGradeLevels,
   type EnrollmentDraft,
 } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
+import { useSchoolSettings } from "@/hooks/useSettings";
 import { useStudents } from "@/hooks/useStudents";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -53,7 +55,7 @@ export function Enrollment() {
               type="button"
               onClick={() => setPickedDept(d.id)}
               className={cn(
-                "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                "inline-flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
                 pickedDept === d.id
                   ? "bg-foreground/10 text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -103,6 +105,7 @@ export function Enrollment() {
             <CohortEnrollmentPanel
               cohortId={pickedCohort}
               entryGradeLevelId={cohorts.find((c) => c.id === pickedCohort)?.entry_grade_level_id ?? ""}
+              entryYear={cohorts.find((c) => c.id === pickedCohort)?.entry_year ?? 0}
               departmentId={departmentId}
               mayEdit={mayEdit}
             />
@@ -118,11 +121,13 @@ export function Enrollment() {
 function CohortEnrollmentPanel({
   cohortId,
   entryGradeLevelId,
+  entryYear,
   departmentId,
   mayEdit,
 }: {
   cohortId: string;
   entryGradeLevelId: string;
+  entryYear: number;
   departmentId: string;
   mayEdit: boolean;
 }) {
@@ -130,88 +135,129 @@ function CohortEnrollmentPanel({
   const { data: enrollments = [] } = useCurrentEnrollments(cohortId);
   const { data: students = [] } = useStudents({ search: "", departmentId, status: "" });
   const { data: studyPlans = [] } = useCohortStudyPlans(cohortId);
-  const { data: allGradeLevels = [] } = useAllGradeLevels();
+  const { data: gradeLevels = [] } = useGradeLevels(departmentId);
+  const { data: schoolSettings } = useSchoolSettings();
+  const deleteEnrollment = useDeleteEnrollment();
+
+  // Cohort's entry grade is fixed at creation; students actually advance a
+  // grade each academic year. Shift by elapsed years so the mismatch check
+  // compares against where this cohort's students should be *now*, not where
+  // they started.
+  const expectedGradeLevelId = useMemo(() => {
+    const entryLevel = gradeLevels.find((g) => g.id === entryGradeLevelId);
+    if (!entryLevel || !schoolSettings) return entryGradeLevelId;
+    const elapsed = schoolSettings.academic_year - entryYear;
+    const expected = gradeLevels.find((g) => g.sort_order === entryLevel.sort_order + elapsed);
+    return expected?.id ?? entryGradeLevelId;
+  }, [gradeLevels, schoolSettings, entryGradeLevelId, entryYear]);
 
   const studentName = useMemo(
     () => new Map(students.map((s) => [s.id, `${s.first_name} ${s.last_name}`])),
     [students],
   );
   const planName = useMemo(() => new Map(studyPlans.map((p) => [p.id, p.name])), [studyPlans]);
-  const entryGradeLevelName = useMemo(
-    () => allGradeLevels.find((g) => g.id === entryGradeLevelId)?.name ?? "",
-    [allGradeLevels, entryGradeLevelId],
-  );
+  const gradeLevelName = useMemo(() => new Map(gradeLevels.map((g) => [g.id, g.name])), [gradeLevels]);
+  const alreadyEnrolled = useMemo(() => new Set(enrollments.map((e) => e.student_id)), [enrollments]);
 
   return (
-    <Card className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">นักเรียนในรุ่นนี้ ({enrollments.length})</h3>
-        {mayEdit && (
-          <Button variant="outline" size="sm" onClick={() => setAssigning(true)}>
-            <Plus className="h-3.5 w-3.5" />
-            ลงทะเบียนนักเรียน
-          </Button>
+    <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
+      <Card className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">นักเรียนในรุ่นนี้ ({enrollments.length})</h3>
+          {mayEdit && (
+            <Button variant="outline" size="sm" className="lg:hidden" onClick={() => setAssigning(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              ลงทะเบียนนักเรียน
+            </Button>
+          )}
+        </div>
+
+        {enrollments.length === 0 && (
+          <p className="text-sm text-muted-foreground">ยังไม่มีนักเรียนลงทะเบียนรุ่นนี้</p>
         )}
+        {enrollments.length > 0 && (
+          <ul className="max-h-96 divide-y divide-border overflow-y-auto text-xs">
+            {enrollments.map((e) => (
+              <li key={e.id} className="flex items-center justify-between gap-2 py-1.5">
+                <div className="min-w-0 flex-1">
+                  <div>{studentName.get(e.student_id) ?? "—"}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {e.study_plan_id ? planName.get(e.study_plan_id) ?? "—" : "—"}
+                  </div>
+                </div>
+                {mayEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      if (confirm(`ลบนักเรียน "${studentName.get(e.student_id)}" ออกจากรุ่นนี้?`)) {
+                        deleteEnrollment.mutate(e.id);
+                      }
+                    }}
+                    disabled={deleteEnrollment.isPending}
+                    aria-label="ลบ"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      {mayEdit && (
+        <Card className="hidden space-y-4 lg:block">
+          <h3 className="text-lg font-semibold">ลงทะเบียนนักเรียนเข้าหลักสูตร</h3>
+          <EnrollForm
+            cohortId={cohortId}
+            students={students}
+            alreadyEnrolled={alreadyEnrolled}
+            studyPlans={studyPlans}
+            expectedGradeLevelId={expectedGradeLevelId}
+            gradeLevelName={gradeLevelName}
+          />
+        </Card>
+      )}
+
+      <div className="lg:hidden">
+        <EnrollStudentsSheet
+          open={assigning}
+          onClose={() => setAssigning(false)}
+          cohortId={cohortId}
+          students={students}
+          alreadyEnrolled={alreadyEnrolled}
+          studyPlans={studyPlans}
+          expectedGradeLevelId={expectedGradeLevelId}
+          gradeLevelName={gradeLevelName}
+        />
       </div>
-
-      {enrollments.length === 0 && (
-        <p className="text-sm text-muted-foreground">ยังไม่มีนักเรียนลงทะเบียนรุ่นนี้</p>
-      )}
-      {enrollments.length > 0 && (
-        <ul className="max-h-96 divide-y divide-border overflow-y-auto text-sm">
-          {enrollments.map((e) => (
-            <li key={e.id} className="flex items-center justify-between py-1.5">
-              <span>{studentName.get(e.student_id) ?? "—"}</span>
-              <span className="text-muted-foreground">
-                {e.study_plan_id ? planName.get(e.study_plan_id) ?? "—" : "—"}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <EnrollStudentsSheet
-        open={assigning}
-        onClose={() => setAssigning(false)}
-        cohortId={cohortId}
-        students={students}
-        alreadyEnrolled={new Set(enrollments.map((e) => e.student_id))}
-        studyPlans={studyPlans}
-        entryGradeLevelId={entryGradeLevelId}
-        entryGradeLevelName={entryGradeLevelName}
-      />
-    </Card>
+    </div>
   );
 }
 
-function EnrollStudentsSheet({
-  open,
-  onClose,
-  cohortId,
-  students,
-  alreadyEnrolled,
-  studyPlans,
-  entryGradeLevelId,
-  entryGradeLevelName,
-}: {
-  open: boolean;
-  onClose: () => void;
+type EnrollFormProps = {
   cohortId: string;
   students: { id: string; student_code: string; first_name: string; last_name: string; grade_level_id: string | null }[];
   alreadyEnrolled: Set<string>;
   studyPlans: { id: string; name: string }[];
-  entryGradeLevelId: string;
-  entryGradeLevelName: string;
-}) {
+  expectedGradeLevelId: string;
+  gradeLevelName: Map<string, string>;
+  onDone?: () => void;
+};
+
+function EnrollForm({
+  cohortId,
+  students,
+  alreadyEnrolled,
+  studyPlans,
+  expectedGradeLevelId,
+  gradeLevelName,
+  onDone,
+}: EnrollFormProps) {
   const enroll = useEnrollStudents();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [studyPlanId, setStudyPlanId] = useState("");
-
-  function close() {
-    setSelected(new Set());
-    setStudyPlanId("");
-    onClose();
-  }
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -230,69 +276,77 @@ function EnrollStudentsSheet({
       cohort_id: cohortId,
       study_plan_id: studyPlanId || null,
     }));
-    enroll.mutate(drafts, { onSuccess: close });
+    enroll.mutate(drafts, {
+      onSuccess: () => {
+        setSelected(new Set());
+        setStudyPlanId("");
+        onDone?.();
+      },
+    });
   }
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && close()} title="ลงทะเบียนนักเรียนเข้าหลักสูตร">
-      <form onSubmit={submit} className="space-y-4">
-        {studyPlans.length > 0 && (
-          <Field label="แผนการเรียน (ใช้กับทุกคนที่เลือก)">
-            <Select value={studyPlanId} onChange={(e) => setStudyPlanId(e.target.value)}>
-              <option value="">ไม่ระบุ</option>
-              {studyPlans.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        )}
+    <form onSubmit={submit} className="space-y-4">
+      {studyPlans.length > 0 && (
+        <Field label="แผนการเรียน (ใช้กับทุกคนที่เลือก)">
+          <Select value={studyPlanId} onChange={(e) => setStudyPlanId(e.target.value)}>
+            <option value="">ไม่ระบุ</option>
+            {studyPlans.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
 
-        {entryGradeLevelName && (
-          <p className="text-xs text-muted-foreground">
-            รุ่นนี้เข้าที่ {entryGradeLevelName} — คนที่ชั้นปัจจุบันไม่ตรงจะมีเครื่องหมาย ⚠ กำกับ (ยังลงทะเบียนได้ตามปกติ เผื่อเป็นนักเรียนย้ายเข้า)
-          </p>
-        )}
-
-        <div className="max-h-80 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
-          {students.map((s) => {
-            const gradeMismatch = entryGradeLevelId && s.grade_level_id !== entryGradeLevelId;
-            return (
-              <label
-                key={s.id}
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-              >
-                <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} />
-                <span className="flex-1">
-                  {s.first_name} {s.last_name}{" "}
-                  <span className="text-muted-foreground">({s.student_code})</span>
+      <div className="max-h-80 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+        {students.map((s) => {
+          const gradeMismatch = expectedGradeLevelId && s.grade_level_id !== expectedGradeLevelId;
+          return (
+            <label
+              key={s.id}
+              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
+            >
+              <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} />
+              <span className="flex-1">
+                {s.first_name} {s.last_name}{" "}
+                <span className="text-muted-foreground">({s.student_code})</span>
+              </span>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                {s.grade_level_id ? gradeLevelName.get(s.grade_level_id) ?? "—" : "—"}
+              </span>
+              {gradeMismatch && (
+                <span className="text-xs text-warning" title="ชั้นปัจจุบันไม่ตรงชั้นที่ควรอยู่ตอนนี้ของรุ่นนี้">
+                  ⚠ ชั้นไม่ตรง
                 </span>
-                {gradeMismatch && (
-                  <span className="text-xs text-warning" title="ชั้นปัจจุบันไม่ตรงจุดเข้าของรุ่นนี้">
-                    ⚠ ชั้นไม่ตรง
-                  </span>
-                )}
-                {alreadyEnrolled.has(s.id) && (
-                  <span className="text-xs text-muted-foreground">ลงทะเบียนแล้ว</span>
-                )}
-              </label>
-            );
-          })}
-          {students.length === 0 && (
-            <p className="p-2 text-sm text-muted-foreground">ไม่มีนักเรียนในแผนกนี้</p>
-          )}
-        </div>
+              )}
+              {alreadyEnrolled.has(s.id) && (
+                <span className="text-xs text-muted-foreground">ลงทะเบียนแล้ว</span>
+              )}
+            </label>
+          );
+        })}
+        {students.length === 0 && (
+          <p className="p-2 text-sm text-muted-foreground">ไม่มีนักเรียนในแผนกนี้</p>
+        )}
+      </div>
 
-        <div className="flex gap-2 pt-2">
-          <Button type="button" variant="outline" className="flex-1" onClick={close}>
-            ยกเลิก
-          </Button>
-          <Button type="submit" className="flex-1" disabled={selected.size === 0 || enroll.isPending}>
-            {enroll.isPending ? <Spinner className="h-3 w-3" /> : `ลงทะเบียน ${selected.size} คน`}
-          </Button>
-        </div>
-      </form>
+      <Button type="submit" className="w-full" disabled={selected.size === 0 || enroll.isPending}>
+        {enroll.isPending ? <Spinner className="h-3 w-3" /> : `ลงทะเบียน ${selected.size} คน`}
+      </Button>
+    </form>
+  );
+}
+
+function EnrollStudentsSheet({
+  open,
+  onClose,
+  ...formProps
+}: { open: boolean; onClose: () => void } & Omit<EnrollFormProps, "onDone">) {
+  return (
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()} title="ลงทะเบียนนักเรียนเข้าหลักสูตร">
+      <EnrollForm {...formProps} onDone={onClose} />
     </Sheet>
   );
 }

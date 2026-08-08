@@ -101,7 +101,7 @@ export function Roster() {
       )}
 
       {rows && rows.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-border">
+        <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full min-w-[36rem] text-sm">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>

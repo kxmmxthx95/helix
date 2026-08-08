@@ -104,7 +104,7 @@ export function Users() {
       {rows && rows.length > 0 && (
         // Table stays a table on mobile; the wrapper scrolls sideways so the
         // page body never does.
-        <div className="overflow-x-auto rounded-xl border border-border">
+        <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full min-w-[42rem] text-sm">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>

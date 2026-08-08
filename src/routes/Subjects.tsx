@@ -1,19 +1,30 @@
-import { Plus, Search, SlidersHorizontal } from "@/components/icons";
-import { useMemo, useState } from "react";
+import { FileUp, Plus, Search, SlidersHorizontal } from "@/components/icons";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
+import { ImportSubjectsSheet } from "@/components/ImportSubjectsSheet";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
 import {
+  useDeleteSubject,
   useLearningAreas,
+  useSaveLearningArea,
   useSaveSubject,
   useSubjects,
   type SubjectDraft,
   type SubjectFilters,
 } from "@/hooks/useCurriculum";
-import type { Subject, SubjectType } from "@/lib/database.types";
-import { isOrgWide } from "@/lib/roles";
+import { useGradeLevels } from "@/hooks/useCurriculumStructure";
+import { useDepartments } from "@/hooks/useProfiles";
+import type { LearningArea, Subject, SubjectType } from "@/lib/database.types";
+import { canManage, isOrgWide } from "@/lib/roles";
+import { cn } from "@/lib/utils";
 
-const EMPTY: SubjectFilters = { search: "", learningAreaId: "", subjectType: "", includeInactive: false };
+const EMPTY: Omit<SubjectFilters, "departmentId"> = {
+  search: "",
+  learningAreaId: "",
+  subjectType: "",
+  includeInactive: false,
+};
 
 const SUBJECT_TYPE_LABEL: Record<SubjectType, string> = {
   basic: "พื้นฐาน",
@@ -23,15 +34,38 @@ const SUBJECT_TYPE_LABEL: Record<SubjectType, string> = {
 
 export function Subjects() {
   const { profile: me } = useAuth();
-  const [filters, setFilters] = useState<SubjectFilters>(EMPTY);
+  const { data: departments = [] } = useDepartments();
+  const [filters, setFilters] = useState<Omit<SubjectFilters, "departmentId">>(EMPTY);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [editing, setEditing] = useState<Subject | "new" | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [pickedDept, setPickedDept] = useState("");
+
+  const orgWide = me ? isOrgWide(me.roles) : false;
+  const mayEdit = me ? canManage(me.roles) : false;
+  // KG never uses subjects (it has its own learning_units/kg_assessment_topics model).
+  const pickableDepartments = useMemo(() => departments.filter((d) => d.code !== "KG"), [departments]);
+
+  useEffect(() => {
+    if (orgWide && !pickedDept && pickableDepartments.length > 0) setPickedDept(pickableDepartments[0]!.id);
+  }, [orgWide, pickableDepartments, pickedDept]);
+
+  const departmentId = orgWide ? pickedDept : me?.department_id ?? "";
+  const departmentName = departments.find((d) => d.id === departmentId)?.name ?? "";
 
   const { data: learningAreas = [] } = useLearningAreas();
-  const { data: rows, isLoading, error } = useSubjects(filters);
+  const { data: rows, isLoading, error } = useSubjects({ ...filters, departmentId });
+  const del = useDeleteSubject();
 
-  const areaName = useMemo(() => new Map(learningAreas.map((a) => [a.id, a.name])), [learningAreas]);
-  const mayEdit = me ? isOrgWide(me.roles) : false;
+  const areaName = useMemo(() => {
+    const byId = new Map(learningAreas.map((a) => [a.id, a]));
+    return new Map(
+      learningAreas.map((a) => {
+        const parent = a.parent_id ? byId.get(a.parent_id) : null;
+        return [a.id, parent ? `${parent.name} · ${a.name}` : a.name];
+      }),
+    );
+  }, [learningAreas]);
 
   const activeFilterCount = [filters.learningAreaId, filters.subjectType, filters.includeInactive ? "1" : ""].filter(
     Boolean,
@@ -39,13 +73,25 @@ export function Subjects() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        {mayEdit && (
-          <Button size="icon" onClick={() => setEditing("new")} aria-label="เพิ่มรายวิชา">
-            <Plus className="h-3 w-3" />
-          </Button>
-        )}
-      </div>
+      {orgWide && pickableDepartments.length > 0 && (
+        <div className="flex gap-1 overflow-x-auto rounded-lg border border-border p-1">
+          {pickableDepartments.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => setPickedDept(d.id)}
+              className={cn(
+                "inline-flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                pickedDept === d.id
+                  ? "bg-foreground/10 text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              {d.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="flex gap-2">
         <div className="relative flex-1">
@@ -72,6 +118,16 @@ export function Subjects() {
             </span>
           )}
         </Button>
+        {mayEdit && (
+          <Button variant="outline" size="icon" onClick={() => setImporting(true)} aria-label="นำเข้ารายวิชา">
+            <FileUp className="h-3 w-3" />
+          </Button>
+        )}
+        {mayEdit && (
+          <Button size="icon" onClick={() => setEditing("new")} aria-label="เพิ่มรายวิชา">
+            <Plus className="h-3 w-3" />
+          </Button>
+        )}
       </div>
 
       {isLoading && (
@@ -87,8 +143,8 @@ export function Subjects() {
       )}
 
       {rows && rows.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-border">
-          <table className="w-full min-w-[40rem] text-sm">
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full min-w-[40rem] text-xs">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">รหัส</th>
@@ -97,6 +153,7 @@ export function Subjects() {
                 <th className="px-3 py-2 font-medium">ประเภท</th>
                 <th className="px-3 py-2 font-medium">หน่วยกิต</th>
                 <th className="px-3 py-2 font-medium">ชม./สัปดาห์</th>
+                {mayEdit && <th className="px-3 py-2" />}
               </tr>
             </thead>
             <tbody>
@@ -123,6 +180,28 @@ export function Subjects() {
                   <td className="px-3 py-3 text-muted-foreground">{SUBJECT_TYPE_LABEL[row.subject_type]}</td>
                   <td className="px-3 py-3 text-muted-foreground">{row.credits}</td>
                   <td className="px-3 py-3 text-muted-foreground">{row.hours_per_week}</td>
+                  {mayEdit && (
+                    <td className="px-3 py-3 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={del.isPending}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`ลบรายวิชา "${row.name_th}" ถาวร? ข้อมูลนี้กู้คืนไม่ได้`)) {
+                            del.mutate(row.id, {
+                              onError: () =>
+                                alert(
+                                  `ลบไม่ได้ — "${row.name_th}" ถูกใช้อยู่ในโครงสร้างหลักสูตร ให้ปิดใช้งานแทน`,
+                                ),
+                            });
+                          }
+                        }}
+                      >
+                        ลบ
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -140,7 +219,7 @@ export function Subjects() {
               <option value="">ทุกกลุ่มสาระ</option>
               {learningAreas.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.name}
+                  {areaName.get(a.id) ?? a.name}
                 </option>
               ))}
             </Select>
@@ -181,21 +260,37 @@ export function Subjects() {
         </div>
       </Sheet>
 
-      <EditSubjectSheet target={editing} onClose={() => setEditing(null)} />
+      <EditSubjectSheet
+        target={editing}
+        onClose={() => setEditing(null)}
+        departmentId={departmentId}
+        departmentName={departmentName}
+      />
+
+      <ImportSubjectsSheet
+        open={importing}
+        onOpenChange={setImporting}
+        departmentId={departmentId}
+        departmentName={departmentName}
+        learningAreas={learningAreas}
+      />
     </div>
   );
 }
 
-function blankDraft(learningAreaId: string): SubjectDraft {
+function blankDraft(learningAreaId: string, departmentId: string): SubjectDraft {
   return {
     code: "",
     name_th: "",
     name_en: null,
+    department_id: departmentId,
     learning_area_id: learningAreaId,
     subject_type: "basic",
     credits: 1,
     hours_per_week: 1,
     is_active: true,
+    suggested_grade_level_id: null,
+    suggested_term: null,
   };
 }
 
@@ -204,26 +299,53 @@ function pickDraft(s: Subject): SubjectDraft {
     code: s.code,
     name_th: s.name_th,
     name_en: s.name_en,
+    department_id: s.department_id,
     learning_area_id: s.learning_area_id,
     subject_type: s.subject_type,
     credits: s.credits,
     hours_per_week: s.hours_per_week,
     is_active: s.is_active,
+    suggested_grade_level_id: s.suggested_grade_level_id,
+    suggested_term: s.suggested_term,
   };
 }
 
-function EditSubjectSheet({ target, onClose }: { target: Subject | "new" | null; onClose: () => void }) {
+function EditSubjectSheet({
+  target,
+  onClose,
+  departmentId,
+  departmentName,
+}: {
+  target: Subject | "new" | null;
+  onClose: () => void;
+  departmentId: string;
+  departmentName: string;
+}) {
+  const { profile: me } = useAuth();
   const { data: learningAreas = [] } = useLearningAreas();
+  const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
   const save = useSaveSubject();
   const [draft, setDraft] = useState<SubjectDraft | null>(null);
+  const [addingSubArea, setAddingSubArea] = useState(false);
+
+  const canAddLearningArea = me ? isOrgWide(me.roles) : false;
+  const topLevelAreas = useMemo(() => learningAreas.filter((a) => !a.parent_id), [learningAreas]);
 
   const isNew = target === "new";
   const base: SubjectDraft | null =
-    target === null ? null : isNew ? blankDraft(learningAreas[0]?.id ?? "") : pickDraft(target);
+    target === null ? null : isNew ? blankDraft(topLevelAreas[0]?.id ?? "", departmentId) : pickDraft(target);
   const current = draft ?? base;
+
+  const selectedArea = learningAreas.find((a) => a.id === current?.learning_area_id);
+  const selectedTopId = selectedArea ? selectedArea.parent_id ?? selectedArea.id : "";
+  const subAreas = useMemo(
+    () => learningAreas.filter((a) => a.parent_id === selectedTopId),
+    [learningAreas, selectedTopId],
+  );
 
   function close() {
     setDraft(null);
+    setAddingSubArea(false);
     onClose();
   }
 
@@ -238,6 +360,10 @@ function EditSubjectSheet({ target, onClose }: { target: Subject | "new" | null;
     <Sheet open={target !== null} onOpenChange={(open) => !open && close()} title={isNew ? "เพิ่มรายวิชา" : "แก้ไขรายวิชา"}>
       {current && (
         <form onSubmit={submit} className="space-y-4">
+          <Field label="แผนก">
+            <p className="flex h-7 items-center text-sm font-medium">{departmentName}</p>
+          </Field>
+
           <Field label="รหัสวิชา">
             <Input value={current.code} onChange={(e) => setDraft({ ...current, code: e.target.value })} required />
           </Field>
@@ -260,17 +386,53 @@ function EditSubjectSheet({ target, onClose }: { target: Subject | "new" | null;
 
           <Field label="กลุ่มสาระการเรียนรู้">
             <Select
-              value={current.learning_area_id}
+              value={selectedTopId}
               onChange={(e) => setDraft({ ...current, learning_area_id: e.target.value })}
               required
             >
-              {learningAreas.map((a) => (
+              {topLevelAreas.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
                 </option>
               ))}
             </Select>
           </Field>
+
+          {(subAreas.length > 0 || canAddLearningArea) && (
+            <Field label="สาระย่อย (ถ้ามี)">
+              {!addingSubArea && (
+                <div className="flex gap-2">
+                  <Select
+                    value={selectedArea?.parent_id === selectedTopId ? selectedArea.id : ""}
+                    onChange={(e) => setDraft({ ...current, learning_area_id: e.target.value || selectedTopId })}
+                    className="flex-1"
+                  >
+                    <option value="">ไม่มีสาระย่อย</option>
+                    {subAreas.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </Select>
+                  {canAddLearningArea && (
+                    <Button type="button" variant="outline" size="icon" onClick={() => setAddingSubArea(true)}>
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              )}
+              {addingSubArea && (
+                <NewSubLearningAreaField
+                  parentId={selectedTopId}
+                  onCreated={(area) => {
+                    setDraft({ ...current, learning_area_id: area.id });
+                    setAddingSubArea(false);
+                  }}
+                  onCancel={() => setAddingSubArea(false)}
+                />
+              )}
+            </Field>
+          )}
 
           <Field label="ประเภทวิชา">
             <Select
@@ -308,6 +470,32 @@ function EditSubjectSheet({ target, onClose }: { target: Subject | "new" | null;
             </Field>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="ระดับชั้นที่แนะนำ">
+              <Select
+                value={current.suggested_grade_level_id ?? ""}
+                onChange={(e) => setDraft({ ...current, suggested_grade_level_id: e.target.value || null })}
+              >
+                <option value="">ไม่ระบุ</option>
+                {gradeLevels.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="เทอมที่แนะนำ">
+              <Select
+                value={current.suggested_term ? String(current.suggested_term) : ""}
+                onChange={(e) => setDraft({ ...current, suggested_term: e.target.value ? Number(e.target.value) : null })}
+              >
+                <option value="">ไม่ระบุ</option>
+                <option value="1">เทอม 1</option>
+                <option value="2">เทอม 2</option>
+              </Select>
+            </Field>
+          </div>
+
           {!isNew && (
             <Field label="สถานะ">
               <Select
@@ -331,5 +519,48 @@ function EditSubjectSheet({ target, onClose }: { target: Subject | "new" | null;
         </form>
       )}
     </Sheet>
+  );
+}
+
+/** Inline "+ สาระย่อย" — learning_areas has no dedicated admin page, same pattern as NewStudyPlanField. */
+function NewSubLearningAreaField({
+  parentId,
+  onCreated,
+  onCancel,
+}: {
+  parentId: string;
+  onCreated: (area: LearningArea) => void;
+  onCancel: () => void;
+}) {
+  const save = useSaveLearningArea();
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <Input placeholder="รหัส เช่น physics" value={code} onChange={(e) => setCode(e.target.value)} />
+        <Input placeholder="ชื่อ เช่น ฟิสิกส์" value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" size="sm" className="flex-1" onClick={onCancel}>
+          ยกเลิก
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          className="flex-1"
+          disabled={!code.trim() || !name.trim() || save.isPending}
+          onClick={() =>
+            save.mutate(
+              { code: code.trim(), name: name.trim(), parent_id: parentId },
+              { onSuccess: onCreated },
+            )
+          }
+        >
+          {save.isPending ? <Spinner className="h-3 w-3" /> : "บันทึกสาระย่อย"}
+        </Button>
+      </div>
+    </div>
   );
 }

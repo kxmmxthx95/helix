@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
@@ -9,10 +9,12 @@ import {
   DOMAIN_LABEL,
   useCohorts,
   useCurriculumSubjects,
+  useDeleteCohort,
   useDeleteCurriculumSubject,
   useDeleteKgAssessmentTopic,
   useDeleteLearningUnit,
   useGradeLevels,
+  useKgAcademicYears,
   useKgAssessmentTopics,
   useLearningUnits,
   useSaveCohort,
@@ -42,6 +44,7 @@ export function Curriculum() {
   const [pickedGradeLevel, setPickedGradeLevel] = useState("");
   const [pickedCohort, setPickedCohort] = useState("");
   const [kgAcademicYear, setKgAcademicYear] = useState<number | null>(null);
+  const [addingKgYear, setAddingKgYear] = useState(false);
 
   useEffect(() => {
     if (orgWide && !pickedDept && departments.length > 0) setPickedDept(departments[0]!.id);
@@ -57,6 +60,15 @@ export function Curriculum() {
 
   const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
   const { data: cohorts = [] } = useCohorts(!isKg ? departmentId || null : null);
+  const { data: kgYears = [] } = useKgAcademicYears(isKg ? gradeLevels.map((g) => g.id) : []);
+
+  // Only years with real data (plus the current academic year) get a tab —
+  // same "no phantom year" rule as curriculum_cohorts (grill decision, 2026-08-08).
+  const kgYearTabs = useMemo(() => {
+    const set = new Set(kgYears);
+    if (schoolSettings) set.add(schoolSettings.academic_year);
+    return [...set].sort((a, b) => b - a);
+  }, [kgYears, schoolSettings]);
 
   useEffect(() => {
     if (gradeLevels.length > 0 && !gradeLevels.some((g) => g.id === pickedGradeLevel)) {
@@ -74,19 +86,6 @@ export function Curriculum() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        {isKg && kgAcademicYear !== null && (
-          <div className="w-28 shrink-0">
-            <Input
-              type="number"
-              value={kgAcademicYear}
-              onChange={(e) => setKgAcademicYear(Number(e.target.value))}
-              aria-label="ปีการศึกษา"
-            />
-          </div>
-        )}
-      </div>
-
       {orgWide && departments.length > 0 && (
         <div className="flex gap-1 overflow-x-auto rounded-lg border border-border p-1">
           {departments.map((d) => (
@@ -98,7 +97,7 @@ export function Curriculum() {
                 setPickedGradeLevel("");
               }}
               className={cn(
-                "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                "inline-flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
                 pickedDept === d.id
                   ? "bg-foreground/10 text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -107,6 +106,48 @@ export function Curriculum() {
               {d.name}
             </button>
           ))}
+        </div>
+      )}
+
+      {isKg && kgAcademicYear !== null && (
+        <div className="flex flex-wrap items-center gap-2">
+          {kgYearTabs.map((y) => (
+            <button
+              key={y}
+              type="button"
+              onClick={() => setKgAcademicYear(y)}
+              className={cn(
+                "inline-flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                kgAcademicYear === y
+                  ? "bg-foreground/10 text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              ปี {y}
+            </button>
+          ))}
+          {mayEdit && !addingKgYear && (
+            <Button variant="ghost" size="sm" onClick={() => setAddingKgYear(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              ปีอื่น
+            </Button>
+          )}
+          {mayEdit && addingKgYear && (
+            <Input
+              type="number"
+              autoFocus
+              className="w-24"
+              placeholder="พ.ศ."
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              onBlur={(e) => {
+                const y = Number(e.target.value);
+                setAddingKgYear(false);
+                if (y) setKgAcademicYear(y);
+              }}
+            />
+          )}
         </div>
       )}
 
@@ -130,7 +171,7 @@ export function Curriculum() {
               type="button"
               onClick={() => setPickedGradeLevel(g.id)}
               className={cn(
-                "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                "inline-flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
                 pickedGradeLevel === g.id
                   ? "bg-foreground/10 text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -159,7 +200,9 @@ export function Curriculum() {
           key={`${pickedGradeLevel}-${pickedCohort}`}
           gradeLevelId={pickedGradeLevel}
           cohortId={pickedCohort}
+          departmentId={department.id}
           departmentCode={department.code}
+          gradeLevels={gradeLevels}
           mayEdit={mayEdit}
         />
       )}
@@ -178,34 +221,135 @@ function CohortPicker({
   mayEdit,
   defaultEntryYear,
 }: {
-  cohorts: { id: string; name: string }[];
+  cohorts: { id: string; name: string; entry_year: number }[];
   pickedCohort: string;
   onPick: (id: string) => void;
   departmentId: string;
-  gradeLevels: { id: string; name: string }[];
+  gradeLevels: { id: string; name: string; code: string; is_entry_point: boolean }[];
   mayEdit: boolean;
   defaultEntryYear: number;
 }) {
   const [creating, setCreating] = useState(false);
+  const [pickedYear, setPickedYear] = useState(defaultEntryYear);
+  const [addingYear, setAddingYear] = useState(false);
   const save = useSaveCohort();
+  const del = useDeleteCohort();
+
+  // Jump to the most recent year that actually has a cohort, once — so
+  // reopening this page after creating a cohort for a non-current year
+  // (via "ปีอื่น") lands on it instead of defaulting back to the current
+  // academic year. Only runs before the user picks a year themselves.
+  const userPickedYear = useRef(false);
+  useEffect(() => {
+    if (userPickedYear.current || cohorts.length === 0) return;
+    setPickedYear(Math.max(...cohorts.map((c) => c.entry_year)));
+  }, [cohorts]);
+
+  // Only years with a real cohort (plus the current academic year) are
+  // shown — a typed-but-not-yet-created year never gets its own tab, so
+  // there's nothing to look "lost" on refresh (grill decision, 2026-08-08).
+  const years = useMemo(() => {
+    const set = new Set(cohorts.map((c) => c.entry_year));
+    set.add(defaultEntryYear);
+    return [...set].sort((a, b) => b - a);
+  }, [cohorts, defaultEntryYear]);
+
+  const cohortsInYear = cohorts.filter((c) => c.entry_year === pickedYear);
+
+  function closeCreating() {
+    setCreating(false);
+    if (!cohorts.some((c) => c.entry_year === pickedYear) && pickedYear !== defaultEntryYear) {
+      setPickedYear(defaultEntryYear);
+    }
+  }
 
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        {cohorts.map((c) => (
+        {years.map((y) => (
           <button
-            key={c.id}
+            key={y}
             type="button"
-            onClick={() => onPick(c.id)}
+            onClick={() => {
+              userPickedYear.current = true;
+              setPickedYear(y);
+              if (pickedCohort && !cohorts.some((c) => c.id === pickedCohort && c.entry_year === y)) onPick("");
+            }}
             className={cn(
-              "rounded-full border px-3 py-1 text-sm transition-colors",
-              pickedCohort === c.id
-                ? "border-foreground bg-foreground/10 text-foreground"
-                : "border-border text-muted-foreground hover:bg-muted",
+              "inline-flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+              pickedYear === y
+                ? "bg-foreground/10 text-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
-            {c.name}
+            ปี {y}
           </button>
+        ))}
+        {mayEdit && !addingYear && (
+          <Button variant="ghost" size="sm" onClick={() => setAddingYear(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            ปีอื่น
+          </Button>
+        )}
+        {mayEdit && addingYear && (
+          <Input
+            type="number"
+            autoFocus
+            className="w-24"
+            placeholder="พ.ศ."
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+            onBlur={(e) => {
+              const y = Number(e.target.value);
+              setAddingYear(false);
+              if (!y) return;
+              // Go straight to the create form for year y instead of
+              // parking on an empty tab — nothing is real until saved.
+              userPickedYear.current = true;
+              setPickedYear(y);
+              if (pickedCohort && !cohorts.some((c) => c.id === pickedCohort && c.entry_year === y)) onPick("");
+              setCreating(true);
+            }}
+          />
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {cohortsInYear.map((c) => (
+          <div key={c.id} className="group relative">
+            <button
+              type="button"
+              onClick={() => onPick(c.id)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-sm transition-colors",
+                pickedCohort === c.id
+                  ? "border-foreground bg-foreground/10 text-foreground"
+                  : "border-border text-muted-foreground hover:bg-muted",
+              )}
+            >
+              {c.name}
+            </button>
+            {mayEdit && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`ลบรุ่น "${c.name}"?`)) {
+                    del.mutate(c.id, {
+                      onSuccess: () => {
+                        if (pickedCohort === c.id) onPick("");
+                      },
+                    });
+                  }
+                }}
+                disabled={del.isPending}
+                className="absolute -right-2 -top-2 hidden h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-bold hover:bg-destructive/90 group-hover:flex disabled:opacity-50"
+                aria-label="ลบ"
+              >
+                ×
+              </button>
+            )}
+          </div>
         ))}
         {mayEdit && (
           <Button variant="outline" size="sm" onClick={() => setCreating(true)}>
@@ -215,15 +359,27 @@ function CohortPicker({
         )}
       </div>
 
-      <Sheet open={creating} onOpenChange={setCreating} title="สร้างหลักสูตรรุ่นใหม่">
+      <Sheet open={creating} onOpenChange={(open) => !open && closeCreating()} title="สร้างหลักสูตรรุ่นใหม่">
         <CreateCohortForm
           departmentId={departmentId}
           gradeLevels={gradeLevels}
-          defaultEntryYear={defaultEntryYear}
-          onSubmit={(draft) => {
-            save.mutate(draft, { onSuccess: () => setCreating(false) });
+          entryYear={pickedYear}
+          onSubmit={(draft, resetForm) => {
+            save.mutate(draft, {
+              onSuccess: () => {
+                userPickedYear.current = true;
+                resetForm();
+                setCreating(false);
+              },
+              onError: (err) =>
+                alert(
+                  err.message.includes("duplicate")
+                    ? `มีหลักสูตรระดับชั้นนี้ของปี ${draft.entry_year} อยู่แล้ว`
+                    : `สร้างไม่สำเร็จ: ${err.message}`,
+                ),
+            });
           }}
-          onCancel={() => setCreating(false)}
+          onCancel={closeCreating}
           pending={save.isPending}
         />
       </Sheet>
@@ -234,21 +390,25 @@ function CohortPicker({
 function CreateCohortForm({
   departmentId,
   gradeLevels,
-  defaultEntryYear,
+  entryYear,
   onSubmit,
   onCancel,
   pending,
 }: {
   departmentId: string;
-  gradeLevels: { id: string; name: string }[];
-  defaultEntryYear: number;
-  onSubmit: (draft: CohortDraft) => void;
+  gradeLevels: { id: string; name: string; code: string; is_entry_point: boolean }[];
+  entryYear: number;
+  onSubmit: (draft: CohortDraft, resetForm: () => void) => void;
   onCancel: () => void;
   pending: boolean;
 }) {
   const [entryGradeLevelId, setEntryGradeLevelId] = useState("");
-  const [entryYear, setEntryYear] = useState(defaultEntryYear);
   const [name, setName] = useState("");
+
+  function reset() {
+    setEntryGradeLevelId("");
+    setName("");
+  }
 
   return (
     <form
@@ -256,30 +416,35 @@ function CreateCohortForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (!entryGradeLevelId || !name.trim()) return;
-        onSubmit({
-          department_id: departmentId,
-          entry_grade_level_id: entryGradeLevelId,
-          entry_year: entryYear,
-          name: name.trim(),
-        });
+        onSubmit(
+          {
+            department_id: departmentId,
+            entry_grade_level_id: entryGradeLevelId,
+            entry_year: entryYear,
+            name: name.trim(),
+          },
+          reset,
+        );
       }}
     >
+      <Field label="ปีการศึกษาที่เข้า (พ.ศ.)">
+        <p className="flex h-7 items-center text-sm font-medium">{entryYear}</p>
+      </Field>
+
       <Field label="ระดับชั้นที่เข้า (จุดเริ่มรุ่น)">
         <Select value={entryGradeLevelId} onChange={(e) => setEntryGradeLevelId(e.target.value)} required>
-          <option value="">เลือกระดับชั้น</option>
-          {gradeLevels.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
+          <option value="">เลือกจุดเริ่มต้น</option>
+          {gradeLevels
+            .filter((g) => g.is_entry_point)
+            .map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
         </Select>
       </Field>
 
-      <Field label="ปีการศึกษาที่เข้า (พ.ศ.)">
-        <Input type="number" value={entryYear} onChange={(e) => setEntryYear(Number(e.target.value))} required />
-      </Field>
-
-      <Field label="ชื่อรุ่น">
+      <Field label="ชื่อหลักสูตร">
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -289,7 +454,15 @@ function CreateCohortForm({
       </Field>
 
       <div className="flex gap-2 pt-2">
-        <Button type="button" variant="outline" className="flex-1" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="outline"
+          className="flex-1"
+          onClick={() => {
+            reset();
+            onCancel();
+          }}
+        >
           ยกเลิก
         </Button>
         <Button type="submit" className="flex-1" disabled={pending}>
@@ -307,12 +480,16 @@ const TERM_LABEL: Record<number, string> = { 1: "เทอม 1", 2: "เทอ�
 function SubjectPanel({
   gradeLevelId,
   cohortId,
+  departmentId,
   departmentCode,
+  gradeLevels,
   mayEdit,
 }: {
   gradeLevelId: string;
   cohortId: string;
+  departmentId: string;
   departmentCode: string;
+  gradeLevels: { id: string; name: string }[];
   mayEdit: boolean;
 }) {
   const splitsByTerm = departmentCode === "SEC";
@@ -320,11 +497,18 @@ function SubjectPanel({
   const [adding, setAdding] = useState(false);
 
   const { data: rows, isLoading } = useCurriculumSubjects(gradeLevelId, cohortId);
-  const { data: subjects = [] } = useSubjects({ search: "", learningAreaId: "", subjectType: "", includeInactive: true });
+  const { data: subjects = [] } = useSubjects({
+    search: "",
+    departmentId,
+    learningAreaId: "",
+    subjectType: "",
+    includeInactive: true,
+  });
   const { data: studyPlans = [] } = useStudyPlans();
   const del = useDeleteCurriculumSubject();
 
   const subjectName = useMemo(() => new Map(subjects.map((s) => [s.id, `${s.code} · ${s.name_th}`])), [subjects]);
+  const activeSubjects = useMemo(() => subjects.filter((s) => s.is_active), [subjects]);
 
   const visible = (rows ?? []).filter((r) => !splitsByTerm || r.term === term);
   // Core = shared by every track (study_plan_id null); Track = specific to one study plan.
@@ -343,7 +527,7 @@ function SubjectPanel({
               type="button"
               onClick={() => setTerm(t as 1 | 2)}
               className={cn(
-                "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                "flex h-7 flex-1 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
                 term === t
                   ? "bg-foreground/10 text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -375,14 +559,26 @@ function SubjectPanel({
       {coreRows.length > 0 && (
         <div className="space-y-2">
           <p className="text-sm font-medium">วิชาแกนบังคับ (Core)</p>
-          <SubjectTable rows={coreRows} subjectName={subjectName} mayEdit={mayEdit} onDelete={(id) => del.mutate(id)} />
+          <SubjectTable
+            rows={coreRows}
+            subjectName={subjectName}
+            planLabel="Core"
+            mayEdit={mayEdit}
+            onDelete={(id) => del.mutate(id)}
+          />
         </div>
       )}
 
       {trackGroups.map(({ plan, rows }) => (
         <div key={plan.id} className="space-y-2">
           <p className="text-sm font-medium">{plan.name} (Track)</p>
-          <SubjectTable rows={rows} subjectName={subjectName} mayEdit={mayEdit} onDelete={(id) => del.mutate(id)} />
+          <SubjectTable
+            rows={rows}
+            subjectName={subjectName}
+            planLabel={plan.name}
+            mayEdit={mayEdit}
+            onDelete={(id) => del.mutate(id)}
+          />
         </div>
       ))}
 
@@ -392,9 +588,10 @@ function SubjectPanel({
         gradeLevelId={gradeLevelId}
         cohortId={cohortId}
         term={splitsByTerm ? term : null}
-        subjects={subjects}
+        subjects={activeSubjects}
         studyPlans={studyPlans}
-        showStudyPlan={splitsByTerm}
+        gradeLevels={gradeLevels}
+        showStudyPlan
       />
     </div>
   );
@@ -403,20 +600,23 @@ function SubjectPanel({
 function SubjectTable({
   rows,
   subjectName,
+  planLabel,
   mayEdit,
   onDelete,
 }: {
   rows: CurriculumSubject[];
   subjectName: Map<string, string>;
+  planLabel: string;
   mayEdit: boolean;
   onDelete: (id: string) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-border">
-      <table className="w-full min-w-[28rem] text-sm">
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full min-w-[28rem] text-xs">
         <thead className="bg-muted text-left text-xs text-muted-foreground">
           <tr>
             <th className="px-3 py-2 font-medium">วิชา</th>
+            <th className="px-3 py-2 font-medium">แผน</th>
             <th className="px-3 py-2 font-medium">สัดส่วนคะแนน</th>
             {mayEdit && <th className="px-3 py-2" />}
           </tr>
@@ -425,6 +625,18 @@ function SubjectTable({
           {rows.map((row) => (
             <tr key={row.id} className="border-t border-border">
               <td className="px-3 py-3 font-medium">{subjectName.get(row.subject_id) ?? "—"}</td>
+              <td className="px-3 py-3">
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-xs",
+                    row.study_plan_id === null
+                      ? "bg-foreground/10 text-foreground"
+                      : "bg-accent/10 text-accent",
+                  )}
+                >
+                  {planLabel}
+                </span>
+              </td>
               <td className="px-3 py-3 text-muted-foreground">
                 {row.score_collect_pct !== null
                   ? `เก็บ ${row.score_collect_pct} : สอบ ${row.score_exam_pct}`
@@ -453,6 +665,7 @@ function AddCurriculumSubjectSheet({
   term,
   subjects,
   studyPlans,
+  gradeLevels,
   showStudyPlan,
 }: {
   open: boolean;
@@ -460,18 +673,38 @@ function AddCurriculumSubjectSheet({
   gradeLevelId: string;
   cohortId: string;
   term: number | null;
-  subjects: { id: string; code: string; name_th: string }[];
+  subjects: {
+    id: string;
+    code: string;
+    name_th: string;
+    suggested_grade_level_id: string | null;
+    suggested_term: number | null;
+  }[];
   studyPlans: { id: string; code: string; name: string }[];
+  gradeLevels: { id: string; name: string }[];
   showStudyPlan: boolean;
 }) {
   const save = useSaveCurriculumSubject();
   const [subjectId, setSubjectId] = useState("");
+  const [subjectSearch, setSubjectSearch] = useState("");
   const [studyPlanId, setStudyPlanId] = useState("");
   const [collectPct, setCollectPct] = useState("");
   const [addingPlan, setAddingPlan] = useState(false);
 
+  const gradeLevelName = useMemo(() => new Map(gradeLevels.map((g) => [g.id, g.name])), [gradeLevels]);
+  const selectedSubject = subjects.find((s) => s.id === subjectId);
+
+  const filteredSubjects = useMemo(() => {
+    const term = subjectSearch.trim().toLowerCase();
+    if (!term) return subjects;
+    return subjects.filter(
+      (s) => s.code.toLowerCase().includes(term) || s.name_th.toLowerCase().includes(term),
+    );
+  }, [subjects, subjectSearch]);
+
   function close() {
     setSubjectId("");
+    setSubjectSearch("");
     setStudyPlanId("");
     setCollectPct("");
     setAddingPlan(false);
@@ -498,14 +731,31 @@ function AddCurriculumSubjectSheet({
     <Sheet open={open} onOpenChange={(o) => !o && close()} title="เพิ่มวิชาเข้าโครงสร้างหลักสูตร">
       <form onSubmit={submit} className="space-y-4">
         <Field label="รายวิชา">
-          <Select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} required>
-            <option value="">เลือกวิชา</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} · {s.name_th}
-              </option>
-            ))}
-          </Select>
+          <div className="space-y-1.5">
+            <Input
+              type="search"
+              value={subjectSearch}
+              onChange={(e) => setSubjectSearch(e.target.value)}
+              placeholder="ค้นหารหัสหรือชื่อวิชา..."
+            />
+            <Select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} required>
+              <option value="">เลือกวิชา ({filteredSubjects.length})</option>
+              {filteredSubjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.code} · {s.name_th}
+                </option>
+              ))}
+            </Select>
+            {selectedSubject && (selectedSubject.suggested_grade_level_id || selectedSubject.suggested_term) && (
+              <p className="text-xs text-muted-foreground">
+                แนะนำ:{" "}
+                {selectedSubject.suggested_grade_level_id
+                  ? gradeLevelName.get(selectedSubject.suggested_grade_level_id) ?? "—"
+                  : "ไม่ระบุระดับชั้น"}
+                {selectedSubject.suggested_term ? ` เทอม ${selectedSubject.suggested_term}` : ""}
+              </p>
+            )}
+          </div>
         </Field>
 
         {showStudyPlan && !addingPlan && (

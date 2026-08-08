@@ -95,19 +95,24 @@ export type LearningArea = {
   id: string;
   code: string;
   name: string;
+  parent_id: string | null; // optional sub-area under another learning_area — one level only
   created_at: string;
 };
 
-/** School-wide master catalog — never tagged to a department, reused across academic years. */
+/** Per-department catalog — reused across academic years within that department, never across departments. */
 export type Subject = {
   id: string;
   code: string;
   name_th: string;
   name_en: string | null;
+  department_id: string; // subjects don't cross departments — each belongs to exactly one
   learning_area_id: string;
   subject_type: SubjectType;
   credits: number;
   hours_per_week: number;
+  // Advisory hint shown when adding this subject into a cohort's curriculum — not enforced.
+  suggested_grade_level_id: string | null;
+  suggested_term: number | null;
   is_active: boolean; // soft delete — past academic years may still reference a retired subject
   created_at: string;
   updated_at: string;
@@ -128,6 +133,7 @@ export type GradeLevel = {
   code: string;
   name: string;
   sort_order: number;
+  is_entry_point: boolean; // true for ม.1/ม.4/ป.1/ป.4 — valid curriculum_cohorts entry points
   created_at: string;
 };
 
@@ -265,10 +271,13 @@ export type Database = {
       guardianships: Table<{ parent_id: string; student_id: string }>;
       school_settings: Table<SchoolSettings>;
       department_settings: Table<DepartmentSettings>;
-      learning_areas: Table<LearningArea, InsertOf<LearningArea, never>>;
-      subjects: Table<Subject, InsertOf<Subject, "name_en" | "is_active">>;
+      learning_areas: Table<LearningArea, InsertOf<LearningArea, "parent_id">>;
+      subjects: Table<
+        Subject,
+        InsertOf<Subject, "name_en" | "is_active" | "suggested_grade_level_id" | "suggested_term">
+      >;
       study_plans: Table<StudyPlan, InsertOf<StudyPlan, never>>;
-      grade_levels: Table<GradeLevel, InsertOf<GradeLevel, "sort_order">>;
+      grade_levels: Table<GradeLevel, InsertOf<GradeLevel, "sort_order" | "is_entry_point">>;
       curriculum_cohorts: Table<CurriculumCohort, InsertOf<CurriculumCohort, never>>;
       curriculum_subjects: Table<
         CurriculumSubject,

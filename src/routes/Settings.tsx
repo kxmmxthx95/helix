@@ -254,7 +254,7 @@ export function Settings() {
               type="button"
               onClick={() => setPickedDept(d.id)}
               className={cn(
-                "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                "inline-flex h-7 shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
                 pickedDept === d.id
                   ? "bg-foreground/10 text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",

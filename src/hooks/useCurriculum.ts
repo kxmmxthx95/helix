@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { LearningArea, Subject, SubjectType } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
+import type { ImportOutcome } from "@/hooks/useStudents";
 
 export function useLearningAreas() {
   return useQuery({
@@ -13,8 +14,24 @@ export function useLearningAreas() {
   });
 }
 
+export type LearningAreaDraft = Pick<LearningArea, "code" | "name" | "parent_id">;
+
+/** Insert only — no admin page for learning_areas, just the inline "+ สาระย่อย" creator in the subject form. */
+export function useSaveLearningArea() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (draft: LearningAreaDraft): Promise<LearningArea> => {
+      const { data, error } = await supabase.from("learning_areas").insert(draft).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["learning_areas"] }),
+  });
+}
+
 export type SubjectFilters = {
   search: string;
+  departmentId: string;
   learningAreaId: string;
   subjectType: SubjectType | "";
   includeInactive: boolean;
@@ -23,8 +40,9 @@ export type SubjectFilters = {
 export function useSubjects(filters: SubjectFilters) {
   return useQuery({
     queryKey: ["subjects", filters],
+    enabled: !!filters.departmentId,
     queryFn: async (): Promise<Subject[]> => {
-      let q = supabase.from("subjects").select("*").order("code");
+      let q = supabase.from("subjects").select("*").eq("department_id", filters.departmentId).order("code");
 
       if (!filters.includeInactive) q = q.eq("is_active", true);
       if (filters.learningAreaId) q = q.eq("learning_area_id", filters.learningAreaId);
@@ -44,7 +62,17 @@ export function useSubjects(filters: SubjectFilters) {
 
 export type SubjectDraft = Pick<
   Subject,
-  "code" | "name_th" | "name_en" | "learning_area_id" | "subject_type" | "credits" | "hours_per_week" | "is_active"
+  | "code"
+  | "name_th"
+  | "name_en"
+  | "department_id"
+  | "learning_area_id"
+  | "subject_type"
+  | "credits"
+  | "hours_per_week"
+  | "is_active"
+  | "suggested_grade_level_id"
+  | "suggested_term"
 >;
 
 export function useSaveSubject() {
@@ -55,6 +83,53 @@ export function useSaveSubject() {
       const { error } = id
         ? await supabase.from("subjects").update(draft).eq("id", id)
         : await supabase.from("subjects").insert(draft);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["subjects"] }),
+  });
+}
+
+/**
+ * Bulk insert from CSV, scoped to one department (all drafts share the same
+ * department_id). Codes that already exist in that department are reported
+ * back rather than overwritten — same shape as useImportStudents.
+ */
+export function useImportSubjects() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (drafts: SubjectDraft[]): Promise<ImportOutcome> => {
+      if (drafts.length === 0) return { inserted: 0, skipped: [] };
+      const departmentId = drafts[0]!.department_id;
+      const codes = drafts.map((d) => d.code);
+      const { data: existing, error: lookupError } = await supabase
+        .from("subjects")
+        .select("code")
+        .eq("department_id", departmentId)
+        .in("code", codes);
+      if (lookupError) throw lookupError;
+
+      const taken = new Set(existing.map((r) => r.code));
+      const fresh = drafts.filter((d) => !taken.has(d.code));
+
+      if (fresh.length > 0) {
+        const { error } = await supabase.from("subjects").insert(fresh);
+        if (error) throw error;
+      }
+
+      return { inserted: fresh.length, skipped: [...taken] };
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["subjects"] }),
+  });
+}
+
+/** Hard delete — blocked at the DB (on delete restrict) if the subject is used in any curriculum_subjects row. */
+export function useDeleteSubject() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("subjects").delete().eq("id", id);
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["subjects"] }),

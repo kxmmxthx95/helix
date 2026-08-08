@@ -14,7 +14,7 @@ const button = cva(
         destructive: "bg-destructive text-destructive-foreground hover:opacity-90",
       },
       size: {
-        default: "h-8 px-2.5 text-xs",
+        default: "h-8 pxาม-2.5 text-xs",
         sm: "h-7 px-2 text-xs",
         lg: "h-8 px-3 text-xs",
         icon: "h-7 w-7",

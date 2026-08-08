@@ -123,6 +123,17 @@ export function useSaveCohort() {
   });
 }
 
+export function useDeleteCohort() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("curriculum_cohorts").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["curriculum_cohorts"] }),
+  });
+}
+
 // -------------------------------------------------------- curriculum_subjects
 
 export function useCurriculumSubjects(gradeLevelId: string | null, cohortId: string | null) {
@@ -171,6 +182,25 @@ export function useDeleteCurriculumSubject() {
 }
 
 // ---------------------------------------------------------------- KG (อนุบาล)
+
+/** Distinct academic years that already have units or assessment topics across these grade levels — for the year picker tabs. */
+export function useKgAcademicYears(gradeLevelIds: string[]) {
+  const key = [...gradeLevelIds].sort().join(",");
+  return useQuery({
+    queryKey: ["kg_academic_years", key],
+    enabled: gradeLevelIds.length > 0,
+    queryFn: async (): Promise<number[]> => {
+      const [units, topics] = await Promise.all([
+        supabase.from("learning_units").select("academic_year").in("grade_level_id", gradeLevelIds),
+        supabase.from("kg_assessment_topics").select("academic_year").in("grade_level_id", gradeLevelIds),
+      ]);
+      if (units.error) throw units.error;
+      if (topics.error) throw topics.error;
+      const years = new Set([...units.data, ...topics.data].map((r) => r.academic_year));
+      return [...years];
+    },
+  });
+}
 
 export function useLearningUnits(gradeLevelId: string | null, academicYear: number) {
   return useQuery({
@@ -296,6 +326,17 @@ export function useEnrollStudents() {
   return useMutation({
     mutationFn: async (drafts: EnrollmentDraft[]) => {
       const { error } = await supabase.from("student_cohort_enrollments").insert(drafts);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["student_cohort_enrollments"] }),
+  });
+}
+
+export function useDeleteEnrollment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("student_cohort_enrollments").delete().eq("id", id);
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["student_cohort_enrollments"] }),
