@@ -5,10 +5,10 @@ import { Sheet } from "@/components/Sheet";
 import { Button, Card, Field, Select, Spinner } from "@/components/ui";
 import {
   useAllGradeLevels,
+  useCohortStudyPlans,
   useCohorts,
   useCurrentEnrollments,
   useEnrollStudents,
-  useStudyPlans,
   type EnrollmentDraft,
 } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
@@ -129,7 +129,7 @@ function CohortEnrollmentPanel({
   const [assigning, setAssigning] = useState(false);
   const { data: enrollments = [] } = useCurrentEnrollments(cohortId);
   const { data: students = [] } = useStudents({ search: "", departmentId, status: "" });
-  const { data: studyPlans = [] } = useStudyPlans();
+  const { data: studyPlans = [] } = useCohortStudyPlans(cohortId);
   const { data: allGradeLevels = [] } = useAllGradeLevels();
 
   const studentName = useMemo(

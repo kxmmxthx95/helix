@@ -24,6 +24,27 @@ export function useStudyPlans() {
   });
 }
 
+/** Only the plans actually used in this cohort's curriculum_subjects — not every plan in the system. */
+export function useCohortStudyPlans(cohortId: string | null) {
+  return useQuery({
+    queryKey: ["study_plans", "by_cohort", cohortId],
+    enabled: !!cohortId,
+    queryFn: async (): Promise<StudyPlan[]> => {
+      const { data, error } = await supabase
+        .from("curriculum_subjects")
+        .select("study_plan:study_plans!inner(*)")
+        .eq("cohort_id", cohortId!)
+        .not("study_plan_id", "is", null);
+      if (error) throw error;
+      const byId = new Map<string, StudyPlan>();
+      for (const row of data as unknown as { study_plan: StudyPlan }[]) {
+        byId.set(row.study_plan.id, row.study_plan);
+      }
+      return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
+}
+
 export type StudyPlanDraft = Pick<StudyPlan, "code" | "name">;
 
 export function useSaveStudyPlan() {
