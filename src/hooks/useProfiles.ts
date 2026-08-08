@@ -17,9 +17,11 @@ export function useDepartments() {
   return useQuery({
     queryKey: ["departments"],
     queryFn: async (): Promise<Department[]> => {
-      const { data, error } = await supabase.from("departments").select("*").order("name");
+      const { data, error } = await supabase.from("departments").select("*");
       if (error) throw error;
-      return data;
+      // Order: KG (อนุบาล), PRI (ประถม), SEC (มัธยม)
+      const order = { KG: 0, PRI: 1, SEC: 2 };
+      return (data ?? []).sort((a, b) => (order[a.code as keyof typeof order] ?? 999) - (order[b.code as keyof typeof order] ?? 999));
     },
     staleTime: 60 * 60 * 1000, // Departments change roughly never.
   });
