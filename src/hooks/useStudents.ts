@@ -14,7 +14,7 @@ export type StudentDraft = Pick<
   | "first_name"
   | "last_name"
   | "department_id"
-  | "class_level"
+  | "grade_level_id"
   | "status"
   | "national_id"
   | "guardian_name"

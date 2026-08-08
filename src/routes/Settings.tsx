@@ -102,7 +102,7 @@ function SchoolSettingsCard() {
           />
         </Field>
         <Button type="submit" disabled={update.isPending}>
-          {update.isPending ? <Spinner className="h-4 w-4" /> : "บันทึก"}
+          {update.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
         </Button>
       </form>
     </Card>
@@ -121,6 +121,8 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
         semester1_end: settings.semester1_end,
         semester2_start: settings.semester2_start,
         semester2_end: settings.semester2_end,
+        score_collect_pct: settings.score_collect_pct,
+        score_exam_pct: settings.score_exam_pct,
       });
     }
   }, [settings]);
@@ -187,8 +189,38 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
           </div>
         </div>
 
+        <div className="space-y-2">
+          <p className="text-sm font-medium">สัดส่วนคะแนนเก็บ : สอบ</p>
+          <p className="text-xs text-muted-foreground">
+            ค่า default ของแผนก — แต่ละวิชากำหนดสัดส่วนของตัวเองแทนได้ภายหลัง
+          </p>
+          <div className="flex items-center gap-3">
+            <Field label="เก็บ (%)">
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                placeholder="ยังไม่กำหนด"
+                value={form.score_collect_pct ?? ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") {
+                    setForm({ ...form, score_collect_pct: null, score_exam_pct: null });
+                    return;
+                  }
+                  const collect = Math.min(100, Math.max(0, Number(raw)));
+                  setForm({ ...form, score_collect_pct: collect, score_exam_pct: 100 - collect });
+                }}
+              />
+            </Field>
+            <span className="pt-6 text-sm text-muted-foreground">
+              สอบ {form.score_exam_pct ?? "—"}%
+            </span>
+          </div>
+        </div>
+
         <Button type="submit" disabled={update.isPending}>
-          {update.isPending ? <Spinner className="h-4 w-4" /> : "บันทึก"}
+          {update.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
         </Button>
       </form>
     </Card>
@@ -212,8 +244,6 @@ export function Settings() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold tracking-tight">ตั้งค่าระบบ</h2>
-
       {orgWide && <SchoolSettingsCard />}
 
       {orgWide && departments.length > 0 && (

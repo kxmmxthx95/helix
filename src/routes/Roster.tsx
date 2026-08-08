@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments, useInviteUsers, type UserInvite } from "@/hooks/useProfiles";
 import {
   useSaveStudent,
@@ -33,8 +34,13 @@ export function Roster() {
 
   const { data: departments = [] } = useDepartments();
   const { data: rows, isLoading, error } = useStudents(filters);
+  const { data: allGradeLevels = [] } = useAllGradeLevels();
 
   const deptName = useMemo(() => new Map(departments.map((d) => [d.id, d.name])), [departments]);
+  const gradeLevelName = useMemo(
+    () => new Map(allGradeLevels.map((g) => [g.id, g.name])),
+    [allGradeLevels],
+  );
   const mayEdit = me ? canManage(me.roles) : false;
   const mayManageUsers = me ? canManageUsers(me.roles) : false;
 
@@ -43,14 +49,13 @@ export function Roster() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight">รายชื่อนักเรียน</h2>
         {mayEdit && (
           <div className="flex gap-2">
             <Button variant="outline" size="icon" onClick={() => setImportOpen(true)} aria-label="นำเข้า CSV">
-              <Upload className="h-4 w-4" />
+              <Upload className="h-3 w-3" />
             </Button>
             <Button size="icon" onClick={() => setEditing("new")} aria-label="เพิ่มนักเรียน">
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3 w-3" />
             </Button>
           </div>
         )}
@@ -58,7 +63,7 @@ export function Roster() {
 
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={filters.search}
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
@@ -74,7 +79,7 @@ export function Roster() {
           onClick={() => setFiltersOpen(true)}
           aria-label="ตัวกรอง"
         >
-          <SlidersHorizontal className="h-4 w-4" />
+          <SlidersHorizontal className="h-3 w-3" />
           {activeFilterCount > 0 && (
             <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] text-accent-foreground">
               {activeFilterCount}
@@ -126,7 +131,9 @@ export function Roster() {
                   <td className="px-3 py-3 text-muted-foreground">
                     {deptName.get(row.department_id) ?? "—"}
                   </td>
-                  <td className="px-3 py-3 text-muted-foreground">{row.class_level ?? "—"}</td>
+                  <td className="px-3 py-3 text-muted-foreground">
+                    {row.grade_level_id ? gradeLevelName.get(row.grade_level_id) ?? "—" : "—"}
+                  </td>
                   <td className="px-3 py-3">
                     <span
                       className={
@@ -226,7 +233,7 @@ function blankDraft(departmentId: string): StudentDraft {
     first_name: "",
     last_name: "",
     department_id: departmentId,
-    class_level: null,
+    grade_level_id: null,
     status: "studying",
     national_id: null,
     guardian_name: null,
@@ -254,6 +261,7 @@ function EditStudentSheet({
         ? blankDraft(me?.department_id ?? departments[0]?.id ?? "")
         : pickDraft(target);
   const current = draft ?? base;
+  const { data: gradeLevels = [] } = useGradeLevels(current?.department_id ?? null);
 
   function close() {
     setDraft(null);
@@ -303,7 +311,9 @@ function EditStudentSheet({
           <Field label="แผนก">
             <Select
               value={current.department_id}
-              onChange={(e) => setDraft({ ...current, department_id: e.target.value })}
+              onChange={(e) =>
+                setDraft({ ...current, department_id: e.target.value, grade_level_id: null })
+              }
               required
               disabled={!me || !isOrgWide(me.roles)}
             >
@@ -317,10 +327,17 @@ function EditStudentSheet({
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="ชั้น">
-              <Input
-                value={current.class_level ?? ""}
-                onChange={(e) => setDraft({ ...current, class_level: e.target.value || null })}
-              />
+              <Select
+                value={current.grade_level_id ?? ""}
+                onChange={(e) => setDraft({ ...current, grade_level_id: e.target.value || null })}
+              >
+                <option value="">ยังไม่จัดชั้น</option>
+                {gradeLevels.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </Select>
             </Field>
             <Field label="สถานะ">
               <Select
@@ -371,7 +388,7 @@ function pickDraft(s: Student): StudentDraft {
     first_name: s.first_name,
     last_name: s.last_name,
     department_id: s.department_id,
-    class_level: s.class_level,
+    grade_level_id: s.grade_level_id,
     status: s.status,
     national_id: s.national_id,
     guardian_name: s.guardian_name,

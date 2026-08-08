@@ -54,14 +54,13 @@ export function Users() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold tracking-tight">ผู้ใช้งาน</h2>
         {mayManage && (
           <div className="flex gap-2">
             <Button variant="outline" size="icon" onClick={() => setImporting(true)} aria-label="นำเข้า CSV">
-              <Upload className="h-4 w-4" />
+              <Upload className="h-3 w-3" />
             </Button>
             <Button size="icon" onClick={() => setCreating(true)} aria-label="เพิ่มผู้ใช้งาน">
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3 w-3" />
             </Button>
           </div>
         )}
@@ -69,7 +68,7 @@ export function Users() {
 
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={filters.search}
             onChange={(e) => setFilters({ ...filters, search: e.target.value })}
@@ -79,7 +78,7 @@ export function Users() {
           />
         </div>
         <Button variant="outline" size="icon" onClick={() => setFiltersOpen(true)} aria-label="ตัวกรอง">
-          <SlidersHorizontal className="h-4 w-4" />
+          <SlidersHorizontal className="h-3 w-3" />
           {activeFilterCount > 0 && (
             <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] text-accent-foreground">
               {activeFilterCount}

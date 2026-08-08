@@ -52,6 +52,9 @@ export type DepartmentSettings = {
   semester1_end: string | null;
   semester2_start: string | null;
   semester2_end: string | null;
+  // Default เก็บ:สอบ split — curriculum_subjects rows may override per subject.
+  score_collect_pct: number | null;
+  score_exam_pct: number | null;
   updated_at: string;
 };
 
@@ -73,11 +76,122 @@ export type Student = {
   first_name: string;
   last_name: string;
   department_id: string;
-  class_level: string | null;
+  grade_level_id: string | null;
   status: StudentStatus;
   profile_id: string | null;
   guardian_name: string | null;
   guardian_phone: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// ------------------------------------------------------------- curriculum
+// See supabase/migrations/0004_curriculum.sql for the full grill rationale.
+
+export type SubjectType = "basic" | "additional" | "activity"; // พื้นฐาน / เพิ่มเติม / กิจกรรม
+export type DevelopmentDomain = "physical" | "emotional" | "social" | "cognitive"; // ร่างกาย / อารมณ์-จิตใจ / สังคม / สติปัญญา
+
+export type LearningArea = {
+  id: string;
+  code: string;
+  name: string;
+  created_at: string;
+};
+
+/** School-wide master catalog — never tagged to a department, reused across academic years. */
+export type Subject = {
+  id: string;
+  code: string;
+  name_th: string;
+  name_en: string | null;
+  learning_area_id: string;
+  subject_type: SubjectType;
+  credits: number;
+  hours_per_week: number;
+  is_active: boolean; // soft delete — past academic years may still reference a retired subject
+  created_at: string;
+  updated_at: string;
+};
+
+/** แผนการเรียน (วิทย์-คณิต, ศิลป์-คำนวณ, ...) — used by SEC only, but not department-tagged itself. */
+export type StudyPlan = {
+  id: string;
+  code: string;
+  name: string;
+  created_at: string;
+};
+
+/** ม.1..ม.6 / ป.1..ป.6 / อ.1..อ.3 — code is unique only within its department. */
+export type GradeLevel = {
+  id: string;
+  department_id: string;
+  code: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+};
+
+/**
+ * A curriculum bundle for one entry cohort (e.g. "มัธยมต้น รุ่นปี 2569") —
+ * authored once, stays fixed for that cohort across every grade it spans.
+ * See supabase/migrations/0005_curriculum_cohorts.sql.
+ */
+export type CurriculumCohort = {
+  id: string;
+  department_id: string;
+  entry_grade_level_id: string; // ม.1 or ม.4 — the entry point this cohort started at
+  entry_year: number; // พ.ศ.
+  name: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Binds a subject to a department's grade level within one cohort's curriculum. */
+export type CurriculumSubject = {
+  id: string;
+  subject_id: string;
+  grade_level_id: string;
+  study_plan_id: string | null; // track within the cohort: สายวิทย์/สายศิลป์, or null = shared
+  term: number | null; // 1 or 2 for SEC, null everywhere else
+  cohort_id: string;
+  score_collect_pct: number | null; // overrides department_settings default when set
+  score_exam_pct: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * History, not a mutable pointer — a transfer or ซ้ำชั้น inserts a new row
+ * rather than overwriting the old one. Latest row per student = current.
+ */
+export type StudentCohortEnrollment = {
+  id: string;
+  student_id: string;
+  cohort_id: string;
+  study_plan_id: string | null;
+  created_at: string;
+};
+
+/** KG (อนุบาล) หน่วยการเรียนรู้ — replaces subjects entirely for this department. */
+export type LearningUnit = {
+  id: string;
+  grade_level_id: string;
+  academic_year: number;
+  name_th: string;
+  name_en: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** KG หัวข้อการประเมินพัฒนาการ, grouped under one of the 4 fixed domains. */
+export type KgAssessmentTopic = {
+  id: string;
+  grade_level_id: string;
+  domain: DevelopmentDomain;
+  academic_year: number;
+  name_th: string;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 };
@@ -143,7 +257,7 @@ export type Database = {
           | "status"
           | "profile_id"
           | "national_id"
-          | "class_level"
+          | "grade_level_id"
           | "guardian_name"
           | "guardian_phone"
         >
@@ -151,6 +265,21 @@ export type Database = {
       guardianships: Table<{ parent_id: string; student_id: string }>;
       school_settings: Table<SchoolSettings>;
       department_settings: Table<DepartmentSettings>;
+      learning_areas: Table<LearningArea, InsertOf<LearningArea, never>>;
+      subjects: Table<Subject, InsertOf<Subject, "name_en" | "is_active">>;
+      study_plans: Table<StudyPlan, InsertOf<StudyPlan, never>>;
+      grade_levels: Table<GradeLevel, InsertOf<GradeLevel, "sort_order">>;
+      curriculum_cohorts: Table<CurriculumCohort, InsertOf<CurriculumCohort, never>>;
+      curriculum_subjects: Table<
+        CurriculumSubject,
+        InsertOf<CurriculumSubject, "study_plan_id" | "term" | "score_collect_pct" | "score_exam_pct">
+      >;
+      learning_units: Table<LearningUnit, InsertOf<LearningUnit, "name_en" | "sort_order">>;
+      kg_assessment_topics: Table<KgAssessmentTopic, InsertOf<KgAssessmentTopic, "sort_order">>;
+      student_cohort_enrollments: Table<
+        StudentCohortEnrollment,
+        InsertOf<StudentCohortEnrollment, "study_plan_id">
+      >;
       audit_logs: Table<{
         id: number;
         actor_id: string | null;
@@ -164,7 +293,12 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
-    Enums: { app_role: Role; student_status: StudentStatus };
+    Enums: {
+      app_role: Role;
+      student_status: StudentStatus;
+      subject_type: SubjectType;
+      development_domain: DevelopmentDomain;
+    };
     CompositeTypes: Record<string, never>;
   };
 };

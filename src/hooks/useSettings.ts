@@ -72,7 +72,12 @@ export function useDepartmentSettings(departmentId: string | null) {
 
 export type DepartmentSettingsEdit = Pick<
   DepartmentSettings,
-  "semester1_start" | "semester1_end" | "semester2_start" | "semester2_end"
+  | "semester1_start"
+  | "semester1_end"
+  | "semester2_start"
+  | "semester2_end"
+  | "score_collect_pct"
+  | "score_exam_pct"
 >;
 
 export function useUpdateDepartmentSettings(departmentId: string | null) {

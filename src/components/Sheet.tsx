@@ -31,10 +31,10 @@ export function Sheet({
             className,
           )}
         >
-          <div className="px-5 pb-2 pt-5">
-            <Drawer.Title className="text-lg font-semibold">{title}</Drawer.Title>
+          <div className="px-3 pb-1.5 pt-3">
+            <Drawer.Title className="text-base font-semibold">{title}</Drawer.Title>
             {description ? (
-              <Drawer.Description className="text-sm text-muted-foreground">
+              <Drawer.Description className="text-xs text-muted-foreground">
                 {description}
               </Drawer.Description>
             ) : (
@@ -42,7 +42,7 @@ export function Sheet({
               <Drawer.Description className="sr-only">{title}</Drawer.Description>
             )}
           </div>
-          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-8 pb-safe">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-6 pb-safe">
             {children}
           </div>
         </Drawer.Content>

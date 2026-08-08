@@ -2,6 +2,7 @@ import type React from "react";
 // Deep imports — the package barrel pulls every icon into the main chunk.
 import Add from "react-ionicons/lib/Add";
 import Apps from "react-ionicons/lib/Apps";
+import Book from "react-ionicons/lib/Book";
 import IonChevronBack from "react-ionicons/lib/ChevronBack";
 import IonChevronForward from "react-ionicons/lib/ChevronForward";
 import CloudOffline from "react-ionicons/lib/CloudOffline";
@@ -11,10 +12,12 @@ import DocumentAttach from "react-ionicons/lib/DocumentAttach";
 import Download from "react-ionicons/lib/Download";
 import Grid from "react-ionicons/lib/Grid";
 import Key from "react-ionicons/lib/Key";
+import Library from "react-ionicons/lib/Library";
 import IonLogOut from "react-ionicons/lib/LogOut";
 import IonMoon from "react-ionicons/lib/Moon";
 import Options from "react-ionicons/lib/Options";
 import People from "react-ionicons/lib/People";
+import PersonAdd from "react-ionicons/lib/PersonAdd";
 import IonSearch from "react-ionicons/lib/Search";
 import School from "react-ionicons/lib/School";
 import IonSettings from "react-ionicons/lib/Settings";
@@ -29,9 +32,9 @@ interface IconProps {
 
 /** Map Tailwind `h-*` (spacing scale) to px for ionicons width/height props. */
 function sizeFromClass(className?: string): number {
-  if (!className) return 16;
+  if (!className) return 12;
   const match = className.match(/(?:^|\s)h-(\d+(?:\.\d+)?)(?:\s|$)/);
-  if (!match?.[1]) return 16;
+  if (!match?.[1]) return 12;
   return Math.round(Number.parseFloat(match[1]) * 4);
 }
 
@@ -69,3 +72,6 @@ export const AppsIcon = wrap(Apps);
 export const ChevronBack = wrap(IonChevronBack);
 export const ChevronForward = wrap(IonChevronForward);
 export const SettingsIcon = wrap(IonSettings);
+export const BookIcon = wrap(Book);
+export const LibraryIcon = wrap(Library);
+export const PersonAddIcon = wrap(PersonAdd);

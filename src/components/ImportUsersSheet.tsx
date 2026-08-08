@@ -178,7 +178,7 @@ export function ImportUsersSheet({
                 size="sm"
                 onClick={() => downloadCsv("helix-users-template.csv", TEMPLATE)}
               >
-                <DownloadIcon className="h-4 w-4" />
+                <DownloadIcon className="h-3 w-3" />
                 ดาวน์โหลด template
               </Button>
             </Card>
@@ -191,7 +191,7 @@ export function ImportUsersSheet({
               className="hidden"
             />
             <Button size="lg" className="w-full" onClick={() => fileInput.current?.click()}>
-              <FileUp className="h-4 w-4" />
+              <FileUp className="h-3 w-3" />
               เลือกไฟล์ CSV
             </Button>
           </>
@@ -202,7 +202,7 @@ export function ImportUsersSheet({
             {parsed.issues.length > 0 && (
               <Card className="space-y-1 border-warning/40">
                 <p className="flex items-center gap-2 text-sm font-medium text-warning">
-                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTriangle className="h-3 w-3" />
                   ข้ามไป {parsed.issues.length} แถว (รูปแบบไฟล์)
                 </p>
                 <ul className="space-y-0.5 text-xs text-muted-foreground">
@@ -219,7 +219,7 @@ export function ImportUsersSheet({
             {unresolved.length > 0 && (
               <Card className="space-y-1 border-warning/40">
                 <p className="flex items-center gap-2 text-sm font-medium text-warning">
-                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTriangle className="h-3 w-3" />
                   ข้ามไป {unresolved.length} แถว (สิทธิ์/ตำแหน่ง/แผนกไม่ถูกต้อง)
                 </p>
                 <ul className="space-y-0.5 text-xs text-muted-foreground">

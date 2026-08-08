@@ -1,8 +1,9 @@
 import { AlertTriangle, FileUp } from "@/components/icons";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, Field, Select, Spinner } from "@/components/ui";
+import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useImportStudents, type ImportOutcome, type StudentDraft } from "@/hooks/useStudents";
 import { readTable, type CsvIssue } from "@/lib/csv";
@@ -40,6 +41,18 @@ export function ImportSheet({
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
   const [failed, setFailed] = useState(false);
 
+  const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
+  // Match the CSV's free-text "ชั้น" cell against this department's grade levels
+  // by code or name — case/whitespace-insensitive, since schools' own CSVs vary.
+  const gradeLevelByLabel = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const g of gradeLevels) {
+      map.set(g.code.trim().toLowerCase(), g.id);
+      map.set(g.name.trim().toLowerCase(), g.id);
+    }
+    return map;
+  }, [gradeLevels]);
+
   function reset() {
     setParsed(null);
     setOutcome(null);
@@ -62,7 +75,7 @@ export function ImportSheet({
       first_name: r.first_name!,
       last_name: r.last_name!,
       department_id: departmentId,
-      class_level: r.class_level || null,
+      grade_level_id: r.class_level ? gradeLevelByLabel.get(r.class_level.trim().toLowerCase()) ?? null : null,
       status: "studying",
       national_id: r.national_id || null,
       guardian_name: r.guardian_name || null,
@@ -110,7 +123,7 @@ export function ImportSheet({
               className="hidden"
             />
             <Button size="lg" className="w-full" onClick={() => fileInput.current?.click()}>
-              <FileUp className="h-4 w-4" />
+              <FileUp className="h-3 w-3" />
               เลือกไฟล์ CSV
             </Button>
           </>
@@ -134,7 +147,7 @@ export function ImportSheet({
             {parsed.issues.length > 0 && (
               <Card className="space-y-1 border-warning/40">
                 <p className="flex items-center gap-2 text-sm font-medium text-warning">
-                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTriangle className="h-3 w-3" />
                   ข้ามไป {parsed.issues.length} แถว
                 </p>
                 <ul className="space-y-0.5 text-xs text-muted-foreground">

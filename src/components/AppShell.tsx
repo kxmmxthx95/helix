@@ -1,14 +1,17 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import {
+  BookIcon,
   ChevronBack,
   ChevronForward,
   CloudOff,
   GraduationCap,
   LayoutDashboard,
+  LibraryIcon,
   LogOut,
   Monitor,
   Moon,
+  PersonAddIcon,
   SettingsIcon,
   Sun,
   Users,
@@ -19,13 +22,30 @@ import { useTheme } from "@/components/ThemeProvider";
 import { Avatar, Button } from "@/components/ui";
 import { useOutboxSync } from "@/hooks/useOutboxSync";
 import { profileFullName } from "@/lib/database.types";
-import { canManageUsers, isOrgWide, roleLabels } from "@/lib/roles";
+import { canManage, canManageUsers, isOrgWide, roleLabels } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { to: "/", label: "หน้าหลัก", icon: LayoutDashboard, managerOnly: false },
-  { to: "/users", label: "ผู้ใช้งาน", icon: Users, managerOnly: true },
-  { to: "/roster", label: "นักเรียน", icon: GraduationCap, managerOnly: false },
+  { to: "/", label: "หน้าหลัก", icon: LayoutDashboard, managerOnly: false, orgWideOnly: false, deptManagerOnly: false },
+  { to: "/users", label: "ผู้ใช้งาน", icon: Users, managerOnly: true, orgWideOnly: false, deptManagerOnly: false },
+  { to: "/roster", label: "นักเรียน", icon: GraduationCap, managerOnly: false, orgWideOnly: false, deptManagerOnly: false },
+  { to: "/subjects", label: "คลังรายวิชา", icon: BookIcon, managerOnly: false, orgWideOnly: true, deptManagerOnly: false },
+  {
+    to: "/curriculum",
+    label: "หลักสูตร",
+    icon: LibraryIcon,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: true,
+  },
+  {
+    to: "/enrollment",
+    label: "ลงทะเบียน",
+    icon: PersonAddIcon,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: true,
+  },
 ];
 
 const SIDEBAR_KEY = "helix-sidebar-collapsed";
@@ -60,7 +80,12 @@ export function AppShell() {
     }
   }, [collapsed]);
 
-  const tabs = TABS.filter((t) => !t.managerOnly || (profile && canManageUsers(profile.roles)));
+  const tabs = TABS.filter(
+    (t) =>
+      (!t.managerOnly || (profile && canManageUsers(profile.roles))) &&
+      (!t.orgWideOnly || (profile && isOrgWide(profile.roles))) &&
+      (!t.deptManagerOnly || (profile && canManage(profile.roles))),
+  );
 
   const themeButton = (
     <Button
@@ -71,11 +96,11 @@ export function AppShell() {
       title={`Theme: ${preference}`}
     >
       {preference === "system" ? (
-        <Monitor className="h-4 w-4" />
+        <Monitor className="h-3 w-3" />
       ) : preference === "dark" ? (
-        <Sun className="h-4 w-4" />
+        <Sun className="h-3 w-3" />
       ) : (
-        <Moon className="h-4 w-4" />
+        <Moon className="h-3 w-3" />
       )}
     </Button>
   );
@@ -89,13 +114,13 @@ export function AppShell() {
       title="ตั้งค่าระบบ"
       className={location.pathname === "/settings" ? "text-foreground" : "text-muted-foreground"}
     >
-      <SettingsIcon className="h-4 w-4" />
+      <SettingsIcon className="h-3 w-3" />
     </Button>
   );
 
   const signOutButton = (
     <Button variant="ghost" size="icon" onClick={signOut} aria-label="ออกจากระบบ">
-      <LogOut className="h-4 w-4" />
+      <LogOut className="h-3 w-3" />
     </Button>
   );
 
@@ -135,9 +160,9 @@ export function AppShell() {
             title={collapsed ? "ขยายแถบด้านข้าง" : "หุบแถบด้านข้าง"}
           >
             {collapsed ? (
-              <ChevronForward className="h-4 w-4" />
+              <ChevronForward className="h-3 w-3" />
             ) : (
-              <ChevronBack className="h-4 w-4" />
+              <ChevronBack className="h-3 w-3" />
             )}
           </Button>
         </div>
@@ -159,7 +184,7 @@ export function AppShell() {
                 )
               }
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              <Icon className="h-3 w-3 shrink-0" />
               {!collapsed && <span className="truncate">{label}</span>}
             </NavLink>
           ))}
@@ -204,7 +229,7 @@ export function AppShell() {
 
         <header className="sticky top-0 z-20 hidden h-12 shrink-0 border-b border-border/60 lg:block">
           <div className={cn("mx-auto flex h-full w-full max-w-6xl items-center", "px-3")}>
-            <p className="text-sm text-muted-foreground">ระบบจัดการสถานศึกษา</p>
+            <p className="text-sm text-foreground">{tabs.find(t => t.to === location.pathname || (t.to === "/" && location.pathname === "/"))?.label || "ระบบจัดการสถานศึกษา"}</p>
           </div>
         </header>
 
@@ -247,7 +272,7 @@ export function AppShell() {
                   )
                 }
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-3 w-3" />
                 {label}
               </NavLink>
             ))}
