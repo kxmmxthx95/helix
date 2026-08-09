@@ -72,6 +72,18 @@ export function useSaveStudent() {
   });
 }
 
+/** Hard delete — cascades to guardianships, contacts, cohort/classroom enrollments, transfer intake. */
+export function useDeleteStudent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("students").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["students"] }),
+  });
+}
+
 export type ImportOutcome = { inserted: number; skipped: string[] };
 
 /**

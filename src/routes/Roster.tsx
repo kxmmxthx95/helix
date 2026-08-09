@@ -16,6 +16,7 @@ import {
   type StudentContactDraft,
 } from "@/hooks/useStudentContacts";
 import {
+  useDeleteStudent,
   useSaveStudent,
   useStudents,
   type StudentDraft,
@@ -162,6 +163,7 @@ export function Roster() {
   );
   const mayEdit = me ? canManage(me.roles) : false;
   const mayManageUsers = me ? canManageUsers(me.roles) : false;
+  const deleteStudent = useDeleteStudent();
 
   const activeFilterCount = [filters.departmentId, filters.status].filter(Boolean).length;
 
@@ -228,6 +230,7 @@ export function Roster() {
                 <th className="px-3 py-2 font-medium">ชั้น</th>
                 <th className="px-3 py-2 font-medium">สถานะ</th>
                 {mayManageUsers && <th className="px-3 py-2 font-medium">บัญชี</th>}
+                {mayEdit && <th className="px-3 py-2 font-medium" />}
               </tr>
             </thead>
             <tbody>
@@ -280,6 +283,28 @@ export function Roster() {
                           สร้างบัญชี
                         </Button>
                       )}
+                    </td>
+                  )}
+                  {mayEdit && (
+                    <td className="px-3 py-3">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="ลบนักเรียน"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (
+                            confirm(
+                              `ลบ "${row.first_name} ${row.last_name}" ถาวร? ข้อมูลผู้ปกครอง, ประวัติลงทะเบียน, และการจัดห้องของนักเรียนคนนี้จะถูกลบไปด้วยทั้งหมด กู้คืนไม่ได้`,
+                            )
+                          ) {
+                            deleteStudent.mutate(row.id);
+                          }
+                        }}
+                        disabled={deleteStudent.isPending}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
                     </td>
                   )}
                 </tr>
