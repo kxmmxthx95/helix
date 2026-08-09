@@ -622,9 +622,9 @@ function SubjectTable({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="border-t border-border">
-              <td className="px-3 py-3 font-medium">{subjectName.get(row.subject_id) ?? "—"}</td>
-              <td className="px-3 py-3">
+            <tr key={row.id} className="h-[38px] border-t border-border">
+              <td className="px-3 py-0 font-medium">{subjectName.get(row.subject_id) ?? "—"}</td>
+              <td className="px-3 py-0">
                 <span
                   className={cn(
                     "rounded-full px-2 py-0.5 text-xs",
@@ -636,13 +636,13 @@ function SubjectTable({
                   {planLabel}
                 </span>
               </td>
-              <td className="px-3 py-3 text-muted-foreground">
+              <td className="px-3 py-0 text-muted-foreground">
                 {row.score_collect_pct !== null
                   ? `เก็บ ${row.score_collect_pct} : สอบ ${row.score_exam_pct}`
                   : "ค่า default แผนก"}
               </td>
               {mayEdit && (
-                <td className="px-3 py-3 text-right">
+                <td className="px-3 py-0 text-right">
                   <Button variant="ghost" size="sm" onClick={() => onDelete(row.id)}>
                     ลบ
                   </Button>

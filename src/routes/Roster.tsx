@@ -240,22 +240,22 @@ export function Roster() {
                   onClick={() => mayEdit && setEditing(row)}
                   className={
                     mayEdit
-                      ? "cursor-pointer border-t border-border active:bg-muted"
-                      : "border-t border-border"
+                      ? "h-[38px] cursor-pointer border-t border-border active:bg-muted"
+                      : "h-[38px] border-t border-border"
                   }
                 >
-                  <td className="px-3 py-3 font-mono text-xs">{row.student_code}</td>
-                  <td className="px-3 py-3 text-muted-foreground">{row.prefix ?? "—"}</td>
-                  <td className="px-3 py-3 font-medium">
+                  <td className="px-3 py-0 font-mono text-xs">{row.student_code}</td>
+                  <td className="px-3 py-0 text-muted-foreground">{row.prefix ?? "—"}</td>
+                  <td className="px-3 py-0 font-medium">
                     {row.first_name} {row.last_name}
                   </td>
-                  <td className="px-3 py-3 text-muted-foreground">
+                  <td className="px-3 py-0 text-muted-foreground">
                     {deptName.get(row.department_id) ?? "—"}
                   </td>
-                  <td className="px-3 py-3 text-muted-foreground">
+                  <td className="px-3 py-0 text-muted-foreground">
                     {row.grade_level_id ? gradeLevelName.get(row.grade_level_id) ?? "—" : "—"}
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-0">
                     <span
                       className={
                         row.status === "studying"
@@ -267,7 +267,7 @@ export function Roster() {
                     </span>
                   </td>
                   {mayManageUsers && (
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-0">
                       {row.profile_id ? (
                         <span className="text-xs text-muted-foreground">มีบัญชีแล้ว</span>
                       ) : (
@@ -286,7 +286,7 @@ export function Roster() {
                     </td>
                   )}
                   {mayEdit && (
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-0">
                       <Button
                         variant="ghost"
                         size="icon"

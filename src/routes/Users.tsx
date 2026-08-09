@@ -125,24 +125,24 @@ export function Users() {
                   onClick={() => mayManage && setEditing(row)}
                   className={
                     mayManage
-                      ? "cursor-pointer border-t border-border active:bg-muted"
-                      : "border-t border-border"
+                      ? "h-[38px] cursor-pointer border-t border-border active:bg-muted"
+                      : "h-[38px] border-t border-border"
                   }
                 >
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-0">
                     <p className="font-medium">{profileFullName(row)}</p>
                     <p className="text-xs text-muted-foreground">{row.email}</p>
                   </td>
-                  <td className="px-3 py-3">{roleLabels(row.roles)}</td>
-                  <td className="px-3 py-3 text-muted-foreground">
+                  <td className="px-3 py-0">{roleLabels(row.roles)}</td>
+                  <td className="px-3 py-0 text-muted-foreground">
                     {row.positionTitleIds.length
                       ? row.positionTitleIds.map((id) => titleName.get(id) ?? "—").join(", ")
                       : "—"}
                   </td>
-                  <td className="px-3 py-3 text-muted-foreground">
+                  <td className="px-3 py-0 text-muted-foreground">
                     {row.department_id ? (deptName.get(row.department_id) ?? "—") : "ทุกแผนก"}
                   </td>
-                  <td className="px-3 py-3">
+                  <td className="px-3 py-0">
                     <span
                       className={
                         row.is_active

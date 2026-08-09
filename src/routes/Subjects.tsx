@@ -163,12 +163,12 @@ export function Subjects() {
                   onClick={() => mayEdit && setEditing(row)}
                   className={
                     mayEdit
-                      ? "cursor-pointer border-t border-border active:bg-muted"
-                      : "border-t border-border"
+                      ? "h-[38px] cursor-pointer border-t border-border active:bg-muted"
+                      : "h-[38px] border-t border-border"
                   }
                 >
-                  <td className="px-3 py-3 font-mono text-xs">{row.code}</td>
-                  <td className="px-3 py-3 font-medium">
+                  <td className="px-3 py-0 font-mono text-xs">{row.code}</td>
+                  <td className="px-3 py-0 font-medium">
                     {row.name_th}
                     {!row.is_active && (
                       <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
@@ -176,12 +176,12 @@ export function Subjects() {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-muted-foreground">{areaName.get(row.learning_area_id) ?? "—"}</td>
-                  <td className="px-3 py-3 text-muted-foreground">{SUBJECT_TYPE_LABEL[row.subject_type]}</td>
-                  <td className="px-3 py-3 text-muted-foreground">{row.credits}</td>
-                  <td className="px-3 py-3 text-muted-foreground">{row.hours_per_week}</td>
+                  <td className="px-3 py-0 text-muted-foreground">{areaName.get(row.learning_area_id) ?? "—"}</td>
+                  <td className="px-3 py-0 text-muted-foreground">{SUBJECT_TYPE_LABEL[row.subject_type]}</td>
+                  <td className="px-3 py-0 text-muted-foreground">{row.credits}</td>
+                  <td className="px-3 py-0 text-muted-foreground">{row.hours_per_week}</td>
                   {mayEdit && (
-                    <td className="px-3 py-3 text-right">
+                    <td className="px-3 py-0 text-right">
                       <Button
                         variant="ghost"
                         size="sm"
