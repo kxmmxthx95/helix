@@ -3,7 +3,8 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportUsersSheet } from "@/components/ImportUsersSheet";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { usePagination } from "@/hooks/usePagination";
 import {
   useDepartments,
   usePositionTitles,
@@ -35,6 +36,7 @@ export function Users() {
   const { data: departments = [] } = useDepartments();
   const { data: positionTitles = [] } = usePositionTitles();
   const { data: rows, isLoading, error } = useProfiles(filters);
+  const { page, setPage, pageCount, pageRows } = usePagination(rows ?? [], [filters]);
 
   const mayManage = me ? canManageUsers(me.roles) : false;
 
@@ -105,58 +107,60 @@ export function Users() {
       )}
 
       {rows && rows.length > 0 && (
-        // Table stays a table on mobile; the wrapper scrolls sideways so the
-        // page body never does.
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[42rem] text-xs">
-            <thead className="bg-muted text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">ชื่อ</th>
-                <th className="px-3 py-2 font-medium">สิทธิ์</th>
-                <th className="px-3 py-2 font-medium">ตำแหน่ง</th>
-                <th className="px-3 py-2 font-medium">แผนก</th>
-                <th className="px-3 py-2 font-medium">สถานะ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={row.id}
-                  onClick={() => mayManage && setEditing(row)}
-                  className={
-                    mayManage
-                      ? "h-[40px] cursor-pointer border-t border-border active:bg-muted"
-                      : "h-[40px] border-t border-border"
-                  }
-                >
-                  <td className="px-3 py-0">
-                    <p className="font-medium">{profileFullName(row)}</p>
-                    <p className="text-xs text-muted-foreground">{row.email}</p>
-                  </td>
-                  <td className="px-3 py-0">{roleLabels(row.roles)}</td>
-                  <td className="px-3 py-0 text-muted-foreground">
-                    {row.positionTitleIds.length
-                      ? row.positionTitleIds.map((id) => titleName.get(id) ?? "—").join(", ")
-                      : "—"}
-                  </td>
-                  <td className="px-3 py-0 text-muted-foreground">
-                    {row.department_id ? (deptName.get(row.department_id) ?? "—") : "ทุกแผนก"}
-                  </td>
-                  <td className="px-3 py-0">
-                    <span
-                      className={
-                        row.is_active
-                          ? "rounded-full bg-success/15 px-2 py-0.5 text-xs text-success"
-                          : "rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-                      }
-                    >
-                      {row.is_active ? "ใช้งาน" : "ปิด"}
-                    </span>
-                  </td>
+        <div className="space-y-2">
+          {/* Table stays a table on mobile; the wrapper scrolls sideways so the page body never does. */}
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full min-w-[42rem] text-xs">
+              <thead className="bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">ชื่อ</th>
+                  <th className="px-3 py-2 font-medium">สิทธิ์</th>
+                  <th className="px-3 py-2 font-medium">ตำแหน่ง</th>
+                  <th className="px-3 py-2 font-medium">แผนก</th>
+                  <th className="px-3 py-2 font-medium">สถานะ</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pageRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    onClick={() => mayManage && setEditing(row)}
+                    className={
+                      mayManage
+                        ? "h-[40px] cursor-pointer border-t border-border active:bg-muted"
+                        : "h-[40px] border-t border-border"
+                    }
+                  >
+                    <td className="px-3 py-0">
+                      <p className="font-medium">{profileFullName(row)}</p>
+                      <p className="text-xs text-muted-foreground">{row.email}</p>
+                    </td>
+                    <td className="px-3 py-0">{roleLabels(row.roles)}</td>
+                    <td className="px-3 py-0 text-muted-foreground">
+                      {row.positionTitleIds.length
+                        ? row.positionTitleIds.map((id) => titleName.get(id) ?? "—").join(", ")
+                        : "—"}
+                    </td>
+                    <td className="px-3 py-0 text-muted-foreground">
+                      {row.department_id ? (deptName.get(row.department_id) ?? "—") : "ทุกแผนก"}
+                    </td>
+                    <td className="px-3 py-0">
+                      <span
+                        className={
+                          row.is_active
+                            ? "rounded-full bg-success/15 px-2 py-0.5 text-xs text-success"
+                            : "rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                        }
+                      >
+                        {row.is_active ? "ใช้งาน" : "ปิด"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </div>
       )}
 

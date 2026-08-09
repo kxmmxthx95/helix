@@ -94,6 +94,41 @@ export function Field({
   );
 }
 
+export function Pagination({
+  page,
+  pageCount,
+  onChange,
+}: {
+  page: number;
+  pageCount: number;
+  onChange: (page: number) => void;
+}) {
+  if (pageCount <= 1) return null;
+  return (
+    <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+      <button
+        type="button"
+        className="tappable rounded-md px-2 py-1 hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+        onClick={() => onChange(page - 1)}
+        disabled={page <= 1}
+      >
+        ก่อนหน้า
+      </button>
+      <span>
+        หน้า {page} จาก {pageCount}
+      </span>
+      <button
+        type="button"
+        className="tappable rounded-md px-2 py-1 hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+        onClick={() => onChange(page + 1)}
+        disabled={page >= pageCount}
+      >
+        ถัดไป
+      </button>
+    </div>
+  );
+}
+
 export function Spinner({ className }: { className?: string }) {
   return (
     <span

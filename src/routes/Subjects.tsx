@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSubjectsSheet } from "@/components/ImportSubjectsSheet";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import {
   useDeleteSubject,
   useLearningAreas,
@@ -14,6 +14,7 @@ import {
   type SubjectFilters,
 } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
+import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import type { LearningArea, Subject, SubjectType } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
@@ -56,6 +57,7 @@ export function Subjects() {
   const { data: learningAreas = [] } = useLearningAreas();
   const { data: rows, isLoading, error } = useSubjects({ ...filters, departmentId });
   const del = useDeleteSubject();
+  const { page, setPage, pageCount, pageRows } = usePagination(rows ?? [], [filters, departmentId]);
 
   const areaName = useMemo(() => {
     const byId = new Map(learningAreas.map((a) => [a.id, a]));
@@ -143,69 +145,72 @@ export function Subjects() {
       )}
 
       {rows && rows.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[40rem] text-xs">
-            <thead className="bg-muted text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">รหัส</th>
-                <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
-                <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
-                <th className="px-3 py-2 font-medium">ประเภท</th>
-                <th className="px-3 py-2 font-medium">หน่วยกิต</th>
-                <th className="px-3 py-2 font-medium">ชม./สัปดาห์</th>
-                {mayEdit && <th className="px-3 py-2" />}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={row.id}
-                  onClick={() => mayEdit && setEditing(row)}
-                  className={
-                    mayEdit
-                      ? "h-[40px] cursor-pointer border-t border-border active:bg-muted"
-                      : "h-[40px] border-t border-border"
-                  }
-                >
-                  <td className="px-3 py-0 font-mono text-xs">{row.code}</td>
-                  <td className="px-3 py-0 font-medium">
-                    {row.name_th}
-                    {!row.is_active && (
-                      <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                        ปิดใช้งาน
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-0 text-muted-foreground">{areaName.get(row.learning_area_id) ?? "—"}</td>
-                  <td className="px-3 py-0 text-muted-foreground">{SUBJECT_TYPE_LABEL[row.subject_type]}</td>
-                  <td className="px-3 py-0 text-muted-foreground">{row.credits}</td>
-                  <td className="px-3 py-0 text-muted-foreground">{row.hours_per_week}</td>
-                  {mayEdit && (
-                    <td className="px-3 py-0 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={del.isPending}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm(`ลบรายวิชา "${row.name_th}" ถาวร? ข้อมูลนี้กู้คืนไม่ได้`)) {
-                            del.mutate(row.id, {
-                              onError: () =>
-                                alert(
-                                  `ลบไม่ได้ — "${row.name_th}" ถูกใช้อยู่ในโครงสร้างหลักสูตร ให้ปิดใช้งานแทน`,
-                                ),
-                            });
-                          }
-                        }}
-                      >
-                        ลบ
-                      </Button>
-                    </td>
-                  )}
+        <div className="space-y-2">
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full min-w-[40rem] text-xs">
+              <thead className="bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">รหัส</th>
+                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
+                  <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
+                  <th className="px-3 py-2 font-medium">ประเภท</th>
+                  <th className="px-3 py-2 font-medium">หน่วยกิต</th>
+                  <th className="px-3 py-2 font-medium">ชม./สัปดาห์</th>
+                  {mayEdit && <th className="px-3 py-2" />}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pageRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    onClick={() => mayEdit && setEditing(row)}
+                    className={
+                      mayEdit
+                        ? "h-[40px] cursor-pointer border-t border-border active:bg-muted"
+                        : "h-[40px] border-t border-border"
+                    }
+                  >
+                    <td className="px-3 py-0 font-mono text-xs">{row.code}</td>
+                    <td className="px-3 py-0 font-medium">
+                      {row.name_th}
+                      {!row.is_active && (
+                        <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                          ปิดใช้งาน
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-0 text-muted-foreground">{areaName.get(row.learning_area_id) ?? "—"}</td>
+                    <td className="px-3 py-0 text-muted-foreground">{SUBJECT_TYPE_LABEL[row.subject_type]}</td>
+                    <td className="px-3 py-0 text-muted-foreground">{row.credits}</td>
+                    <td className="px-3 py-0 text-muted-foreground">{row.hours_per_week}</td>
+                    {mayEdit && (
+                      <td className="px-3 py-0 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={del.isPending}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`ลบรายวิชา "${row.name_th}" ถาวร? ข้อมูลนี้กู้คืนไม่ได้`)) {
+                              del.mutate(row.id, {
+                                onError: () =>
+                                  alert(
+                                    `ลบไม่ได้ — "${row.name_th}" ถูกใช้อยู่ในโครงสร้างหลักสูตร ให้ปิดใช้งานแทน`,
+                                  ),
+                              });
+                            }
+                          }}
+                        >
+                          ลบ
+                        </Button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </div>
       )}
 

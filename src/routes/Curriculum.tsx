@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useDepartments } from "@/hooks/useProfiles";
+import { usePagination } from "@/hooks/usePagination";
 import { useSubjects } from "@/hooks/useCurriculum";
 import {
   DOMAIN_LABEL,
@@ -609,49 +610,53 @@ function SubjectTable({
   mayEdit: boolean;
   onDelete: (id: string) => void;
 }) {
+  const { page, setPage, pageCount, pageRows } = usePagination(rows, [rows.length]);
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full min-w-[28rem] text-xs">
-        <thead className="bg-muted text-left text-xs text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2 font-medium">วิชา</th>
-            <th className="px-3 py-2 font-medium">แผน</th>
-            <th className="px-3 py-2 font-medium">สัดส่วนคะแนน</th>
-            {mayEdit && <th className="px-3 py-2" />}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="h-[40px] border-t border-border">
-              <td className="px-3 py-0 font-medium">{subjectName.get(row.subject_id) ?? "—"}</td>
-              <td className="px-3 py-0">
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-xs",
-                    row.study_plan_id === null
-                      ? "bg-foreground/10 text-foreground"
-                      : "bg-accent/10 text-accent",
-                  )}
-                >
-                  {planLabel}
-                </span>
-              </td>
-              <td className="px-3 py-0 text-muted-foreground">
-                {row.score_collect_pct !== null
-                  ? `เก็บ ${row.score_collect_pct} : สอบ ${row.score_exam_pct}`
-                  : "ค่า default แผนก"}
-              </td>
-              {mayEdit && (
-                <td className="px-3 py-0 text-right">
-                  <Button variant="ghost" size="sm" onClick={() => onDelete(row.id)}>
-                    ลบ
-                  </Button>
-                </td>
-              )}
+    <div className="space-y-2">
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <table className="w-full min-w-[28rem] text-xs">
+          <thead className="bg-muted text-left text-xs text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 font-medium">วิชา</th>
+              <th className="px-3 py-2 font-medium">แผน</th>
+              <th className="px-3 py-2 font-medium">สัดส่วนคะแนน</th>
+              {mayEdit && <th className="px-3 py-2" />}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {pageRows.map((row) => (
+              <tr key={row.id} className="h-[40px] border-t border-border">
+                <td className="px-3 py-0 font-medium">{subjectName.get(row.subject_id) ?? "—"}</td>
+                <td className="px-3 py-0">
+                  <span
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-xs",
+                      row.study_plan_id === null
+                        ? "bg-foreground/10 text-foreground"
+                        : "bg-accent/10 text-accent",
+                    )}
+                  >
+                    {planLabel}
+                  </span>
+                </td>
+                <td className="px-3 py-0 text-muted-foreground">
+                  {row.score_collect_pct !== null
+                    ? `เก็บ ${row.score_collect_pct} : สอบ ${row.score_exam_pct}`
+                    : "ค่า default แผนก"}
+                </td>
+                {mayEdit && (
+                  <td className="px-3 py-0 text-right">
+                    <Button variant="ghost" size="sm" onClick={() => onDelete(row.id)}>
+                      ลบ
+                    </Button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={page} pageCount={pageCount} onChange={setPage} />
     </div>
   );
 }

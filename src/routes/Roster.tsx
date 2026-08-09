@@ -3,8 +3,9 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
+import { usePagination } from "@/hooks/usePagination";
 import { useDepartments, useInviteUsers, type UserInvite } from "@/hooks/useProfiles";
 import {
   useDeleteStudentContact,
@@ -164,6 +165,7 @@ export function Roster() {
   const mayEdit = me ? canManage(me.roles) : false;
   const mayManageUsers = me ? canManageUsers(me.roles) : false;
   const deleteStudent = useDeleteStudent();
+  const { page, setPage, pageCount, pageRows } = usePagination(rows ?? [], [filters]);
 
   const activeFilterCount = [filters.departmentId, filters.status].filter(Boolean).length;
 
@@ -219,98 +221,101 @@ export function Roster() {
       )}
 
       {rows && rows.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[40rem] text-xs">
-            <thead className="bg-muted text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">รหัส</th>
-                <th className="px-3 py-2 font-medium">คำนำหน้า</th>
-                <th className="px-3 py-2 font-medium">ชื่อ-นามสกุล</th>
-                <th className="px-3 py-2 font-medium">แผนก</th>
-                <th className="px-3 py-2 font-medium">ชั้น</th>
-                <th className="px-3 py-2 font-medium">สถานะ</th>
-                {mayManageUsers && <th className="px-3 py-2 font-medium">บัญชี</th>}
-                {mayEdit && <th className="px-3 py-2 font-medium" />}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={row.id}
-                  onClick={() => mayEdit && setEditing(row)}
-                  className={
-                    mayEdit
-                      ? "h-[40px] cursor-pointer border-t border-border active:bg-muted"
-                      : "h-[40px] border-t border-border"
-                  }
-                >
-                  <td className="px-3 py-0 font-mono text-xs">{row.student_code}</td>
-                  <td className="px-3 py-0 text-muted-foreground">{row.prefix ?? "—"}</td>
-                  <td className="px-3 py-0 font-medium">
-                    {row.first_name} {row.last_name}
-                  </td>
-                  <td className="px-3 py-0 text-muted-foreground">
-                    {deptName.get(row.department_id) ?? "—"}
-                  </td>
-                  <td className="px-3 py-0 text-muted-foreground">
-                    {row.grade_level_id ? gradeLevelName.get(row.grade_level_id) ?? "—" : "—"}
-                  </td>
-                  <td className="px-3 py-0">
-                    <span
-                      className={
-                        row.status === "studying"
-                          ? "rounded-full bg-success/15 px-2 py-0.5 text-xs text-success"
-                          : "rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-                      }
-                    >
-                      {STATUS_LABEL[row.status]}
-                    </span>
-                  </td>
-                  {mayManageUsers && (
+        <div className="space-y-2">
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full min-w-[40rem] text-xs">
+              <thead className="bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">รหัส</th>
+                  <th className="px-3 py-2 font-medium">คำนำหน้า</th>
+                  <th className="px-3 py-2 font-medium">ชื่อ-นามสกุล</th>
+                  <th className="px-3 py-2 font-medium">แผนก</th>
+                  <th className="px-3 py-2 font-medium">ชั้น</th>
+                  <th className="px-3 py-2 font-medium">สถานะ</th>
+                  {mayManageUsers && <th className="px-3 py-2 font-medium">บัญชี</th>}
+                  {mayEdit && <th className="px-3 py-2 font-medium" />}
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((row) => (
+                  <tr
+                    key={row.id}
+                    onClick={() => mayEdit && setEditing(row)}
+                    className={
+                      mayEdit
+                        ? "h-[40px] cursor-pointer border-t border-border active:bg-muted"
+                        : "h-[40px] border-t border-border"
+                    }
+                  >
+                    <td className="px-3 py-0 font-mono text-xs">{row.student_code}</td>
+                    <td className="px-3 py-0 text-muted-foreground">{row.prefix ?? "—"}</td>
+                    <td className="px-3 py-0 font-medium">
+                      {row.first_name} {row.last_name}
+                    </td>
+                    <td className="px-3 py-0 text-muted-foreground">
+                      {deptName.get(row.department_id) ?? "—"}
+                    </td>
+                    <td className="px-3 py-0 text-muted-foreground">
+                      {row.grade_level_id ? gradeLevelName.get(row.grade_level_id) ?? "—" : "—"}
+                    </td>
                     <td className="px-3 py-0">
-                      {row.profile_id ? (
-                        <span className="text-xs text-muted-foreground">มีบัญชีแล้ว</span>
-                      ) : (
+                      <span
+                        className={
+                          row.status === "studying"
+                            ? "rounded-full bg-success/15 px-2 py-0.5 text-xs text-success"
+                            : "rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                        }
+                      >
+                        {STATUS_LABEL[row.status]}
+                      </span>
+                    </td>
+                    {mayManageUsers && (
+                      <td className="px-3 py-0">
+                        {row.profile_id ? (
+                          <span className="text-xs text-muted-foreground">มีบัญชีแล้ว</span>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCreatingLoginFor(row);
+                            }}
+                          >
+                            <KeyIcon className="h-3.5 w-3.5" />
+                            สร้างบัญชี
+                          </Button>
+                        )}
+                      </td>
+                    )}
+                    {mayEdit && (
+                      <td className="px-3 py-0">
                         <Button
-                          variant="outline"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          aria-label="ลบนักเรียน"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setCreatingLoginFor(row);
+                            if (
+                              confirm(
+                                `ลบ "${row.first_name} ${row.last_name}" ถาวร? ข้อมูลผู้ปกครอง, ประวัติลงทะเบียน, และการจัดห้องของนักเรียนคนนี้จะถูกลบไปด้วยทั้งหมด กู้คืนไม่ได้`,
+                              )
+                            ) {
+                              deleteStudent.mutate(row.id);
+                            }
                           }}
+                          disabled={deleteStudent.isPending}
                         >
-                          <KeyIcon className="h-3.5 w-3.5" />
-                          สร้างบัญชี
+                          <X className="h-3 w-3" />
                         </Button>
-                      )}
-                    </td>
-                  )}
-                  {mayEdit && (
-                    <td className="px-3 py-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="ลบนักเรียน"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (
-                            confirm(
-                              `ลบ "${row.first_name} ${row.last_name}" ถาวร? ข้อมูลผู้ปกครอง, ประวัติลงทะเบียน, และการจัดห้องของนักเรียนคนนี้จะถูกลบไปด้วยทั้งหมด กู้คืนไม่ได้`,
-                            )
-                          ) {
-                            deleteStudent.mutate(row.id);
-                          }
-                        }}
-                        disabled={deleteStudent.isPending}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </div>
       )}
 
