@@ -22,6 +22,7 @@ import {
   type StudentFilters,
 } from "@/hooks/useStudents";
 import type {
+  AddressFields,
   BloodType,
   GuardianRelationship,
   Student,
@@ -49,6 +50,85 @@ const BLOOD_TYPES: BloodType[] = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O
 
 const textareaClass =
   "flex min-h-16 w-full rounded-lg border border-input bg-background px-2.5 py-2 text-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring disabled:opacity-50";
+
+const ADDRESS_KEYS: (keyof AddressFields)[] = [
+  "house_no",
+  "village_no",
+  "alley",
+  "road",
+  "subdistrict",
+  "district",
+  "province",
+  "postal_code",
+];
+
+function pickAddress(v: AddressFields): AddressFields {
+  return Object.fromEntries(ADDRESS_KEYS.map((k) => [k, v[k]])) as AddressFields;
+}
+
+/** Standard Thai postal address — บ้านเลขที่/หมู่ที่/ตรอกซอย/ถนน/ตำบล/อำเภอ/จังหวัด/รหัสไปรษณีย์. */
+function AddressInputs({
+  value,
+  onChange,
+}: {
+  value: AddressFields;
+  onChange: (patch: Partial<AddressFields>) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="บ้านเลขที่">
+          <Input
+            value={value.house_no ?? ""}
+            onChange={(e) => onChange({ house_no: e.target.value || null })}
+          />
+        </Field>
+        <Field label="หมู่ที่">
+          <Input
+            value={value.village_no ?? ""}
+            onChange={(e) => onChange({ village_no: e.target.value || null })}
+          />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="ตรอก/ซอย">
+          <Input value={value.alley ?? ""} onChange={(e) => onChange({ alley: e.target.value || null })} />
+        </Field>
+        <Field label="ถนน">
+          <Input value={value.road ?? ""} onChange={(e) => onChange({ road: e.target.value || null })} />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="ตำบล/แขวง">
+          <Input
+            value={value.subdistrict ?? ""}
+            onChange={(e) => onChange({ subdistrict: e.target.value || null })}
+          />
+        </Field>
+        <Field label="อำเภอ/เขต">
+          <Input
+            value={value.district ?? ""}
+            onChange={(e) => onChange({ district: e.target.value || null })}
+          />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="จังหวัด">
+          <Input
+            value={value.province ?? ""}
+            onChange={(e) => onChange({ province: e.target.value || null })}
+          />
+        </Field>
+        <Field label="รหัสไปรษณีย์">
+          <Input
+            value={value.postal_code ?? ""}
+            onChange={(e) => onChange({ postal_code: e.target.value || null })}
+          />
+        </Field>
+      </div>
+    </div>
+  );
+}
 
 export function Roster() {
   const { profile: me } = useAuth();
@@ -269,7 +349,14 @@ function blankDraft(departmentId: string): StudentDraft {
     national_id: null,
     phone: null,
     email: null,
-    address: null,
+    house_no: null,
+    village_no: null,
+    alley: null,
+    road: null,
+    subdistrict: null,
+    district: null,
+    province: null,
+    postal_code: null,
     family_status: null,
     blood_type: null,
     chronic_disease: null,
@@ -462,13 +549,10 @@ function EditStudentSheet({
                   />
                 </Field>
 
-                <Field label="ที่อยู่">
-                  <textarea
-                    className={textareaClass}
-                    value={current.address ?? ""}
-                    onChange={(e) => setDraft({ ...current, address: e.target.value || null })}
-                  />
-                </Field>
+                <div>
+                  <p className="mb-1.5 text-xs font-medium text-muted-foreground">ที่อยู่</p>
+                  <AddressInputs value={current} onChange={(patch) => setDraft({ ...current, ...patch })} />
+                </div>
               </>
             )}
 
@@ -535,7 +619,7 @@ function EditStudentSheet({
               ) : (
                 <GuardianSection
                   studentId={(target as Student).id}
-                  studentAddress={current.address}
+                  studentAddress={pickAddress(current)}
                 />
               )}
             </div>
@@ -558,7 +642,14 @@ function pickDraft(s: Student): StudentDraft {
     national_id: s.national_id,
     phone: s.phone,
     email: s.email,
-    address: s.address,
+    house_no: s.house_no,
+    village_no: s.village_no,
+    alley: s.alley,
+    road: s.road,
+    subdistrict: s.subdistrict,
+    district: s.district,
+    province: s.province,
+    postal_code: s.postal_code,
     family_status: s.family_status,
     blood_type: s.blood_type,
     chronic_disease: s.chronic_disease,
@@ -574,7 +665,7 @@ function GuardianSection({
   studentAddress,
 }: {
   studentId: string;
-  studentAddress: string | null;
+  studentAddress: AddressFields;
 }) {
   const { data: contacts = [] } = useStudentContacts(studentId);
   const contactIds = useMemo(() => contacts.map((c) => c.id), [contacts]);
@@ -676,7 +767,7 @@ function ContactForm({
   onDone,
 }: {
   studentId: string;
-  studentAddress: string | null;
+  studentAddress: AddressFields;
   target: StudentContact | "new";
   financial: { occupation: string | null; workplace: string | null; monthly_income: number | null } | undefined;
   onDone: () => void;
@@ -696,7 +787,14 @@ function ContactForm({
           last_name: "",
           phone: null,
           email: null,
-          address: null,
+          house_no: null,
+          village_no: null,
+          alley: null,
+          road: null,
+          subdistrict: null,
+          district: null,
+          province: null,
+          postal_code: null,
         }
       : {
           student_id: target.student_id,
@@ -707,7 +805,7 @@ function ContactForm({
           last_name: target.last_name,
           phone: target.phone,
           email: target.email,
-          address: target.address,
+          ...pickAddress(target),
         },
   );
   const [occupation, setOccupation] = useState(financial?.occupation ?? "");
@@ -815,20 +913,19 @@ function ContactForm({
         />
       </Field>
 
-      <Field label="ที่อยู่">
-        <textarea
-          className={textareaClass}
-          value={draft.address ?? ""}
-          onChange={(e) => setDraft({ ...draft, address: e.target.value || null })}
-        />
-        <button
-          type="button"
-          className="mt-1.5 text-xs text-accent-foreground underline"
-          onClick={() => setDraft({ ...draft, address: studentAddress })}
-        >
-          ใช้ที่อยู่เดียวกับนักเรียน
-        </button>
-      </Field>
+      <div>
+        <div className="mb-1.5 flex items-center justify-between">
+          <p className="text-xs font-medium text-muted-foreground">ที่อยู่</p>
+          <button
+            type="button"
+            className="text-xs text-accent-foreground underline"
+            onClick={() => setDraft({ ...draft, ...studentAddress })}
+          >
+            ใช้ที่อยู่เดียวกับนักเรียน
+          </button>
+        </div>
+        <AddressInputs value={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
+      </div>
 
       <Field label="อาชีพ">
         <Input value={occupation} onChange={(e) => setOccupation(e.target.value)} />

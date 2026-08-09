@@ -84,7 +84,14 @@ export type Student = {
   profile_id: string | null;
   phone: string | null;
   email: string | null;
-  address: string | null;
+  house_no: string | null;
+  village_no: string | null; // หมู่ที่
+  alley: string | null; // ตรอก/ซอย
+  road: string | null;
+  subdistrict: string | null; // ตำบล/แขวง
+  district: string | null; // อำเภอ/เขต
+  province: string | null;
+  postal_code: string | null;
   family_status: string | null; // สถานภาพครอบครัว — free text like prefix
   blood_type: BloodType | null;
   chronic_disease: string | null;
@@ -92,6 +99,18 @@ export type Student = {
   food_allergy: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/** Standard Thai postal address, broken into real columns — see migration 0016. */
+export type AddressFields = {
+  house_no: string | null;
+  village_no: string | null;
+  alley: string | null;
+  road: string | null;
+  subdistrict: string | null;
+  district: string | null;
+  province: string | null;
+  postal_code: string | null;
 };
 
 export type GuardianRelationship = "father" | "mother" | "other";
@@ -108,7 +127,14 @@ export type StudentContact = {
   last_name: string;
   phone: string | null;
   email: string | null;
-  address: string | null;
+  house_no: string | null;
+  village_no: string | null;
+  alley: string | null;
+  road: string | null;
+  subdistrict: string | null;
+  district: string | null;
+  province: string | null;
+  postal_code: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -336,7 +362,14 @@ export type Database = {
           | "grade_level_id"
           | "phone"
           | "email"
-          | "address"
+          | "house_no"
+          | "village_no"
+          | "alley"
+          | "road"
+          | "subdistrict"
+          | "district"
+          | "province"
+          | "postal_code"
           | "family_status"
           | "blood_type"
           | "chronic_disease"
@@ -373,7 +406,22 @@ export type Database = {
       transfer_intakes: Table<TransferIntake, InsertOf<TransferIntake, "intake_date">>;
       student_contacts: Table<
         StudentContact,
-        InsertOf<StudentContact, "relationship_note" | "is_primary" | "prefix" | "phone" | "email" | "address">
+        InsertOf<
+          StudentContact,
+          | "relationship_note"
+          | "is_primary"
+          | "prefix"
+          | "phone"
+          | "email"
+          | "house_no"
+          | "village_no"
+          | "alley"
+          | "road"
+          | "subdistrict"
+          | "district"
+          | "province"
+          | "postal_code"
+        >
       >;
       student_guardian_financials: Table<
         StudentGuardianFinancial,

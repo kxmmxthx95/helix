@@ -28,7 +28,14 @@ export type StudentContactDraft = Pick<
   | "last_name"
   | "phone"
   | "email"
-  | "address"
+  | "house_no"
+  | "village_no"
+  | "alley"
+  | "road"
+  | "subdistrict"
+  | "district"
+  | "province"
+  | "postal_code"
 >;
 
 /** Returns the saved row — a fresh insert's id is needed right after to attach a financial record. */
