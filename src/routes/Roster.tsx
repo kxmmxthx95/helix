@@ -48,6 +48,19 @@ const RELATIONSHIP_LABEL: Record<GuardianRelationship, string> = {
 
 const BLOOD_TYPES: BloodType[] = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
+// สถานภาพครอบครัว — free text column (0015), UI narrows it to a fixed
+// list to avoid typo'd variants of the same status; adjust the list
+// freely since nothing else depends on exact values.
+const FAMILY_STATUSES = [
+  "อยู่ด้วยกัน",
+  "หย่าร้าง",
+  "แยกกันอยู่",
+  "บิดาเสียชีวิต",
+  "มารดาเสียชีวิต",
+  "เสียชีวิตทั้งคู่",
+  "อื่นๆ",
+];
+
 const textareaClass =
   "flex min-h-16 w-full rounded-lg border border-input bg-background px-2.5 py-2 text-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring disabled:opacity-50";
 
@@ -604,12 +617,18 @@ function EditStudentSheet({
           {section === "guardian" && (
             <div className="space-y-4">
               <Field label="สถานภาพครอบครัว">
-                <Input
+                <Select
                   form="edit-student"
                   value={current.family_status ?? ""}
                   onChange={(e) => setDraft({ ...current, family_status: e.target.value || null })}
-                  placeholder="เช่น สมรส, หย่าร้าง, แยกกันอยู่, บิดา/มารดาเสียชีวิต"
-                />
+                >
+                  <option value="">— ไม่ระบุ —</option>
+                  {FAMILY_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </Select>
               </Field>
 
               {isNew ? (
