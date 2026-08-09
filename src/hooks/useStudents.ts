@@ -18,8 +18,14 @@ export type StudentDraft = Pick<
   | "grade_level_id"
   | "status"
   | "national_id"
-  | "guardian_name"
-  | "guardian_phone"
+  | "phone"
+  | "email"
+  | "address"
+  | "family_status"
+  | "blood_type"
+  | "chronic_disease"
+  | "drug_allergy"
+  | "food_allergy"
 >;
 
 export function useStudents(filters: StudentFilters) {

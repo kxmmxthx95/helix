@@ -15,8 +15,6 @@ const COLUMNS = [
   { key: "last_name", header: "นามสกุล", required: true },
   { key: "class_level", header: "ชั้น" },
   { key: "national_id", header: "เลขบัตรประชาชน" },
-  { key: "guardian_name", header: "ชื่อผู้ปกครอง" },
-  { key: "guardian_phone", header: "เบอร์ผู้ปกครอง" },
 ];
 
 const TEMPLATE = COLUMNS.map((c) => c.header).join(",");
@@ -79,8 +77,14 @@ export function ImportSheet({
       grade_level_id: r.class_level ? gradeLevelByLabel.get(r.class_level.trim().toLowerCase()) ?? null : null,
       status: "studying",
       national_id: r.national_id || null,
-      guardian_name: r.guardian_name || null,
-      guardian_phone: r.guardian_phone || null,
+      phone: null,
+      email: null,
+      address: null,
+      family_status: null,
+      blood_type: null,
+      chronic_disease: null,
+      drug_allergy: null,
+      food_allergy: null,
     }));
 
     try {

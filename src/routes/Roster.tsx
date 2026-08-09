@@ -1,4 +1,4 @@
-import { KeyIcon, Plus, Search, SlidersHorizontal, Upload } from "@/components/icons";
+import { KeyIcon, Plus, Search, SlidersHorizontal, Upload, X } from "@/components/icons";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
@@ -7,15 +7,30 @@ import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments, useInviteUsers, type UserInvite } from "@/hooks/useProfiles";
 import {
+  useDeleteStudentContact,
+  useGuardianFinancials,
+  useSaveGuardianFinancial,
+  useSaveStudentContact,
+  useSetPrimaryContact,
+  useStudentContacts,
+  type StudentContactDraft,
+} from "@/hooks/useStudentContacts";
+import {
   useSaveStudent,
   useStudents,
   type StudentDraft,
   type StudentFilters,
 } from "@/hooks/useStudents";
-import type { Student, StudentStatus } from "@/lib/database.types";
+import type {
+  BloodType,
+  GuardianRelationship,
+  Student,
+  StudentContact,
+  StudentStatus,
+} from "@/lib/database.types";
 import { canManage, canManageUsers, isOrgWide, STUDENT_PREFIXES } from "@/lib/roles";
 
-const EMPTY: StudentFilters = { search: "", departmentId: "", status: "" };
+const EMPTY: StudentFilters = { search: "", departmentId: "", status: "studying" };
 
 const STATUS_LABEL: Record<StudentStatus, string> = {
   studying: "กำลังศึกษา",
@@ -23,6 +38,17 @@ const STATUS_LABEL: Record<StudentStatus, string> = {
   graduated: "จบการศึกษา",
   dropped: "พ้นสภาพ",
 };
+
+const RELATIONSHIP_LABEL: Record<GuardianRelationship, string> = {
+  father: "บิดา",
+  mother: "มารดา",
+  other: "ผู้ปกครอง (อื่นๆ)",
+};
+
+const BLOOD_TYPES: BloodType[] = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+const textareaClass =
+  "flex min-h-16 w-full rounded-lg border border-input bg-background px-2.5 py-2 text-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring disabled:opacity-50";
 
 export function Roster() {
   const { profile: me } = useAuth();
@@ -241,10 +267,24 @@ function blankDraft(departmentId: string): StudentDraft {
     grade_level_id: null,
     status: "studying",
     national_id: null,
-    guardian_name: null,
-    guardian_phone: null,
+    phone: null,
+    email: null,
+    address: null,
+    family_status: null,
+    blood_type: null,
+    chronic_disease: null,
+    drug_allergy: null,
+    food_allergy: null,
   };
 }
+
+type Section = "basic" | "health" | "guardian";
+
+const SECTIONS: { key: Section; label: string }[] = [
+  { key: "basic", label: "พื้นฐาน" },
+  { key: "health", label: "สุขภาพ" },
+  { key: "guardian", label: "ผู้ปกครอง" },
+];
 
 function EditStudentSheet({
   target,
@@ -257,6 +297,7 @@ function EditStudentSheet({
   const { data: departments = [] } = useDepartments();
   const save = useSaveStudent();
   const [draft, setDraft] = useState<StudentDraft | null>(null);
+  const [section, setSection] = useState<Section>("basic");
 
   const isNew = target === "new";
   const base: StudentDraft | null =
@@ -270,6 +311,7 @@ function EditStudentSheet({
 
   function close() {
     setDraft(null);
+    setSection("basic");
     onClose();
   }
 
@@ -299,106 +341,206 @@ function EditStudentSheet({
       }
     >
       {current && (
-        <form id="edit-student" onSubmit={submit} className="space-y-4">
-          <Field label="รหัสนักเรียน">
-            <Input
-              value={current.student_code}
-              onChange={(e) => setDraft({ ...current, student_code: e.target.value })}
-              required
-            />
-          </Field>
-
-          <Field label="คำนำหน้า">
-            <Select
-              value={current.prefix ?? ""}
-              onChange={(e) => setDraft({ ...current, prefix: e.target.value || null })}
-            >
-              <option value="">— ไม่ระบุ —</option>
-              {STUDENT_PREFIXES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </Select>
-          </Field>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="ชื่อ">
-              <Input
-                value={current.first_name}
-                onChange={(e) => setDraft({ ...current, first_name: e.target.value })}
-                required
-              />
-            </Field>
-            <Field label="นามสกุล">
-              <Input
-                value={current.last_name}
-                onChange={(e) => setDraft({ ...current, last_name: e.target.value })}
-                required
-              />
-            </Field>
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            {SECTIONS.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => setSection(s.key)}
+                className={
+                  section === s.key
+                    ? "rounded-full border border-foreground bg-foreground/10 px-3 py-1 text-xs text-foreground transition-colors"
+                    : "rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted"
+                }
+              >
+                {s.label}
+              </button>
+            ))}
           </div>
 
-          <Field label="แผนก">
-            <Select
-              value={current.department_id}
-              onChange={(e) =>
-                setDraft({ ...current, department_id: e.target.value, grade_level_id: null })
-              }
-              required
-              disabled={!me || !isOrgWide(me.roles)}
-            >
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <form id="edit-student" onSubmit={submit} className="space-y-4">
+            {section === "basic" && (
+              <>
+                <Field label="รหัสนักเรียน">
+                  <Input
+                    value={current.student_code}
+                    onChange={(e) => setDraft({ ...current, student_code: e.target.value })}
+                    required
+                  />
+                </Field>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="ชั้น">
-              <Select
-                value={current.grade_level_id ?? ""}
-                onChange={(e) => setDraft({ ...current, grade_level_id: e.target.value || null })}
-              >
-                <option value="">ยังไม่จัดชั้น</option>
-                {gradeLevels.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="สถานะ">
-              <Select
-                value={current.status}
-                onChange={(e) => setDraft({ ...current, status: e.target.value as StudentStatus })}
-              >
-                {(Object.keys(STATUS_LABEL) as StudentStatus[]).map((s) => (
-                  <option key={s} value={s}>
-                    {STATUS_LABEL[s]}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
+                <Field label="คำนำหน้า">
+                  <Select
+                    value={current.prefix ?? ""}
+                    onChange={(e) => setDraft({ ...current, prefix: e.target.value || null })}
+                  >
+                    <option value="">— ไม่ระบุ —</option>
+                    {STUDENT_PREFIXES.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
 
-          <Field label="ชื่อผู้ปกครอง">
-            <Input
-              value={current.guardian_name ?? ""}
-              onChange={(e) => setDraft({ ...current, guardian_name: e.target.value || null })}
-            />
-          </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="ชื่อ">
+                    <Input
+                      value={current.first_name}
+                      onChange={(e) => setDraft({ ...current, first_name: e.target.value })}
+                      required
+                    />
+                  </Field>
+                  <Field label="นามสกุล">
+                    <Input
+                      value={current.last_name}
+                      onChange={(e) => setDraft({ ...current, last_name: e.target.value })}
+                      required
+                    />
+                  </Field>
+                </div>
 
-          <Field label="เบอร์ผู้ปกครอง">
-            <Input
-              type="tel"
-              value={current.guardian_phone ?? ""}
-              onChange={(e) => setDraft({ ...current, guardian_phone: e.target.value || null })}
-            />
-          </Field>
-        </form>
+                <Field label="แผนก">
+                  <Select
+                    value={current.department_id}
+                    onChange={(e) =>
+                      setDraft({ ...current, department_id: e.target.value, grade_level_id: null })
+                    }
+                    required
+                    disabled={!me || !isOrgWide(me.roles)}
+                  >
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="ชั้น">
+                    <Select
+                      value={current.grade_level_id ?? ""}
+                      onChange={(e) => setDraft({ ...current, grade_level_id: e.target.value || null })}
+                    >
+                      <option value="">ยังไม่จัดชั้น</option>
+                      {gradeLevels.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="สถานะ">
+                    <Select
+                      value={current.status}
+                      onChange={(e) => setDraft({ ...current, status: e.target.value as StudentStatus })}
+                    >
+                      {(Object.keys(STATUS_LABEL) as StudentStatus[]).map((s) => (
+                        <option key={s} value={s}>
+                          {STATUS_LABEL[s]}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                </div>
+
+                <Field label="เบอร์โทรศัพท์">
+                  <Input
+                    type="tel"
+                    value={current.phone ?? ""}
+                    onChange={(e) => setDraft({ ...current, phone: e.target.value || null })}
+                  />
+                </Field>
+
+                <Field label="อีเมล">
+                  <Input
+                    type="email"
+                    value={current.email ?? ""}
+                    onChange={(e) => setDraft({ ...current, email: e.target.value || null })}
+                  />
+                </Field>
+
+                <Field label="ที่อยู่">
+                  <textarea
+                    className={textareaClass}
+                    value={current.address ?? ""}
+                    onChange={(e) => setDraft({ ...current, address: e.target.value || null })}
+                  />
+                </Field>
+              </>
+            )}
+
+            {section === "health" && (
+              <>
+                <Field label="หมู่เลือด">
+                  <Select
+                    value={current.blood_type ?? ""}
+                    onChange={(e) =>
+                      setDraft({ ...current, blood_type: (e.target.value || null) as BloodType | null })
+                    }
+                  >
+                    <option value="">— ไม่ระบุ —</option>
+                    {BLOOD_TYPES.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+
+                <Field label="โรคประจำตัว">
+                  <textarea
+                    className={textareaClass}
+                    value={current.chronic_disease ?? ""}
+                    onChange={(e) => setDraft({ ...current, chronic_disease: e.target.value || null })}
+                  />
+                </Field>
+
+                <Field label="ยาที่แพ้">
+                  <textarea
+                    className={textareaClass}
+                    value={current.drug_allergy ?? ""}
+                    onChange={(e) => setDraft({ ...current, drug_allergy: e.target.value || null })}
+                  />
+                </Field>
+
+                <Field label="อาหารที่แพ้">
+                  <textarea
+                    className={textareaClass}
+                    value={current.food_allergy ?? ""}
+                    onChange={(e) => setDraft({ ...current, food_allergy: e.target.value || null })}
+                  />
+                </Field>
+              </>
+            )}
+          </form>
+
+          {section === "guardian" && (
+            <div className="space-y-4">
+              <Field label="สถานภาพครอบครัว">
+                <Input
+                  form="edit-student"
+                  value={current.family_status ?? ""}
+                  onChange={(e) => setDraft({ ...current, family_status: e.target.value || null })}
+                  placeholder="เช่น สมรส, หย่าร้าง, แยกกันอยู่, บิดา/มารดาเสียชีวิต"
+                />
+              </Field>
+
+              {isNew ? (
+                <p className="text-sm text-muted-foreground">
+                  บันทึกข้อมูลนักเรียนก่อน แล้วค่อยเพิ่มผู้ปกครอง
+                </p>
+              ) : (
+                <GuardianSection
+                  studentId={(target as Student).id}
+                  studentAddress={current.address}
+                />
+              )}
+            </div>
+          )}
+        </div>
       )}
     </Sheet>
   );
@@ -414,9 +556,302 @@ function pickDraft(s: Student): StudentDraft {
     grade_level_id: s.grade_level_id,
     status: s.status,
     national_id: s.national_id,
-    guardian_name: s.guardian_name,
-    guardian_phone: s.guardian_phone,
+    phone: s.phone,
+    email: s.email,
+    address: s.address,
+    family_status: s.family_status,
+    blood_type: s.blood_type,
+    chronic_disease: s.chronic_disease,
+    drug_allergy: s.drug_allergy,
+    food_allergy: s.food_allergy,
   };
+}
+
+// ------------------------------------------------------------- guardians
+
+function GuardianSection({
+  studentId,
+  studentAddress,
+}: {
+  studentId: string;
+  studentAddress: string | null;
+}) {
+  const { data: contacts = [] } = useStudentContacts(studentId);
+  const contactIds = useMemo(() => contacts.map((c) => c.id), [contacts]);
+  const { data: financials = [] } = useGuardianFinancials(contactIds);
+  const financialByContact = useMemo(
+    () => new Map(financials.map((f) => [f.contact_id, f])),
+    [financials],
+  );
+  const setPrimary = useSetPrimaryContact();
+  const deleteContact = useDeleteStudentContact();
+  const [editingContact, setEditingContact] = useState<StudentContact | "new" | null>(null);
+
+  if (editingContact) {
+    return (
+      <ContactForm
+        studentId={studentId}
+        studentAddress={studentAddress}
+        target={editingContact}
+        financial={editingContact !== "new" ? financialByContact.get(editingContact.id) : undefined}
+        onDone={() => setEditingContact(null)}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold">รายชื่อผู้ปกครอง</h3>
+        <Button type="button" size="sm" onClick={() => setEditingContact("new")}>
+          <Plus className="h-3.5 w-3.5" />
+          เพิ่ม
+        </Button>
+      </div>
+
+      {contacts.length === 0 && (
+        <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูลผู้ปกครอง</p>
+      )}
+
+      <ul className="divide-y divide-border">
+        {contacts.map((c) => (
+          <li key={c.id} className="flex items-center gap-2 py-2 text-sm">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span>
+                  {RELATIONSHIP_LABEL[c.relationship]}
+                  {c.relationship === "other" && c.relationship_note ? ` (${c.relationship_note})` : ""}
+                </span>
+                {c.is_primary && (
+                  <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] text-accent-foreground">
+                    หลัก
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {c.prefix}
+                {c.first_name} {c.last_name} · {c.phone || "—"}
+              </div>
+            </div>
+            {!c.is_primary && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setPrimary.mutate(c.id)}
+                disabled={setPrimary.isPending}
+              >
+                ตั้งเป็นหลัก
+              </Button>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={() => setEditingContact(c)}>
+              แก้ไข
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="ลบผู้ปกครอง"
+              onClick={() => {
+                if (confirm(`ลบข้อมูล "${c.first_name} ${c.last_name}" ออกจากรายชื่อผู้ปกครอง?`)) {
+                  deleteContact.mutate(c.id);
+                }
+              }}
+              disabled={deleteContact.isPending}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ContactForm({
+  studentId,
+  studentAddress,
+  target,
+  financial,
+  onDone,
+}: {
+  studentId: string;
+  studentAddress: string | null;
+  target: StudentContact | "new";
+  financial: { occupation: string | null; workplace: string | null; monthly_income: number | null } | undefined;
+  onDone: () => void;
+}) {
+  const isNew = target === "new";
+  const save = useSaveStudentContact();
+  const saveFinancial = useSaveGuardianFinancial();
+
+  const [draft, setDraft] = useState<StudentContactDraft>(() =>
+    isNew
+      ? {
+          student_id: studentId,
+          relationship: "father",
+          relationship_note: null,
+          prefix: null,
+          first_name: "",
+          last_name: "",
+          phone: null,
+          email: null,
+          address: null,
+        }
+      : {
+          student_id: target.student_id,
+          relationship: target.relationship,
+          relationship_note: target.relationship_note,
+          prefix: target.prefix,
+          first_name: target.first_name,
+          last_name: target.last_name,
+          phone: target.phone,
+          email: target.email,
+          address: target.address,
+        },
+  );
+  const [occupation, setOccupation] = useState(financial?.occupation ?? "");
+  const [workplace, setWorkplace] = useState(financial?.workplace ?? "");
+  const [monthlyIncome, setMonthlyIncome] = useState(financial?.monthly_income?.toString() ?? "");
+  const [pending, setPending] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setPending(true);
+    try {
+      const contact = await save.mutateAsync({
+        ...draft,
+        ...(isNew ? {} : { id: (target as StudentContact).id }),
+      });
+      const hasFinancial = occupation.trim() || workplace.trim() || monthlyIncome.trim();
+      if (hasFinancial) {
+        await saveFinancial.mutateAsync({
+          contact_id: contact.id,
+          occupation: occupation.trim() || null,
+          workplace: workplace.trim() || null,
+          monthly_income: monthlyIncome.trim() ? Number(monthlyIncome) : null,
+        });
+      }
+      onDone();
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <Button type="button" variant="outline" size="sm" onClick={onDone}>
+        ← กลับ
+      </Button>
+
+      <Field label="ความสัมพันธ์">
+        <Select
+          value={draft.relationship}
+          onChange={(e) =>
+            setDraft({ ...draft, relationship: e.target.value as GuardianRelationship })
+          }
+        >
+          {(Object.keys(RELATIONSHIP_LABEL) as GuardianRelationship[]).map((r) => (
+            <option key={r} value={r}>
+              {RELATIONSHIP_LABEL[r]}
+            </option>
+          ))}
+        </Select>
+      </Field>
+
+      {draft.relationship === "other" && (
+        <Field label="ระบุความสัมพันธ์">
+          <Input
+            value={draft.relationship_note ?? ""}
+            onChange={(e) => setDraft({ ...draft, relationship_note: e.target.value || null })}
+            placeholder="เช่น ปู่, ย่า, ญาติ, ผู้อุปการะ"
+            required
+          />
+        </Field>
+      )}
+
+      <Field label="คำนำหน้า">
+        <Select
+          value={draft.prefix ?? ""}
+          onChange={(e) => setDraft({ ...draft, prefix: e.target.value || null })}
+        >
+          <option value="">— ไม่ระบุ —</option>
+          <option value="นาย">นาย</option>
+          <option value="นาง">นาง</option>
+          <option value="นางสาว">นางสาว</option>
+        </Select>
+      </Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="ชื่อ">
+          <Input
+            value={draft.first_name}
+            onChange={(e) => setDraft({ ...draft, first_name: e.target.value })}
+            required
+          />
+        </Field>
+        <Field label="นามสกุล">
+          <Input
+            value={draft.last_name}
+            onChange={(e) => setDraft({ ...draft, last_name: e.target.value })}
+            required
+          />
+        </Field>
+      </div>
+
+      <Field label="เบอร์โทรศัพท์">
+        <Input
+          type="tel"
+          value={draft.phone ?? ""}
+          onChange={(e) => setDraft({ ...draft, phone: e.target.value || null })}
+        />
+      </Field>
+
+      <Field label="อีเมล">
+        <Input
+          type="email"
+          value={draft.email ?? ""}
+          onChange={(e) => setDraft({ ...draft, email: e.target.value || null })}
+        />
+      </Field>
+
+      <Field label="ที่อยู่">
+        <textarea
+          className={textareaClass}
+          value={draft.address ?? ""}
+          onChange={(e) => setDraft({ ...draft, address: e.target.value || null })}
+        />
+        <button
+          type="button"
+          className="mt-1.5 text-xs text-accent-foreground underline"
+          onClick={() => setDraft({ ...draft, address: studentAddress })}
+        >
+          ใช้ที่อยู่เดียวกับนักเรียน
+        </button>
+      </Field>
+
+      <Field label="อาชีพ">
+        <Input value={occupation} onChange={(e) => setOccupation(e.target.value)} />
+      </Field>
+
+      <Field label="สถานที่ทำงาน">
+        <Input value={workplace} onChange={(e) => setWorkplace(e.target.value)} />
+      </Field>
+
+      <Field label="เงินเดือน">
+        <Input
+          type="number"
+          min="0"
+          value={monthlyIncome}
+          onChange={(e) => setMonthlyIncome(e.target.value)}
+        />
+      </Field>
+
+      <Button type="submit" className="w-full" disabled={pending}>
+        {pending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
+      </Button>
+    </form>
+  );
 }
 
 type StudentLoginDraft = {

@@ -69,6 +69,8 @@ export type ProfileRole = {
 /** A profile plus the role names it holds — enough for every permission check. */
 export type ProfileWithRoles = Profile & { roles: Role[] };
 
+export type BloodType = "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-";
+
 export type Student = {
   id: string;
   student_code: string;
@@ -80,9 +82,43 @@ export type Student = {
   grade_level_id: string | null;
   status: StudentStatus;
   profile_id: string | null;
-  guardian_name: string | null;
-  guardian_phone: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  family_status: string | null; // สถานภาพครอบครัว — free text like prefix
+  blood_type: BloodType | null;
+  chronic_disease: string | null;
+  drug_allergy: string | null;
+  food_allergy: string | null;
   created_at: string;
+  updated_at: string;
+};
+
+export type GuardianRelationship = "father" | "mother" | "other";
+
+/** 0..N per student, one may be marked primary — see migration 0015. */
+export type StudentContact = {
+  id: string;
+  student_id: string;
+  relationship: GuardianRelationship;
+  relationship_note: string | null; // shown/required when relationship = "other"
+  is_primary: boolean;
+  prefix: string | null;
+  first_name: string;
+  last_name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** 1:1 with a StudentContact — split out for narrower RLS (can_manage() only). */
+export type StudentGuardianFinancial = {
+  contact_id: string;
+  occupation: string | null;
+  workplace: string | null;
+  monthly_income: number | null;
   updated_at: string;
 };
 
@@ -298,8 +334,14 @@ export type Database = {
           | "national_id"
           | "prefix"
           | "grade_level_id"
-          | "guardian_name"
-          | "guardian_phone"
+          | "phone"
+          | "email"
+          | "address"
+          | "family_status"
+          | "blood_type"
+          | "chronic_disease"
+          | "drug_allergy"
+          | "food_allergy"
         >
       >;
       guardianships: Table<{ parent_id: string; student_id: string }>;
@@ -329,6 +371,14 @@ export type Database = {
         InsertOf<StudentClassroomEnrollment, never>
       >;
       transfer_intakes: Table<TransferIntake, InsertOf<TransferIntake, "intake_date">>;
+      student_contacts: Table<
+        StudentContact,
+        InsertOf<StudentContact, "relationship_note" | "is_primary" | "prefix" | "phone" | "email" | "address">
+      >;
+      student_guardian_financials: Table<
+        StudentGuardianFinancial,
+        InsertOf<StudentGuardianFinancial, "occupation" | "workplace" | "monthly_income">
+      >;
       audit_logs: Table<{
         id: number;
         actor_id: string | null;
@@ -347,6 +397,8 @@ export type Database = {
       student_status: StudentStatus;
       subject_type: SubjectType;
       development_domain: DevelopmentDomain;
+      blood_type: BloodType;
+      guardian_relationship: GuardianRelationship;
     };
     CompositeTypes: Record<string, never>;
   };
