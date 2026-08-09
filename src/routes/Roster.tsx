@@ -676,7 +676,7 @@ function GuardianSection({
   );
   const setPrimary = useSetPrimaryContact();
   const deleteContact = useDeleteStudentContact();
-  const [editingContact, setEditingContact] = useState<StudentContact | "new" | null>(null);
+  const [editingContact, setEditingContact] = useState<StudentContact | NewContact | null>(null);
 
   if (editingContact) {
     return (
@@ -684,21 +684,51 @@ function GuardianSection({
         studentId={studentId}
         studentAddress={studentAddress}
         target={editingContact}
-        financial={editingContact !== "new" ? financialByContact.get(editingContact.id) : undefined}
+        financial={"id" in editingContact ? financialByContact.get(editingContact.id) : undefined}
         onDone={() => setEditingContact(null)}
       />
     );
   }
 
+  const hasFather = contacts.some((c) => c.relationship === "father");
+  const hasMother = contacts.some((c) => c.relationship === "mother");
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">รายชื่อผู้ปกครอง</h3>
-        <Button type="button" size="sm" onClick={() => setEditingContact("new")}>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => setEditingContact({ new: true, relationship: "other" })}
+        >
           <Plus className="h-3.5 w-3.5" />
           เพิ่ม
         </Button>
       </div>
+
+      {(!hasFather || !hasMother) && (
+        <div className="flex gap-2">
+          {!hasFather && (
+            <button
+              type="button"
+              className="flex-1 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted"
+              onClick={() => setEditingContact({ new: true, relationship: "father" })}
+            >
+              + เพิ่มข้อมูลบิดา
+            </button>
+          )}
+          {!hasMother && (
+            <button
+              type="button"
+              className="flex-1 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted"
+              onClick={() => setEditingContact({ new: true, relationship: "mother" })}
+            >
+              + เพิ่มข้อมูลมารดา
+            </button>
+          )}
+        </div>
+      )}
 
       {contacts.length === 0 && (
         <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูลผู้ปกครอง</p>
@@ -759,6 +789,8 @@ function GuardianSection({
   );
 }
 
+type NewContact = { new: true; relationship: GuardianRelationship };
+
 function ContactForm({
   studentId,
   studentAddress,
@@ -768,11 +800,11 @@ function ContactForm({
 }: {
   studentId: string;
   studentAddress: AddressFields;
-  target: StudentContact | "new";
+  target: StudentContact | NewContact;
   financial: { occupation: string | null; workplace: string | null; monthly_income: number | null } | undefined;
   onDone: () => void;
 }) {
-  const isNew = target === "new";
+  const isNew = !("id" in target);
   const save = useSaveStudentContact();
   const saveFinancial = useSaveGuardianFinancial();
 
@@ -780,7 +812,7 @@ function ContactForm({
     isNew
       ? {
           student_id: studentId,
-          relationship: "father",
+          relationship: target.relationship,
           relationship_note: null,
           prefix: null,
           first_name: "",
