@@ -89,7 +89,7 @@ export function Enrollment() {
                   type="button"
                   onClick={() => setPickedCohort(c.id)}
                   className={cn(
-                    "rounded-full border px-3 py-1 text-sm transition-colors",
+                    "rounded-full border px-3 py-1 text-xs transition-colors",
                     pickedCohort === c.id
                       ? "border-foreground bg-foreground/10 text-foreground"
                       : "border-border text-muted-foreground hover:bg-muted",
