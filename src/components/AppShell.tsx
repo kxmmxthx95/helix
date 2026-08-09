@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import {
+  AppsIcon,
   BookIcon,
   ChevronBack,
   ChevronForward,
@@ -45,6 +46,14 @@ const TABS = [
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: true,
+  },
+  {
+    to: "/status",
+    label: "จัดการสถานภาพ",
+    icon: AppsIcon,
+    managerOnly: false,
+    orgWideOnly: true,
+    deptManagerOnly: false,
   },
 ];
 

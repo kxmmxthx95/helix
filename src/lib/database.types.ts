@@ -203,6 +203,24 @@ export type KgAssessmentTopic = {
   updated_at: string;
 };
 
+/** ห้องเรียน (e.g. "1" under ม.1 -> displayed "ม.1/1") — durable, reused every year. */
+export type Classroom = {
+  id: string;
+  grade_level_id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+};
+
+/** History, not a mutable pointer — a reassignment inserts a new row. Latest row per (student, academic_year) = current. */
+export type StudentClassroomEnrollment = {
+  id: string;
+  student_id: string;
+  classroom_id: string;
+  academic_year: number;
+  created_at: string;
+};
+
 type Table<Row, Insert = Partial<Row>> = {
   Row: Row;
   Insert: Insert;
@@ -290,6 +308,11 @@ export type Database = {
       student_cohort_enrollments: Table<
         StudentCohortEnrollment,
         InsertOf<StudentCohortEnrollment, "study_plan_id">
+      >;
+      classrooms: Table<Classroom, InsertOf<Classroom, "is_active">>;
+      student_classroom_enrollments: Table<
+        StudentClassroomEnrollment,
+        InsertOf<StudentClassroomEnrollment, never>
       >;
       audit_logs: Table<{
         id: number;

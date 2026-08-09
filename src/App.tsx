@@ -9,6 +9,7 @@ import { Curriculum } from "@/routes/Curriculum";
 import { Enrollment } from "@/routes/Enrollment";
 import { Roster } from "@/routes/Roster";
 import { Settings } from "@/routes/Settings";
+import { StatusManagement } from "@/routes/StatusManagement";
 import { Subjects } from "@/routes/Subjects";
 import { Users } from "@/routes/Users";
 
@@ -34,6 +35,7 @@ function Gate() {
         <Route path="subjects" element={<Subjects />} />
         <Route path="curriculum" element={<Curriculum />} />
         <Route path="enrollment" element={<Enrollment />} />
+        <Route path="status" element={<StatusManagement />} />
         <Route path="settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
