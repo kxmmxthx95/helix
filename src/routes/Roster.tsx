@@ -220,7 +220,7 @@ export function Roster() {
 
       {rows && rows.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[40rem] text-sm">
+          <table className="w-full min-w-[40rem] text-xs">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">รหัส</th>

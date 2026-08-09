@@ -108,7 +108,7 @@ export function Users() {
         // Table stays a table on mobile; the wrapper scrolls sideways so the
         // page body never does.
         <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[42rem] text-sm">
+          <table className="w-full min-w-[42rem] text-xs">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">ชื่อ</th>
