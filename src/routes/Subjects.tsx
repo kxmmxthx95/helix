@@ -163,7 +163,7 @@ export function Subjects() {
                   onClick={() => mayEdit && setEditing(row)}
                   className={
                     mayEdit
-                      ? "tappable cursor-pointer border-t border-border active:bg-muted"
+                      ? "cursor-pointer border-t border-border active:bg-muted"
                       : "border-t border-border"
                   }
                 >

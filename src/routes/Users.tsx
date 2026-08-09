@@ -125,7 +125,7 @@ export function Users() {
                   onClick={() => mayManage && setEditing(row)}
                   className={
                     mayManage
-                      ? "tappable cursor-pointer border-t border-border active:bg-muted"
+                      ? "cursor-pointer border-t border-border active:bg-muted"
                       : "border-t border-border"
                   }
                 >
