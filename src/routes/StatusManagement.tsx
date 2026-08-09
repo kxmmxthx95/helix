@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Plus, Search } from "@/components/icons";
+import { Sheet } from "@/components/Sheet";
 import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
@@ -15,6 +16,11 @@ import {
   useSetClassroomActive,
 } from "@/hooks/useStatusManagement";
 import { useStudents } from "@/hooks/useStudents";
+import {
+  useCreateTransferIntake,
+  useTransferIntakes,
+  useTransferProgress,
+} from "@/hooks/useTransferIntakes";
 import type { StudentStatus } from "@/lib/database.types";
 import { isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -26,12 +32,13 @@ const STATUS_LABEL: Record<StudentStatus, string> = {
   dropped: "พ้นสภาพ",
 };
 
-type SubTab = "promote" | "classroom" | "status";
+type SubTab = "promote" | "classroom" | "status" | "transfer";
 
 const SUB_TABS: { key: SubTab; label: string }[] = [
   { key: "promote", label: "เลื่อนชั้นประจำปี" },
   { key: "classroom", label: "จัดห้องเรียน" },
   { key: "status", label: "เปลี่ยนสถานะ" },
+  { key: "transfer", label: "รับย้ายเข้า" },
 ];
 
 export function StatusManagement() {
@@ -93,6 +100,7 @@ export function StatusManagement() {
       {pickedDept && subTab === "promote" && <PromotionPanel departmentId={pickedDept} />}
       {pickedDept && subTab === "classroom" && <ClassroomPanel departmentId={pickedDept} />}
       {pickedDept && subTab === "status" && <BulkStatusPanel departmentId={pickedDept} />}
+      {pickedDept && subTab === "transfer" && <TransferIntakePanel departmentId={pickedDept} />}
     </div>
   );
 }
@@ -459,5 +467,191 @@ function BulkStatusPanel({ departmentId }: { departmentId: string }) {
         </Button>
       </div>
     </Card>
+  );
+}
+
+// ------------------------------------------------------------- transfer-in
+// Case tracker only, not a workflow engine (grill decision, 2026-08-09) —
+// classroom assignment and cohort enrollment stay on their own tabs/pages
+// (ClassroomPanel above, Enrollment.tsx), each already reusable for a
+// single ad-hoc student. This panel just remembers source_school and
+// shows whether those two steps are done, derived live rather than stored.
+
+function TransferIntakePanel({ departmentId }: { departmentId: string }) {
+  const [creating, setCreating] = useState(false);
+  const { data: intakes = [] } = useTransferIntakes();
+  const { data: students = [] } = useStudents({ search: "", departmentId, status: "" });
+
+  const studentById = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
+  const deptIntakes = useMemo(
+    () => intakes.filter((i) => studentById.has(i.student_id)),
+    [intakes, studentById],
+  );
+  const studentIds = useMemo(() => deptIntakes.map((i) => i.student_id), [deptIntakes]);
+  const { data: progress } = useTransferProgress(studentIds);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold">เคสรับย้ายเข้า</h3>
+        <Button size="sm" onClick={() => setCreating(true)}>
+          <Plus className="h-3.5 w-3.5" />
+          เพิ่มเคสใหม่
+        </Button>
+      </div>
+
+      <Card className="divide-y divide-border p-0">
+        {deptIntakes.length === 0 && (
+          <p className="p-4 text-sm text-muted-foreground">ยังไม่มีเคสรับย้ายเข้าในแผนกนี้</p>
+        )}
+        {deptIntakes.map((intake) => {
+          const student = studentById.get(intake.student_id);
+          const hasClassroom = progress?.hasClassroom.has(intake.student_id) ?? false;
+          const hasCohort = progress?.hasCohort.has(intake.student_id) ?? false;
+          return (
+            <div key={intake.id} className="flex flex-wrap items-center gap-2 p-3 text-sm">
+              <div className="min-w-0 flex-1">
+                <div>
+                  {student ? `${student.first_name} ${student.last_name}` : "—"}{" "}
+                  <span className="text-xs text-muted-foreground">({student?.student_code ?? "—"})</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  จาก {intake.source_school} · รับเข้า {intake.intake_date}
+                </div>
+              </div>
+              <TransferStatusBadge done={hasClassroom} doneLabel="จัดห้องแล้ว" pendingLabel="ยังไม่จัดห้อง" />
+              <TransferStatusBadge done={hasCohort} doneLabel="ลงทะเบียนแล้ว" pendingLabel="ยังไม่ลงทะเบียน" />
+            </div>
+          );
+        })}
+      </Card>
+
+      <p className="text-xs text-muted-foreground">
+        จัดห้อง: ไปแท็บ "จัดห้องเรียน" ด้านบน · ลงทะเบียนเข้าหลักสูตร: ไปหน้า "ลงทะเบียน"
+      </p>
+
+      <NewIntakeSheet open={creating} onClose={() => setCreating(false)} departmentId={departmentId} />
+    </div>
+  );
+}
+
+function TransferStatusBadge({
+  done,
+  doneLabel,
+  pendingLabel,
+}: {
+  done: boolean;
+  doneLabel: string;
+  pendingLabel: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded-full px-2 py-0.5 text-xs",
+        done ? "bg-success/10 text-success" : "bg-muted text-muted-foreground",
+      )}
+    >
+      {done ? doneLabel : pendingLabel}
+    </span>
+  );
+}
+
+function NewIntakeSheet({
+  open,
+  onClose,
+  departmentId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  departmentId: string;
+}) {
+  const [search, setSearch] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [sourceSchool, setSourceSchool] = useState("");
+  const [intakeDate, setIntakeDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const { data: students = [] } = useStudents({ search, departmentId, status: "" });
+  const { data: existing = [] } = useTransferIntakes();
+  const create = useCreateTransferIntake();
+
+  const alreadyCase = useMemo(() => new Set(existing.map((i) => i.student_id)), [existing]);
+
+  useEffect(() => {
+    if (!open) {
+      setSearch("");
+      setStudentId("");
+      setSourceSchool("");
+      setIntakeDate(new Date().toISOString().slice(0, 10));
+    }
+  }, [open]);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!studentId || !sourceSchool.trim()) return;
+    create.mutate(
+      { student_id: studentId, source_school: sourceSchool.trim(), intake_date: intakeDate },
+      { onSuccess: onClose },
+    );
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()} title="เพิ่มเคสรับย้ายเข้า">
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="นักเรียน (สร้าง profile ที่หน้ารายชื่อนักเรียนก่อน)">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหาชื่อหรือรหัสนักเรียน"
+              className="pl-9"
+              type="search"
+            />
+          </div>
+          <div className="mt-2 max-h-48 divide-y divide-border overflow-y-auto rounded-lg border border-border">
+            {students.map((s) => (
+              <label
+                key={s.id}
+                className={cn(
+                  "flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted",
+                  alreadyCase.has(s.id) && "opacity-50",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="transfer-student"
+                  checked={studentId === s.id}
+                  disabled={alreadyCase.has(s.id)}
+                  onChange={() => setStudentId(s.id)}
+                />
+                <span className="flex-1">
+                  {s.first_name} {s.last_name}{" "}
+                  <span className="text-muted-foreground">({s.student_code})</span>
+                </span>
+                {alreadyCase.has(s.id) && <span className="text-muted-foreground">มีเคสแล้ว</span>}
+              </label>
+            ))}
+            {students.length === 0 && (
+              <p className="px-2 py-3 text-xs text-muted-foreground">ไม่พบนักเรียน</p>
+            )}
+          </div>
+        </Field>
+
+        <Field label="โรงเรียนเดิม">
+          <Input value={sourceSchool} onChange={(e) => setSourceSchool(e.target.value)} required />
+        </Field>
+
+        <Field label="วันที่รับเอกสาร">
+          <Input type="date" value={intakeDate} onChange={(e) => setIntakeDate(e.target.value)} required />
+        </Field>
+
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={!studentId || !sourceSchool.trim() || create.isPending}
+        >
+          {create.isPending ? <Spinner className="h-3 w-3" /> : "บันทึกเคส"}
+        </Button>
+      </form>
+    </Sheet>
   );
 }

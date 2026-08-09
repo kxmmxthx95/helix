@@ -221,6 +221,20 @@ export type StudentClassroomEnrollment = {
   created_at: string;
 };
 
+/**
+ * รับย้ายเข้า case — one row per transfer-in student, kept forever as a
+ * record of which school they came from. Not a state machine: whether the
+ * case is "done" is derived by checking for a student_classroom_enrollments
+ * / student_cohort_enrollments row, not stored here.
+ */
+export type TransferIntake = {
+  id: string;
+  student_id: string;
+  source_school: string;
+  intake_date: string;
+  created_at: string;
+};
+
 type Table<Row, Insert = Partial<Row>> = {
   Row: Row;
   Insert: Insert;
@@ -314,6 +328,7 @@ export type Database = {
         StudentClassroomEnrollment,
         InsertOf<StudentClassroomEnrollment, never>
       >;
+      transfer_intakes: Table<TransferIntake, InsertOf<TransferIntake, "intake_date">>;
       audit_logs: Table<{
         id: number;
         actor_id: string | null;
