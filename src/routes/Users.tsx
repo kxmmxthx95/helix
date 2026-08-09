@@ -125,8 +125,8 @@ export function Users() {
                   onClick={() => mayManage && setEditing(row)}
                   className={
                     mayManage
-                      ? "h-[38px] cursor-pointer border-t border-border active:bg-muted"
-                      : "h-[38px] border-t border-border"
+                      ? "h-[40px] cursor-pointer border-t border-border active:bg-muted"
+                      : "h-[40px] border-t border-border"
                   }
                 >
                   <td className="px-3 py-0">

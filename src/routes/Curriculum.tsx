@@ -622,7 +622,7 @@ function SubjectTable({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="h-[38px] border-t border-border">
+            <tr key={row.id} className="h-[40px] border-t border-border">
               <td className="px-3 py-0 font-medium">{subjectName.get(row.subject_id) ?? "—"}</td>
               <td className="px-3 py-0">
                 <span
