@@ -288,7 +288,7 @@ export function Roster() {
                   {mayEdit && (
                     <td className="px-3 py-3">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="icon"
                         aria-label="ลบนักเรียน"
                         onClick={(e) => {
