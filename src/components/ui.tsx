@@ -53,18 +53,28 @@ Input.displayName = "Input";
  * Native <select> on purpose: iOS and Android render it as the OS wheel
  * picker, which is more app-like than any custom dropdown we could build.
  */
-export const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
-  ({ className, ...props }, ref) => (
-    <select
-      ref={ref}
-      className={cn(
-        "ui-select h-8 w-full rounded-lg border border-input bg-background px-2.5 pr-8 text-xs outline-none focus-visible:border-ring disabled:opacity-50",
-        className,
-      )}
-      {...props}
-    />
-  ),
-);
+export const Select = forwardRef<
+  HTMLSelectElement,
+  React.SelectHTMLAttributes<HTMLSelectElement> & { placeholder?: string }
+>(({ className, placeholder, children, value, ...props }, ref) => (
+  <select
+    ref={ref}
+    value={value}
+    className={cn(
+      "ui-select h-8 w-full rounded-lg border border-input bg-background px-2.5 pr-8 text-xs outline-none focus-visible:border-ring disabled:opacity-50",
+      placeholder != null && (value === "" || value === undefined) && "ui-select-placeholder",
+      className,
+    )}
+    {...props}
+  >
+    {placeholder != null && (
+      <option value="" disabled>
+        {placeholder}
+      </option>
+    )}
+    {children}
+  </select>
+));
 Select.displayName = "Select";
 
 /** Glass surface — bottom nav, cards and sheets only (grill decision). */

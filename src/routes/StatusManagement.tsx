@@ -52,10 +52,6 @@ export function StatusManagement() {
   const [pickedDept, setPickedDept] = useState("");
   const [subTab, setSubTab] = useState<SubTab>("promote");
 
-  useEffect(() => {
-    if (!pickedDept && departments.length > 0) setPickedDept(departments[0]!.id);
-  }, [departments, pickedDept]);
-
   if (!me || !orgWide) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
   }
@@ -68,6 +64,7 @@ export function StatusManagement() {
           value={pickedDept}
           onChange={(e) => setPickedDept(e.target.value)}
           aria-label="แผนก"
+          placeholder="เลือกแผนก"
         >
           {departments.map((d) => (
             <option key={d.id} value={d.id}>

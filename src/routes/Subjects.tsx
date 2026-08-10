@@ -1,5 +1,5 @@
 import { FileUp, Plus, Search, SlidersHorizontal } from "@/components/icons";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSubjectsSheet } from "@/components/ImportSubjectsSheet";
 import { Sheet } from "@/components/Sheet";
@@ -46,10 +46,6 @@ export function Subjects() {
   // KG never uses subjects (it has its own learning_units/kg_assessment_topics model).
   const pickableDepartments = useMemo(() => departments.filter((d) => d.code !== "KG"), [departments]);
 
-  useEffect(() => {
-    if (orgWide && !pickedDept && pickableDepartments.length > 0) setPickedDept(pickableDepartments[0]!.id);
-  }, [orgWide, pickableDepartments, pickedDept]);
-
   const departmentId = orgWide ? pickedDept : me?.department_id ?? "";
   const departmentName = departments.find((d) => d.id === departmentId)?.name ?? "";
 
@@ -81,6 +77,7 @@ export function Subjects() {
             value={pickedDept}
             onChange={(e) => setPickedDept(e.target.value)}
             aria-label="แผนก"
+            placeholder="เลือกแผนก"
           >
             {pickableDepartments.map((d) => (
               <option key={d.id} value={d.id}>

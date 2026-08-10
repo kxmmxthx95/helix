@@ -28,10 +28,6 @@ export function Enrollment() {
   const [pickedCohort, setPickedCohort] = useState("");
 
   useEffect(() => {
-    if (orgWide && !pickedDept && departments.length > 0) setPickedDept(departments[0]!.id);
-  }, [orgWide, departments, pickedDept]);
-
-  useEffect(() => {
     setPickedCohort("");
   }, [pickedDept]);
 
@@ -53,6 +49,7 @@ export function Enrollment() {
           value={pickedDept}
           onChange={(e) => setPickedDept(e.target.value)}
           aria-label="แผนก"
+          placeholder="เลือกแผนก"
         >
           {departments.map((d) => (
             <option key={d.id} value={d.id}>

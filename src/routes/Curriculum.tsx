@@ -50,10 +50,6 @@ export function Curriculum() {
   const [pendingCreate, setPendingCreate] = useState(false);
   const userPickedYear = useRef(false);
 
-  useEffect(() => {
-    if (orgWide && !pickedDept && departments.length > 0) setPickedDept(departments[0]!.id);
-  }, [orgWide, departments, pickedDept]);
-
   const departmentId = orgWide ? pickedDept : me?.department_id ?? "";
   const department = departments.find((d) => d.id === departmentId);
   const isKg = department?.code === "KG";
@@ -133,6 +129,7 @@ export function Curriculum() {
               setPickedGradeLevel("");
             }}
             aria-label="แผนก"
+            placeholder="เลือกแผนก"
           >
             {departments.map((d) => (
               <option key={d.id} value={d.id}>
@@ -160,9 +157,8 @@ export function Curriculum() {
                 </Select>
                 {mayEdit && !addingKgYear && (
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="icon"
-                    className="text-white hover:bg-transparent hover:text-white"
                     onClick={() => setAddingKgYear(true)}
                     aria-label="เพิ่มปีการศึกษา"
                   >
@@ -202,9 +198,8 @@ export function Curriculum() {
                 </Select>
                 {mayEdit && !addingYear && (
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="icon"
-                    className="text-white hover:bg-transparent hover:text-white"
                     onClick={() => setAddingYear(true)}
                     aria-label="เพิ่มปีการศึกษา"
                   >
@@ -385,9 +380,13 @@ function CohortPicker({
           </div>
         ))}
         {mayEdit && (
-          <Button variant="ghost" size="sm" className="text-white hover:bg-transparent hover:text-white" onClick={() => setCreating(true)}>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setCreating(true)}
+            aria-label="สร้างหลักสูตร"
+          >
             <Plus className="h-3.5 w-3.5" />
-            สร้างหลักสูตร
           </Button>
         )}
       </div>

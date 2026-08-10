@@ -32,10 +32,6 @@ export function TeachingLoad() {
   const [term, setTerm] = useState<1 | 2>(1);
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
 
-  useEffect(() => {
-    if (orgWide && !pickedDept && departments.length > 0) setPickedDept(departments[0]!.id);
-  }, [orgWide, departments, pickedDept]);
-
   const departmentId = orgWide ? pickedDept : (me?.department_id ?? "");
   const department = departments.find((d) => d.id === departmentId);
   const splitsByTerm = department?.code === "SEC";
@@ -59,6 +55,7 @@ export function TeachingLoad() {
             setSelectedTeacherId("");
           }}
           aria-label="แผนก"
+          placeholder="เลือกแผนก"
         >
           {departments.map((d) => (
             <option key={d.id} value={d.id}>

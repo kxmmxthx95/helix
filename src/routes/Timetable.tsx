@@ -46,10 +46,6 @@ export function Timetable() {
   const [teacherId, setTeacherId] = useState("");
 
   useEffect(() => {
-    if (orgWide && !pickedDept && departments.length > 0) setPickedDept(departments[0]!.id);
-  }, [orgWide, departments, pickedDept]);
-
-  useEffect(() => {
     if (!teacherId && me?.id) setTeacherId(me.id);
   }, [teacherId, me?.id]);
 
@@ -79,6 +75,7 @@ export function Timetable() {
           value={pickedDept}
           onChange={(e) => setPickedDept(e.target.value)}
           aria-label="แผนก"
+          placeholder="เลือกแผนก"
         >
           {departments.map((d) => (
             <option key={d.id} value={d.id}>
