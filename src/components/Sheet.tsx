@@ -34,7 +34,7 @@ export function Sheet({
             className,
           )}
         >
-          <div className="px-3 pb-1.5 pt-3">
+          <div className="shrink-0 border-b border-border px-3 pb-3 pt-3">
             <Drawer.Title className="text-base font-semibold">{title}</Drawer.Title>
             {description ? (
               <Drawer.Description className="text-xs text-muted-foreground">

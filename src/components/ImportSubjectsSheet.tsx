@@ -98,13 +98,11 @@ export function ImportSubjectsSheet({
   open,
   onOpenChange,
   departmentId,
-  departmentName,
   learningAreas,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   departmentId: string;
-  departmentName: string;
   learningAreas: LearningArea[];
 }) {
   const importSubjects = useImportSubjects();
@@ -174,7 +172,6 @@ export function ImportSubjectsSheet({
         onOpenChange(next);
       }}
       title="นำเข้ารายวิชา"
-      description={`ไฟล์ CSV — export จาก Google Sheet ได้เลย (File → Download → CSV) — นำเข้าไปยังแผนก${departmentName ? ` "${departmentName}"` : ""}`}
       footer={
         parsed ? (
           <div className="flex gap-2">

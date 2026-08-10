@@ -271,7 +271,6 @@ export function Subjects() {
         open={importing}
         onOpenChange={setImporting}
         departmentId={departmentId}
-        departmentName={departmentName}
         learningAreas={learningAreas}
       />
     </div>
