@@ -154,21 +154,29 @@ function CohortEnrollmentPanel({
 
   return (
     <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
-      <Card className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">นักเรียนในรุ่นนี้ ({enrollments.length})</h3>
+      {enrollments.length === 0 ? (
+        <div className="space-y-3">
           {mayEdit && (
-            <Button variant="outline" size="sm" className="lg:hidden" onClick={() => setAssigning(true)}>
-              <Plus className="h-3.5 w-3.5" />
-              ลงทะเบียนนักเรียน
-            </Button>
+            <div className="flex justify-end lg:hidden">
+              <Button variant="outline" size="sm" onClick={() => setAssigning(true)}>
+                <Plus className="h-3.5 w-3.5" />
+                ลงทะเบียนนักเรียน
+              </Button>
+            </div>
           )}
+          <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีนักเรียนลงทะเบียนรุ่นนี้" />
         </div>
-
-        {enrollments.length === 0 && (
-          <p className="text-sm text-muted-foreground">ยังไม่มีนักเรียนลงทะเบียนรุ่นนี้</p>
-        )}
-        {enrollments.length > 0 && (
+      ) : (
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">นักเรียนในรุ่นนี้ ({enrollments.length})</h3>
+            {mayEdit && (
+              <Button variant="outline" size="sm" className="lg:hidden" onClick={() => setAssigning(true)}>
+                <Plus className="h-3.5 w-3.5" />
+                ลงทะเบียนนักเรียน
+              </Button>
+            )}
+          </div>
           <ul className="max-h-96 divide-y divide-border overflow-y-auto text-xs">
             {enrollments.map((e) => (
               <li key={e.id} className="flex items-center justify-between gap-2 py-1.5">
@@ -196,8 +204,8 @@ function CohortEnrollmentPanel({
               </li>
             ))}
           </ul>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {mayEdit && (
         <Card className="hidden space-y-4 lg:block">

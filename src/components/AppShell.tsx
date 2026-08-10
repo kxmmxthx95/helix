@@ -212,7 +212,7 @@ export function AppShell() {
               title={label}
               className={({ isActive }) =>
                 cn(
-                  "tappable flex items-center rounded-lg text-sm font-medium transition-colors",
+                  "tappable flex items-center rounded-lg text-xs font-medium transition-colors",
                   collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2",
                   isActive
                     ? "bg-foreground/10 text-foreground"

@@ -74,23 +74,18 @@ export function StatusManagement() {
         </Select>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <Select
+        className="w-auto min-w-[12rem]"
+        value={subTab}
+        onChange={(e) => setSubTab(e.target.value as SubTab)}
+        aria-label="เมนูจัดการสถานภาพ"
+      >
         {SUB_TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setSubTab(t.key)}
-            className={cn(
-              "rounded-full border px-3 py-1 text-xs transition-colors",
-              subTab === t.key
-                ? "border-foreground bg-foreground/10 text-foreground"
-                : "border-border text-muted-foreground hover:bg-muted",
-            )}
-          >
+          <option key={t.key} value={t.key}>
             {t.label}
-          </button>
+          </option>
         ))}
-      </div>
+      </Select>
 
       {pickedDept && subTab === "promote" && <PromotionPanel departmentId={pickedDept} />}
       {pickedDept && subTab === "classroom" && <ClassroomPanel departmentId={pickedDept} />}
