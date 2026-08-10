@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useDepartments } from "@/hooks/useProfiles";
 import { usePagination } from "@/hooks/usePagination";
 import { useSubjects } from "@/hooks/useCurriculum";
@@ -45,6 +45,10 @@ export function Curriculum() {
   const [pickedCohort, setPickedCohort] = useState("");
   const [kgAcademicYear, setKgAcademicYear] = useState<number | null>(null);
   const [addingKgYear, setAddingKgYear] = useState(false);
+  const [pickedYear, setPickedYear] = useState(() => new Date().getFullYear() + 543);
+  const [addingYear, setAddingYear] = useState(false);
+  const [pendingCreate, setPendingCreate] = useState(false);
+  const userPickedYear = useRef(false);
 
   useEffect(() => {
     if (orgWide && !pickedDept && departments.length > 0) setPickedDept(departments[0]!.id);
@@ -55,6 +59,7 @@ export function Curriculum() {
   const isKg = department?.code === "KG";
 
   const { data: activeYear } = useActiveAcademicYear(departmentId || null);
+  const defaultEntryYear = activeYear ?? new Date().getFullYear() + 543;
 
   useEffect(() => {
     if (activeYear !== undefined && kgAcademicYear === null) setKgAcademicYear(activeYear);
@@ -69,8 +74,28 @@ export function Curriculum() {
   const kgYearTabs = useMemo(() => {
     const set = new Set(kgYears);
     if (activeYear !== undefined) set.add(activeYear);
+    if (kgAcademicYear !== null) set.add(kgAcademicYear);
     return [...set].sort((a, b) => b - a);
-  }, [kgYears, activeYear]);
+  }, [kgYears, activeYear, kgAcademicYear]);
+
+  const years = useMemo(() => {
+    const set = new Set(cohorts.map((c) => c.entry_year));
+    set.add(defaultEntryYear);
+    set.add(pickedYear);
+    return [...set].sort((a, b) => b - a);
+  }, [cohorts, defaultEntryYear, pickedYear]);
+
+  useEffect(() => {
+    userPickedYear.current = false;
+    setPickedYear(defaultEntryYear);
+    setAddingYear(false);
+    setPendingCreate(false);
+  }, [departmentId, defaultEntryYear]);
+
+  useEffect(() => {
+    if (userPickedYear.current || cohorts.length === 0) return;
+    setPickedYear(Math.max(...cohorts.map((c) => c.entry_year)));
+  }, [cohorts]);
 
   useEffect(() => {
     if (gradeLevels.length > 0 && !gradeLevels.some((g) => g.id === pickedGradeLevel)) {
@@ -82,78 +107,133 @@ export function Curriculum() {
     setPickedCohort("");
   }, [departmentId]);
 
+  function pickYear(y: number) {
+    userPickedYear.current = true;
+    setPickedYear(y);
+    if (pickedCohort && !cohorts.some((c) => c.id === pickedCohort && c.entry_year === y)) {
+      setPickedCohort("");
+    }
+  }
+
   if (!me || (!orgWide && !me.roles.includes("dept_head"))) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์ดูโครงสร้างหลักสูตร</Card>;
   }
 
+  const showYearToolbar = (isKg && kgAcademicYear !== null) || (!isKg && !!departmentId);
+
   return (
     <div className="space-y-4">
-      {orgWide && departments.length > 0 && (
-        <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
-          {departments.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => {
-                setPickedDept(d.id);
-                setPickedGradeLevel("");
-              }}
-              className={cn(
-                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                pickedDept === d.id
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              {d.name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {isKg && kgAcademicYear !== null && (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
-            {kgYearTabs.map((y) => (
-              <button
-                key={y}
-                type="button"
-                onClick={() => setKgAcademicYear(y)}
-                className={cn(
-                  "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                  kgAcademicYear === y
-                    ? "bg-foreground/10 text-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                ปี {y}
-              </button>
+      <div className="flex flex-wrap items-center gap-2">
+        {orgWide && departments.length > 0 && (
+          <Select
+            className="w-auto min-w-[10rem] shrink-0"
+            value={pickedDept}
+            onChange={(e) => {
+              setPickedDept(e.target.value);
+              setPickedGradeLevel("");
+            }}
+            aria-label="แผนก"
+          >
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
             ))}
+          </Select>
+        )}
+
+        {showYearToolbar && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {isKg && kgAcademicYear !== null ? (
+              <>
+                <Select
+                  className="w-auto min-w-[7rem]"
+                  value={String(kgAcademicYear)}
+                  onChange={(e) => setKgAcademicYear(Number(e.target.value))}
+                  aria-label="ปีการศึกษา"
+                >
+                  {kgYearTabs.map((y) => (
+                    <option key={y} value={y}>
+                      ปี {y}
+                    </option>
+                  ))}
+                </Select>
+                {mayEdit && !addingKgYear && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-white hover:bg-transparent hover:text-white"
+                    onClick={() => setAddingKgYear(true)}
+                    aria-label="เพิ่มปีการศึกษา"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                {mayEdit && addingKgYear && (
+                  <Input
+                    type="number"
+                    autoFocus
+                    className="w-24"
+                    placeholder="พ.ศ."
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                    }}
+                    onBlur={(e) => {
+                      const y = Number(e.target.value);
+                      setAddingKgYear(false);
+                      if (y) setKgAcademicYear(y);
+                    }}
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <Select
+                  className="w-auto min-w-[7rem]"
+                  value={String(pickedYear)}
+                  onChange={(e) => pickYear(Number(e.target.value))}
+                  aria-label="ปีการศึกษา"
+                >
+                  {years.map((y) => (
+                    <option key={y} value={y}>
+                      ปี {y}
+                    </option>
+                  ))}
+                </Select>
+                {mayEdit && !addingYear && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-white hover:bg-transparent hover:text-white"
+                    onClick={() => setAddingYear(true)}
+                    aria-label="เพิ่มปีการศึกษา"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                {mayEdit && addingYear && (
+                  <Input
+                    type="number"
+                    autoFocus
+                    className="w-24"
+                    placeholder="พ.ศ."
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                    }}
+                    onBlur={(e) => {
+                      const y = Number(e.target.value);
+                      setAddingYear(false);
+                      if (!y) return;
+                      pickYear(y);
+                      setPendingCreate(true);
+                    }}
+                  />
+                )}
+              </>
+            )}
           </div>
-          {mayEdit && !addingKgYear && (
-            <Button variant="ghost" size="sm" className="text-white hover:bg-transparent hover:text-white" onClick={() => setAddingKgYear(true)}>
-              <Plus className="h-3.5 w-3.5" />
-              ปีการศึกษา
-            </Button>
-          )}
-          {mayEdit && addingKgYear && (
-            <Input
-              type="number"
-              autoFocus
-              className="w-24"
-              placeholder="พ.ศ."
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-              }}
-              onBlur={(e) => {
-                const y = Number(e.target.value);
-                setAddingKgYear(false);
-                if (y) setKgAcademicYear(y);
-              }}
-            />
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
       {!isKg && departmentId && (
         <CohortPicker
@@ -163,22 +243,28 @@ export function Curriculum() {
           departmentId={departmentId}
           gradeLevels={gradeLevels}
           mayEdit={mayEdit}
-          defaultEntryYear={activeYear ?? new Date().getFullYear() + 543}
+          defaultEntryYear={defaultEntryYear}
+          pickedYear={pickedYear}
+          onYearChange={pickYear}
+          pendingCreate={pendingCreate}
+          onPendingCreateHandled={() => setPendingCreate(false)}
         />
       )}
 
       {(isKg || pickedCohort) && gradeLevels.length > 0 && (
-        <div className="flex h-8 w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
+        <div className="flex w-full gap-0 overflow-x-auto border-b border-border" role="tablist">
           {gradeLevels.map((g) => (
             <button
               key={g.id}
               type="button"
+              role="tab"
+              aria-selected={pickedGradeLevel === g.id}
               onClick={() => setPickedGradeLevel(g.id)}
               className={cn(
-                "inline-flex h-full min-w-0 flex-1 items-center justify-center rounded-md px-2 text-xs font-medium transition-colors",
+                "inline-flex h-8 min-w-0 flex-1 items-center justify-center border-b-2 px-3 text-xs font-medium transition-colors -mb-px",
                 pickedGradeLevel === g.id
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  ? "border-foreground text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
               )}
             >
               <span className="truncate">{g.name}</span>
@@ -188,11 +274,11 @@ export function Curriculum() {
       )}
 
       {!isKg && departmentId && gradeLevels.length > 0 && !pickedCohort && (
-        <Card className="py-10 text-center text-sm text-muted-foreground">เลือกหรือสร้างรุ่นก่อนจัดวิชา</Card>
+        <EmptyState title="ไม่พบข้อมูล" description="เลือกหรือสร้างรุ่นก่อนจัดวิชา" />
       )}
 
       {departmentId && gradeLevels.length === 0 && (
-        <Card className="py-10 text-center text-sm text-muted-foreground">ไม่พบระดับชั้นของแผนกนี้</Card>
+        <EmptyState title="ไม่พบข้อมูล" description="ไม่พบระดับชั้นของแผนกนี้" />
       )}
 
       {isKg && pickedGradeLevel && kgAcademicYear !== null && (
@@ -224,6 +310,10 @@ function CohortPicker({
   gradeLevels,
   mayEdit,
   defaultEntryYear,
+  pickedYear,
+  onYearChange,
+  pendingCreate,
+  onPendingCreateHandled,
 }: {
   cohorts: { id: string; name: string; entry_year: number }[];
   pickedCohort: string;
@@ -232,95 +322,32 @@ function CohortPicker({
   gradeLevels: { id: string; name: string; code: string; is_entry_point: boolean }[];
   mayEdit: boolean;
   defaultEntryYear: number;
+  pickedYear: number;
+  onYearChange: (year: number) => void;
+  pendingCreate: boolean;
+  onPendingCreateHandled: () => void;
 }) {
   const [creating, setCreating] = useState(false);
-  const [pickedYear, setPickedYear] = useState(defaultEntryYear);
-  const [addingYear, setAddingYear] = useState(false);
   const save = useSaveCohort();
   const del = useDeleteCohort();
 
-  // Jump to the most recent year that actually has a cohort, once — so
-  // reopening this page after creating a cohort for a non-current year
-  // (via "ปีอื่น") lands on it instead of defaulting back to the current
-  // academic year. Only runs before the user picks a year themselves.
-  const userPickedYear = useRef(false);
   useEffect(() => {
-    if (userPickedYear.current || cohorts.length === 0) return;
-    setPickedYear(Math.max(...cohorts.map((c) => c.entry_year)));
-  }, [cohorts]);
-
-  // Only years with a real cohort (plus the current academic year) are
-  // shown — a typed-but-not-yet-created year never gets its own tab, so
-  // there's nothing to look "lost" on refresh (grill decision, 2026-08-08).
-  const years = useMemo(() => {
-    const set = new Set(cohorts.map((c) => c.entry_year));
-    set.add(defaultEntryYear);
-    return [...set].sort((a, b) => b - a);
-  }, [cohorts, defaultEntryYear]);
+    if (!pendingCreate) return;
+    setCreating(true);
+    onPendingCreateHandled();
+  }, [pendingCreate, onPendingCreateHandled]);
 
   const cohortsInYear = cohorts.filter((c) => c.entry_year === pickedYear);
 
   function closeCreating() {
     setCreating(false);
     if (!cohorts.some((c) => c.entry_year === pickedYear) && pickedYear !== defaultEntryYear) {
-      setPickedYear(defaultEntryYear);
+      onYearChange(defaultEntryYear);
     }
   }
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
-          {years.map((y) => (
-            <button
-              key={y}
-              type="button"
-              onClick={() => {
-                userPickedYear.current = true;
-                setPickedYear(y);
-                if (pickedCohort && !cohorts.some((c) => c.id === pickedCohort && c.entry_year === y)) onPick("");
-              }}
-              className={cn(
-                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                pickedYear === y
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              ปี {y}
-            </button>
-          ))}
-        </div>
-        {mayEdit && !addingYear && (
-          <Button variant="ghost" size="sm" className="text-white hover:bg-transparent hover:text-white" onClick={() => setAddingYear(true)}>
-            <Plus className="h-3.5 w-3.5" />
-            ปีการศึกษา
-          </Button>
-        )}
-        {mayEdit && addingYear && (
-          <Input
-            type="number"
-            autoFocus
-            className="w-24"
-            placeholder="พ.ศ."
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-            onBlur={(e) => {
-              const y = Number(e.target.value);
-              setAddingYear(false);
-              if (!y) return;
-              // Go straight to the create form for year y instead of
-              // parking on an empty tab — nothing is real until saved.
-              userPickedYear.current = true;
-              setPickedYear(y);
-              if (pickedCohort && !cohorts.some((c) => c.id === pickedCohort && c.entry_year === y)) onPick("");
-              setCreating(true);
-            }}
-          />
-        )}
-      </div>
-
       <div className="flex flex-wrap items-center gap-2">
         {cohortsInYear.map((c) => (
           <div key={c.id} className="group relative">
@@ -387,7 +414,7 @@ function CohortPicker({
           onSubmit={(draft, resetForm) => {
             save.mutate(draft, {
               onSuccess: () => {
-                userPickedYear.current = true;
+                onYearChange(pickedYear);
                 resetForm();
                 setCreating(false);
               },
@@ -554,7 +581,7 @@ function SubjectPanel({
       )}
 
       {!isLoading && visible.length === 0 && (
-        <Card className="py-8 text-center text-sm text-muted-foreground">ยังไม่มีวิชาในโครงสร้างนี้</Card>
+        <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีวิชาในโครงสร้างนี้" />
       )}
 
       {coreRows.length > 0 && (

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Select, Spinner } from "@/components/ui";
 import {
   useCohortStudyPlans,
   useCohorts,
@@ -48,23 +48,18 @@ export function Enrollment() {
   return (
     <div className="space-y-4">
       {orgWide && departments.length > 0 && (
-        <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
+        <Select
+          className="w-auto min-w-[10rem]"
+          value={pickedDept}
+          onChange={(e) => setPickedDept(e.target.value)}
+          aria-label="แผนก"
+        >
           {departments.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => setPickedDept(d.id)}
-              className={cn(
-                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                pickedDept === d.id
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
+            <option key={d.id} value={d.id}>
               {d.name}
-            </button>
+            </option>
           ))}
-        </div>
+        </Select>
       )}
 
       {isKg && (
@@ -76,9 +71,10 @@ export function Enrollment() {
       {!isKg && departmentId && (
         <>
           {cohorts.length === 0 && (
-            <Card className="py-10 text-center text-sm text-muted-foreground">
-              แผนกนี้ยังไม่มีรุ่นหลักสูตร — สร้างที่หน้าโครงสร้างหลักสูตรก่อน
-            </Card>
+            <EmptyState
+              title="ไม่พบข้อมูล"
+              description="แผนกนี้ยังไม่มีรุ่นหลักสูตร — สร้างที่หน้าโครงสร้างหลักสูตรก่อน"
+            />
           )}
 
           {cohorts.length > 0 && (

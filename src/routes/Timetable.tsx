@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { Card, Select, Spinner } from "@/components/ui";
+import { Card, EmptyState, Select, Spinner } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useDepartmentPeriods } from "@/hooks/usePeriodDefinitions";
 import { useSubjects } from "@/hooks/useCurriculum";
@@ -74,23 +74,18 @@ export function Timetable() {
   return (
     <div className="space-y-4">
       {orgWide && departments.length > 0 && (
-        <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
+        <Select
+          className="w-auto min-w-[10rem]"
+          value={pickedDept}
+          onChange={(e) => setPickedDept(e.target.value)}
+          aria-label="แผนก"
+        >
           {departments.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => setPickedDept(d.id)}
-              className={cn(
-                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                pickedDept === d.id
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
+            <option key={d.id} value={d.id}>
               {d.name}
-            </button>
+            </option>
           ))}
-        </div>
+        </Select>
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -351,7 +346,12 @@ function TimetableGrid({
   }
 
   if (days.length === 0) {
-    return <Card className="py-10 text-center text-sm text-muted-foreground">ยังไม่ได้ตั้งค่าคาบเวลาของแผนกนี้ — ไปที่ตั้งค่าระบบ</Card>;
+    return (
+      <EmptyState
+        title="ไม่พบข้อมูล"
+        description="ยังไม่ได้ตั้งค่าคาบเวลาของแผนกนี้ — ไปที่ตั้งค่าระบบ"
+      />
+    );
   }
 
   return (

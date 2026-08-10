@@ -2,6 +2,7 @@ import type React from "react";
 // Deep imports — the package barrel pulls every icon into the main chunk.
 import Add from "react-ionicons/lib/Add";
 import Apps from "react-ionicons/lib/Apps";
+import BarChartOutline from "react-ionicons/lib/BarChartOutline";
 import Book from "react-ionicons/lib/Book";
 import CalendarOutline from "react-ionicons/lib/CalendarOutline";
 import IonChevronBack from "react-ionicons/lib/ChevronBack";
@@ -73,6 +74,7 @@ export const Plus = wrap(Add);
 export const Upload = wrap(CloudUpload);
 export const Monitor = wrap(Desktop);
 export const AppsIcon = wrap(Apps);
+export const BarChartIcon = wrap(BarChartOutline);
 export const ChevronBack = wrap(IonChevronBack);
 export const ChevronForward = wrap(IonChevronForward);
 export const SettingsIcon = wrap(IonSettings);

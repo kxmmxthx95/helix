@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
 import {
   useAcademicEvents,
   useDeleteAcademicEvent,
@@ -74,7 +74,7 @@ export function AcademicEvents() {
       )}
 
       {!isLoading && events.length === 0 && (
-        <Card className="py-10 text-center text-sm text-muted-foreground">ยังไม่มี Event</Card>
+        <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มี Event ในระบบ" />
       )}
 
       {!isLoading && events.length > 0 && (

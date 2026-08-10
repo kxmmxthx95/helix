@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportUsersSheet } from "@/components/ImportUsersSheet";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useLearningAreas } from "@/hooks/useCurriculum";
 import { usePagination } from "@/hooks/usePagination";
 import {
@@ -104,7 +104,7 @@ export function Users() {
       )}
 
       {rows && rows.length === 0 && (
-        <Card className="py-10 text-center text-sm text-muted-foreground">ไม่พบผู้ใช้งาน</Card>
+        <EmptyState title="ไม่พบข้อมูล" description="ไม่พบผู้ใช้งานตามเงื่อนไขที่เลือก" />
       )}
 
       {rows && rows.length > 0 && (

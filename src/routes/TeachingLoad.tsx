@@ -51,26 +51,21 @@ export function TeachingLoad() {
   return (
     <div className="space-y-4">
       {orgWide && departments.length > 0 && (
-        <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
+        <Select
+          className="w-auto min-w-[10rem]"
+          value={pickedDept}
+          onChange={(e) => {
+            setPickedDept(e.target.value);
+            setSelectedTeacherId("");
+          }}
+          aria-label="แผนก"
+        >
           {departments.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => {
-                setPickedDept(d.id);
-                setSelectedTeacherId("");
-              }}
-              className={cn(
-                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                pickedDept === d.id
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
+            <option key={d.id} value={d.id}>
               {d.name}
-            </button>
+            </option>
           ))}
-        </div>
+        </Select>
       )}
 
       {splitsByTerm && (

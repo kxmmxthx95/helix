@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments, useInviteUsers, type UserInvite } from "@/hooks/useProfiles";
@@ -217,7 +217,7 @@ export function Roster() {
       {error && <Card className="text-sm text-destructive">โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง</Card>}
 
       {rows && rows.length === 0 && (
-        <Card className="py-10 text-center text-sm text-muted-foreground">ไม่พบนักเรียน</Card>
+        <EmptyState title="ไม่พบข้อมูล" description="ไม่พบนักเรียนตามเงื่อนไขที่เลือก" />
       )}
 
       {rows && rows.length > 0 && (

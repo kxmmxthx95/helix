@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSubjectsSheet } from "@/components/ImportSubjectsSheet";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import {
   useDeleteSubject,
   useLearningAreas,
@@ -18,7 +18,6 @@ import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import type { LearningArea, Subject, SubjectType } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
-import { cn } from "@/lib/utils";
 
 const EMPTY: Omit<SubjectFilters, "departmentId"> = {
   search: "",
@@ -75,28 +74,22 @@ export function Subjects() {
 
   return (
     <div className="space-y-4">
-      {orgWide && pickableDepartments.length > 0 && (
-        <div className="inline-flex h-8 max-w-full gap-1 overflow-x-auto rounded-lg border border-border p-0.5">
-          {pickableDepartments.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => setPickedDept(d.id)}
-              className={cn(
-                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                pickedDept === d.id
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              {d.name}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className="flex gap-2">
-        <div className="relative flex-1">
+        {orgWide && pickableDepartments.length > 0 && (
+          <Select
+            className="w-auto min-w-[10rem] shrink-0"
+            value={pickedDept}
+            onChange={(e) => setPickedDept(e.target.value)}
+            aria-label="แผนก"
+          >
+            {pickableDepartments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
+        )}
+        <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={filters.search}
@@ -109,7 +102,7 @@ export function Subjects() {
         <Button
           variant="outline"
           size="icon"
-          className="relative"
+          className="relative shrink-0"
           onClick={() => setFiltersOpen(true)}
           aria-label="ตัวกรอง"
         >
@@ -121,12 +114,12 @@ export function Subjects() {
           )}
         </Button>
         {mayEdit && (
-          <Button variant="outline" size="icon" onClick={() => setImporting(true)} aria-label="นำเข้ารายวิชา">
+          <Button variant="outline" size="icon" className="shrink-0" onClick={() => setImporting(true)} aria-label="นำเข้ารายวิชา">
             <FileUp className="h-3 w-3" />
           </Button>
         )}
         {mayEdit && (
-          <Button size="icon" onClick={() => setEditing("new")} aria-label="เพิ่มรายวิชา">
+          <Button size="icon" className="shrink-0" onClick={() => setEditing("new")} aria-label="เพิ่มรายวิชา">
             <Plus className="h-3 w-3" />
           </Button>
         )}
@@ -141,7 +134,7 @@ export function Subjects() {
       {error && <Card className="text-sm text-destructive">โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง</Card>}
 
       {rows && rows.length === 0 && (
-        <Card className="py-10 text-center text-sm text-muted-foreground">ไม่พบรายวิชา</Card>
+        <EmptyState title="ไม่พบข้อมูล" description="ไม่พบรายวิชาตามเงื่อนไขที่เลือก" />
       )}
 
       {rows && rows.length > 0 && (

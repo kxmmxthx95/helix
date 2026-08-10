@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { forwardRef } from "react";
+import { forwardRef, type ComponentType } from "react";
+import { BarChartIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 const button = cva(
@@ -57,7 +58,7 @@ export const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<H
     <select
       ref={ref}
       className={cn(
-        "h-8 w-full appearance-none rounded-lg border border-input bg-background px-2.5 text-xs outline-none focus-visible:border-ring disabled:opacity-50",
+        "ui-select h-8 w-full rounded-lg border border-input bg-background px-2.5 pr-8 text-xs outline-none focus-visible:border-ring disabled:opacity-50",
         className,
       )}
       {...props}
@@ -139,6 +140,29 @@ export function Spinner({ className }: { className?: string }) {
       role="status"
       aria-label="กำลังโหลด"
     />
+  );
+}
+
+/** Centered empty placeholder — icon tile + title + muted description. */
+export function EmptyState({
+  title,
+  description,
+  icon: Icon = BarChartIcon,
+  className,
+}: {
+  title: string;
+  description?: string;
+  icon?: ComponentType<{ className?: string }>;
+  className?: string;
+}) {
+  return (
+    <div className={cn("empty-state", className)}>
+      <div className="empty-state-icon">
+        <Icon className="h-5 w-5" />
+      </div>
+      <p className="empty-state-title">{title}</p>
+      {description && <p className="empty-state-description">{description}</p>}
+    </div>
   );
 }
 
