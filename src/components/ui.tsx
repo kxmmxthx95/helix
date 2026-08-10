@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { forwardRef, type ComponentType } from "react";
+import { forwardRef, type ComponentType, type ReactNode } from "react";
 import { BarChartIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
@@ -158,11 +158,13 @@ export function EmptyState({
   title,
   description,
   icon: Icon = BarChartIcon,
+  action,
   className,
 }: {
   title: string;
   description?: string;
   icon?: ComponentType<{ className?: string }>;
+  action?: ReactNode;
   className?: string;
 }) {
   return (
@@ -172,6 +174,7 @@ export function EmptyState({
       </div>
       <p className="empty-state-title">{title}</p>
       {description && <p className="empty-state-description">{description}</p>}
+      {action && <div className="empty-state-action">{action}</div>}
     </div>
   );
 }

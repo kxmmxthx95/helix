@@ -33,6 +33,12 @@ const SUBJECT_TYPE_LABEL: Record<SubjectType, string> = {
   activity: "กิจกรรม",
 };
 
+const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
+  basic: "bg-blue-600 text-blue-50 dark:bg-blue-500 dark:text-blue-50",
+  additional: "bg-sky-600 text-sky-50 dark:bg-sky-500 dark:text-sky-50",
+  activity: "bg-violet-600 text-violet-50 dark:bg-violet-500 dark:text-violet-50",
+};
+
 type SubjectSortKey = "code" | "name_th" | "learning_area" | "sub_area" | "subject_type" | "credits" | "hours_per_week";
 
 function SortTh({
@@ -248,9 +254,9 @@ export function Subjects() {
                     <SortTh label="ชื่อวิชา" column="name_th" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                     <SortTh label="กลุ่มสาระ" column="learning_area" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                     <SortTh label="สาระย่อย" column="sub_area" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-                    <SortTh label="ประเภท" column="subject_type" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                     <SortTh label="หน่วยกิต" column="credits" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-                    <SortTh label="ชม./สัปดาห์" column="hours_per_week" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                    <SortTh label="จำนวนชั่วโมง" column="hours_per_week" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                    <SortTh label="ประเภท" column="subject_type" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                     {mayEdit && <th className="px-3 py-2" />}
                   </tr>
                 </thead>
@@ -274,11 +280,17 @@ export function Subjects() {
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-0 text-muted-foreground">{topAreaLabel(row.learning_area_id)}</td>
-                      <td className="px-3 py-0 text-muted-foreground">{subAreaLabel(row.learning_area_id)}</td>
-                      <td className="px-3 py-0 text-muted-foreground">{SUBJECT_TYPE_LABEL[row.subject_type]}</td>
-                      <td className="px-3 py-0 text-muted-foreground">{row.credits}</td>
-                      <td className="px-3 py-0 text-muted-foreground">{row.hours_per_week}</td>
+                      <td className="px-3 py-0">{topAreaLabel(row.learning_area_id)}</td>
+                      <td className="px-3 py-0">{subAreaLabel(row.learning_area_id)}</td>
+                      <td className="px-3 py-0">{row.credits}</td>
+                      <td className="px-3 py-0">{row.hours_per_week}</td>
+                      <td className="px-3 py-0">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-medium leading-none ${SUBJECT_TYPE_BADGE[row.subject_type]}`}
+                        >
+                          {SUBJECT_TYPE_LABEL[row.subject_type]}
+                        </span>
+                      </td>
                       {mayEdit && (
                         <td className="px-3 py-0 text-right">
                           <Button

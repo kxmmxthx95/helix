@@ -219,6 +219,10 @@
     color: hsl(var(--muted-foreground));
   }
 
+  .empty-state-action {
+    margin-top: 1rem;
+  }
+
   /* Table panel that fills remaining viewport below page chrome */
   .table-panel {
     display: flex;

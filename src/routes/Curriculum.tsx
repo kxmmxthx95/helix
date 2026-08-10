@@ -30,7 +30,7 @@ import {
   type LearningUnitDraft,
 } from "@/hooks/useCurriculumStructure";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
-import type { CurriculumSubject, DevelopmentDomain, StudyPlan } from "@/lib/database.types";
+import type { CurriculumSubject, DevelopmentDomain, StudyPlan, Subject } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
@@ -216,27 +216,26 @@ export function Curriculum() {
                     }}
                   />
                 )}
+                {pickedYear !== null && (
+                  <CohortPicker
+                    cohorts={cohorts}
+                    pickedCohort={pickedCohort}
+                    onPick={setPickedCohort}
+                    departmentId={departmentId}
+                    gradeLevels={gradeLevels}
+                    mayEdit={mayEdit}
+                    defaultEntryYear={defaultEntryYear}
+                    pickedYear={pickedYear}
+                    onYearChange={pickYear}
+                    pendingCreate={pendingCreate}
+                    onPendingCreateHandled={() => setPendingCreate(false)}
+                  />
+                )}
               </>
             )}
           </div>
         )}
       </div>
-
-      {!isKg && departmentId && pickedYear !== null && (
-        <CohortPicker
-          cohorts={cohorts}
-          pickedCohort={pickedCohort}
-          onPick={setPickedCohort}
-          departmentId={departmentId}
-          gradeLevels={gradeLevels}
-          mayEdit={mayEdit}
-          defaultEntryYear={defaultEntryYear}
-          pickedYear={pickedYear}
-          onYearChange={pickYear}
-          pendingCreate={pendingCreate}
-          onPendingCreateHandled={() => setPendingCreate(false)}
-        />
-      )}
 
       {((isKg && kgAcademicYear !== null) || pickedCohort) && gradeLevels.length > 0 && (
         <div className="flex w-full gap-0 overflow-x-auto border-b border-border" role="tablist">
@@ -334,50 +333,48 @@ function CohortPicker({
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {mayEdit && pickedCohort && (
-          <Button
-            variant="outline"
-            size="icon"
-            disabled={del.isPending}
-            aria-label="ลบรุ่น"
-            onClick={() => {
-              const name = cohortsInYear.find((c) => c.id === pickedCohort)?.name ?? "";
-              if (confirm(`ลบรุ่น "${name}"?`)) {
-                del.mutate(pickedCohort, {
-                  onSuccess: () => onPick(""),
-                });
-              }
-            }}
-          >
-            <X className="h-3.5 w-3.5" />
-          </Button>
-        )}
-        <Select
-          className="w-auto min-w-[10rem]"
-          value={pickedCohort}
-          onChange={(e) => onPick(e.target.value)}
-          aria-label="หลักสูตร"
-          placeholder="เลือกหลักสูตร"
+    <>
+      <Select
+        className="w-auto min-w-[10rem]"
+        value={pickedCohort}
+        onChange={(e) => onPick(e.target.value)}
+        aria-label="หลักสูตร"
+        placeholder="เลือกหลักสูตร"
+      >
+        {cohortsInYear.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </Select>
+      {mayEdit && (
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setCreating(true)}
+          aria-label="สร้างหลักสูตร"
         >
-          {cohortsInYear.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
-        {mayEdit && (
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setCreating(true)}
-            aria-label="สร้างหลักสูตร"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
-        )}
-      </div>
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
+      )}
+      {mayEdit && pickedCohort && (
+        <Button
+          variant="outline"
+          size="icon"
+          disabled={del.isPending}
+          aria-label="ลบรุ่น"
+          onClick={() => {
+            const name = cohortsInYear.find((c) => c.id === pickedCohort)?.name ?? "";
+            if (confirm(`ลบรุ่น "${name}"?`)) {
+              del.mutate(pickedCohort, {
+                onSuccess: () => onPick(""),
+              });
+            }
+          }}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      )}
 
       <Sheet
         open={creating}
@@ -415,7 +412,7 @@ function CohortPicker({
           }}
         />
       </Sheet>
-    </div>
+    </>
   );
 }
 
@@ -519,7 +516,7 @@ function SubjectPanel({
   const { data: studyPlans = [] } = useStudyPlans();
   const del = useDeleteCurriculumSubject();
 
-  const subjectName = useMemo(() => new Map(subjects.map((s) => [s.id, `${s.code} · ${s.name_th}`])), [subjects]);
+  const subjectById = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
   const activeSubjects = useMemo(() => subjects.filter((s) => s.is_active), [subjects]);
 
   const visible = (rows ?? []).filter((r) => !splitsByTerm || r.term === term);
@@ -562,7 +559,17 @@ function SubjectPanel({
       )}
 
       {!isLoading && visible.length === 0 && (
-        <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีวิชาในโครงสร้างนี้" />
+        <EmptyState
+          title="ไม่พบข้อมูล"
+          description="ยังไม่มีวิชาในโครงสร้างนี้"
+          action={
+            mayEdit ? (
+              <Button variant="outline" size="icon" onClick={() => setAdding(true)} aria-label="เพิ่มวิชา">
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            ) : undefined
+          }
+        />
       )}
 
       {coreRows.length > 0 && (
@@ -570,7 +577,7 @@ function SubjectPanel({
           <p className="text-sm font-medium">วิชาแกนบังคับ (Core)</p>
           <SubjectTable
             rows={coreRows}
-            subjectName={subjectName}
+            subjectById={subjectById}
             planLabel="Core"
             mayEdit={mayEdit}
             onDelete={(id) => del.mutate(id)}
@@ -583,7 +590,7 @@ function SubjectPanel({
           <p className="text-sm font-medium">{plan.name} (Track)</p>
           <SubjectTable
             rows={rows}
-            subjectName={subjectName}
+            subjectById={subjectById}
             planLabel={plan.name}
             mayEdit={mayEdit}
             onDelete={(id) => del.mutate(id)}
@@ -608,13 +615,13 @@ function SubjectPanel({
 
 function SubjectTable({
   rows,
-  subjectName,
+  subjectById,
   planLabel,
   mayEdit,
   onDelete,
 }: {
   rows: CurriculumSubject[];
-  subjectName: Map<string, string>;
+  subjectById: Map<string, Subject>;
   planLabel: string;
   mayEdit: boolean;
   onDelete: (id: string) => void;
@@ -626,6 +633,7 @@ function SubjectTable({
         <table className="w-full min-w-[28rem] text-xs">
           <thead className="bg-muted text-left text-xs text-muted-foreground">
             <tr>
+              <th className="px-3 py-2 font-medium">รหัส</th>
               <th className="px-3 py-2 font-medium">วิชา</th>
               <th className="px-3 py-2 font-medium">แผน</th>
               <th className="px-3 py-2 font-medium">สัดส่วนคะแนน</th>
@@ -633,9 +641,12 @@ function SubjectTable({
             </tr>
           </thead>
           <tbody>
-            {pageRows.map((row) => (
+            {pageRows.map((row) => {
+              const subject = subjectById.get(row.subject_id);
+              return (
               <tr key={row.id} className="h-[40px] border-t border-border">
-                <td className="px-3 py-0 font-medium">{subjectName.get(row.subject_id) ?? "—"}</td>
+                <td className="px-3 py-0 tabular-nums text-muted-foreground">{subject?.code ?? "—"}</td>
+                <td className="px-3 py-0 font-medium">{subject?.name_th ?? "—"}</td>
                 <td className="px-3 py-0">
                   <span
                     className={cn(
@@ -655,13 +666,19 @@ function SubjectTable({
                 </td>
                 {mayEdit && (
                   <td className="px-3 py-0 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => onDelete(row.id)}>
-                      ลบ
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="ลบ"
+                      onClick={() => onDelete(row.id)}
+                    >
+                      <X className="h-3.5 w-3.5" />
                     </Button>
                   </td>
                 )}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
