@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Pagination, PasswordInput, Select, Spinner } from "@/components/ui";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments, useInviteUsers, type UserInvite } from "@/hooks/useProfiles";
@@ -1124,8 +1124,7 @@ function CreateStudentLoginSheet({
           </p>
 
           <Field label="รหัสผ่าน">
-            <Input
-              type="password"
+            <PasswordInput
               value={current.password}
               onChange={(e) => setDraft({ ...current, password: e.target.value })}
               minLength={8}

@@ -5,6 +5,7 @@ import {
   BookIcon,
   CalendarIcon,
   ChevronBack,
+  ClipboardIcon,
   ChevronForward,
   CloudOff,
   GraduationCap,
@@ -26,14 +27,46 @@ import { useTheme } from "@/components/ThemeProvider";
 import { Avatar, Button } from "@/components/ui";
 import { useOutboxSync } from "@/hooks/useOutboxSync";
 import { profileFullName } from "@/lib/database.types";
-import { canManage, canManageUsers, isOrgWide, roleLabels } from "@/lib/roles";
+import { canManage, canManageAcademic, canManageUsers, isOrgWide, roleLabels } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { to: "/", label: "หน้าหลัก", icon: LayoutDashboard, managerOnly: false, orgWideOnly: false, deptManagerOnly: false },
-  { to: "/users", label: "ผู้ใช้งาน", icon: Users, managerOnly: true, orgWideOnly: false, deptManagerOnly: false },
-  { to: "/roster", label: "นักเรียน", icon: GraduationCap, managerOnly: false, orgWideOnly: false, deptManagerOnly: false },
-  { to: "/subjects", label: "คลังรายวิชา", icon: BookIcon, managerOnly: false, orgWideOnly: true, deptManagerOnly: false },
+  {
+    to: "/",
+    label: "หน้าหลัก",
+    icon: LayoutDashboard,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+  },
+  {
+    to: "/users",
+    label: "ผู้ใช้งาน",
+    icon: Users,
+    managerOnly: true,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+  },
+  {
+    to: "/roster",
+    label: "นักเรียน",
+    icon: GraduationCap,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+  },
+  {
+    to: "/subjects",
+    label: "คลังรายวิชา",
+    icon: BookIcon,
+    managerOnly: false,
+    orgWideOnly: true,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+  },
   {
     to: "/curriculum",
     label: "หลักสูตร",
@@ -41,6 +74,7 @@ const TABS = [
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: true,
+    academicManagerOnly: false,
   },
   {
     to: "/enrollment",
@@ -49,6 +83,7 @@ const TABS = [
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: true,
+    academicManagerOnly: false,
   },
   {
     to: "/teaching-load",
@@ -57,6 +92,7 @@ const TABS = [
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: true,
+    academicManagerOnly: false,
   },
   {
     to: "/timetable",
@@ -65,6 +101,25 @@ const TABS = [
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
+    academicManagerOnly: false,
+  },
+  {
+    to: "/teaching-plan",
+    label: "แผนการสอน",
+    icon: ClipboardIcon,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+  },
+  {
+    to: "/teaching-plan-overview",
+    label: "ภาพรวมแผนการสอน",
+    icon: ClipboardIcon,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: true,
   },
   {
     to: "/status",
@@ -73,6 +128,7 @@ const TABS = [
     managerOnly: false,
     orgWideOnly: true,
     deptManagerOnly: false,
+    academicManagerOnly: false,
   },
   {
     to: "/academic-events",
@@ -81,6 +137,7 @@ const TABS = [
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
+    academicManagerOnly: false,
   },
 ];
 
@@ -120,7 +177,8 @@ export function AppShell() {
     (t) =>
       (!t.managerOnly || (profile && canManageUsers(profile.roles))) &&
       (!t.orgWideOnly || (profile && isOrgWide(profile.roles))) &&
-      (!t.deptManagerOnly || (profile && canManage(profile.roles))),
+      (!t.deptManagerOnly || (profile && canManage(profile.roles))) &&
+      (!t.academicManagerOnly || (profile && canManageAcademic(profile.roles))),
   );
 
   const themeButton = (

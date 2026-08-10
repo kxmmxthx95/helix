@@ -360,6 +360,24 @@ export type ScheduleEntry = {
   created_at: string;
 };
 
+/**
+ * แผนการสอน — a teaching_assignment's content broken into sequential units
+ * (สัปดาห์ที่/คาบที่, teacher picks the count). "Current" unit for a session
+ * is derived client-side: lowest unit_no with completed_at still null — a
+ * queue, not a calendar mapping. See migration 0020.
+ */
+export type TeachingPlanUnit = {
+  id: string;
+  teaching_assignment_id: string;
+  unit_no: number;
+  title: string;
+  description: string | null;
+  completed_at: string | null;
+  completed_on_plan: boolean | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // ------------------------------------------------------------- academic_terms
 // See supabase/migrations/0018_academic_terms.sql for the full grill rationale.
 
@@ -516,6 +534,10 @@ export type Database = {
         InsertOf<ClassroomHomeroomTeacher, never>
       >;
       teaching_assignments: Table<TeachingAssignment, InsertOf<TeachingAssignment, "term" | "group_id">>;
+      teaching_plan_units: Table<
+        TeachingPlanUnit,
+        InsertOf<TeachingPlanUnit, "description" | "completed_at" | "completed_on_plan">
+      >;
       period_definitions: Table<PeriodDefinition, InsertOf<PeriodDefinition, never>>;
       schedule_entries: Table<ScheduleEntry, InsertOf<ScheduleEntry, never>>;
       academic_terms: Table<AcademicTerm, InsertOf<AcademicTerm, "start_date" | "end_date" | "status">>;

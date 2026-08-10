@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { forwardRef, type ComponentType, type ReactNode } from "react";
-import { BarChartIcon } from "@/components/icons";
+import { forwardRef, useState, type ComponentType, type ReactNode } from "react";
+import { BarChartIcon, EyeIcon, EyeOffIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 const button = cva(
@@ -48,6 +48,31 @@ export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTML
   ),
 );
 Input.displayName = "Input";
+
+export const PasswordInput = forwardRef<
+  HTMLInputElement,
+  Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> & { iconClassName?: string }
+>(({ className, iconClassName, ...props }, ref) => {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative">
+      <Input ref={ref} type={visible ? "text" : "password"} className={cn("pr-8", className)} {...props} />
+      <button
+        type="button"
+        tabIndex={-1}
+        onClick={() => setVisible((v) => !v)}
+        className={cn(
+          "absolute inset-y-0 right-0 flex w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground",
+          iconClassName,
+        )}
+        aria-label={visible ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+      >
+        {visible ? <EyeOffIcon className="h-3.5 w-3.5" /> : <EyeIcon className="h-3.5 w-3.5" />}
+      </button>
+    </div>
+  );
+});
+PasswordInput.displayName = "PasswordInput";
 
 /**
  * Native <select> on purpose: iOS and Android render it as the OS wheel

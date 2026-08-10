@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { lazy, Suspense, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, Field, Input, Spinner } from "@/components/ui";
+import { Button, Field, Input, PasswordInput, Spinner } from "@/components/ui";
 
 const Beams = lazy(() => import("@/components/Beams/Beams"));
 
@@ -124,14 +124,14 @@ export function Login() {
               )}
 
               <Field label={mode === "signin" ? "รหัสผ่าน" : "รหัสผ่านใหม่"}>
-                <Input
-                  type="password"
+                <PasswordInput
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete={mode === "signin" ? "current-password" : "new-password"}
                   required
                   minLength={mode === "reset" ? 8 : undefined}
                   className={inputClass}
+                  iconClassName="text-white/40 hover:text-white"
                 />
               </Field>
 

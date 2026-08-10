@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportUsersSheet } from "@/components/ImportUsersSheet";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Pagination, PasswordInput, Select, Spinner } from "@/components/ui";
 import { useLearningAreas } from "@/hooks/useCurriculum";
 import { usePagination } from "@/hooks/usePagination";
 import {
@@ -589,8 +589,7 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
         </Field>
 
         <Field label="รหัสผ่าน">
-          <Input
-            type="password"
+          <PasswordInput
             value={draft.password}
             onChange={(e) => setDraft({ ...draft, password: e.target.value })}
             minLength={8}

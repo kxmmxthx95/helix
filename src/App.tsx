@@ -13,6 +13,8 @@ import { AcademicEvents } from "@/routes/AcademicEvents";
 import { StatusManagement } from "@/routes/StatusManagement";
 import { Subjects } from "@/routes/Subjects";
 import { TeachingLoad } from "@/routes/TeachingLoad";
+import { TeachingPlan } from "@/routes/TeachingPlan";
+import { TeachingPlanOverview } from "@/routes/TeachingPlanOverview";
 import { Timetable } from "@/routes/Timetable";
 import { Users } from "@/routes/Users";
 
@@ -39,6 +41,8 @@ function Gate() {
         <Route path="curriculum" element={<Curriculum />} />
         <Route path="enrollment" element={<Enrollment />} />
         <Route path="teaching-load" element={<TeachingLoad />} />
+        <Route path="teaching-plan" element={<TeachingPlan />} />
+        <Route path="teaching-plan-overview" element={<TeachingPlanOverview />} />
         <Route path="timetable" element={<Timetable />} />
         <Route path="academic-events" element={<AcademicEvents />} />
         <Route path="status" element={<StatusManagement />} />

@@ -39,6 +39,8 @@ export const STUDENT_PREFIXES = ["เด็กชาย", "เด็กหญิ
 
 const ORG_WIDE: readonly Role[] = ["super_admin", "director", "staff"];
 const MANAGERS: readonly Role[] = ["super_admin", "director", "staff", "dept_head"];
+/** Same as MANAGERS minus staff (ธุรการ) — lesson-plan content/oversight isn't roster admin work. See migration 0020. */
+const ACADEMIC_MANAGERS: readonly Role[] = ["super_admin", "director", "dept_head"];
 /** Roles whose actions land in audit_logs — students and parents are excluded. */
 const AUDITED: readonly Role[] = ["super_admin", "director", "dept_head", "teacher", "staff"];
 
@@ -47,6 +49,9 @@ export const isOrgWide = (roles: Role[]) => roles.some((r) => ORG_WIDE.includes(
 
 /** May create/edit roster rows within their scope. Does NOT cover user accounts. */
 export const canManage = (roles: Role[]) => roles.some((r) => MANAGERS.includes(r));
+
+/** May view/edit other teachers' lesson plans (แผนการสอนภาพรวม) — canManage() minus staff. */
+export const canManageAcademic = (roles: Role[]) => roles.some((r) => ACADEMIC_MANAGERS.includes(r));
 
 /** May open the user-management screen and create/edit accounts — super_admin only (grill decision). */
 export const canManageUsers = (roles: Role[]) => roles.includes("super_admin");
