@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   AppsIcon,
   BookIcon,
+  CalendarIcon,
   ChevronBack,
   ChevronForward,
   CloudOff,
@@ -15,6 +16,8 @@ import {
   PersonAddIcon,
   SettingsIcon,
   Sun,
+  TimeIcon,
+  TimetableIcon,
   Users,
 } from "@/components/icons";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -48,11 +51,35 @@ const TABS = [
     deptManagerOnly: true,
   },
   {
+    to: "/teaching-load",
+    label: "ภาระงานสอน",
+    icon: TimeIcon,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: true,
+  },
+  {
+    to: "/timetable",
+    label: "ตารางสอน",
+    icon: TimetableIcon,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+  },
+  {
     to: "/status",
     label: "จัดการสถานภาพ",
     icon: AppsIcon,
     managerOnly: false,
     orgWideOnly: true,
+    deptManagerOnly: false,
+  },
+  {
+    to: "/academic-events",
+    label: "ปฏิทินกิจกรรม",
+    icon: CalendarIcon,
+    managerOnly: false,
+    orgWideOnly: false,
     deptManagerOnly: false,
   },
 ];

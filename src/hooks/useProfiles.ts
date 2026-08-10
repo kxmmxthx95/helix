@@ -94,6 +94,8 @@ export type ProfileEdit = Pick<
   | "date_of_birth"
   | "department_id"
   | "is_active"
+  | "teacher_code"
+  | "learning_area_id"
 > & {
   /** Roles other than dept_head — dept_head is implied by positionTitleIds. */
   roles: Role[];
@@ -183,6 +185,8 @@ export type UserInvite = {
   positionTitleIds: string[]; // ignored for kind="student"
   /** kind="student" only — links students.profile_id to the new account. */
   studentRowId?: string;
+  teacher_code: string | null;
+  learning_area_id: string | null; // required when roles includes "teacher"
 };
 
 export type InviteOutcome = { inserted: number; skipped: { loginId: string; reason: string }[] };

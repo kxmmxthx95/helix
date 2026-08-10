@@ -3,17 +3,20 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Plus, Search } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
-import { useDepartments } from "@/hooks/useProfiles";
-import { useSchoolSettings } from "@/hooks/useSettings";
+import { useDepartments, useProfiles } from "@/hooks/useProfiles";
 import {
   useAssignClassroom,
   useBulkSetStudentStatus,
   useClassrooms,
   useCreateClassroom,
   useCurrentClassroomEnrollments,
+  useHomeroomTeachers,
   usePromoteStudents,
+  useRemoveHomeroomTeacher,
   useSetClassroomActive,
+  useSetHomeroomTeacher,
 } from "@/hooks/useStatusManagement";
 import { useStudents } from "@/hooks/useStudents";
 import {
@@ -21,7 +24,7 @@ import {
   useTransferIntakes,
   useTransferProgress,
 } from "@/hooks/useTransferIntakes";
-import type { StudentStatus } from "@/lib/database.types";
+import { profileFullName, type StudentStatus } from "@/lib/database.types";
 import { isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
@@ -238,7 +241,7 @@ function PromotionPanel({ departmentId }: { departmentId: string }) {
 
 function ClassroomPanel({ departmentId }: { departmentId: string }) {
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
-  const { data: schoolSettings } = useSchoolSettings();
+  const { data: activeYear } = useActiveAcademicYear(departmentId);
   const { data: students = [] } = useStudents({ search: "", departmentId, status: "studying" });
   const createRoom = useCreateClassroom();
   const setActive = useSetClassroomActive();
@@ -256,7 +259,7 @@ function ClassroomPanel({ departmentId }: { departmentId: string }) {
     setNewRoomName("");
   }, [gradeLevelId]);
 
-  const academicYear = schoolSettings?.academic_year ?? new Date().getFullYear() + 543;
+  const academicYear = activeYear ?? new Date().getFullYear() + 543;
   const { data: classrooms = [] } = useClassrooms(gradeLevelId || null);
   const { data: enrollments = [] } = useCurrentClassroomEnrollments(gradeLevelId || null, academicYear);
 
@@ -387,7 +390,103 @@ function ClassroomPanel({ departmentId }: { departmentId: string }) {
           </Card>
         </div>
       )}
+
+      {gradeLevelId && (
+        <HomeroomCard
+          departmentId={departmentId}
+          gradeLevelName={gradeLevel?.name ?? ""}
+          activeRooms={activeRooms}
+          academicYear={academicYear}
+        />
+      )}
     </div>
+  );
+}
+
+function HomeroomCard({
+  departmentId,
+  gradeLevelName,
+  activeRooms,
+  academicYear,
+}: {
+  departmentId: string;
+  gradeLevelName: string;
+  activeRooms: { id: string; name: string }[];
+  academicYear: number;
+}) {
+  const [roomId, setRoomId] = useState("");
+  const [addingTeacherId, setAddingTeacherId] = useState("");
+
+  useEffect(() => {
+    setRoomId("");
+    setAddingTeacherId("");
+  }, [activeRooms]);
+
+  // Default filter to the room's own department — DB doesn't enforce it (grill
+  // decision), but same-department is the normal case and a much shorter list.
+  const { data: teachers = [] } = useProfiles({ search: "", departmentId, role: "teacher", active: "true" });
+  const { data: homerooms = [] } = useHomeroomTeachers(roomId || null, academicYear);
+  const setTeacher = useSetHomeroomTeacher();
+  const removeTeacher = useRemoveHomeroomTeacher();
+
+  const teacherName = useMemo(() => new Map(teachers.map((t) => [t.id, profileFullName(t)])), [teachers]);
+  const assignedIds = useMemo(() => new Set(homerooms.map((h) => h.teacher_id)), [homerooms]);
+  const pickable = teachers.filter((t) => !assignedIds.has(t.id));
+  const room = activeRooms.find((c) => c.id === roomId);
+
+  function addTeacher() {
+    if (!roomId || !addingTeacherId) return;
+    setTeacher.mutate(
+      { classroom_id: roomId, teacher_id: addingTeacherId, academic_year: academicYear },
+      { onSuccess: () => setAddingTeacherId("") },
+    );
+  }
+
+  return (
+    <Card className="space-y-3">
+      <h3 className="text-sm font-semibold">ครูประจำชั้น (ปีการศึกษา {academicYear})</h3>
+      <Field label="ห้อง">
+        <Select value={roomId} onChange={(e) => setRoomId(e.target.value)}>
+          <option value="">— เลือกห้อง —</option>
+          {activeRooms.map((c) => (
+            <option key={c.id} value={c.id}>
+              {gradeLevelName}/{c.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+
+      {room && (
+        <>
+          <ul className="divide-y divide-border text-sm">
+            {homerooms.map((h) => (
+              <li key={h.id} className="flex items-center justify-between gap-2 py-1.5">
+                <span>{teacherName.get(h.teacher_id) ?? "—"}</span>
+                <Button variant="outline" size="sm" onClick={() => removeTeacher.mutate(h.id)}>
+                  ลบ
+                </Button>
+              </li>
+            ))}
+            {homerooms.length === 0 && (
+              <p className="py-2 text-sm text-muted-foreground">ยังไม่มีครูประจำชั้น</p>
+            )}
+          </ul>
+          <div className="flex gap-2">
+            <Select value={addingTeacherId} onChange={(e) => setAddingTeacherId(e.target.value)} className="flex-1">
+              <option value="">— เลือกครู —</option>
+              {pickable.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {profileFullName(t)}
+                </option>
+              ))}
+            </Select>
+            <Button onClick={addTeacher} disabled={!addingTeacherId || setTeacher.isPending}>
+              {setTeacher.isPending ? <Spinner className="h-3 w-3" /> : "เพิ่ม"}
+            </Button>
+          </div>
+        </>
+      )}
+    </Card>
   );
 }
 

@@ -1,5 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Classroom, StudentClassroomEnrollment, StudentStatus } from "@/lib/database.types";
+import type {
+  Classroom,
+  ClassroomHomeroomTeacher,
+  StudentClassroomEnrollment,
+  StudentStatus,
+} from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
 // ------------------------------------------------------------- classrooms
@@ -43,6 +48,70 @@ export function useSetClassroomActive() {
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["classrooms"] }),
+  });
+}
+
+/** Every room across every grade level in a department — for pages that aren't grade-level-scoped (e.g. teaching load). */
+export function useClassroomsByDepartment(departmentId: string | null) {
+  return useQuery({
+    queryKey: ["classrooms", "by_department", departmentId],
+    enabled: !!departmentId,
+    queryFn: async (): Promise<Classroom[]> => {
+      const { data, error } = await supabase
+        .from("classrooms")
+        .select("*, grade_level:grade_levels!inner(department_id)")
+        .eq("grade_level.department_id", departmentId!)
+        .order("name");
+      if (error) throw error;
+      return data as unknown as Classroom[];
+    },
+  });
+}
+
+// ------------------------------------------------- classroom_homeroom_teachers
+// History per room per academic year, not a mutable pointer (see migration
+// 0017) — same shape as student_classroom_enrollments below.
+
+export function useHomeroomTeachers(classroomId: string | null, academicYear: number) {
+  return useQuery({
+    queryKey: ["classroom_homeroom_teachers", classroomId, academicYear],
+    enabled: !!classroomId,
+    queryFn: async (): Promise<ClassroomHomeroomTeacher[]> => {
+      const { data, error } = await supabase
+        .from("classroom_homeroom_teachers")
+        .select("*")
+        .eq("classroom_id", classroomId!)
+        .eq("academic_year", academicYear);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export type HomeroomTeacherDraft = Pick<
+  ClassroomHomeroomTeacher,
+  "classroom_id" | "teacher_id" | "academic_year"
+>;
+
+export function useSetHomeroomTeacher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (draft: HomeroomTeacherDraft) => {
+      const { error } = await supabase.from("classroom_homeroom_teachers").insert(draft);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["classroom_homeroom_teachers"] }),
+  });
+}
+
+export function useRemoveHomeroomTeacher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("classroom_homeroom_teachers").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["classroom_homeroom_teachers"] }),
   });
 }
 

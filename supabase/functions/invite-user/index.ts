@@ -36,6 +36,8 @@ type UserInput = {
   roles: string[]; // ignored when kind === "student" (always just ["student"])
   positionTitleIds: string[]; // ignored when kind === "student"
   studentRowId?: string; // kind === "student": links students.profile_id
+  teacher_code: string | null;
+  learning_area_id: string | null; // required when roles includes "teacher"
 };
 
 function json(body: unknown, status = 200) {
@@ -112,6 +114,8 @@ Deno.serve(async (req) => {
       national_id: u.national_id,
       date_of_birth: u.date_of_birth,
       department_id: u.department_id,
+      teacher_code: u.teacher_code,
+      learning_area_id: u.learning_area_id,
     });
     if (profileError) {
       skipped.push({ loginId: u.loginId, reason: profileError.message });

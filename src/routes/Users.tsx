@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ImportUsersSheet } from "@/components/ImportUsersSheet";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { useLearningAreas } from "@/hooks/useCurriculum";
 import { usePagination } from "@/hooks/usePagination";
 import {
   useDepartments,
@@ -323,6 +324,44 @@ function PrefixNameFields({
   );
 }
 
+/** teacher_code + learning_area_id — shown only when role "teacher" is checked (required by check_profile_role_dept()). */
+function TeacherFields({
+  teacherCode,
+  learningAreaId,
+  onChange,
+}: {
+  teacherCode: string | null;
+  learningAreaId: string | null;
+  onChange: (patch: { teacher_code?: string | null; learning_area_id?: string | null }) => void;
+}) {
+  const { data: learningAreas = [] } = useLearningAreas();
+
+  return (
+    <>
+      <Field label="รหัสครู">
+        <Input
+          value={teacherCode ?? ""}
+          onChange={(e) => onChange({ teacher_code: e.target.value || null })}
+        />
+      </Field>
+      <Field label="กลุ่มสาระฯ">
+        <Select
+          value={learningAreaId ?? ""}
+          onChange={(e) => onChange({ learning_area_id: e.target.value || null })}
+          required
+        >
+          <option value="">— เลือกกลุ่มสาระ —</option>
+          {learningAreas.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    </>
+  );
+}
+
 function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClose: () => void }) {
   const { profile: me } = useAuth();
   const { data: departments = [] } = useDepartments();
@@ -422,6 +461,14 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
             onToggleTitle={toggleTitle}
           />
 
+          {current.roles.includes("teacher") && (
+            <TeacherFields
+              teacherCode={current.teacher_code}
+              learningAreaId={current.learning_area_id}
+              onChange={(patch) => setDraft({ ...current, ...patch })}
+            />
+          )}
+
           {me && isOrgWide(me.roles) && (
             <Field label="แผนก">
               <Select
@@ -467,6 +514,8 @@ function blankInvite(departmentId: string | null): UserInvite {
     department_id: departmentId,
     roles: [],
     positionTitleIds: [],
+    teacher_code: null,
+    learning_area_id: null,
   };
 }
 
@@ -589,6 +638,14 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
           onToggleTitle={toggleTitle}
         />
 
+        {draft.roles.includes("teacher") && (
+          <TeacherFields
+            teacherCode={draft.teacher_code}
+            learningAreaId={draft.learning_area_id}
+            onChange={(patch) => setDraft({ ...draft, ...patch })}
+          />
+        )}
+
         {me && isOrgWide(me.roles) && (
           <Field label="แผนก">
             <Select
@@ -622,6 +679,8 @@ function pickEditable(p: ProfileRow): ProfileEdit {
     date_of_birth: p.date_of_birth,
     department_id: p.department_id,
     is_active: p.is_active,
+    teacher_code: p.teacher_code,
+    learning_area_id: p.learning_area_id,
     roles: p.roles.filter((r) => r !== "dept_head"),
     positionTitleIds: p.positionTitleIds,
   };

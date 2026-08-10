@@ -89,6 +89,10 @@ export function resolveUserRow(
       department_id: departmentId,
       roles: (roles as Role[]).filter((r) => r !== "dept_head"),
       positionTitleIds: titleIds as string[],
+      // Not collected via CSV — teacher rows need these added afterward via
+      // the edit sheet (the DB rejects role=teacher without learning_area_id).
+      teacher_code: null,
+      learning_area_id: null,
     },
   };
 }

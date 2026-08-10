@@ -15,7 +15,7 @@ export function useSchoolSettings() {
   });
 }
 
-export type SchoolSettingsEdit = Pick<SchoolSettings, "name_th" | "name_en" | "academic_year">;
+export type SchoolSettingsEdit = Pick<SchoolSettings, "name_th" | "name_en">;
 
 export function useUpdateSchoolSettings() {
   const qc = useQueryClient();
@@ -72,12 +72,7 @@ export function useDepartmentSettings(departmentId: string | null) {
 
 export type DepartmentSettingsEdit = Pick<
   DepartmentSettings,
-  | "semester1_start"
-  | "semester1_end"
-  | "semester2_start"
-  | "semester2_end"
-  | "score_collect_pct"
-  | "score_exam_pct"
+  "score_collect_pct" | "score_exam_pct" | "min_periods_per_week" | "max_periods_per_week"
 >;
 
 export function useUpdateDepartmentSettings(departmentId: string | null) {

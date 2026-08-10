@@ -35,6 +35,8 @@ describe("resolveUserRow", () => {
         department_id: "dept-1",
         roles: ["teacher"],
         positionTitleIds: [],
+        teacher_code: null,
+        learning_area_id: null,
       },
     });
   });
@@ -68,6 +70,8 @@ describe("resolveUserRow", () => {
         // dept_head itself is dropped — it's implied by positionTitleIds instead.
         roles: ["teacher"],
         positionTitleIds: ["title-1"],
+        teacher_code: null,
+        learning_area_id: null,
       },
     });
   });
@@ -116,6 +120,8 @@ describe("resolveUserRow", () => {
         department_id: null,
         roles: ["staff"],
         positionTitleIds: [],
+        teacher_code: null,
+        learning_area_id: null,
       },
     });
   });

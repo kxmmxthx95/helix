@@ -29,7 +29,7 @@ import {
   type KgAssessmentTopicDraft,
   type LearningUnitDraft,
 } from "@/hooks/useCurriculumStructure";
-import { useSchoolSettings } from "@/hooks/useSettings";
+import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import type { CurriculumSubject, DevelopmentDomain, StudyPlan } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -37,7 +37,6 @@ import { cn } from "@/lib/utils";
 export function Curriculum() {
   const { profile: me } = useAuth();
   const { data: departments = [] } = useDepartments();
-  const { data: schoolSettings } = useSchoolSettings();
   const orgWide = me ? isOrgWide(me.roles) : false;
   const mayEdit = me ? canManage(me.roles) : false;
 
@@ -51,13 +50,15 @@ export function Curriculum() {
     if (orgWide && !pickedDept && departments.length > 0) setPickedDept(departments[0]!.id);
   }, [orgWide, departments, pickedDept]);
 
-  useEffect(() => {
-    if (schoolSettings && kgAcademicYear === null) setKgAcademicYear(schoolSettings.academic_year);
-  }, [schoolSettings, kgAcademicYear]);
-
   const departmentId = orgWide ? pickedDept : me?.department_id ?? "";
   const department = departments.find((d) => d.id === departmentId);
   const isKg = department?.code === "KG";
+
+  const { data: activeYear } = useActiveAcademicYear(departmentId || null);
+
+  useEffect(() => {
+    if (activeYear !== undefined && kgAcademicYear === null) setKgAcademicYear(activeYear);
+  }, [activeYear, kgAcademicYear]);
 
   const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
   const { data: cohorts = [] } = useCohorts(!isKg ? departmentId || null : null);
@@ -67,9 +68,9 @@ export function Curriculum() {
   // same "no phantom year" rule as curriculum_cohorts (grill decision, 2026-08-08).
   const kgYearTabs = useMemo(() => {
     const set = new Set(kgYears);
-    if (schoolSettings) set.add(schoolSettings.academic_year);
+    if (activeYear !== undefined) set.add(activeYear);
     return [...set].sort((a, b) => b - a);
-  }, [kgYears, schoolSettings]);
+  }, [kgYears, activeYear]);
 
   useEffect(() => {
     if (gradeLevels.length > 0 && !gradeLevels.some((g) => g.id === pickedGradeLevel)) {
@@ -162,7 +163,7 @@ export function Curriculum() {
           departmentId={departmentId}
           gradeLevels={gradeLevels}
           mayEdit={mayEdit}
-          defaultEntryYear={schoolSettings?.academic_year ?? new Date().getFullYear() + 543}
+          defaultEntryYear={activeYear ?? new Date().getFullYear() + 543}
         />
       )}
 

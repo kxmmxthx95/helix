@@ -1085,6 +1085,8 @@ function CreateStudentLoginSheet({
       roles: [],
       positionTitleIds: [],
       studentRowId: student.id,
+      teacher_code: null,
+      learning_area_id: null,
     };
 
     const outcome = await invite.mutateAsync([payload]);

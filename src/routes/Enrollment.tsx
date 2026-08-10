@@ -13,7 +13,7 @@ import {
   type EnrollmentDraft,
 } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
-import { useSchoolSettings } from "@/hooks/useSettings";
+import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useStudents } from "@/hooks/useStudents";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -136,7 +136,7 @@ function CohortEnrollmentPanel({
   const { data: students = [] } = useStudents({ search: "", departmentId, status: "" });
   const { data: studyPlans = [] } = useCohortStudyPlans(cohortId);
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
-  const { data: schoolSettings } = useSchoolSettings();
+  const { data: activeYear } = useActiveAcademicYear(departmentId);
   const deleteEnrollment = useDeleteEnrollment();
 
   // Cohort's entry grade is fixed at creation; students actually advance a
@@ -145,11 +145,11 @@ function CohortEnrollmentPanel({
   // they started.
   const expectedGradeLevelId = useMemo(() => {
     const entryLevel = gradeLevels.find((g) => g.id === entryGradeLevelId);
-    if (!entryLevel || !schoolSettings) return entryGradeLevelId;
-    const elapsed = schoolSettings.academic_year - entryYear;
+    if (!entryLevel || activeYear === undefined) return entryGradeLevelId;
+    const elapsed = activeYear - entryYear;
     const expected = gradeLevels.find((g) => g.sort_order === entryLevel.sort_order + elapsed);
     return expected?.id ?? entryGradeLevelId;
-  }, [gradeLevels, schoolSettings, entryGradeLevelId, entryYear]);
+  }, [gradeLevels, activeYear, entryGradeLevelId, entryYear]);
 
   const studentName = useMemo(
     () => new Map(students.map((s) => [s.id, `${s.first_name} ${s.last_name}`])),

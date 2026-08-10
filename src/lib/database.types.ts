@@ -28,6 +28,8 @@ export type Profile = {
   date_of_birth: string | null;
   line_user_id: string | null;
   is_active: boolean;
+  teacher_code: string | null; // display/reference code — not the login id
+  learning_area_id: string | null; // required iff role includes 'teacher', see migration 0017
   created_at: string;
   updated_at: string;
 };
@@ -41,20 +43,18 @@ export type SchoolSettings = {
   name_th: string;
   name_en: string | null;
   logo_path: string | null; // object path in the school-assets storage bucket
-  academic_year: number; // พ.ศ.
   updated_at: string;
 };
 
 /** One row per department, always present — see migration 0002 seed trigger. */
 export type DepartmentSettings = {
   department_id: string;
-  semester1_start: string | null;
-  semester1_end: string | null;
-  semester2_start: string | null;
-  semester2_end: string | null;
   // Default เก็บ:สอบ split — curriculum_subjects rows may override per subject.
   score_collect_pct: number | null;
   score_exam_pct: number | null;
+  // Teaching-load alert thresholds — nullable, no alert when unset. See migration 0017.
+  min_periods_per_week: number | null;
+  max_periods_per_week: number | null;
   updated_at: string;
 };
 
@@ -297,6 +297,109 @@ export type TransferIntake = {
   created_at: string;
 };
 
+/** ครูประจำชั้น — history per room per academic year, not a mutable pointer. See migration 0017. */
+export type ClassroomHomeroomTeacher = {
+  id: string;
+  classroom_id: string;
+  teacher_id: string;
+  academic_year: number;
+  created_at: string;
+};
+
+/**
+ * ครูสอนวิชาอะไรให้ห้องไหน + คาบ/สัปดาห์ — periods_per_week is explicit per
+ * row (not derived from subjects.hours_per_week) so split/team-teaching can
+ * be represented. term is required for SEC, must be null elsewhere. See
+ * migration 0017.
+ */
+export type TeachingAssignment = {
+  id: string;
+  teacher_id: string;
+  subject_id: string;
+  classroom_id: string;
+  academic_year: number;
+  term: number | null;
+  periods_per_week: number;
+  // Tags rows that intentionally overlap at the same schedule slot
+  // (เรียนรวม/แบ่งคาบ) — same non-null value on 2+ rows tells the
+  // schedule_entries conflict trigger they're not a real conflict. See
+  // migration 0019.
+  group_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// ------------------------------------------------------------------ timetable
+// See supabase/migrations/0019_timetable.sql for the full grill rationale.
+
+export type PeriodType = "teaching" | "break";
+
+/** Per department, per day — Mon/Wed/Fri commonly differ in real Thai private schools. */
+export type PeriodDefinition = {
+  id: string;
+  department_id: string;
+  day_of_week: number; // 1(จันทร์)..6(เสาร์)
+  period_no: number;
+  period_type: PeriodType;
+  label: string;
+  start_time: string;
+  end_time: string;
+};
+
+/**
+ * Weekly recurring template (no specific dates) placing a
+ * teaching_assignment into a day+period slot. DB trigger blocks: booking
+ * into a non-'teaching' period, teacher/classroom double-booking (unless
+ * both assignments share group_id), and edits once the term is locked.
+ */
+export type ScheduleEntry = {
+  id: string;
+  teaching_assignment_id: string;
+  day_of_week: number;
+  period_no: number;
+  created_at: string;
+};
+
+// ------------------------------------------------------------- academic_terms
+// See supabase/migrations/0018_academic_terms.sql for the full grill rationale.
+
+export type TermType = "term1" | "term2" | "summer";
+export type TermStatus = "upcoming" | "active" | "locked" | "archived";
+
+/** Per department (KG/PRI/SEC keep independent calendars). status='locked'/'archived' freezes writes on teaching_assignments/student_classroom_enrollments for that department+year. */
+export type AcademicTerm = {
+  id: string;
+  department_id: string;
+  academic_year: number; // พ.ศ.
+  term_type: TermType;
+  start_date: string | null;
+  end_date: string | null;
+  status: TermStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AcademicEventType = "holiday" | "school_event" | "exam_period" | "teacher_workday" | "suspended";
+
+/** ปฏิทินกิจกรรม/วันหยุด. No department link (see AcademicEventDepartment) = applies to the whole school. */
+export type AcademicEvent = {
+  id: string;
+  name: string;
+  event_type: AcademicEventType;
+  start_date: string;
+  end_date: string;
+  students_attend: boolean;
+  staff_attend: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Which departments an academic_event applies to — no rows for an event = whole school. */
+export type AcademicEventDepartment = {
+  event_id: string;
+  department_id: string;
+};
+
 type Table<Row, Insert = Partial<Row>> = {
   Row: Row;
   Insert: Insert;
@@ -335,6 +438,8 @@ export type Database = {
           | "date_of_birth"
           | "line_user_id"
           | "is_active"
+          | "teacher_code"
+          | "learning_area_id"
         > &
           Partial<
             Pick<
@@ -347,6 +452,8 @@ export type Database = {
               | "date_of_birth"
               | "line_user_id"
               | "is_active"
+              | "teacher_code"
+              | "learning_area_id"
             >
           >
       >;
@@ -404,6 +511,19 @@ export type Database = {
         InsertOf<StudentClassroomEnrollment, never>
       >;
       transfer_intakes: Table<TransferIntake, InsertOf<TransferIntake, "intake_date">>;
+      classroom_homeroom_teachers: Table<
+        ClassroomHomeroomTeacher,
+        InsertOf<ClassroomHomeroomTeacher, never>
+      >;
+      teaching_assignments: Table<TeachingAssignment, InsertOf<TeachingAssignment, "term" | "group_id">>;
+      period_definitions: Table<PeriodDefinition, InsertOf<PeriodDefinition, never>>;
+      schedule_entries: Table<ScheduleEntry, InsertOf<ScheduleEntry, never>>;
+      academic_terms: Table<AcademicTerm, InsertOf<AcademicTerm, "start_date" | "end_date" | "status">>;
+      academic_events: Table<
+        AcademicEvent,
+        InsertOf<AcademicEvent, "students_attend" | "staff_attend">
+      >;
+      academic_event_departments: Table<AcademicEventDepartment, AcademicEventDepartment>;
       student_contacts: Table<
         StudentContact,
         InsertOf<
@@ -447,6 +567,9 @@ export type Database = {
       development_domain: DevelopmentDomain;
       blood_type: BloodType;
       guardian_relationship: GuardianRelationship;
+      term_type: TermType;
+      term_status: TermStatus;
+      academic_event_type: AcademicEventType;
     };
     CompositeTypes: Record<string, never>;
   };

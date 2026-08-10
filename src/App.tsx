@@ -9,8 +9,11 @@ import { Curriculum } from "@/routes/Curriculum";
 import { Enrollment } from "@/routes/Enrollment";
 import { Roster } from "@/routes/Roster";
 import { Settings } from "@/routes/Settings";
+import { AcademicEvents } from "@/routes/AcademicEvents";
 import { StatusManagement } from "@/routes/StatusManagement";
 import { Subjects } from "@/routes/Subjects";
+import { TeachingLoad } from "@/routes/TeachingLoad";
+import { Timetable } from "@/routes/Timetable";
 import { Users } from "@/routes/Users";
 
 function Gate() {
@@ -35,6 +38,9 @@ function Gate() {
         <Route path="subjects" element={<Subjects />} />
         <Route path="curriculum" element={<Curriculum />} />
         <Route path="enrollment" element={<Enrollment />} />
+        <Route path="teaching-load" element={<TeachingLoad />} />
+        <Route path="timetable" element={<Timetable />} />
+        <Route path="academic-events" element={<AcademicEvents />} />
         <Route path="status" element={<StatusManagement />} />
         <Route path="settings" element={<Settings />} />
       </Route>
