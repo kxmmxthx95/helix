@@ -11,6 +11,7 @@ export function Sheet({
   onOpenChange,
   title,
   description,
+  headerEnd,
   children,
   footer,
   className,
@@ -19,6 +20,8 @@ export function Sheet({
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
+  /** Optional trailing content in the header row (e.g. a badge). */
+  headerEnd?: React.ReactNode;
   children: React.ReactNode;
   /** Sticky actions below the scroll body (cancel / save, etc.). */
   footer?: React.ReactNode;
@@ -35,7 +38,10 @@ export function Sheet({
           )}
         >
           <div className="shrink-0 border-b border-border px-3 pb-3 pt-3">
-            <Drawer.Title className="text-base font-semibold">{title}</Drawer.Title>
+            <div className="flex items-center gap-2">
+              <Drawer.Title className="min-w-0 flex-1 truncate text-base font-semibold">{title}</Drawer.Title>
+              {headerEnd}
+            </div>
             {description ? (
               <Drawer.Description className="text-xs text-muted-foreground">
                 {description}
@@ -47,7 +53,7 @@ export function Sheet({
           </div>
           <div
             className={cn(
-              "flex-1 overflow-y-auto overscroll-contain px-3",
+              "flex-1 overflow-y-auto overscroll-contain px-3 pt-3",
               footer ? "pb-3" : "pb-6 pb-safe",
             )}
           >

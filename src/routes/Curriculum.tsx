@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Plus } from "@/components/icons";
+import { Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useDepartments } from "@/hooks/useProfiles";
@@ -45,10 +45,9 @@ export function Curriculum() {
   const [pickedCohort, setPickedCohort] = useState("");
   const [kgAcademicYear, setKgAcademicYear] = useState<number | null>(null);
   const [addingKgYear, setAddingKgYear] = useState(false);
-  const [pickedYear, setPickedYear] = useState(() => new Date().getFullYear() + 543);
+  const [pickedYear, setPickedYear] = useState<number | null>(null);
   const [addingYear, setAddingYear] = useState(false);
   const [pendingCreate, setPendingCreate] = useState(false);
-  const userPickedYear = useRef(false);
 
   const departmentId = orgWide ? pickedDept : me?.department_id ?? "";
   const department = departments.find((d) => d.id === departmentId);
@@ -56,10 +55,6 @@ export function Curriculum() {
 
   const { data: activeYear } = useActiveAcademicYear(departmentId || null);
   const defaultEntryYear = activeYear ?? new Date().getFullYear() + 543;
-
-  useEffect(() => {
-    if (activeYear !== undefined && kgAcademicYear === null) setKgAcademicYear(activeYear);
-  }, [activeYear, kgAcademicYear]);
 
   const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
   const { data: cohorts = [] } = useCohorts(!isKg ? departmentId || null : null);
@@ -77,21 +72,17 @@ export function Curriculum() {
   const years = useMemo(() => {
     const set = new Set(cohorts.map((c) => c.entry_year));
     set.add(defaultEntryYear);
-    set.add(pickedYear);
+    if (pickedYear !== null) set.add(pickedYear);
     return [...set].sort((a, b) => b - a);
   }, [cohorts, defaultEntryYear, pickedYear]);
 
   useEffect(() => {
-    userPickedYear.current = false;
-    setPickedYear(defaultEntryYear);
+    setPickedYear(null);
+    setKgAcademicYear(null);
     setAddingYear(false);
+    setAddingKgYear(false);
     setPendingCreate(false);
-  }, [departmentId, defaultEntryYear]);
-
-  useEffect(() => {
-    if (userPickedYear.current || cohorts.length === 0) return;
-    setPickedYear(Math.max(...cohorts.map((c) => c.entry_year)));
-  }, [cohorts]);
+  }, [departmentId]);
 
   useEffect(() => {
     if (gradeLevels.length > 0 && !gradeLevels.some((g) => g.id === pickedGradeLevel)) {
@@ -104,7 +95,6 @@ export function Curriculum() {
   }, [departmentId]);
 
   function pickYear(y: number) {
-    userPickedYear.current = true;
     setPickedYear(y);
     if (pickedCohort && !cohorts.some((c) => c.id === pickedCohort && c.entry_year === y)) {
       setPickedCohort("");
@@ -115,7 +105,7 @@ export function Curriculum() {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์ดูโครงสร้างหลักสูตร</Card>;
   }
 
-  const showYearToolbar = (isKg && kgAcademicYear !== null) || (!isKg && !!departmentId);
+  const showYearToolbar = !!departmentId;
 
   return (
     <div className="space-y-4">
@@ -141,13 +131,14 @@ export function Curriculum() {
 
         {showYearToolbar && (
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            {isKg && kgAcademicYear !== null ? (
+            {isKg ? (
               <>
                 <Select
-                  className="w-auto min-w-[7rem]"
-                  value={String(kgAcademicYear)}
+                  className="w-auto min-w-[10rem]"
+                  value={kgAcademicYear === null ? "" : String(kgAcademicYear)}
                   onChange={(e) => setKgAcademicYear(Number(e.target.value))}
                   aria-label="ปีการศึกษา"
+                  placeholder="เลือกปีการศึกษา"
                 >
                   {kgYearTabs.map((y) => (
                     <option key={y} value={y}>
@@ -185,10 +176,11 @@ export function Curriculum() {
             ) : (
               <>
                 <Select
-                  className="w-auto min-w-[7rem]"
-                  value={String(pickedYear)}
+                  className="w-auto min-w-[10rem]"
+                  value={pickedYear === null ? "" : String(pickedYear)}
                   onChange={(e) => pickYear(Number(e.target.value))}
                   aria-label="ปีการศึกษา"
+                  placeholder="เลือกปีการศึกษา"
                 >
                   {years.map((y) => (
                     <option key={y} value={y}>
@@ -230,7 +222,7 @@ export function Curriculum() {
         )}
       </div>
 
-      {!isKg && departmentId && (
+      {!isKg && departmentId && pickedYear !== null && (
         <CohortPicker
           cohorts={cohorts}
           pickedCohort={pickedCohort}
@@ -246,7 +238,7 @@ export function Curriculum() {
         />
       )}
 
-      {(isKg || pickedCohort) && gradeLevels.length > 0 && (
+      {((isKg && kgAcademicYear !== null) || pickedCohort) && gradeLevels.length > 0 && (
         <div className="flex w-full gap-0 overflow-x-auto border-b border-border" role="tablist">
           {gradeLevels.map((g) => (
             <button
@@ -268,7 +260,7 @@ export function Curriculum() {
         </div>
       )}
 
-      {!isKg && departmentId && gradeLevels.length > 0 && !pickedCohort && (
+      {!isKg && departmentId && pickedYear !== null && gradeLevels.length > 0 && !pickedCohort && (
         <EmptyState title="ไม่พบข้อมูล" description="เลือกหรือสร้างรุ่นก่อนจัดวิชา" />
       )}
 
@@ -343,42 +335,38 @@ function CohortPicker({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        {cohortsInYear.map((c) => (
-          <div key={c.id} className="group relative">
-            <button
-              type="button"
-              onClick={() => onPick(c.id)}
-              className={cn(
-                "rounded-full border px-3 py-1 text-xs transition-colors",
-                pickedCohort === c.id
-                  ? "border-foreground bg-foreground/10 text-foreground"
-                  : "border-border text-muted-foreground hover:bg-muted",
-              )}
-            >
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {mayEdit && pickedCohort && (
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={del.isPending}
+            aria-label="ลบรุ่น"
+            onClick={() => {
+              const name = cohortsInYear.find((c) => c.id === pickedCohort)?.name ?? "";
+              if (confirm(`ลบรุ่น "${name}"?`)) {
+                del.mutate(pickedCohort, {
+                  onSuccess: () => onPick(""),
+                });
+              }
+            }}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        <Select
+          className="w-auto min-w-[10rem]"
+          value={pickedCohort}
+          onChange={(e) => onPick(e.target.value)}
+          aria-label="หลักสูตร"
+          placeholder="เลือกหลักสูตร"
+        >
+          {cohortsInYear.map((c) => (
+            <option key={c.id} value={c.id}>
               {c.name}
-            </button>
-            {mayEdit && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirm(`ลบรุ่น "${c.name}"?`)) {
-                    del.mutate(c.id, {
-                      onSuccess: () => {
-                        if (pickedCohort === c.id) onPick("");
-                      },
-                    });
-                  }
-                }}
-                disabled={del.isPending}
-                className="absolute -right-2 -top-2 hidden h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-bold hover:bg-destructive/90 group-hover:flex disabled:opacity-50"
-                aria-label="ลบ"
-              >
-                ×
-              </button>
-            )}
-          </div>
-        ))}
+            </option>
+          ))}
+        </Select>
         {mayEdit && (
           <Button
             variant="outline"
@@ -544,31 +532,25 @@ function SubjectPanel({
   return (
     <div className="space-y-3">
       {(splitsByTerm || mayEdit) && (
-        <div className="flex items-center gap-2">
-          {mayEdit && (
-            <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
-              <Plus className="h-3.5 w-3.5" />
-              เพิ่มวิชา
-            </Button>
-          )}
+        <div className="flex items-center justify-end gap-2">
           {splitsByTerm && (
-            <div className="ml-auto inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
+            <Select
+              className="w-auto min-w-[10rem]"
+              value={String(term)}
+              onChange={(e) => setTerm(Number(e.target.value) as 1 | 2)}
+              aria-label="ภาคเรียน"
+            >
               {[1, 2].map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTerm(t as 1 | 2)}
-                  className={cn(
-                    "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                    term === t
-                      ? "bg-foreground/10 text-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                >
+                <option key={t} value={t}>
                   {TERM_LABEL[t]}
-                </button>
+                </option>
               ))}
-            </div>
+            </Select>
+          )}
+          {mayEdit && (
+            <Button variant="outline" size="icon" onClick={() => setAdding(true)} aria-label="เพิ่มวิชา">
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
           )}
         </div>
       )}

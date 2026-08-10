@@ -1,5 +1,5 @@
-import { FileUp, Plus, Search, SlidersHorizontal } from "@/components/icons";
-import { useMemo, useState } from "react";
+import { FileUp, Plus, Search, SlidersHorizontal, X } from "@/components/icons";
+import { useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSubjectsSheet } from "@/components/ImportSubjectsSheet";
 import { Sheet } from "@/components/Sheet";
@@ -14,6 +14,7 @@ import {
   type SubjectFilters,
 } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
+import { useFillPageSize } from "@/hooks/useFillPageSize";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import type { LearningArea, Subject, SubjectType } from "@/lib/database.types";
@@ -32,6 +33,40 @@ const SUBJECT_TYPE_LABEL: Record<SubjectType, string> = {
   activity: "กิจกรรม",
 };
 
+type SubjectSortKey = "code" | "name_th" | "learning_area" | "sub_area" | "subject_type" | "credits" | "hours_per_week";
+
+function SortTh({
+  label,
+  column,
+  sortKey,
+  sortDir,
+  onSort,
+  className,
+}: {
+  label: string;
+  column: SubjectSortKey;
+  sortKey: SubjectSortKey;
+  sortDir: "asc" | "desc";
+  onSort: (key: SubjectSortKey) => void;
+  className?: string;
+}) {
+  const active = sortKey === column;
+  return (
+    <th className={className ?? "px-3 py-2 font-medium"} aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        type="button"
+        className="tappable inline-flex items-center gap-1 text-left hover:text-foreground"
+        onClick={() => onSort(column)}
+      >
+        {label}
+        <span className={active ? "text-foreground" : "text-muted-foreground/40"} aria-hidden>
+          {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+        </span>
+      </button>
+    </th>
+  );
+}
+
 export function Subjects() {
   const { profile: me } = useAuth();
   const { data: departments = [] } = useDepartments();
@@ -40,6 +75,8 @@ export function Subjects() {
   const [editing, setEditing] = useState<Subject | "new" | null>(null);
   const [importing, setImporting] = useState(false);
   const [pickedDept, setPickedDept] = useState("");
+  const [sortKey, setSortKey] = useState<SubjectSortKey>("code");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const orgWide = me ? isOrgWide(me.roles) : false;
   const mayEdit = me ? canManage(me.roles) : false;
@@ -52,25 +89,89 @@ export function Subjects() {
   const { data: learningAreas = [] } = useLearningAreas();
   const { data: rows, isLoading, error } = useSubjects({ ...filters, departmentId });
   const del = useDeleteSubject();
-  const { page, setPage, pageCount, pageRows } = usePagination(rows ?? [], [filters, departmentId]);
+
+  const areaById = useMemo(() => new Map(learningAreas.map((a) => [a.id, a])), [learningAreas]);
 
   const areaName = useMemo(() => {
-    const byId = new Map(learningAreas.map((a) => [a.id, a]));
     return new Map(
       learningAreas.map((a) => {
-        const parent = a.parent_id ? byId.get(a.parent_id) : null;
+        const parent = a.parent_id ? areaById.get(a.parent_id) : null;
         return [a.id, parent ? `${parent.name} · ${a.name}` : a.name];
       }),
     );
-  }, [learningAreas]);
+  }, [learningAreas, areaById]);
+
+  function topAreaLabel(learningAreaId: string) {
+    const area = areaById.get(learningAreaId);
+    if (!area) return "—";
+    if (area.parent_id) return areaById.get(area.parent_id)?.name ?? "—";
+    return area.name;
+  }
+
+  function subAreaLabel(learningAreaId: string) {
+    const area = areaById.get(learningAreaId);
+    if (!area?.parent_id) return "—";
+    return area.name;
+  }
+
+  const sortedRows = useMemo(() => {
+    if (!rows) return [];
+    const list = [...rows];
+    const dir = sortDir === "asc" ? 1 : -1;
+    list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "code":
+          cmp = a.code.localeCompare(b.code, "th", { numeric: true });
+          break;
+        case "name_th":
+          cmp = a.name_th.localeCompare(b.name_th, "th");
+          break;
+        case "learning_area":
+          cmp = topAreaLabel(a.learning_area_id).localeCompare(topAreaLabel(b.learning_area_id), "th");
+          break;
+        case "sub_area":
+          cmp = subAreaLabel(a.learning_area_id).localeCompare(subAreaLabel(b.learning_area_id), "th");
+          break;
+        case "subject_type":
+          cmp = SUBJECT_TYPE_LABEL[a.subject_type].localeCompare(SUBJECT_TYPE_LABEL[b.subject_type], "th");
+          break;
+        case "credits":
+          cmp = a.credits - b.credits;
+          break;
+        case "hours_per_week":
+          cmp = a.hours_per_week - b.hours_per_week;
+          break;
+      }
+      return cmp * dir;
+    });
+    return list;
+  }, [rows, sortKey, sortDir, areaById]);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const tableReady = Boolean(rows && rows.length > 0);
+  const pageSize = useFillPageSize(scrollRef, tableReady);
+  const { page, setPage, pageCount, pageRows } = usePagination(
+    sortedRows,
+    [filters, departmentId, sortKey, sortDir],
+    pageSize,
+  );
+
+  function onSort(key: SubjectSortKey) {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const activeFilterCount = [filters.learningAreaId, filters.subjectType, filters.includeInactive ? "1" : ""].filter(
     Boolean,
   ).length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
+    <div className="page-fill">
+      <div className="flex shrink-0 gap-2">
         {orgWide && pickableDepartments.length > 0 && (
           <Select
             className="w-auto min-w-[10rem] shrink-0"
@@ -123,82 +224,89 @@ export function Subjects() {
       </div>
 
       {isLoading && (
-        <div className="flex justify-center py-12">
+        <div className="flex flex-1 items-center justify-center py-12">
           <Spinner className="h-5 w-5 text-muted-foreground" />
         </div>
       )}
 
-      {error && <Card className="text-sm text-destructive">โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง</Card>}
+      {error && <Card className="shrink-0 text-sm text-destructive">โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง</Card>}
 
       {rows && rows.length === 0 && (
-        <EmptyState title="ไม่พบข้อมูล" description="ไม่พบรายวิชาตามเงื่อนไขที่เลือก" />
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="ไม่พบข้อมูล" description="ไม่พบรายวิชาตามเงื่อนไขที่เลือก" />
+        </div>
       )}
 
       {rows && rows.length > 0 && (
-        <div className="space-y-2">
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full min-w-[40rem] text-xs">
-              <thead className="bg-muted text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">รหัส</th>
-                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
-                  <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
-                  <th className="px-3 py-2 font-medium">ประเภท</th>
-                  <th className="px-3 py-2 font-medium">หน่วยกิต</th>
-                  <th className="px-3 py-2 font-medium">ชม./สัปดาห์</th>
-                  {mayEdit && <th className="px-3 py-2" />}
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((row) => (
-                  <tr
-                    key={row.id}
-                    onClick={() => mayEdit && setEditing(row)}
-                    className={
-                      mayEdit
-                        ? "h-[40px] cursor-pointer border-t border-border active:bg-muted"
-                        : "h-[40px] border-t border-border"
-                    }
-                  >
-                    <td className="px-3 py-0 font-mono text-xs">{row.code}</td>
-                    <td className="px-3 py-0 font-medium">
-                      {row.name_th}
-                      {!row.is_active && (
-                        <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                          ปิดใช้งาน
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-0 text-muted-foreground">{areaName.get(row.learning_area_id) ?? "—"}</td>
-                    <td className="px-3 py-0 text-muted-foreground">{SUBJECT_TYPE_LABEL[row.subject_type]}</td>
-                    <td className="px-3 py-0 text-muted-foreground">{row.credits}</td>
-                    <td className="px-3 py-0 text-muted-foreground">{row.hours_per_week}</td>
-                    {mayEdit && (
-                      <td className="px-3 py-0 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={del.isPending}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (confirm(`ลบรายวิชา "${row.name_th}" ถาวร? ข้อมูลนี้กู้คืนไม่ได้`)) {
-                              del.mutate(row.id, {
-                                onError: () =>
-                                  alert(
-                                    `ลบไม่ได้ — "${row.name_th}" ถูกใช้อยู่ในโครงสร้างหลักสูตร ให้ปิดใช้งานแทน`,
-                                  ),
-                              });
-                            }
-                          }}
-                        >
-                          ลบ
-                        </Button>
-                      </td>
-                    )}
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+          <div className="table-panel">
+            <div ref={scrollRef} className="table-panel-scroll">
+              <table className="w-full min-w-[48rem] text-xs">
+                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                  <tr>
+                    <SortTh label="รหัส" column="code" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                    <SortTh label="ชื่อวิชา" column="name_th" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                    <SortTh label="กลุ่มสาระ" column="learning_area" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                    <SortTh label="สาระย่อย" column="sub_area" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                    <SortTh label="ประเภท" column="subject_type" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                    <SortTh label="หน่วยกิต" column="credits" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                    <SortTh label="ชม./สัปดาห์" column="hours_per_week" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                    {mayEdit && <th className="px-3 py-2" />}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {pageRows.map((row) => (
+                    <tr
+                      key={row.id}
+                      onClick={() => mayEdit && setEditing(row)}
+                      className={
+                        mayEdit
+                          ? "h-[40px] cursor-pointer border-t border-border active:bg-muted"
+                          : "h-[40px] border-t border-border"
+                      }
+                    >
+                      <td className="px-3 py-0 text-xs tabular-nums">{row.code}</td>
+                      <td className="px-3 py-0 font-medium">
+                        {row.name_th}
+                        {!row.is_active && (
+                          <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                            ปิดใช้งาน
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-0 text-muted-foreground">{topAreaLabel(row.learning_area_id)}</td>
+                      <td className="px-3 py-0 text-muted-foreground">{subAreaLabel(row.learning_area_id)}</td>
+                      <td className="px-3 py-0 text-muted-foreground">{SUBJECT_TYPE_LABEL[row.subject_type]}</td>
+                      <td className="px-3 py-0 text-muted-foreground">{row.credits}</td>
+                      <td className="px-3 py-0 text-muted-foreground">{row.hours_per_week}</td>
+                      {mayEdit && (
+                        <td className="px-3 py-0 text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="ลบ"
+                            disabled={del.isPending}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`ลบรายวิชา "${row.name_th}" ถาวร? ข้อมูลนี้กู้คืนไม่ได้`)) {
+                                del.mutate(row.id, {
+                                  onError: () =>
+                                    alert(
+                                      `ลบไม่ได้ — "${row.name_th}" ถูกใช้อยู่ในโครงสร้างหลักสูตร ให้ปิดใช้งานแทน`,
+                                    ),
+                                });
+                              }
+                            }}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
           <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </div>
@@ -360,6 +468,13 @@ function EditSubjectSheet({
       open={target !== null}
       onOpenChange={(open) => !open && close()}
       title={isNew ? "เพิ่มรายวิชา" : "แก้ไขรายวิชา"}
+      headerEnd={
+        departmentName ? (
+          <span className="shrink-0 rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+            {departmentName}
+          </span>
+        ) : undefined
+      }
       footer={
         current ? (
           <div className="flex gap-2">
@@ -375,13 +490,6 @@ function EditSubjectSheet({
     >
       {current && (
         <form id="edit-subject" onSubmit={submit} className="space-y-4">
-          <div className="flex h-8 items-center justify-between gap-2 text-sm">
-            <span className="text-xs font-medium text-muted-foreground">แผนก</span>
-            <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
-              {departmentName}
-            </span>
-          </div>
-
           <Field label="รหัสวิชา">
             <Input value={current.code} onChange={(e) => setDraft({ ...current, code: e.target.value })} required />
           </Field>
@@ -542,15 +650,11 @@ function NewSubLearningAreaField({
   onCancel: () => void;
 }) {
   const save = useSaveLearningArea();
-  const [code, setCode] = useState("");
   const [name, setName] = useState("");
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        <Input placeholder="รหัส เช่น physics" value={code} onChange={(e) => setCode(e.target.value)} />
-        <Input placeholder="ชื่อ เช่น ฟิสิกส์" value={name} onChange={(e) => setName(e.target.value)} />
-      </div>
+      <Input placeholder="ชื่อ เช่น ฟิสิกส์" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
       <div className="flex gap-2">
         <Button type="button" variant="outline" size="sm" className="flex-1" onClick={onCancel}>
           ยกเลิก
@@ -559,10 +663,15 @@ function NewSubLearningAreaField({
           type="button"
           size="sm"
           className="flex-1"
-          disabled={!code.trim() || !name.trim() || save.isPending}
+          disabled={!name.trim() || save.isPending}
           onClick={() =>
             save.mutate(
-              { code: code.trim(), name: name.trim(), parent_id: parentId },
+              {
+                // code is unique/required in DB — not shown in UI for sub-areas
+                code: `sub_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`,
+                name: name.trim(),
+                parent_id: parentId,
+              },
               { onSuccess: onCreated },
             )
           }
