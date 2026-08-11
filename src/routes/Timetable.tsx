@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Plus, X } from "@/components/icons";
+import { GraduationCap, Plus, Users, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { Card, EmptyState, Select, Spinner } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
@@ -45,10 +45,6 @@ export function Timetable() {
   const [classroomId, setClassroomId] = useState("");
   const [teacherId, setTeacherId] = useState("");
 
-  useEffect(() => {
-    if (!teacherId && me?.id) setTeacherId(me.id);
-  }, [teacherId, me?.id]);
-
   const departmentId = orgWide ? pickedDept : (me?.department_id ?? "");
   const department = departments.find((d) => d.id === departmentId);
   const splitsByTerm = department?.code === "SEC";
@@ -69,40 +65,22 @@ export function Timetable() {
 
   return (
     <div className="space-y-4">
-      {orgWide && departments.length > 0 && (
-        <Select
-          className="w-auto min-w-[10rem]"
-          value={pickedDept}
-          onChange={(e) => setPickedDept(e.target.value)}
-          aria-label="แผนก"
-          placeholder="เลือกแผนก"
-        >
-          {departments.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </Select>
-      )}
-
       <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
-          {(["classroom", "teacher"] as View[]).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => setView(v)}
-              className={cn(
-                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                view === v
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              {v === "classroom" ? "มุมมองห้องเรียน" : "มุมมองครู"}
-            </button>
-          ))}
-        </div>
+        {orgWide && departments.length > 0 && (
+          <Select
+            className="w-auto min-w-[10rem]"
+            value={pickedDept}
+            onChange={(e) => setPickedDept(e.target.value)}
+            aria-label="แผนก"
+            placeholder="เลือกแผนก"
+          >
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
+        )}
 
         {splitsByTerm && (
           <div className="inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
@@ -133,7 +111,13 @@ export function Timetable() {
             ))}
           </Select>
         ) : (
-          <Select value={teacherId} onChange={(e) => setTeacherId(e.target.value)} className="h-8 w-auto">
+          <Select
+            value={teacherId}
+            onChange={(e) => setTeacherId(e.target.value)}
+            className="h-8 w-auto min-w-[10rem]"
+            aria-label="ครูผู้สอน"
+            placeholder="เลือกครูผู้สอน"
+          >
             {teachers.map((t) => (
               <option key={t.id} value={t.id}>
                 {profileFullName(t)}
@@ -141,6 +125,29 @@ export function Timetable() {
             ))}
           </Select>
         )}
+
+        <div className="ml-auto inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
+          {([
+            { id: "classroom" as const, label: "มุมมองห้องเรียน", Icon: GraduationCap },
+            { id: "teacher" as const, label: "มุมมองครู", Icon: Users },
+          ]).map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setView(id)}
+              aria-label={label}
+              title={label}
+              className={cn(
+                "inline-flex h-full w-8 shrink-0 items-center justify-center rounded-md transition-colors",
+                view === id
+                  ? "bg-foreground/10 text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              <Icon className="h-4 w-4" />
+            </button>
+          ))}
+        </div>
       </div>
 
       {departmentId && view === "classroom" && classroomId && (

@@ -36,16 +36,38 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = "Button";
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
-  ({ className, ...props }, ref) => (
-    <input
-      ref={ref}
-      className={cn(
-        "flex h-8 w-full rounded-lg border border-input bg-background px-2.5 text-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring disabled:opacity-50",
-        className,
-      )}
-      {...props}
-    />
-  ),
+  ({ className, type, value, onClick, onKeyDown, inputMode, ...props }, ref) => {
+    const isDate = type === "date";
+    return (
+      <input
+        ref={ref}
+        type={type}
+        value={value}
+        inputMode={isDate ? "none" : inputMode}
+        className={cn(
+          "flex h-8 w-full rounded-lg border border-input bg-background px-2.5 text-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring disabled:opacity-50",
+          isDate && "ui-date pr-8",
+          isDate && (value === "" || value === undefined) && "ui-date-empty",
+          className,
+        )}
+        onClick={(e) => {
+          if (isDate) {
+            try {
+              e.currentTarget.showPicker?.();
+            } catch {
+              /* showPicker throws if input is not user-activated or unsupported */
+            }
+          }
+          onClick?.(e);
+        }}
+        onKeyDown={(e) => {
+          if (isDate && e.key.length === 1) e.preventDefault();
+          onKeyDown?.(e);
+        }}
+        {...props}
+      />
+    );
+  },
 );
 Input.displayName = "Input";
 

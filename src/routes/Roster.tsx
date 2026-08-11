@@ -434,7 +434,9 @@ function EditStudentSheet({
     target === null
       ? null
       : isNew
-        ? blankDraft(me?.department_id ?? departments[0]?.id ?? "")
+        ? blankDraft(
+            me && isOrgWide(me.roles) ? (me.department_id ?? "") : (me?.department_id ?? departments[0]?.id ?? ""),
+          )
         : pickDraft(target);
   const current = draft ?? base;
   const { data: gradeLevels = [] } = useGradeLevels(current?.department_id ?? null);
@@ -448,6 +450,16 @@ function EditStudentSheet({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!current) return;
+    if (
+      !current.student_code.trim() ||
+      !current.prefix ||
+      !current.first_name.trim() ||
+      !current.last_name.trim() ||
+      !current.department_id
+    ) {
+      setSection("basic");
+      return;
+    }
     save.mutate({ ...current, ...(isNew ? {} : { id: (target as Student).id }) });
     close();
   }
@@ -504,8 +516,9 @@ function EditStudentSheet({
                   <Select
                     value={current.prefix ?? ""}
                     onChange={(e) => setDraft({ ...current, prefix: e.target.value || null })}
+                    required
+                    placeholder="เลือกคำนำหน้า"
                   >
-                    <option value="">— ไม่ระบุ —</option>
                     {STUDENT_PREFIXES.map((p) => (
                       <option key={p} value={p}>
                         {p}
@@ -538,6 +551,7 @@ function EditStudentSheet({
                       setDraft({ ...current, department_id: e.target.value, grade_level_id: null })
                     }
                     required
+                    placeholder="เลือกแผนก"
                     disabled={!me || !isOrgWide(me.roles)}
                   >
                     {departments.map((d) => (

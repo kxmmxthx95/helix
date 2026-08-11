@@ -209,3 +209,19 @@ export function useInviteUsers() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ["profiles"] }),
   });
 }
+
+/** Hard delete via Edge Function — needs service-role to remove auth.users (cascades to profiles). */
+export function useDeleteUser() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke("delete-user", { body: { userId } });
+      if (error) throw error;
+      if (data && typeof data === "object" && "error" in data && data.error) {
+        throw new Error(String(data.error));
+      }
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["profiles"] }),
+  });
+}

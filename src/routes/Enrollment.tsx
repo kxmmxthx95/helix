@@ -16,7 +16,6 @@ import { useDepartments } from "@/hooks/useProfiles";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useStudents } from "@/hooks/useStudents";
 import { canManage, isOrgWide } from "@/lib/roles";
-import { cn } from "@/lib/utils";
 
 export function Enrollment() {
   const { profile: me } = useAuth();
@@ -25,11 +24,8 @@ export function Enrollment() {
   const mayEdit = me ? canManage(me.roles) : false;
 
   const [pickedDept, setPickedDept] = useState("");
+  const [pickedYear, setPickedYear] = useState<number | null>(null);
   const [pickedCohort, setPickedCohort] = useState("");
-
-  useEffect(() => {
-    setPickedCohort("");
-  }, [pickedDept]);
 
   const departmentId = orgWide ? pickedDept : me?.department_id ?? "";
   const department = departments.find((d) => d.id === departmentId);
@@ -37,27 +33,83 @@ export function Enrollment() {
 
   const { data: cohorts = [] } = useCohorts(!isKg ? departmentId || null : null);
 
+  const years = useMemo(
+    () => [...new Set(cohorts.map((c) => c.entry_year))].sort((a, b) => b - a),
+    [cohorts],
+  );
+
+  const cohortsForYear = useMemo(
+    () => (pickedYear === null ? [] : cohorts.filter((c) => c.entry_year === pickedYear)),
+    [cohorts, pickedYear],
+  );
+
+  useEffect(() => {
+    setPickedYear(null);
+    setPickedCohort("");
+  }, [departmentId]);
+
+  useEffect(() => {
+    if (pickedCohort && !cohortsForYear.some((c) => c.id === pickedCohort)) {
+      setPickedCohort("");
+    }
+  }, [cohortsForYear, pickedCohort]);
+
   if (!me || (!orgWide && !me.roles.includes("dept_head"))) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์ลงทะเบียนนักเรียน</Card>;
   }
 
   return (
     <div className="space-y-4">
-      {orgWide && departments.length > 0 && (
+      <div className="flex flex-wrap items-center gap-2">
+        {orgWide && departments.length > 0 && (
+          <Select
+            className="min-w-[10rem] flex-1"
+            value={pickedDept}
+            onChange={(e) => setPickedDept(e.target.value)}
+            aria-label="แผนก"
+            placeholder="เลือกแผนก"
+          >
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
+        )}
+
         <Select
-          className="w-auto min-w-[10rem]"
-          value={pickedDept}
-          onChange={(e) => setPickedDept(e.target.value)}
-          aria-label="แผนก"
-          placeholder="เลือกแผนก"
+          className="min-w-[10rem] flex-1"
+          value={pickedYear === null ? "" : String(pickedYear)}
+          onChange={(e) => {
+            setPickedYear(Number(e.target.value));
+            setPickedCohort("");
+          }}
+          aria-label="ปีการศึกษา"
+          placeholder="เลือกปีการศึกษา"
+          disabled={!departmentId || isKg || years.length === 0}
         >
-          {departments.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
+          {years.map((y) => (
+            <option key={y} value={y}>
+              ปี {y}
             </option>
           ))}
         </Select>
-      )}
+
+        <Select
+          className="min-w-[10rem] flex-1"
+          value={pickedCohort}
+          onChange={(e) => setPickedCohort(e.target.value)}
+          aria-label="หลักสูตร"
+          placeholder="เลือกหลักสูตร"
+          disabled={pickedYear === null || isKg || cohortsForYear.length === 0}
+        >
+          {cohortsForYear.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </Select>
+      </div>
 
       {isKg && (
         <Card className="text-sm text-muted-foreground">
@@ -65,45 +117,21 @@ export function Enrollment() {
         </Card>
       )}
 
-      {!isKg && departmentId && (
-        <>
-          {cohorts.length === 0 && (
-            <EmptyState
-              title="ไม่พบข้อมูล"
-              description="แผนกนี้ยังไม่มีรุ่นหลักสูตร — สร้างที่หน้าโครงสร้างหลักสูตรก่อน"
-            />
-          )}
+      {!isKg && departmentId && cohorts.length === 0 && (
+        <EmptyState
+          title="ไม่พบข้อมูล"
+          description="แผนกนี้ยังไม่มีรุ่นหลักสูตร — สร้างที่หน้าโครงสร้างหลักสูตรก่อน"
+        />
+      )}
 
-          {cohorts.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              {cohorts.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setPickedCohort(c.id)}
-                  className={cn(
-                    "rounded-full border px-3 py-1 text-xs transition-colors",
-                    pickedCohort === c.id
-                      ? "border-foreground bg-foreground/10 text-foreground"
-                      : "border-border text-muted-foreground hover:bg-muted",
-                  )}
-                >
-                  {c.name}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {pickedCohort && (
-            <CohortEnrollmentPanel
-              cohortId={pickedCohort}
-              entryGradeLevelId={cohorts.find((c) => c.id === pickedCohort)?.entry_grade_level_id ?? ""}
-              entryYear={cohorts.find((c) => c.id === pickedCohort)?.entry_year ?? 0}
-              departmentId={departmentId}
-              mayEdit={mayEdit}
-            />
-          )}
-        </>
+      {!isKg && pickedCohort && (
+        <CohortEnrollmentPanel
+          cohortId={pickedCohort}
+          entryGradeLevelId={cohorts.find((c) => c.id === pickedCohort)?.entry_grade_level_id ?? ""}
+          entryYear={cohorts.find((c) => c.id === pickedCohort)?.entry_year ?? 0}
+          departmentId={departmentId}
+          mayEdit={mayEdit}
+        />
       )}
     </div>
   );

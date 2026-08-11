@@ -397,14 +397,14 @@ export function Subjects() {
   );
 }
 
-function blankDraft(learningAreaId: string, departmentId: string): SubjectDraft {
+function blankDraft(departmentId: string): SubjectDraft {
   return {
     code: "",
     name_th: "",
     name_en: null,
     department_id: departmentId,
-    learning_area_id: learningAreaId,
-    subject_type: "basic",
+    learning_area_id: "",
+    subject_type: "",
     credits: 1,
     hours_per_week: 1,
     is_active: true,
@@ -452,7 +452,7 @@ function EditSubjectSheet({
 
   const isNew = target === "new";
   const base: SubjectDraft | null =
-    target === null ? null : isNew ? blankDraft(topLevelAreas[0]?.id ?? "", departmentId) : pickDraft(target);
+    target === null ? null : isNew ? blankDraft(departmentId) : pickDraft(target);
   const current = draft ?? base;
 
   const selectedArea = learningAreas.find((a) => a.id === current?.learning_area_id);
@@ -471,6 +471,7 @@ function EditSubjectSheet({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!current) return;
+    if (!current.learning_area_id || !current.subject_type) return;
     save.mutate({ ...current, ...(isNew ? {} : { id: (target as Subject).id }) });
     close();
   }
@@ -527,6 +528,7 @@ function EditSubjectSheet({
               value={selectedTopId}
               onChange={(e) => setDraft({ ...current, learning_area_id: e.target.value })}
               required
+              placeholder="เลือกสาระการเรียนรู้"
             >
               {topLevelAreas.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -544,8 +546,9 @@ function EditSubjectSheet({
                     value={selectedArea?.parent_id === selectedTopId ? selectedArea.id : ""}
                     onChange={(e) => setDraft({ ...current, learning_area_id: e.target.value || selectedTopId })}
                     className="flex-1"
+                    placeholder="เลือกสาระย่อย"
+                    disabled={!selectedTopId}
                   >
-                    <option value="">ไม่มีสาระย่อย</option>
                     {subAreas.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name}
@@ -553,7 +556,13 @@ function EditSubjectSheet({
                     ))}
                   </Select>
                   {canAddLearningArea && (
-                    <Button type="button" variant="outline" size="icon" onClick={() => setAddingSubArea(true)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setAddingSubArea(true)}
+                      disabled={!selectedTopId}
+                    >
                       <Plus className="h-3 w-3" />
                     </Button>
                   )}
@@ -576,6 +585,8 @@ function EditSubjectSheet({
             <Select
               value={current.subject_type}
               onChange={(e) => setDraft({ ...current, subject_type: e.target.value as SubjectType })}
+              required
+              placeholder="เลือกประเภทวิชา"
             >
               {(Object.keys(SUBJECT_TYPE_LABEL) as SubjectType[]).map((t) => (
                 <option key={t} value={t}>

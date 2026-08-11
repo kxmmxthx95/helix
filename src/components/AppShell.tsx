@@ -323,7 +323,7 @@ export function AppShell() {
 
         <header className="sticky top-0 z-20 hidden h-12 shrink-0 border-b border-border/60 lg:block">
           <div className={cn("mx-auto flex h-full w-full max-w-6xl items-center", "px-3")}>
-            <p className="text-sm text-foreground">{tabs.find(t => t.to === location.pathname || (t.to === "/" && location.pathname === "/"))?.label || "ระบบจัดการสถานศึกษา"}</p>
+            <p className="text-sm font-semibold text-foreground">{tabs.find(t => t.to === location.pathname || (t.to === "/" && location.pathname === "/"))?.label || "ระบบจัดการสถานศึกษา"}</p>
           </div>
         </header>
 

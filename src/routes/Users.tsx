@@ -1,5 +1,22 @@
-import { Plus, Search, SlidersHorizontal, Upload } from "@/components/icons";
-import { useMemo, useState } from "react";
+import {
+  AppsIcon,
+  BarChartIcon,
+  BookIcon,
+  ClipboardIcon,
+  GraduationCap,
+  KeyIcon,
+  LibraryIcon,
+  Monitor,
+  PersonAddIcon,
+  Plus,
+  Search,
+  SettingsIcon,
+  SlidersHorizontal,
+  Upload,
+  Users as UsersIcon,
+  X,
+} from "@/components/icons";
+import { useMemo, useState, type ComponentType } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportUsersSheet } from "@/components/ImportUsersSheet";
 import { Sheet } from "@/components/Sheet";
@@ -7,6 +24,7 @@ import { Button, Card, EmptyState, Field, Input, Pagination, PasswordInput, Sele
 import { useLearningAreas } from "@/hooks/useCurriculum";
 import { usePagination } from "@/hooks/usePagination";
 import {
+  useDeleteUser,
   useDepartments,
   usePositionTitles,
   useProfiles,
@@ -20,11 +38,32 @@ import {
 import type { PositionTitle } from "@/lib/database.types";
 import { profileFullName } from "@/lib/database.types";
 import { canManageUsers, isOrgWide, PREFIXES, ROLE_LABEL, ROLES, roleLabels, type Role } from "@/lib/roles";
+import { cn } from "@/lib/utils";
 
 const EMPTY: ProfileFilters = { search: "", departmentId: "", role: "", active: "" };
 
 /** Roles pickable directly as checkboxes — dept_head comes from position_titles instead. */
 const BASE_ROLES = ROLES.filter((r) => r !== "dept_head");
+
+type IconComp = ComponentType<{ className?: string }>;
+
+const ROLE_ICON: Record<(typeof BASE_ROLES)[number], IconComp> = {
+  super_admin: KeyIcon,
+  director: Monitor,
+  staff: ClipboardIcon,
+  teacher: BookIcon,
+  student: GraduationCap,
+  parent: UsersIcon,
+};
+
+const TITLE_ICON: Record<string, IconComp> = {
+  dept_lead: AppsIcon,
+  academic_head: LibraryIcon,
+  student_affairs_head: UsersIcon,
+  budget_head: BarChartIcon,
+  general_affairs_head: SettingsIcon,
+  hr_head: PersonAddIcon,
+};
 
 export function Users() {
   const { profile: me } = useAuth();
@@ -38,6 +77,7 @@ export function Users() {
   const { data: positionTitles = [] } = usePositionTitles();
   const { data: rows, isLoading, error } = useProfiles(filters);
   const { page, setPage, pageCount, pageRows } = usePagination(rows ?? [], [filters]);
+  const deleteUser = useDeleteUser();
 
   const mayManage = me ? canManageUsers(me.roles) : false;
 
@@ -119,6 +159,7 @@ export function Users() {
                   <th className="px-3 py-2 font-medium">ตำแหน่ง</th>
                   <th className="px-3 py-2 font-medium">แผนก</th>
                   <th className="px-3 py-2 font-medium">สถานะ</th>
+                  {mayManage && <th className="w-10 px-3 py-2 font-medium" />}
                 </tr>
               </thead>
               <tbody>
@@ -156,6 +197,33 @@ export function Users() {
                         {row.is_active ? "ใช้งาน" : "ปิด"}
                       </span>
                     </td>
+                    {mayManage && (
+                      <td className="px-3 py-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="ลบผู้ใช้งาน"
+                          disabled={row.id === me?.id || deleteUser.isPending}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (row.id === me?.id) return;
+                            if (
+                              confirm(
+                                `ลบ "${profileFullName(row)}" ถาวร? บัญชีเข้าสู่ระบบจะถูกลบด้วย กู้คืนไม่ได้`,
+                              )
+                            ) {
+                              deleteUser.mutate(row.id, {
+                                onError: (err) => {
+                                  alert(err instanceof Error ? err.message : "ลบไม่สำเร็จ");
+                                },
+                              });
+                            }
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -237,7 +305,7 @@ export function Users() {
   );
 }
 
-/** Role + position-title checkboxes, shared by the edit and create sheets. */
+/** Role + position-title toggles, shared by the edit and create sheets. */
 function RolePicker({
   roles,
   positionTitleIds,
@@ -254,34 +322,54 @@ function RolePicker({
   return (
     <>
       <Field label="สิทธิ์">
-        <div className="space-y-1.5">
-          {BASE_ROLES.map((r) => (
-            <label key={r} className="flex items-center gap-2 py-1 text-sm">
-              <input
-                type="checkbox"
-                checked={roles.includes(r)}
-                onChange={(e) => onToggleRole(r, e.target.checked)}
-                className="h-5 w-5 accent-[hsl(var(--accent))]"
-              />
-              {ROLE_LABEL[r]}
-            </label>
-          ))}
+        <div className="grid grid-cols-2 gap-2">
+          {BASE_ROLES.map((r) => {
+            const selected = roles.includes(r);
+            const Icon = ROLE_ICON[r];
+            return (
+              <button
+                key={r}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => onToggleRole(r, !selected)}
+                className={cn(
+                  "flex h-8 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs transition-colors",
+                  selected
+                    ? "border-foreground bg-foreground/10 text-foreground"
+                    : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{ROLE_LABEL[r]}</span>
+              </button>
+            );
+          })}
         </div>
       </Field>
 
       <Field label="ตำแหน่งหัวหน้างาน (แผนกตัวเอง)">
-        <div className="space-y-1.5">
-          {positionTitles.map((t) => (
-            <label key={t.id} className="flex items-center gap-2 py-1 text-sm">
-              <input
-                type="checkbox"
-                checked={positionTitleIds.includes(t.id)}
-                onChange={(e) => onToggleTitle(t.id, e.target.checked)}
-                className="h-5 w-5 accent-[hsl(var(--accent))]"
-              />
-              {t.name}
-            </label>
-          ))}
+        <div className="grid grid-cols-2 gap-2">
+          {positionTitles.map((t) => {
+            const selected = positionTitleIds.includes(t.id);
+            const Icon = TITLE_ICON[t.code] ?? AppsIcon;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => onToggleTitle(t.id, !selected)}
+                className={cn(
+                  "flex h-8 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs transition-colors",
+                  selected
+                    ? "border-foreground bg-foreground/10 text-foreground"
+                    : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{t.name}</span>
+              </button>
+            );
+          })}
         </div>
       </Field>
     </>
@@ -440,8 +528,19 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
 
           <Field label="เลขบัตรประชาชน">
             <Input
+              inputMode="numeric"
+              autoComplete="off"
               value={current.national_id ?? ""}
-              onChange={(e) => setDraft({ ...current, national_id: e.target.value || null })}
+              onChange={(e) =>
+                setDraft({
+                  ...current,
+                  national_id: e.target.value.replace(/\D/g, "").slice(0, 13) || null,
+                })
+              }
+              pattern="[0-9]{13}"
+              minLength={13}
+              maxLength={13}
+              title="เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก"
             />
           </Field>
 
@@ -553,7 +652,17 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setFailReason(null);
-    const outcome = await invite.mutateAsync([draft]);
+    const phone = draft.loginId.replace(/\D/g, "");
+    const nationalId = (draft.national_id ?? "").replace(/\D/g, "");
+    if (phone.length !== 10) {
+      setFailReason("เบอร์โทรต้องเป็นตัวเลข 10 หลัก");
+      return;
+    }
+    if (nationalId.length !== 13) {
+      setFailReason("เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก");
+      return;
+    }
+    const outcome = await invite.mutateAsync([{ ...draft, loginId: phone, national_id: nationalId }]);
     if (outcome.inserted > 0) {
       close();
     } else {
@@ -582,8 +691,16 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
         <Field label="เบอร์โทร (รหัสผู้ใช้)">
           <Input
             type="tel"
+            inputMode="numeric"
+            autoComplete="tel"
             value={draft.loginId}
-            onChange={(e) => setDraft({ ...draft, loginId: e.target.value })}
+            onChange={(e) =>
+              setDraft({ ...draft, loginId: e.target.value.replace(/\D/g, "").slice(0, 10) })
+            }
+            pattern="[0-9]{10}"
+            minLength={10}
+            maxLength={10}
+            title="เบอร์โทรต้องเป็นตัวเลข 10 หลัก"
             required
           />
         </Field>
@@ -614,8 +731,19 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
 
         <Field label="เลขบัตรประชาชน (ใช้ยืนยันตอนลืมรหัสผ่าน)">
           <Input
+            inputMode="numeric"
+            autoComplete="off"
             value={draft.national_id ?? ""}
-            onChange={(e) => setDraft({ ...draft, national_id: e.target.value || null })}
+            onChange={(e) =>
+              setDraft({
+                ...draft,
+                national_id: e.target.value.replace(/\D/g, "").slice(0, 13) || null,
+              })
+            }
+            pattern="[0-9]{13}"
+            minLength={13}
+            maxLength={13}
+            title="เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก"
             required
           />
         </Field>

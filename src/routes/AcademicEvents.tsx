@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronBack, ChevronForward, Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Field, Input, Select, Spinner } from "@/components/ui";
 import {
   useAcademicEvents,
   useDeleteAcademicEvent,
@@ -99,16 +99,12 @@ export function AcademicEvents() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">ปฏิทินกิจกรรม/วันหยุด</h2>
-        {mayEdit && (
-          <Button size="sm" onClick={() => setCreating("")}>
-            <Plus className="h-3.5 w-3.5" />
-            เพิ่ม Event
-          </Button>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium">
+            {cursor.toLocaleDateString("th-TH", { month: "long", year: "numeric" })}
+          </span>
+          {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+        </div>
         <div className="flex items-center gap-1">
           <Button variant="outline" size="icon" onClick={() => setCursor((c) => addMonths(c, -1))} aria-label="เดือนก่อนหน้า">
             <ChevronBack className="h-4 w-4" />
@@ -119,70 +115,70 @@ export function AcademicEvents() {
           <Button variant="outline" size="icon" onClick={() => setCursor((c) => addMonths(c, 1))} aria-label="เดือนถัดไป">
             <ChevronForward className="h-4 w-4" />
           </Button>
+          {mayEdit && (
+            <Button size="icon" variant="default" className="ml-1" onClick={() => setCreating("")} aria-label="เพิ่ม Event">
+              <Plus className="h-4 w-4" />
+            </Button>
+          )}
         </div>
-        <span className="text-sm font-medium">
-          {cursor.toLocaleDateString("th-TH", { month: "long", year: "numeric" })}
-        </span>
-        {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
       </div>
 
-      <Card className="space-y-1 p-2">
-        <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-          {WEEKDAY_LABEL.map((w) => (
-            <div key={w} className="py-1">
-              {w}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 border-l border-t border-border">
-          {days.map((day) => {
-            const iso = toISODate(day);
-            const dayEvents = eventsByDay.get(iso) ?? [];
-            const inMonth = day.getMonth() === cursor.getMonth();
-            return (
-              <div
-                key={iso}
-                onClick={() => mayEdit && setCreating(iso)}
+      <div className="grid grid-cols-7 border-l border-t border-border">
+        {WEEKDAY_LABEL.map((w) => (
+          <div
+            key={w}
+            className="border-b border-r border-border py-1.5 text-center text-xs text-muted-foreground"
+          >
+            {w}
+          </div>
+        ))}
+        {days.map((day) => {
+          const iso = toISODate(day);
+          const dayEvents = eventsByDay.get(iso) ?? [];
+          const inMonth = day.getMonth() === cursor.getMonth();
+          return (
+            <div
+              key={iso}
+              onClick={() => mayEdit && setCreating(iso)}
+              className={cn(
+                "flex min-h-20 flex-col gap-0.5 border-b border-r border-border p-1 text-xs",
+                inMonth ? "bg-background/40" : "opacity-40",
+                mayEdit && "cursor-pointer hover:bg-muted/60",
+              )}
+            >
+              <span
                 className={cn(
-                  "flex min-h-20 flex-col gap-0.5 border-b border-r border-border p-1 text-xs",
-                  inMonth ? "bg-background/40" : "opacity-40",
-                  mayEdit && "cursor-pointer hover:bg-muted/60",
+                  "inline-flex h-6 w-6 items-center justify-center rounded-full text-[0.7rem]",
+                  iso === todayISO && "bg-accent text-accent-foreground",
                 )}
               >
-                <span
+                {day.getDate()}
+              </span>
+              {dayEvents.slice(0, 3).map((ev) => (
+                <button
+                  key={ev.id}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (canEditRow(ev)) setEditing(ev);
+                  }}
                   className={cn(
-                    "self-start rounded-full px-1.5 text-[0.7rem]",
-                    iso === todayISO && "bg-accent text-accent-foreground",
+                    "flex items-center gap-1 truncate rounded px-1 py-0.5 text-left hover:bg-muted",
+                    canEditRow(ev) ? "cursor-pointer" : "cursor-default",
                   )}
+                  title={ev.name}
                 >
-                  {day.getDate()}
-                </span>
-                {dayEvents.slice(0, 3).map((ev) => (
-                  <button
-                    key={ev.id}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (canEditRow(ev)) setEditing(ev);
-                    }}
-                    className={cn(
-                      "flex items-center gap-1 truncate rounded px-1 py-0.5 text-left hover:bg-muted",
-                      canEditRow(ev) ? "cursor-pointer" : "cursor-default",
-                    )}
-                    title={ev.name}
-                  >
-                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", EVENT_TYPE_DOT[ev.event_type])} />
-                    <span className="truncate">{ev.name}</span>
-                  </button>
-                ))}
-                {dayEvents.length > 3 && (
-                  <span className="px-1 text-[0.7rem] text-muted-foreground">+{dayEvents.length - 3} อื่นๆ</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </Card>
+                  <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", EVENT_TYPE_DOT[ev.event_type])} />
+                  <span className="truncate">{ev.name}</span>
+                </button>
+              ))}
+              {dayEvents.length > 3 && (
+                <span className="px-1 text-[0.7rem] text-muted-foreground">+{dayEvents.length - 3} อื่นๆ</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       <EventSheet
         mode="edit"

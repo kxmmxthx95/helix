@@ -67,22 +67,29 @@ export type SubjectDraft = Pick<
   | "name_en"
   | "department_id"
   | "learning_area_id"
-  | "subject_type"
   | "credits"
   | "hours_per_week"
   | "is_active"
   | "suggested_grade_level_id"
   | "suggested_term"
->;
+> & {
+  /** Empty string while the create form hasn't chosen a type yet. */
+  subject_type: SubjectType | "";
+};
 
 export function useSaveSubject() {
   const qc = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, ...draft }: SubjectDraft & { id?: string }) => {
+      const { subject_type, learning_area_id, ...rest } = draft;
+      if (!learning_area_id || !subject_type) {
+        throw new Error("กรุณาเลือกกลุ่มสาระและประเภทวิชา");
+      }
+      const row = { ...rest, learning_area_id, subject_type };
       const { error } = id
-        ? await supabase.from("subjects").update(draft).eq("id", id)
-        : await supabase.from("subjects").insert(draft);
+        ? await supabase.from("subjects").update(row).eq("id", id)
+        : await supabase.from("subjects").insert(row);
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["subjects"] }),
@@ -110,7 +117,10 @@ export function useImportSubjects() {
       if (lookupError) throw lookupError;
 
       const taken = new Set(existing.map((r) => r.code));
-      const fresh = drafts.filter((d) => !taken.has(d.code));
+      const fresh = drafts.filter(
+        (d): d is SubjectDraft & { subject_type: SubjectType } =>
+          !taken.has(d.code) && !!d.subject_type && !!d.learning_area_id,
+      );
 
       if (fresh.length > 0) {
         const { error } = await supabase.from("subjects").insert(fresh);
