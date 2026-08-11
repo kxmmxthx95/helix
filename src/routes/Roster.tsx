@@ -4,7 +4,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, BuddhistDateSelect, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments, useInviteUsers, type InviteOutcome, type UserInvite } from "@/hooks/useProfiles";
@@ -34,6 +34,7 @@ import type {
   StudentStatus,
 } from "@/lib/database.types";
 import { canManage, canManageUsers, isOrgWide, STUDENT_PREFIXES } from "@/lib/roles";
+import { gradeShortLabel } from "@/lib/gradeLevels";
 
 const EMPTY: StudentFilters = { search: "", departmentId: "", status: "studying" };
 
@@ -213,7 +214,7 @@ export function Roster() {
 
   const deptName = useMemo(() => new Map(departments.map((d) => [d.id, d.name])), [departments]);
   const gradeLevelName = useMemo(
-    () => new Map(allGradeLevels.map((g) => [g.id, g.name])),
+    () => new Map(allGradeLevels.map((g) => [g.id, gradeShortLabel(g.code)])),
     [allGradeLevels],
   );
   const mayEdit = me ? canManage(me.roles) : false;
@@ -224,8 +225,8 @@ export function Roster() {
   const activeFilterCount = [filters.departmentId, filters.status].filter(Boolean).length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
+    <div className="page-fill">
+      <div className="flex shrink-0 items-center gap-2">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -274,12 +275,12 @@ export function Roster() {
       </div>
 
       {isLoading && (
-        <div className="flex justify-center py-12">
+        <div className="flex flex-1 items-center justify-center py-12">
           <Spinner className="h-5 w-5 text-muted-foreground" />
         </div>
       )}
 
-      {error && <Card className="text-sm text-destructive">โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง</Card>}
+      {error && <Card className="shrink-0 text-sm text-destructive">โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง</Card>}
 
       {rows && rows.length === 0 && (
         <EmptyState title="ไม่พบข้อมูล" description="ไม่พบนักเรียนตามเงื่อนไขที่เลือก" />
@@ -312,7 +313,7 @@ export function Roster() {
                         : "h-[40px] border-t border-border"
                     }
                   >
-                    <td className="px-3 py-0 font-mono text-xs">{row.student_code}</td>
+                    <td className="px-3 py-0 text-xs">{row.student_code}</td>
                     <td className="px-3 py-0 text-muted-foreground">{row.prefix ?? "—"}</td>
                     <td className="px-3 py-0 font-medium">
                       {row.first_name} {row.last_name}
@@ -327,8 +328,8 @@ export function Roster() {
                       <span
                         className={
                           row.status === "studying"
-                            ? "rounded-full bg-success/15 px-2 py-0.5 text-xs text-success"
-                            : "rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                            ? "rounded-full bg-success/15 px-2 py-0.5 text-[10px] text-success"
+                            : "rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
                         }
                       >
                         {STATUS_LABEL[row.status]}
@@ -1145,11 +1146,10 @@ function ContactForm({
 
 type StudentLoginDraft = {
   national_id: string;
-  date_of_birth: string;
 };
 
 function blankStudentLoginDraft(s: Student): StudentLoginDraft {
-  return { national_id: s.national_id ?? "", date_of_birth: "" };
+  return { national_id: s.national_id ?? "" };
 }
 
 /**
@@ -1200,7 +1200,7 @@ function CreateStudentLoginSheet({
       last_name: student.last_name,
       email: null,
       national_id: nationalId,
-      date_of_birth: current.date_of_birth || null,
+      date_of_birth: null,
       department_id: student.department_id,
       roles: [],
       positionTitleIds: [],
@@ -1239,7 +1239,7 @@ function CreateStudentLoginSheet({
     >
       {student && current && (
         <form id="create-student-login" onSubmit={submit} className="space-y-4">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             รหัสนักเรียน <span className="font-mono">{student.student_code}</span>{" "}
             จะเป็นรหัสผู้ใช้เข้าระบบ
           </p>
@@ -1257,23 +1257,6 @@ function CreateStudentLoginSheet({
               required
             />
           </Field>
-
-          <Field label="วันเดือนปีเกิด (ใช้ยืนยันตอนลืมรหัสผ่าน)">
-            <BuddhistDateSelect
-              key={student?.id}
-              value={current.date_of_birth}
-              onChange={(v) => setDraft({ ...current, date_of_birth: v })}
-              required
-            />
-          </Field>
-
-          <p className="text-sm text-muted-foreground">
-            รหัสผ่านเริ่มต้น (จากเลขบัตรประชาชน):{" "}
-            <span className="font-mono">
-              {current.national_id.length === 13 ? passwordFromNationalId(current.national_id) : "— กรอกเลขบัตรประชาชนก่อน —"}
-            </span>{" "}
-            นักเรียนตั้งรหัสผ่านใหม่ของตัวเองตอน login ครั้งแรก
-          </p>
 
           {failReason && <p className="text-sm text-destructive">{failReason}</p>}
         </form>

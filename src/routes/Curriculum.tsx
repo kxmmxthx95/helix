@@ -108,8 +108,6 @@ export function Curriculum() {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์ดูโครงสร้างหลักสูตร</Card>;
   }
 
-  const showYearToolbar = !!departmentId;
-
   return (
     <div className="page-fill">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -132,112 +130,110 @@ export function Curriculum() {
           </Select>
         )}
 
-        {showYearToolbar && (
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {isKg ? (
-              <>
-                <Select
-                  className="w-auto min-w-[10rem]"
-                  value={kgAcademicYear === null ? "" : String(kgAcademicYear)}
-                  onChange={(e) => setKgAcademicYear(Number(e.target.value))}
-                  aria-label="ปีการศึกษา"
-                  placeholder="เลือกปีการศึกษา"
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {isKg ? (
+            <>
+              <Select
+                className="w-auto min-w-[10rem]"
+                value={kgAcademicYear === null ? "" : String(kgAcademicYear)}
+                onChange={(e) => setKgAcademicYear(Number(e.target.value))}
+                aria-label="ปีการศึกษา"
+                placeholder="เลือกปีการศึกษา"
+                disabled={!departmentId}
+              >
+                {kgYearTabs.map((y) => (
+                  <option key={y} value={y}>
+                    ปี {y}
+                  </option>
+                ))}
+              </Select>
+              {mayEdit && departmentId && !addingKgYear && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setAddingKgYear(true)}
+                  aria-label="เพิ่มปีการศึกษา"
                 >
-                  {kgYearTabs.map((y) => (
-                    <option key={y} value={y}>
-                      ปี {y}
-                    </option>
-                  ))}
-                </Select>
-                {mayEdit && !addingKgYear && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setAddingKgYear(true)}
-                    aria-label="เพิ่มปีการศึกษา"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-                {mayEdit && addingKgYear && (
-                  <Input
-                    type="number"
-                    autoFocus
-                    className="w-24"
-                    placeholder="พ.ศ."
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") e.currentTarget.blur();
-                    }}
-                    onBlur={(e) => {
-                      const y = Number(e.target.value);
-                      setAddingKgYear(false);
-                      if (y) setKgAcademicYear(y);
-                    }}
-                  />
-                )}
-              </>
-            ) : (
-              <>
-                <Select
-                  className="w-auto min-w-[10rem]"
-                  value={pickedYear === null ? "" : String(pickedYear)}
-                  onChange={(e) => pickYear(Number(e.target.value))}
-                  aria-label="ปีการศึกษา"
-                  placeholder="เลือกปีการศึกษา"
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              {mayEdit && addingKgYear && (
+                <Input
+                  type="number"
+                  autoFocus
+                  className="w-24"
+                  placeholder="พ.ศ."
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
+                  onBlur={(e) => {
+                    const y = Number(e.target.value);
+                    setAddingKgYear(false);
+                    if (y) setKgAcademicYear(y);
+                  }}
+                />
+              )}
+            </>
+          ) : (
+            <>
+              <Select
+                className="w-auto min-w-[10rem]"
+                value={pickedYear === null ? "" : String(pickedYear)}
+                onChange={(e) => pickYear(Number(e.target.value))}
+                aria-label="ปีการศึกษา"
+                placeholder="เลือกปีการศึกษา"
+                disabled={!departmentId}
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    ปี {y}
+                  </option>
+                ))}
+              </Select>
+              {mayEdit && departmentId && !addingYear && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setAddingYear(true)}
+                  aria-label="เพิ่มปีการศึกษา"
                 >
-                  {years.map((y) => (
-                    <option key={y} value={y}>
-                      ปี {y}
-                    </option>
-                  ))}
-                </Select>
-                {mayEdit && !addingYear && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setAddingYear(true)}
-                    aria-label="เพิ่มปีการศึกษา"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-                {mayEdit && addingYear && (
-                  <Input
-                    type="number"
-                    autoFocus
-                    className="w-24"
-                    placeholder="พ.ศ."
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") e.currentTarget.blur();
-                    }}
-                    onBlur={(e) => {
-                      const y = Number(e.target.value);
-                      setAddingYear(false);
-                      if (!y) return;
-                      pickYear(y);
-                      setPendingCreate(true);
-                    }}
-                  />
-                )}
-                {pickedYear !== null && (
-                  <CohortPicker
-                    cohorts={cohorts}
-                    pickedCohort={pickedCohort}
-                    onPick={setPickedCohort}
-                    departmentId={departmentId}
-                    gradeLevels={gradeLevels}
-                    mayEdit={mayEdit}
-                    defaultEntryYear={defaultEntryYear}
-                    pickedYear={pickedYear}
-                    onYearChange={pickYear}
-                    pendingCreate={pendingCreate}
-                    onPendingCreateHandled={() => setPendingCreate(false)}
-                  />
-                )}
-              </>
-            )}
-          </div>
-        )}
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              {mayEdit && addingYear && (
+                <Input
+                  type="number"
+                  autoFocus
+                  className="w-24"
+                  placeholder="พ.ศ."
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                  }}
+                  onBlur={(e) => {
+                    const y = Number(e.target.value);
+                    setAddingYear(false);
+                    if (!y) return;
+                    pickYear(y);
+                    setPendingCreate(true);
+                  }}
+                />
+              )}
+              <CohortPicker
+                cohorts={cohorts}
+                pickedCohort={pickedCohort}
+                onPick={setPickedCohort}
+                departmentId={departmentId}
+                gradeLevels={gradeLevels}
+                mayEdit={mayEdit}
+                defaultEntryYear={defaultEntryYear}
+                pickedYear={pickedYear}
+                onYearChange={pickYear}
+                pendingCreate={pendingCreate}
+                onPendingCreateHandled={() => setPendingCreate(false)}
+              />
+            </>
+          )}
+        </div>
       </div>
 
       {((isKg && kgAcademicYear !== null) || pickedCohort) && gradeLevels.length > 0 && (
@@ -311,7 +307,7 @@ function CohortPicker({
   gradeLevels: { id: string; name: string; code: string; is_entry_point: boolean }[];
   mayEdit: boolean;
   defaultEntryYear: number;
-  pickedYear: number;
+  pickedYear: number | null;
   onYearChange: (year: number) => void;
   pendingCreate: boolean;
   onPendingCreateHandled: () => void;
@@ -321,16 +317,20 @@ function CohortPicker({
   const del = useDeleteCohort();
 
   useEffect(() => {
-    if (!pendingCreate) return;
+    if (!pendingCreate || pickedYear === null) return;
     setCreating(true);
     onPendingCreateHandled();
-  }, [pendingCreate, onPendingCreateHandled]);
+  }, [pendingCreate, pickedYear, onPendingCreateHandled]);
 
-  const cohortsInYear = cohorts.filter((c) => c.entry_year === pickedYear);
+  const cohortsInYear = pickedYear === null ? [] : cohorts.filter((c) => c.entry_year === pickedYear);
 
   function closeCreating() {
     setCreating(false);
-    if (!cohorts.some((c) => c.entry_year === pickedYear) && pickedYear !== defaultEntryYear) {
+    if (
+      pickedYear !== null &&
+      !cohorts.some((c) => c.entry_year === pickedYear) &&
+      pickedYear !== defaultEntryYear
+    ) {
       onYearChange(defaultEntryYear);
     }
   }
@@ -343,6 +343,7 @@ function CohortPicker({
         onChange={(e) => onPick(e.target.value)}
         aria-label="หลักสูตร"
         placeholder="เลือกหลักสูตร"
+        disabled={!departmentId || pickedYear === null}
       >
         {cohortsInYear.map((c) => (
           <option key={c.id} value={c.id}>
@@ -350,7 +351,7 @@ function CohortPicker({
           </option>
         ))}
       </Select>
-      {mayEdit && (
+      {mayEdit && departmentId && pickedYear !== null && (
         <Button
           variant="outline"
           size="icon"
@@ -379,42 +380,44 @@ function CohortPicker({
         </Button>
       )}
 
-      <Sheet
-        open={creating}
-        onOpenChange={(open) => !open && closeCreating()}
-        title="สร้างหลักสูตร"
-        footer={
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={closeCreating}>
-              ยกเลิก
-            </Button>
-            <Button type="submit" form="create-cohort" className="flex-1" disabled={save.isPending}>
-              {save.isPending ? <Spinner className="h-3 w-3" /> : "สร้างรุ่น"}
-            </Button>
-          </div>
-        }
-      >
-        <CreateCohortForm
-          departmentId={departmentId}
-          gradeLevels={gradeLevels}
-          entryYear={pickedYear}
-          onSubmit={(draft, resetForm) => {
-            save.mutate(draft, {
-              onSuccess: () => {
-                onYearChange(pickedYear);
-                resetForm();
-                setCreating(false);
-              },
-              onError: (err) =>
-                alert(
-                  err.message.includes("duplicate")
-                    ? `มีหลักสูตรระดับชั้นนี้ของปี ${draft.entry_year} อยู่แล้ว`
-                    : `สร้างไม่สำเร็จ: ${err.message}`,
-                ),
-            });
-          }}
-        />
-      </Sheet>
+      {pickedYear !== null && (
+        <Sheet
+          open={creating}
+          onOpenChange={(open) => !open && closeCreating()}
+          title="สร้างหลักสูตร"
+          footer={
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={closeCreating}>
+                ยกเลิก
+              </Button>
+              <Button type="submit" form="create-cohort" className="flex-1" disabled={save.isPending}>
+                {save.isPending ? <Spinner className="h-3 w-3" /> : "สร้างรุ่น"}
+              </Button>
+            </div>
+          }
+        >
+          <CreateCohortForm
+            departmentId={departmentId}
+            gradeLevels={gradeLevels}
+            entryYear={pickedYear}
+            onSubmit={(draft, resetForm) => {
+              save.mutate(draft, {
+                onSuccess: () => {
+                  onYearChange(pickedYear);
+                  resetForm();
+                  setCreating(false);
+                },
+                onError: (err) =>
+                  alert(
+                    err.message.includes("duplicate")
+                      ? `มีหลักสูตรระดับชั้นนี้ของปี ${draft.entry_year} อยู่แล้ว`
+                      : `สร้างไม่สำเร็จ: ${err.message}`,
+                  ),
+              });
+            }}
+          />
+        </Sheet>
+      )}
     </>
   );
 }

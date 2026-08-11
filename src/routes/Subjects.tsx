@@ -20,6 +20,7 @@ import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import type { GradingMethod, LearningArea, Subject, SubjectType } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
+import { gradeShortLabel } from "@/lib/gradeLevels";
 
 const EMPTY: Omit<SubjectFilters, "departmentId"> = {
   search: "",
@@ -45,14 +46,6 @@ const GRADING_METHOD_LABEL: Record<GradingMethod, string> = {
   graded: "ตัดเกรด",
   pass_fail: "ผ่าน/ไม่ผ่าน",
 };
-
-/** M1 → ม.1 · P2 → ป.2 · K3 → อ.3 */
-function gradeShortLabel(code: string) {
-  const m = /^([MPK])(\d+)$/i.exec(code.trim());
-  if (!m) return code;
-  const prefix = ({ M: "ม.", P: "ป.", K: "อ." } as const)[m[1]!.toUpperCase() as "M" | "P" | "K"];
-  return prefix ? `${prefix}${m[2]}` : code;
-}
 
 type SubjectSortKey =
   | "code"

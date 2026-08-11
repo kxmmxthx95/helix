@@ -236,9 +236,10 @@
     @apply transition-transform duration-100 active:scale-95;
   }
 
-  /* Empty list / no-results placeholder */
+  /* Empty list / no-results placeholder — flex:1 centers in .page-fill */
   .empty-state {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
     align-items: center;
     justify-content: center;

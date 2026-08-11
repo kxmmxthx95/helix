@@ -43,7 +43,7 @@ export function Sheet({
               {headerEnd}
             </div>
             {description ? (
-              <Drawer.Description className="text-xs text-muted-foreground">
+              <Drawer.Description className="font-sarabun text-xs text-muted-foreground">
                 {description}
               </Drawer.Description>
             ) : (

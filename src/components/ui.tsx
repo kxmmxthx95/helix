@@ -251,7 +251,7 @@ export function Field({
 }) {
   return (
     <label className="block space-y-1">
-      <span className="text-xs font-medium">
+      <span className="font-ui text-xs font-medium">
         {label}
         {required && (
           <span className="text-destructive" aria-hidden>
