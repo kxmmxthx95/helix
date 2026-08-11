@@ -234,7 +234,7 @@ export function AppShell() {
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          "glass-sidebar relative z-10 hidden shrink-0 flex-col rounded-2xl transition-[width] duration-200 lg:flex",
+          "font-ui glass-sidebar relative z-10 hidden shrink-0 flex-col rounded-2xl transition-[width] duration-200 lg:flex",
           collapsed ? "w-14" : "w-56",
         )}
       >
@@ -244,7 +244,7 @@ export function AppShell() {
             collapsed ? "justify-center px-1" : "justify-between gap-2 px-3",
           )}
         >
-          {!collapsed && <p className="truncate text-sm font-bold tracking-tight">Helix</p>}
+          {!collapsed && <p className="font-heading truncate text-sm font-bold tracking-tight">Helix</p>}
           <Button
             variant="ghost"
             size="icon"
@@ -270,7 +270,7 @@ export function AppShell() {
               title={label}
               className={({ isActive }) =>
                 cn(
-                  "tappable flex items-center rounded-lg text-xs font-medium transition-colors",
+                  "font-ui tappable flex items-center rounded-lg text-xs font-medium transition-colors",
                   collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2",
                   isActive
                     ? "bg-foreground/10 text-foreground"
@@ -323,7 +323,7 @@ export function AppShell() {
 
         <header className="sticky top-0 z-20 hidden h-12 shrink-0 border-b border-border/60 lg:block">
           <div className={cn("mx-auto flex h-full w-full max-w-6xl items-center", "px-3")}>
-            <p className="text-sm font-semibold text-foreground">{tabs.find(t => t.to === location.pathname || (t.to === "/" && location.pathname === "/"))?.label || "ระบบจัดการสถานศึกษา"}</p>
+            <p className="font-heading text-sm font-semibold text-foreground">{tabs.find(t => t.to === location.pathname || (t.to === "/" && location.pathname === "/"))?.label || "ระบบจัดการสถานศึกษา"}</p>
           </div>
         </header>
 

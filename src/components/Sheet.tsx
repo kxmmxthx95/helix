@@ -39,7 +39,7 @@ export function Sheet({
         >
           <div className="shrink-0 border-b border-border px-3 pb-3 pt-3">
             <div className="flex items-center gap-2">
-              <Drawer.Title className="min-w-0 flex-1 truncate text-base font-semibold">{title}</Drawer.Title>
+              <Drawer.Title className="font-heading min-w-0 flex-1 truncate text-base font-semibold">{title}</Drawer.Title>
               {headerEnd}
             </div>
             {description ? (

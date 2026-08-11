@@ -39,7 +39,23 @@ const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
   activity: "bg-violet-600 text-violet-50 dark:bg-violet-500 dark:text-violet-50",
 };
 
-type SubjectSortKey = "code" | "name_th" | "learning_area" | "sub_area" | "subject_type" | "credits" | "hours_per_week";
+/** M1 → ม.1 · P2 → ป.2 · K3 → อ.3 */
+function gradeShortLabel(code: string) {
+  const m = /^([MPK])(\d+)$/i.exec(code.trim());
+  if (!m) return code;
+  const prefix = ({ M: "ม.", P: "ป.", K: "อ." } as const)[m[1]!.toUpperCase() as "M" | "P" | "K"];
+  return prefix ? `${prefix}${m[2]}` : code;
+}
+
+type SubjectSortKey =
+  | "code"
+  | "name_th"
+  | "learning_area"
+  | "grade_level"
+  | "term"
+  | "subject_type"
+  | "credits"
+  | "hours_per_week";
 
 function SortTh({
   label,
@@ -93,10 +109,16 @@ export function Subjects() {
   const departmentName = departments.find((d) => d.id === departmentId)?.name ?? "";
 
   const { data: learningAreas = [] } = useLearningAreas();
+  const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
   const { data: rows, isLoading, error } = useSubjects({ ...filters, departmentId });
   const del = useDeleteSubject();
 
   const areaById = useMemo(() => new Map(learningAreas.map((a) => [a.id, a])), [learningAreas]);
+  const gradeName = useMemo(
+    () => new Map(gradeLevels.map((g) => [g.id, gradeShortLabel(g.code)])),
+    [gradeLevels],
+  );
+  const gradeSort = useMemo(() => new Map(gradeLevels.map((g) => [g.id, g.sort_order])), [gradeLevels]);
 
   const areaName = useMemo(() => {
     return new Map(
@@ -111,12 +133,6 @@ export function Subjects() {
     const area = areaById.get(learningAreaId);
     if (!area) return "—";
     if (area.parent_id) return areaById.get(area.parent_id)?.name ?? "—";
-    return area.name;
-  }
-
-  function subAreaLabel(learningAreaId: string) {
-    const area = areaById.get(learningAreaId);
-    if (!area?.parent_id) return "—";
     return area.name;
   }
 
@@ -136,8 +152,14 @@ export function Subjects() {
         case "learning_area":
           cmp = topAreaLabel(a.learning_area_id).localeCompare(topAreaLabel(b.learning_area_id), "th");
           break;
-        case "sub_area":
-          cmp = subAreaLabel(a.learning_area_id).localeCompare(subAreaLabel(b.learning_area_id), "th");
+        case "grade_level": {
+          const ao = a.suggested_grade_level_id ? (gradeSort.get(a.suggested_grade_level_id) ?? 999) : 999;
+          const bo = b.suggested_grade_level_id ? (gradeSort.get(b.suggested_grade_level_id) ?? 999) : 999;
+          cmp = ao - bo;
+          break;
+        }
+        case "term":
+          cmp = (a.suggested_term ?? 999) - (b.suggested_term ?? 999);
           break;
         case "subject_type":
           cmp = SUBJECT_TYPE_LABEL[a.subject_type].localeCompare(SUBJECT_TYPE_LABEL[b.subject_type], "th");
@@ -152,7 +174,7 @@ export function Subjects() {
       return cmp * dir;
     });
     return list;
-  }, [rows, sortKey, sortDir, areaById]);
+  }, [rows, sortKey, sortDir, areaById, gradeSort]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const tableReady = Boolean(rows && rows.length > 0);
@@ -259,7 +281,8 @@ export function Subjects() {
                     <SortTh label="รหัส" column="code" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                     <SortTh label="ชื่อวิชา" column="name_th" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                     <SortTh label="กลุ่มสาระ" column="learning_area" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-                    <SortTh label="สาระย่อย" column="sub_area" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                    <SortTh label="ระดับชั้น" column="grade_level" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                    <SortTh label="ภาคเรียน" column="term" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                     <SortTh label="หน่วยกิต" column="credits" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                     <SortTh label="จำนวนชั่วโมง" column="hours_per_week" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                     <SortTh label="ประเภท" column="subject_type" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
@@ -287,7 +310,12 @@ export function Subjects() {
                         )}
                       </td>
                       <td className="px-3 py-0">{topAreaLabel(row.learning_area_id)}</td>
-                      <td className="px-3 py-0">{subAreaLabel(row.learning_area_id)}</td>
+                      <td className="px-3 py-0">
+                        {row.suggested_grade_level_id
+                          ? (gradeName.get(row.suggested_grade_level_id) ?? "—")
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-0">{row.suggested_term ?? "—"}</td>
                       <td className="px-3 py-0">{row.credits}</td>
                       <td className="px-3 py-0">{row.hours_per_week}</td>
                       <td className="px-3 py-0">

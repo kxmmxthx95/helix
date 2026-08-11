@@ -50,7 +50,7 @@ export function StatusManagement() {
   const orgWide = me ? isOrgWide(me.roles) : false;
 
   const [pickedDept, setPickedDept] = useState("");
-  const [subTab, setSubTab] = useState<SubTab>("promote");
+  const [subTab, setSubTab] = useState<SubTab | "">("");
 
   if (!me || !orgWide) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
@@ -79,6 +79,7 @@ export function StatusManagement() {
         value={subTab}
         onChange={(e) => setSubTab(e.target.value as SubTab)}
         aria-label="เมนูจัดการสถานภาพ"
+        placeholder="เลือกเมนู"
       >
         {SUB_TABS.map((t) => (
           <option key={t.key} value={t.key}>

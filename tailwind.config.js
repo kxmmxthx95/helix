@@ -43,7 +43,9 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+        sans: ["Inter", "Sarabun", "system-ui", "-apple-system", "sans-serif"],
+        heading: ["Inter", "Noto Sans Thai", "system-ui", "-apple-system", "sans-serif"],
+        ui: ["Sukhumvit Set", "SukhumvitSet", "Prompt", "Noto Sans Thai", "system-ui", "-apple-system", "sans-serif"],
       },
       keyframes: {
         "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },

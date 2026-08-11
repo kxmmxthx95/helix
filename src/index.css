@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sukhumvit+Set:wght@300;400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -69,13 +67,38 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: Inter, "Sukhumvit Set", system-ui, sans-serif;
+    /* Latin: Inter · Thai body: Sarabun */
+    font-family: Inter, Sarabun, system-ui, sans-serif;
     /* Kill the web tells: no rubber-band, no tap flash, no accidental select */
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
+  }
+
+  /* Headings keep the previous Thai stack */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .empty-state-title {
+    font-family: Inter, "Noto Sans Thai", system-ui, sans-serif;
+  }
+
+  /* Controls: Sukhumvit on Apple · Prompt elsewhere (same foundry, webfont-safe) */
+  button,
+  select,
+  input[type="search"] {
+    font-family: "Sukhumvit Set", SukhumvitSet, Prompt, "Noto Sans Thai", system-ui, sans-serif;
+  }
+
+  /* Sidebar nav + labels */
+  .glass-sidebar,
+  .glass-sidebar a {
+    font-family: "Sukhumvit Set", SukhumvitSet, Prompt, "Noto Sans Thai", system-ui, sans-serif;
   }
 
   /* Text the user genuinely needs to copy stays selectable */
