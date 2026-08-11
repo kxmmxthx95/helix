@@ -589,6 +589,17 @@ function EditAvatarField({ profile }: { profile: ProfileRow }) {
           >
             {busy ? <Spinner className="h-5 w-5 text-white" /> : <Upload className="h-5 w-5 text-white" />}
           </button>
+          {src && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void remove()}
+              aria-label="ลบรูป"
+              className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
         <input
           ref={fileRef}
