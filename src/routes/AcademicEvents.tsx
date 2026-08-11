@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Plus } from "@/components/icons";
+import { ChevronBack, ChevronForward, Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
 import {
   useAcademicEvents,
   useDeleteAcademicEvent,
@@ -23,6 +23,35 @@ const EVENT_TYPE_LABEL: Record<AcademicEventType, string> = {
   suspended: "ปิดกรณีพิเศษ",
 };
 
+const EVENT_TYPE_DOT: Record<AcademicEventType, string> = {
+  holiday: "bg-destructive",
+  suspended: "bg-destructive",
+  exam_period: "bg-warning",
+  teacher_workday: "bg-primary",
+  school_event: "bg-accent",
+};
+
+const WEEKDAY_LABEL = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"];
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const toISODate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+// `new Date("YYYY-MM-DD")` parses as UTC midnight, which shifts a day in any
+// timezone behind UTC — build from local Y/M/D components instead.
+const fromISODate = (s: string) => {
+  const parts = s.split("-").map(Number);
+  return new Date(parts[0] ?? 1970, (parts[1] ?? 1) - 1, parts[2] ?? 1);
+};
+const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+const addMonths = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth() + n, 1);
+const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+
+/** 6 weeks × 7 days (Mon-start), enough to cover any month plus lead/trail days. */
+function buildCalendarDays(monthStart: Date): Date[] {
+  const leadingEmpty = (monthStart.getDay() + 6) % 7; // Mon=0..Sun=6
+  const gridStart = addDays(monthStart, -leadingEmpty);
+  return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
+}
+
 // Pre-fills students_attend/staff_attend when the event type changes — still
 // editable, not enforced by the DB (a school might have a real exception).
 const ATTEND_DEFAULTS: Record<AcademicEventType, { students_attend: boolean; staff_attend: boolean }> = {
@@ -35,16 +64,14 @@ const ATTEND_DEFAULTS: Record<AcademicEventType, { students_attend: boolean; sta
 
 export function AcademicEvents() {
   const { profile: me } = useAuth();
-  const { data: departments = [] } = useDepartments();
   const { data: events = [], isLoading } = useAcademicEvents();
   const del = useDeleteAcademicEvent();
   const orgWide = me ? isOrgWide(me.roles) : false;
   const mayEdit = me ? canManage(me.roles) : false;
 
+  const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
   const [editing, setEditing] = useState<AcademicEventRow | null>(null);
-  const [creating, setCreating] = useState(false);
-
-  const deptName = useMemo(() => new Map(departments.map((d) => [d.id, d.name])), [departments]);
+  const [creating, setCreating] = useState<string | null>(null); // ISO date pre-fill, or "" for the blank top button
 
   // A dept_head may only edit events linked to their own department — a
   // whole-school event (no links) is org-wide only. UI hides what the role
@@ -55,69 +82,107 @@ export function AcademicEvents() {
     return row.departmentIds.includes(me.department_id);
   }
 
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, AcademicEventRow[]>();
+    for (const ev of events) {
+      for (let d = fromISODate(ev.start_date); toISODate(d) <= ev.end_date; d = addDays(d, 1)) {
+        const key = toISODate(d);
+        map.set(key, [...(map.get(key) ?? []), ev]);
+      }
+    }
+    return map;
+  }, [events]);
+
+  const days = useMemo(() => buildCalendarDays(cursor), [cursor]);
+  const todayISO = toISODate(new Date());
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">ปฏิทินกิจกรรม/วันหยุด</h2>
         {mayEdit && (
-          <Button size="sm" onClick={() => setCreating(true)}>
+          <Button size="sm" onClick={() => setCreating("")}>
             <Plus className="h-3.5 w-3.5" />
             เพิ่ม Event
           </Button>
         )}
       </div>
 
-      {isLoading && (
-        <div className="flex justify-center py-12">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <Button variant="outline" size="icon" onClick={() => setCursor((c) => addMonths(c, -1))} aria-label="เดือนก่อนหน้า">
+            <ChevronBack className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setCursor(startOfMonth(new Date()))}>
+            วันนี้
+          </Button>
+          <Button variant="outline" size="icon" onClick={() => setCursor((c) => addMonths(c, 1))} aria-label="เดือนถัดไป">
+            <ChevronForward className="h-4 w-4" />
+          </Button>
         </div>
-      )}
+        <span className="text-sm font-medium">
+          {cursor.toLocaleDateString("th-TH", { month: "long", year: "numeric" })}
+        </span>
+        {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+      </div>
 
-      {!isLoading && events.length === 0 && (
-        <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มี Event ในระบบ" />
-      )}
-
-      {!isLoading && events.length > 0 && (
-        <Card className="divide-y divide-border p-0">
-          {events.map((ev) => (
-            <div
-              key={ev.id}
-              onClick={() => canEditRow(ev) && setEditing(ev)}
-              className={cn(
-                "flex flex-wrap items-center gap-2 p-3 text-sm",
-                canEditRow(ev) && "cursor-pointer active:bg-muted",
-              )}
-            >
-              <div className="min-w-0 flex-1">
-                <div className="font-medium">{ev.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {EVENT_TYPE_LABEL[ev.event_type]} · {ev.start_date}
-                  {ev.end_date !== ev.start_date ? ` – ${ev.end_date}` : ""} ·{" "}
-                  {ev.departmentIds.length === 0
-                    ? "ทั้งโรงเรียน"
-                    : ev.departmentIds.map((id) => deptName.get(id) ?? "—").join(", ")}
-                </div>
-              </div>
-              <span
-                className={cn(
-                  "shrink-0 rounded-full px-2 py-0.5 text-xs",
-                  ev.students_attend ? "bg-muted text-muted-foreground" : "bg-warning/15 text-warning",
-                )}
-              >
-                นักเรียน{ev.students_attend ? "มาเรียน" : "หยุด"}
-              </span>
-              <span
-                className={cn(
-                  "shrink-0 rounded-full px-2 py-0.5 text-xs",
-                  ev.staff_attend ? "bg-muted text-muted-foreground" : "bg-warning/15 text-warning",
-                )}
-              >
-                ครู{ev.staff_attend ? "ทำงาน" : "หยุด"}
-              </span>
+      <Card className="space-y-1 p-2">
+        <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+          {WEEKDAY_LABEL.map((w) => (
+            <div key={w} className="py-1">
+              {w}
             </div>
           ))}
-        </Card>
-      )}
+        </div>
+        <div className="grid grid-cols-7 border-l border-t border-border">
+          {days.map((day) => {
+            const iso = toISODate(day);
+            const dayEvents = eventsByDay.get(iso) ?? [];
+            const inMonth = day.getMonth() === cursor.getMonth();
+            return (
+              <div
+                key={iso}
+                onClick={() => mayEdit && setCreating(iso)}
+                className={cn(
+                  "flex min-h-20 flex-col gap-0.5 border-b border-r border-border p-1 text-xs",
+                  inMonth ? "bg-background/40" : "opacity-40",
+                  mayEdit && "cursor-pointer hover:bg-muted/60",
+                )}
+              >
+                <span
+                  className={cn(
+                    "self-start rounded-full px-1.5 text-[0.7rem]",
+                    iso === todayISO && "bg-accent text-accent-foreground",
+                  )}
+                >
+                  {day.getDate()}
+                </span>
+                {dayEvents.slice(0, 3).map((ev) => (
+                  <button
+                    key={ev.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (canEditRow(ev)) setEditing(ev);
+                    }}
+                    className={cn(
+                      "flex items-center gap-1 truncate rounded px-1 py-0.5 text-left hover:bg-muted",
+                      canEditRow(ev) ? "cursor-pointer" : "cursor-default",
+                    )}
+                    title={ev.name}
+                  >
+                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", EVENT_TYPE_DOT[ev.event_type])} />
+                    <span className="truncate">{ev.name}</span>
+                  </button>
+                ))}
+                {dayEvents.length > 3 && (
+                  <span className="px-1 text-[0.7rem] text-muted-foreground">+{dayEvents.length - 3} อื่นๆ</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
 
       <EventSheet
         mode="edit"
@@ -131,10 +196,11 @@ export function AcademicEvents() {
       <EventSheet
         mode="create"
         event={null}
-        open={creating}
+        initialDate={creating || undefined}
+        open={creating !== null}
         orgWide={orgWide}
         myDepartmentId={me?.department_id ?? null}
-        onClose={() => setCreating(false)}
+        onClose={() => setCreating(null)}
       />
     </div>
   );
@@ -143,6 +209,7 @@ export function AcademicEvents() {
 function EventSheet({
   mode,
   event,
+  initialDate,
   open,
   orgWide,
   myDepartmentId,
@@ -151,6 +218,7 @@ function EventSheet({
 }: {
   mode: "create" | "edit";
   event: AcademicEventRow | null;
+  initialDate?: string;
   open: boolean;
   orgWide: boolean;
   myDepartmentId: string | null;
@@ -163,8 +231,8 @@ function EventSheet({
   const blank = (): AcademicEventDraft & { departmentIds: string[] } => ({
     name: "",
     event_type: "holiday",
-    start_date: "",
-    end_date: "",
+    start_date: initialDate ?? "",
+    end_date: initialDate ?? "",
     ...ATTEND_DEFAULTS.holiday,
     // A dept_head's event is always scoped to their own department — the
     // "whole school" (empty) option is org-wide only, so it's never offered here.
