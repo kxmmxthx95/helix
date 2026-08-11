@@ -182,14 +182,19 @@ function EnrollAllSheet({
   const { data: students = [] } = useStudents({ search: "", departmentId, status: "" });
   const { data: studyPlans = [] } = useStudyPlans();
   const [studyPlanId, setStudyPlanId] = useState("");
+  const [planOverride, setPlanOverride] = useState<Record<string, string>>({});
 
-  const pendingIds = useMemo(() => {
+  const pendingStudents = useMemo(() => {
     const enrolled = new Set(enrollments.map((e) => e.student_id));
-    return students.filter((s) => !enrolled.has(s.id)).map((s) => s.id);
+    return students
+      .filter((s) => !enrolled.has(s.id))
+      .sort((a, b) => a.student_code.localeCompare(b.student_code, "th"));
   }, [students, enrollments]);
+  const pendingIds = useMemo(() => pendingStudents.map((s) => s.id), [pendingStudents]);
 
   function close() {
     setStudyPlanId("");
+    setPlanOverride({});
     onClose();
   }
 
@@ -199,7 +204,7 @@ function EnrollAllSheet({
     const drafts: EnrollmentDraft[] = pendingIds.map((student_id) => ({
       student_id,
       cohort_id: cohortId,
-      study_plan_id: studyPlanId || null,
+      study_plan_id: (planOverride[student_id] ?? studyPlanId) || null,
     }));
     enroll.mutate(drafts, {
       onSuccess: () => {
@@ -237,7 +242,7 @@ function EnrollAllSheet({
       }
     >
       <form id="enroll-all" onSubmit={submit} className="space-y-4">
-        <Field label="แผนการเรียน">
+        <Field label="แผนการเรียน (ค่าเริ่มต้นสำหรับทุกคน)">
           <Select value={studyPlanId} onChange={(e) => setStudyPlanId(e.target.value)}>
             <option value="">ไม่ระบุ</option>
             {studyPlans.map((p) => (
@@ -247,6 +252,41 @@ function EnrollAllSheet({
             ))}
           </Select>
         </Field>
+
+        {studyPlans.length > 0 && pendingStudents.length > 0 && (
+          <Field label="แก้ไขเฉพาะราย (ถ้าไม่ตรงค่าเริ่มต้น)">
+            <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-border p-1.5">
+              {pendingStudents.map((s) => (
+                <div key={s.id} className="flex items-center gap-2 text-xs">
+                  <span className="min-w-0 flex-1 truncate">
+                    {s.student_code} {s.first_name} {s.last_name}
+                  </span>
+                  <Select
+                    className="h-7 w-36 shrink-0 px-1.5 text-[11px]"
+                    aria-label={`แผนการเรียนของ ${s.first_name} ${s.last_name}`}
+                    value={planOverride[s.id] ?? ""}
+                    onChange={(e) =>
+                      setPlanOverride((prev) => {
+                        if (!e.target.value) {
+                          const { [s.id]: _, ...rest } = prev;
+                          return rest;
+                        }
+                        return { ...prev, [s.id]: e.target.value };
+                      })
+                    }
+                  >
+                    <option value="">(ใช้ค่าเริ่มต้น)</option>
+                    {studyPlans.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              ))}
+            </div>
+          </Field>
+        )}
       </form>
     </Sheet>
   );
@@ -282,8 +322,8 @@ function CohortEnrollmentPanel({
   const { data: activeYear } = useActiveAcademicYear(departmentId);
   const enroll = useEnrollStudents();
   const deleteEnrollment = useDeleteEnrollment();
-  const [studyPlanId, setStudyPlanId] = useState("");
   const [pendingStudentId, setPendingStudentId] = useState<string | null>(null);
+  const [planSelection, setPlanSelection] = useState<Record<string, string>>({});
 
   // Cohort's entry grade is fixed at creation; students actually advance a
   // grade each academic year. Shift by elapsed years so the mismatch check
@@ -321,11 +361,17 @@ function CohortEnrollmentPanel({
     const draft: EnrollmentDraft = {
       student_id: studentId,
       cohort_id: cohortId,
-      study_plan_id: studyPlanId || null,
+      study_plan_id: planSelection[studentId] || null,
     };
     setPendingStudentId(studentId);
     enroll.mutate([draft], {
-      onSettled: () => setPendingStudentId(null),
+      onSettled: () => {
+        setPendingStudentId(null);
+        setPlanSelection((prev) => {
+          const { [studentId]: _, ...rest } = prev;
+          return rest;
+        });
+      },
     });
   }
 
@@ -341,23 +387,6 @@ function CohortEnrollmentPanel({
 
   return (
     <div className="space-y-4">
-      {mayEdit && (
-        <Field label="แผนการเรียน (ใช้ตอนลงทะเบียน)">
-          <Select
-            className="max-w-xs"
-            value={studyPlanId}
-            onChange={(e) => setStudyPlanId(e.target.value)}
-          >
-            <option value="">ไม่ระบุ</option>
-            {studyPlans.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      )}
-
       {rows.length === 0 ? (
         <EmptyState title="ไม่พบข้อมูล" description="ไม่มีนักเรียนในแผนกนี้" />
       ) : (
@@ -389,9 +418,32 @@ function CohortEnrollmentPanel({
                       {s.grade_level_id ? gradeLevelName.get(s.grade_level_id) ?? "—" : "—"}
                     </td>
                     <td className="px-3 py-0 text-muted-foreground">
-                      {enrollment?.study_plan_id
-                        ? planName.get(enrollment.study_plan_id) ?? "—"
-                        : "—"}
+                      {enrollment ? (
+                        enrollment.study_plan_id ? (
+                          planName.get(enrollment.study_plan_id) ?? "—"
+                        ) : (
+                          "—"
+                        )
+                      ) : mayEdit ? (
+                        <Select
+                          className="h-6 min-w-[7rem] px-1.5 text-[10px]"
+                          aria-label={`แผนการเรียนของ ${name}`}
+                          value={planSelection[s.id] ?? ""}
+                          onChange={(e) =>
+                            setPlanSelection((prev) => ({ ...prev, [s.id]: e.target.value }))
+                          }
+                          disabled={rowBusy}
+                        >
+                          <option value="">ไม่ระบุ</option>
+                          {studyPlans.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td className="px-3 py-0">
                       {enrollment ? (
