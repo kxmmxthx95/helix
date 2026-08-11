@@ -16,6 +16,7 @@ import {
   PasswordInput,
   Select,
   Spinner,
+  Switch,
 } from "@/components/ui";
 import { avatarUrl, useRemoveAvatar, useUploadAvatar } from "@/hooks/useAvatar";
 import { useLearningAreas } from "@/hooks/useCurriculum";
@@ -148,11 +149,11 @@ export function Users() {
                     onClick={() => mayManage && setEditing(row)}
                     className={
                       mayManage
-                        ? "h-[40px] cursor-pointer border-t border-border active:bg-muted"
-                        : "h-[40px] border-t border-border"
+                        ? "cursor-pointer border-t border-border active:bg-muted"
+                        : "border-t border-border"
                     }
                   >
-                    <td className="px-3 py-0">
+                    <td className="px-3 py-2">
                       <div className="flex items-center gap-2.5">
                         <Avatar name={profileFullName(row)} src={avatarUrl(row)} className="h-7 w-7 shrink-0 text-[10px]" />
                         <div className="min-w-0">
@@ -162,28 +163,28 @@ export function Users() {
                       </div>
                     </td>
                     {/* dept_head shows via the ตำแหน่ง column instead — same filter the edit form uses (pickEditable). */}
-                    <td className="px-3 py-0">{roleLabels(row.roles.filter((r) => r !== "dept_head"))}</td>
-                    <td className="px-3 py-0 text-muted-foreground">
+                    <td className="px-3 py-2">{roleLabels(row.roles.filter((r) => r !== "dept_head"))}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
                       {row.positionTitleIds.length
                         ? row.positionTitleIds.map((id) => titleName.get(id) ?? "—").join(", ")
                         : "—"}
                     </td>
-                    <td className="px-3 py-0 text-muted-foreground">
+                    <td className="px-3 py-2 text-muted-foreground">
                       {row.department_id ? (deptName.get(row.department_id) ?? "—") : "ทุกแผนก"}
                     </td>
-                    <td className="px-3 py-0">
+                    <td className="px-3 py-2">
                       <span
                         className={
                           row.is_active
-                            ? "rounded-full bg-success/15 px-2 py-0.5 text-xs text-success"
-                            : "rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                            ? "rounded-full bg-success/15 px-2 py-0.5 text-[10px] text-success"
+                            : "rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
                         }
                       >
                         {row.is_active ? "ใช้งาน" : "ปิด"}
                       </span>
                     </td>
                     {mayManage && (
-                      <td className="px-3 py-0">
+                      <td className="px-3 py-2">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -576,8 +577,19 @@ function EditAvatarField({ profile }: { profile: ProfileRow }) {
 
   return (
     <Field label="รูปโปรไฟล์">
-      <div className="flex items-center gap-3">
-        <Avatar name={profileFullName(profile)} src={src} className="h-14 w-14 text-base" />
+      <div className="flex justify-center">
+        <div className="relative">
+          <Avatar name={profileFullName(profile)} src={src} className="h-20 w-20 text-xl" />
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => fileRef.current?.click()}
+            aria-label={src ? "เปลี่ยนรูป" : "เลือกรูป"}
+            className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity hover:opacity-100"
+          >
+            {busy ? <Spinner className="h-5 w-5 text-white" /> : <Upload className="h-5 w-5 text-white" />}
+          </button>
+        </div>
         <input
           ref={fileRef}
           type="file"
@@ -589,16 +601,6 @@ function EditAvatarField({ profile }: { profile: ProfileRow }) {
             if (file) void pick(file);
           }}
         />
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
-            {busy ? <Spinner className="h-3.5 w-3.5" /> : src ? "เปลี่ยนรูป" : "เลือกรูป"}
-          </Button>
-          {src && (
-            <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={remove}>
-              ลบรูป
-            </Button>
-          )}
-        </div>
       </div>
     </Field>
   );
@@ -749,15 +751,14 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
             </Field>
           )}
 
-          <label className="flex items-center justify-between py-2">
+          <div className="flex items-center justify-between py-2">
             <span className="text-sm font-medium">เปิดใช้งานบัญชี</span>
-            <input
-              type="checkbox"
+            <Switch
               checked={current.is_active}
-              onChange={(e) => setDraft({ ...current, is_active: e.target.checked })}
-              className="h-6 w-6 accent-[hsl(var(--accent))]"
+              onChange={(v) => setDraft({ ...current, is_active: v })}
+              label="เปิดใช้งานบัญชี"
             />
-          </label>
+          </div>
         </div>
       )}
     </Sheet>
@@ -934,12 +935,22 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
     >
       <form id="create-user" onSubmit={submit} className="space-y-4" noValidate>
         <Field label="รูปโปรไฟล์ (ไม่บังคับ)">
-          <div className="flex items-center gap-3">
-            <Avatar
-              name={`${draft.first_name} ${draft.last_name}`.trim() || "?"}
-              src={avatarPreview}
-              className="h-14 w-14 text-base"
-            />
+          <div className="flex justify-center">
+            <div className="relative">
+              <Avatar
+                name={`${draft.first_name} ${draft.last_name}`.trim() || "?"}
+                src={avatarPreview}
+                className="h-20 w-20 text-xl"
+              />
+              <button
+                type="button"
+                onClick={() => avatarFileRef.current?.click()}
+                aria-label={avatarFile ? "เปลี่ยนรูป" : "เลือกรูป"}
+                className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity hover:opacity-100"
+              >
+                <Upload className="h-5 w-5 text-white" />
+              </button>
+            </div>
             <input
               ref={avatarFileRef}
               type="file"
@@ -947,16 +958,6 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
               className="hidden"
               onChange={(e) => pickAvatar(e.target.files?.[0] ?? null)}
             />
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => avatarFileRef.current?.click()}>
-                {avatarFile ? "เปลี่ยนรูป" : "เลือกรูป"}
-              </Button>
-              {avatarFile && (
-                <Button type="button" variant="ghost" size="sm" onClick={() => pickAvatar(null)}>
-                  ลบรูป
-                </Button>
-              )}
-            </div>
           </div>
         </Field>
 
