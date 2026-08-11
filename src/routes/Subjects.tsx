@@ -237,13 +237,19 @@ export function Subjects() {
 
       {error && <Card className="shrink-0 text-sm text-destructive">โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง</Card>}
 
-      {rows && rows.length === 0 && (
+      {!departmentId && (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="เลือกแผนก" description="เลือกแผนกด้านบนเพื่อดูรายวิชา" />
+        </div>
+      )}
+
+      {departmentId && rows && rows.length === 0 && (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="ไม่พบข้อมูล" description="ไม่พบรายวิชาตามเงื่อนไขที่เลือก" />
         </div>
       )}
 
-      {rows && rows.length > 0 && (
+      {departmentId && rows && rows.length > 0 && (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
           <div className="table-panel">
             <div ref={scrollRef} className="table-panel-scroll">
