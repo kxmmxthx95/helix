@@ -28,6 +28,7 @@ describe("resolveSubjectRow", () => {
         department_id: "dept-1",
         learning_area_id: "area-1",
         subject_type: "basic",
+        grading_method: "graded",
         credits: 1.5,
         hours_per_week: 3,
         is_active: true,
@@ -61,7 +62,12 @@ describe("resolveSubjectRow", () => {
       lookups,
     );
     expect(result).toMatchObject({
-      draft: { subject_type: "activity", suggested_grade_level_id: "grade-1", suggested_term: 2 },
+      draft: {
+        subject_type: "activity",
+        grading_method: "pass_fail",
+        suggested_grade_level_id: "grade-1",
+        suggested_term: 2,
+      },
     });
   });
 

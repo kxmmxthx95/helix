@@ -124,6 +124,109 @@ export const Select = forwardRef<
 ));
 Select.displayName = "Select";
 
+const THAI_MONTHS = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
+
+const daysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
+
+/** วัน/เดือน/ปี (พ.ศ.) selects — native <input type=date> only ever shows ค.ศ., so birth dates use this instead. */
+export function BuddhistDateSelect({
+  value,
+  onChange,
+  required,
+  className,
+}: {
+  /** ISO yyyy-mm-dd (ค.ศ.), or "" when unset — same shape as a native date input's value. */
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+  className?: string;
+}) {
+  // Own state, seeded once from `value` — NOT re-derived from it on every
+  // render. Only two of three parts are ever picked at once, and the ISO
+  // `value` prop can't represent that partial state, so deriving straight
+  // from the prop made every incomplete pick round-trip back as onChange("")
+  // and wipe whatever was just selected. Parent resets (e.g. closing a
+  // sheet) remount this via a `key` at the call site instead.
+  const initial = value ? (value.split("-").map(Number) as [number, number, number]) : undefined;
+  const [ceYear, setCeYear] = useState<number | undefined>(initial?.[0]);
+  const [month, setMonth] = useState<number | undefined>(initial?.[1]);
+  const [day, setDay] = useState<number | undefined>(initial?.[2]);
+
+  const thisYearBE = new Date().getFullYear() + 543;
+  const years = Array.from({ length: 100 }, (_, i) => thisYearBE - i);
+  // ponytail: no year picked yet → default to 31/29 days, clamped once a year is known.
+  const dayCount = ceYear && month ? daysInMonth(ceYear, month) : month === 2 ? 29 : 31;
+
+  function commit(nd: number | undefined, nm: number | undefined, ny: number | undefined) {
+    if (nd === undefined || nm === undefined || ny === undefined) {
+      onChange("");
+      return;
+    }
+    const clampedDay = Math.min(nd, daysInMonth(ny, nm));
+    onChange(`${String(ny).padStart(4, "0")}-${String(nm).padStart(2, "0")}-${String(clampedDay).padStart(2, "0")}`);
+  }
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <Select
+        value={day ? String(day) : ""}
+        onChange={(e) => {
+          const v = e.target.value ? Number(e.target.value) : undefined;
+          setDay(v);
+          commit(v, month, ceYear);
+        }}
+        placeholder="วัน"
+        required={required}
+        className={className}
+      >
+        {Array.from({ length: dayCount }, (_, i) => i + 1).map((d) => (
+          <option key={d} value={d}>
+            {d}
+          </option>
+        ))}
+      </Select>
+      <Select
+        value={month ? String(month) : ""}
+        onChange={(e) => {
+          const v = e.target.value ? Number(e.target.value) : undefined;
+          setMonth(v);
+          commit(day, v, ceYear);
+        }}
+        placeholder="เดือน"
+        required={required}
+        className={className}
+      >
+        {THAI_MONTHS.map((name, i) => (
+          <option key={name} value={i + 1}>
+            {name}
+          </option>
+        ))}
+      </Select>
+      <Select
+        value={ceYear ? String(ceYear + 543) : ""}
+        onChange={(e) => {
+          const raw = e.target.value ? Number(e.target.value) : undefined;
+          const v = raw !== undefined ? raw - 543 : undefined;
+          setCeYear(v);
+          commit(day, month, v);
+        }}
+        placeholder="ปี"
+        required={required}
+        className={className}
+      >
+        {years.map((y) => (
+          <option key={y} value={y}>
+            {y}
+          </option>
+        ))}
+      </Select>
+    </div>
+  );
+}
+
 /** Glass surface — bottom nav, cards and sheets only (grill decision). */
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
@@ -137,15 +240,26 @@ export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
 export function Field({
   label,
   error,
+  required,
   children,
 }: {
   label: string;
   error?: string;
+  /** Shows a red * after the label — purely visual, doesn't set HTML required on children. */
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label className="block space-y-1">
-      <span className="text-xs font-medium">{label}</span>
+      <span className="text-xs font-medium">
+        {label}
+        {required && (
+          <span className="text-destructive" aria-hidden>
+            {" "}
+            *
+          </span>
+        )}
+      </span>
       {children}
       {error && <span className="block text-xs text-destructive">{error}</span>}
     </label>
@@ -233,17 +347,17 @@ function initialsFromName(name: string) {
   return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
 }
 
-/** Initials avatar — no photo column on profiles yet. */
-export function Avatar({ name, className }: { name: string; className?: string }) {
+/** Photo if uploaded (migration 0024), else initials. */
+export function Avatar({ name, src, className }: { name: string; src?: string | null; className?: string }) {
   return (
     <div
       className={cn(
-        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/20 text-[11px] font-semibold tracking-wide text-accent ring-1 ring-accent/25",
+        "flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent/20 text-[11px] font-semibold tracking-wide text-accent ring-1 ring-accent/25",
         className,
       )}
       aria-hidden
     >
-      {initialsFromName(name)}
+      {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : initialsFromName(name)}
     </div>
   );
 }

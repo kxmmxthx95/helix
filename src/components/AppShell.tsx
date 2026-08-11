@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AppsIcon,
   BookIcon,
@@ -24,7 +24,9 @@ import {
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { useTheme } from "@/components/ThemeProvider";
+import { useToast } from "@/components/Toast";
 import { Avatar, Button } from "@/components/ui";
+import { avatarUrl, useUploadAvatar } from "@/hooks/useAvatar";
 import { useOutboxSync } from "@/hooks/useOutboxSync";
 import { profileFullName } from "@/lib/database.types";
 import { canManage, canManageAcademic, canManageUsers, isOrgWide, roleLabels } from "@/lib/roles";
@@ -150,13 +152,34 @@ const SIDEBAR_KEY = "helix-sidebar-collapsed";
  * Outer frame never scrolls — only the main pane does.
  */
 export function AppShell() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, refreshProfile } = useAuth();
   const displayName = profile ? profileFullName(profile) : "Helix";
   const { preference, cycle } = useTheme();
   const { online } = useOutboxSync();
   const location = useLocation();
   const navigate = useNavigate();
+  const toast = useToast();
+  const uploadAvatar = useUploadAvatar();
+  const avatarFileRef = useRef<HTMLInputElement>(null);
+  const avatarSrc = profile ? avatarUrl(profile) : null;
   const maySeeSettings = !!profile && (isOrgWide(profile.roles) || profile.roles.includes("dept_head"));
+
+  const pickAvatar = () => avatarFileRef.current?.click();
+  const onAvatarChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !profile) return;
+    try {
+      await uploadAvatar.mutateAsync({ file, profileId: profile.id });
+      await refreshProfile();
+    } catch {
+      toast("อัปโหลดรูปไม่สำเร็จ", "error");
+    }
+  };
+
+  const avatarInput = (
+    <input ref={avatarFileRef} type="file" accept="image/*" className="hidden" onChange={onAvatarChosen} />
+  );
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_KEY) === "1";
@@ -227,6 +250,12 @@ export function AppShell() {
     </div>
   );
 
+  const avatarButton = (avatarClassName?: string) => (
+    <button type="button" onClick={pickAvatar} title="เปลี่ยนรูปโปรไฟล์" className="rounded-full">
+      <Avatar name={displayName} src={avatarSrc} className={avatarClassName} />
+    </button>
+  );
+
   return (
     <div className="relative flex h-dvh overflow-hidden overscroll-none max-lg:flex-col max-lg:gap-0 max-lg:p-0 lg:flex-row lg:gap-2 lg:p-2">
       <div className="absolute inset-0 z-0 bg-background" aria-hidden />
@@ -291,10 +320,10 @@ export function AppShell() {
           )}
         >
           {collapsed ? (
-            <Avatar name={displayName} className="h-8 w-8 text-[10px]" />
+            avatarButton("h-8 w-8 text-[10px]")
           ) : (
             <div className="mb-2 flex items-center gap-3 px-1">
-              <Avatar name={displayName} />
+              {avatarButton()}
               {userLabel}
             </div>
           )}
@@ -305,13 +334,14 @@ export function AppShell() {
           </div>
         </div>
       </aside>
+      {avatarInput}
 
       {/* Main pane: no frosted frame — work area is max-w-6xl column */}
       <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="glass sticky top-0 z-20 shrink-0 border-b border-border pt-safe lg:hidden">
           <div className={cn("flex h-12 items-center justify-between", "px-3")}>
             <div className="flex min-w-0 items-center gap-3">
-              <Avatar name={displayName} className="h-8 w-8 text-[10px]" />
+              {avatarButton("h-8 w-8 text-[10px]")}
               {userLabel}
             </div>
             <div className="flex items-center gap-1">

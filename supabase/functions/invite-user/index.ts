@@ -26,6 +26,8 @@ type UserInput = {
   kind: "staff" | "student";
   loginId: string; // phone (staff) or student_code (student)
   password: string;
+  /** True when `password` above was auto-derived (DOB/national ID/student code), not typed by the admin — forces a change on first login. */
+  mustChangePassword: boolean;
   prefix: string | null;
   first_name: string;
   last_name: string;
@@ -36,6 +38,10 @@ type UserInput = {
   roles: string[]; // ignored when kind === "student" (always just ["student"])
   positionTitleIds: string[]; // ignored when kind === "student"
   studentRowId?: string; // kind === "student": links students.profile_id
+  /** roles includes "parent": student ids to link via guardianships (first one's student_code is the default password). */
+  guardianStudentIds?: string[];
+  /** Base64 (no data-url prefix) of a pre-compressed JPEG — see src/lib/image.ts compressImage/blobToBase64. */
+  avatarBase64?: string;
   teacher_code: string | null;
   learning_area_id: string | null; // required when roles includes "teacher"
 };
@@ -104,6 +110,19 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    // Object name = the new user's own id, same convention as self-service
+    // avatar uploads (src/hooks/useAvatar.ts) — upload before the profile
+    // insert so avatar_path can be set in the same write. Best-effort: a
+    // failed upload shouldn't block account creation, just leaves no photo.
+    let avatarPath: string | null = null;
+    if (u.avatarBase64) {
+      const bytes = Uint8Array.from(atob(u.avatarBase64), (c) => c.charCodeAt(0));
+      const { error: avatarError } = await admin.storage
+        .from("avatars")
+        .upload(created.user.id, bytes, { upsert: true, contentType: "image/jpeg" });
+      if (!avatarError) avatarPath = created.user.id;
+    }
+
     const { error: profileError } = await admin.from("profiles").insert({
       id: created.user.id,
       prefix: u.prefix,
@@ -116,6 +135,11 @@ Deno.serve(async (req) => {
       department_id: u.department_id,
       teacher_code: u.teacher_code,
       learning_area_id: u.learning_area_id,
+      avatar_path: avatarPath,
+      // Forces the onboarding/password-change gate until they set a real one
+      // whenever the password above was auto-derived rather than admin-typed.
+      // See migration 0022.
+      must_change_password: u.mustChangePassword,
     });
     if (profileError) {
       skipped.push({ loginId: u.loginId, reason: profileError.message });
@@ -148,6 +172,16 @@ Deno.serve(async (req) => {
       const { error: roleError } = await admin.from("profile_roles").insert(roleRows);
       if (roleError) {
         skipped.push({ loginId: u.loginId, reason: roleError.message });
+        continue;
+      }
+    }
+
+    if (u.guardianStudentIds && u.guardianStudentIds.length > 0) {
+      const { error: guardianError } = await admin.from("guardianships").insert(
+        u.guardianStudentIds.map((student_id) => ({ parent_id: created.user.id, student_id })),
+      );
+      if (guardianError) {
+        skipped.push({ loginId: u.loginId, reason: guardianError.message });
         continue;
       }
     }

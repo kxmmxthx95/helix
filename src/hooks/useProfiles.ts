@@ -174,6 +174,8 @@ export type UserInvite = {
   /** student_code (kind="student") or phone (kind="staff") — also the login id. */
   loginId: string;
   password: string;
+  /** True when `password` above was auto-derived (DOB/national ID/student code), not typed by the admin — forces a change on first login. */
+  mustChangePassword: boolean;
   prefix: string | null;
   first_name: string;
   last_name: string;
@@ -185,6 +187,10 @@ export type UserInvite = {
   positionTitleIds: string[]; // ignored for kind="student"
   /** kind="student" only — links students.profile_id to the new account. */
   studentRowId?: string;
+  /** roles includes "parent": student ids to link via guardianships (first one's student_code is the default password). */
+  guardianStudentIds?: string[];
+  /** Base64 (no data-url prefix) of a pre-compressed JPEG — see src/lib/image.ts compressImage/blobToBase64. */
+  avatarBase64?: string;
   teacher_code: string | null;
   learning_area_id: string | null; // required when roles includes "teacher"
 };

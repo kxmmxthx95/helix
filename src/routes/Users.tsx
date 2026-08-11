@@ -1,26 +1,23 @@
-import {
-  AppsIcon,
-  BarChartIcon,
-  BookIcon,
-  ClipboardIcon,
-  GraduationCap,
-  KeyIcon,
-  LibraryIcon,
-  Monitor,
-  PersonAddIcon,
-  Plus,
-  Search,
-  SettingsIcon,
-  SlidersHorizontal,
-  Upload,
-  Users as UsersIcon,
-  X,
-} from "@/components/icons";
-import { useMemo, useState, type ComponentType } from "react";
+import { Plus, Search, SlidersHorizontal, Upload, X } from "@/components/icons";
+import { useEffect, useRef, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportUsersSheet } from "@/components/ImportUsersSheet";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, EmptyState, Field, Input, Pagination, PasswordInput, Select, Spinner } from "@/components/ui";
+import { useToast } from "@/components/Toast";
+import {
+  Avatar,
+  Button,
+  BuddhistDateSelect,
+  Card,
+  EmptyState,
+  Field,
+  Input,
+  Pagination,
+  PasswordInput,
+  Select,
+  Spinner,
+} from "@/components/ui";
+import { avatarUrl, useRemoveAvatar, useUploadAvatar } from "@/hooks/useAvatar";
 import { useLearningAreas } from "@/hooks/useCurriculum";
 import { usePagination } from "@/hooks/usePagination";
 import {
@@ -35,35 +32,17 @@ import {
   type ProfileRow,
   type UserInvite,
 } from "@/hooks/useProfiles";
-import type { PositionTitle } from "@/lib/database.types";
+import { useStudents } from "@/hooks/useStudents";
+import type { PositionTitle, Student } from "@/lib/database.types";
 import { profileFullName } from "@/lib/database.types";
+import { blobToBase64, compressImage } from "@/lib/image";
+import { passwordFromDob } from "@/lib/password";
 import { canManageUsers, isOrgWide, PREFIXES, ROLE_LABEL, ROLES, roleLabels, type Role } from "@/lib/roles";
-import { cn } from "@/lib/utils";
 
 const EMPTY: ProfileFilters = { search: "", departmentId: "", role: "", active: "" };
 
-/** Roles pickable directly as checkboxes — dept_head comes from position_titles instead. */
+/** Roles pickable directly — dept_head comes from position_titles instead. */
 const BASE_ROLES = ROLES.filter((r) => r !== "dept_head");
-
-type IconComp = ComponentType<{ className?: string }>;
-
-const ROLE_ICON: Record<(typeof BASE_ROLES)[number], IconComp> = {
-  super_admin: KeyIcon,
-  director: Monitor,
-  staff: ClipboardIcon,
-  teacher: BookIcon,
-  student: GraduationCap,
-  parent: UsersIcon,
-};
-
-const TITLE_ICON: Record<string, IconComp> = {
-  dept_lead: AppsIcon,
-  academic_head: LibraryIcon,
-  student_affairs_head: UsersIcon,
-  budget_head: BarChartIcon,
-  general_affairs_head: SettingsIcon,
-  hr_head: PersonAddIcon,
-};
 
 export function Users() {
   const { profile: me } = useAuth();
@@ -174,10 +153,16 @@ export function Users() {
                     }
                   >
                     <td className="px-3 py-0">
-                      <p className="font-medium">{profileFullName(row)}</p>
-                      <p className="text-xs text-muted-foreground">{row.email}</p>
+                      <div className="flex items-center gap-2.5">
+                        <Avatar name={profileFullName(row)} src={avatarUrl(row)} className="h-7 w-7 shrink-0 text-[10px]" />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{profileFullName(row)}</p>
+                          <p className="truncate text-xs text-muted-foreground">{row.email}</p>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-3 py-0">{roleLabels(row.roles)}</td>
+                    {/* dept_head shows via the ตำแหน่ง column instead — same filter the edit form uses (pickEditable). */}
+                    <td className="px-3 py-0">{roleLabels(row.roles.filter((r) => r !== "dept_head"))}</td>
                     <td className="px-3 py-0 text-muted-foreground">
                       {row.positionTitleIds.length
                         ? row.positionTitleIds.map((id) => titleName.get(id) ?? "—").join(", ")
@@ -305,71 +290,91 @@ export function Users() {
   );
 }
 
-/** Role + position-title toggles, shared by the edit and create sheets. */
+/**
+ * Role + position-title pickers, shared by the edit and create sheets.
+ * Native single-value <select> (grill decision) — a profile holds at most
+ * one of each here. positionTitleIds/roles arrays upstream still support
+ * more than one (a teacher who is both หัวหน้าฝ่ายวิชาการ and
+ * หัวหน้ากิจการนักเรียน, per 0001's schema comment), but this UI can only
+ * set/see the first — saving here overwrites any extra pre-existing ones.
+ */
+/**
+ * สิทธิ์ — one at a time (native select). ตำแหน่งหัวหน้างาน — a person can
+ * hold several at once (e.g. หัวหน้าฝ่ายวิชาการ + หัวหน้ากิจการนักเรียน, per
+ * 0001's schema comment), so it stays multi: select-to-add + a removable
+ * list, rather than a plain <select multiple> (poor touch UX) or reverting
+ * to the old button grid.
+ */
 function RolePicker({
-  roles,
+  role,
   positionTitleIds,
   positionTitles,
-  onToggleRole,
-  onToggleTitle,
+  onRoleChange,
+  onAddTitle,
+  onRemoveTitle,
+  roleError,
 }: {
-  roles: Role[];
+  role: Role | "";
   positionTitleIds: string[];
   positionTitles: PositionTitle[];
-  onToggleRole: (role: Role, checked: boolean) => void;
-  onToggleTitle: (titleId: string, checked: boolean) => void;
+  onRoleChange: (role: Role | "") => void;
+  onAddTitle: (titleId: string) => void;
+  onRemoveTitle: (titleId: string) => void;
+  roleError?: string;
 }) {
+  const available = positionTitles.filter((t) => !positionTitleIds.includes(t.id));
+
   return (
     <>
-      <Field label="สิทธิ์">
-        <div className="grid grid-cols-2 gap-2">
-          {BASE_ROLES.map((r) => {
-            const selected = roles.includes(r);
-            const Icon = ROLE_ICON[r];
-            return (
-              <button
-                key={r}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => onToggleRole(r, !selected)}
-                className={cn(
-                  "flex h-8 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs transition-colors",
-                  selected
-                    ? "border-foreground bg-foreground/10 text-foreground"
-                    : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                <Icon className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{ROLE_LABEL[r]}</span>
-              </button>
-            );
-          })}
-        </div>
+      <Field label="สิทธิ์" error={roleError} required>
+        <Select
+          value={role}
+          onChange={(e) => onRoleChange(e.target.value as Role | "")}
+          placeholder="เลือกสิทธิ์"
+        >
+          {BASE_ROLES.map((r) => (
+            <option key={r} value={r}>
+              {ROLE_LABEL[r]}
+            </option>
+          ))}
+        </Select>
       </Field>
 
       <Field label="ตำแหน่งหัวหน้างาน (แผนกตัวเอง)">
-        <div className="grid grid-cols-2 gap-2">
-          {positionTitles.map((t) => {
-            const selected = positionTitleIds.includes(t.id);
-            const Icon = TITLE_ICON[t.code] ?? AppsIcon;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => onToggleTitle(t.id, !selected)}
-                className={cn(
-                  "flex h-8 w-full min-w-0 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs transition-colors",
-                  selected
-                    ? "border-foreground bg-foreground/10 text-foreground"
-                    : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                <Icon className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{t.name}</span>
-              </button>
-            );
-          })}
+        <div className="space-y-2">
+          {positionTitleIds.length > 0 && (
+            <ul className="space-y-1.5">
+              {positionTitleIds.map((id) => (
+                <li
+                  key={id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border px-2.5 py-1.5 text-xs"
+                >
+                  <span className="truncate">{positionTitles.find((t) => t.id === id)?.name ?? id}</span>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveTitle(id)}
+                    aria-label="ลบตำแหน่ง"
+                    className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {available.length > 0 && (
+            <Select
+              value=""
+              onChange={(e) => e.target.value && onAddTitle(e.target.value)}
+              placeholder="+ เพิ่มตำแหน่ง"
+            >
+              {available.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </Select>
+          )}
         </div>
       </Field>
     </>
@@ -381,11 +386,13 @@ function PrefixNameFields({
   firstName,
   lastName,
   onChange,
+  errors,
 }: {
   prefix: string | null;
   firstName: string;
   lastName: string;
   onChange: (patch: { prefix?: string | null; first_name?: string; last_name?: string }) => void;
+  errors?: { first_name?: string; last_name?: string };
 }) {
   return (
     <>
@@ -401,10 +408,10 @@ function PrefixNameFields({
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="ชื่อ">
+        <Field label="ชื่อ" error={errors?.first_name} required>
           <Input value={firstName} onChange={(e) => onChange({ first_name: e.target.value })} required />
         </Field>
-        <Field label="นามสกุล">
+        <Field label="นามสกุล" error={errors?.last_name} required>
           <Input value={lastName} onChange={(e) => onChange({ last_name: e.target.value })} required />
         </Field>
       </div>
@@ -417,10 +424,12 @@ function TeacherFields({
   teacherCode,
   learningAreaId,
   onChange,
+  error,
 }: {
   teacherCode: string | null;
   learningAreaId: string | null;
   onChange: (patch: { teacher_code?: string | null; learning_area_id?: string | null }) => void;
+  error?: string;
 }) {
   const { data: learningAreas = [] } = useLearningAreas();
 
@@ -432,7 +441,7 @@ function TeacherFields({
           onChange={(e) => onChange({ teacher_code: e.target.value || null })}
         />
       </Field>
-      <Field label="กลุ่มสาระฯ">
+      <Field label="กลุ่มสาระฯ" error={error} required>
         <Select
           value={learningAreaId ?? ""}
           onChange={(e) => onChange({ learning_area_id: e.target.value || null })}
@@ -450,8 +459,154 @@ function TeacherFields({
   );
 }
 
+type LinkedStudent = Pick<Student, "id" | "student_code" | "first_name" | "last_name">;
+
+/** role="parent": which students this account is a guardian of — writes guardianships on create, see invite-user. */
+function LinkedStudentsField({
+  selected,
+  onAdd,
+  onRemove,
+  error,
+}: {
+  selected: LinkedStudent[];
+  onAdd: (s: LinkedStudent) => void;
+  onRemove: (id: string) => void;
+  error?: string;
+}) {
+  const [search, setSearch] = useState("");
+  const { data: results = [] } = useStudents({ search, departmentId: "", status: "" });
+  const available = results.filter((s) => !selected.some((sel) => sel.id === s.id)).slice(0, 8);
+
+  return (
+    <Field label="นักเรียนที่ดูแล (ผู้ปกครองของ)" error={error} required>
+      <div className="space-y-2">
+        {selected.length > 0 && (
+          <ul className="space-y-1.5">
+            {selected.map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center justify-between gap-2 rounded-lg border border-border px-2.5 py-1.5 text-xs"
+              >
+                <span className="truncate">
+                  {s.first_name} {s.last_name} · {s.student_code}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRemove(s.id)}
+                  aria-label="ลบนักเรียน"
+                  className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <Input
+          placeholder="ค้นหาชื่อหรือรหัสนักเรียน"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {search.trim() && available.length > 0 && (
+          <ul className="max-h-40 overflow-y-auto rounded-lg border border-border">
+            {available.map((s) => (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onAdd(s);
+                    setSearch("");
+                  }}
+                  className="block w-full truncate px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-muted"
+                >
+                  {s.first_name} {s.last_name} · {s.student_code}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Field>
+  );
+}
+
+/**
+ * Uploads immediately on pick (not deferred to the sheet's "บันทึก" button)
+ * — same convention as the school-logo and self-service avatar uploads.
+ * `profile` here is a snapshot passed down from the row the admin clicked,
+ * which won't refresh mid-edit even though the mutations below invalidate
+ * the profiles query — so the just-picked/removed photo is tracked locally
+ * instead of waiting on that prop to catch up.
+ */
+function EditAvatarField({ profile }: { profile: ProfileRow }) {
+  const toast = useToast();
+  const uploadAvatar = useUploadAvatar();
+  const removeAvatar = useRemoveAvatar();
+  const [override, setOverride] = useState<{ url: string | null } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const busy = uploadAvatar.isPending || removeAvatar.isPending;
+  const src = override ? override.url : avatarUrl(profile);
+
+  function setPreview(url: string | null) {
+    setOverride((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url);
+      return { url };
+    });
+  }
+
+  async function pick(file: File) {
+    setPreview(URL.createObjectURL(file));
+    try {
+      await uploadAvatar.mutateAsync({ file, profileId: profile.id });
+      toast("อัปเดตรูปโปรไฟล์แล้ว");
+    } catch {
+      toast("อัปโหลดรูปไม่สำเร็จ", "error");
+    }
+  }
+
+  async function remove() {
+    setPreview(null);
+    try {
+      await removeAvatar.mutateAsync(profile.id);
+    } catch {
+      toast("ลบรูปไม่สำเร็จ", "error");
+    }
+  }
+
+  return (
+    <Field label="รูปโปรไฟล์">
+      <div className="flex items-center gap-3">
+        <Avatar name={profileFullName(profile)} src={src} className="h-14 w-14 text-base" />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void pick(file);
+          }}
+        />
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
+            {busy ? <Spinner className="h-3.5 w-3.5" /> : src ? "เปลี่ยนรูป" : "เลือกรูป"}
+          </Button>
+          {src && (
+            <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={remove}>
+              ลบรูป
+            </Button>
+          )}
+        </div>
+      </div>
+    </Field>
+  );
+}
+
 function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClose: () => void }) {
   const { profile: me } = useAuth();
+  const toast = useToast();
   const { data: departments = [] } = useDepartments();
   const { data: positionTitles = [] } = usePositionTitles();
   const update = useUpdateProfile();
@@ -461,23 +616,30 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
   // own values rather than the previously edited row's.
   const current: ProfileEdit | null = draft ?? (profile ? pickEditable(profile) : null);
 
-  function toggleRole(role: Role, checked: boolean) {
+  function setRole(role: Role | "") {
     if (!current) return;
-    const roles = checked ? [...current.roles, role] : current.roles.filter((r) => r !== role);
-    setDraft({ ...current, roles });
+    setDraft({ ...current, roles: role ? [role] : [] });
   }
 
-  function toggleTitle(titleId: string, checked: boolean) {
+  function addTitle(titleId: string) {
+    if (!current || current.positionTitleIds.includes(titleId)) return;
+    setDraft({ ...current, positionTitleIds: [...current.positionTitleIds, titleId] });
+  }
+
+  function removeTitle(titleId: string) {
     if (!current) return;
-    const positionTitleIds = checked
-      ? [...current.positionTitleIds, titleId]
-      : current.positionTitleIds.filter((t) => t !== titleId);
-    setDraft({ ...current, positionTitleIds });
+    setDraft({ ...current, positionTitleIds: current.positionTitleIds.filter((t) => t !== titleId) });
   }
 
   function save() {
     if (!profile || !current) return;
-    update.mutate({ id: profile.id, ...current });
+    update.mutate(
+      { id: profile.id, ...current },
+      {
+        onSuccess: () => toast("บันทึกข้อมูลผู้ใช้งานสำเร็จ"),
+        onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
+      },
+    );
     close();
   }
 
@@ -507,6 +669,8 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
     >
       {profile && current && (
         <div className="space-y-4">
+          <EditAvatarField key={profile.id} profile={profile} />
+
           <PrefixNameFields
             prefix={current.prefix}
             firstName={current.first_name}
@@ -545,19 +709,20 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
           </Field>
 
           <Field label="วันเดือนปีเกิด">
-            <Input
-              type="date"
+            <BuddhistDateSelect
+              key={profile?.id}
               value={current.date_of_birth ?? ""}
-              onChange={(e) => setDraft({ ...current, date_of_birth: e.target.value || null })}
+              onChange={(v) => setDraft({ ...current, date_of_birth: v || null })}
             />
           </Field>
 
           <RolePicker
-            roles={current.roles}
+            role={current.roles[0] ?? ""}
             positionTitleIds={current.positionTitleIds}
             positionTitles={positionTitles}
-            onToggleRole={toggleRole}
-            onToggleTitle={toggleTitle}
+            onRoleChange={setRole}
+            onAddTitle={addTitle}
+            onRemoveTitle={removeTitle}
           />
 
           {current.roles.includes("teacher") && (
@@ -599,11 +764,23 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
   );
 }
 
+/** null = missing an input the rule needs (DOB, or a linked student for role="parent"). */
+function defaultPasswordFor(
+  role: Role | "",
+  dateOfBirth: string | null,
+  firstGuardianStudentCode: string | null,
+): string | null {
+  if (role === "parent") return firstGuardianStudentCode;
+  if (role === "super_admin" || !role) return null; // super_admin always sets its own — grill decision
+  return dateOfBirth ? passwordFromDob(dateOfBirth) : null;
+}
+
 function blankInvite(departmentId: string | null): UserInvite {
   return {
     kind: "staff",
     loginId: "",
     password: "",
+    mustChangePassword: false,
     prefix: null,
     first_name: "",
     last_name: "",
@@ -621,49 +798,117 @@ function blankInvite(departmentId: string | null): UserInvite {
 /** Staff/teacher/etc. only — student logins are created from the Roster page instead. */
 function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { profile: me } = useAuth();
+  const toast = useToast();
   const { data: departments = [] } = useDepartments();
   const { data: positionTitles = [] } = usePositionTitles();
   const invite = useInviteUsers();
   const [draft, setDraft] = useState<UserInvite>(() => blankInvite(me?.department_id ?? null));
+  const [guardianStudents, setGuardianStudents] = useState<
+    Pick<Student, "id" | "student_code" | "first_name" | "last_name">[]
+  >([]);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
   const [failReason, setFailReason] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [attempted, setAttempted] = useState(false);
 
-  function toggleRole(role: Role, checked: boolean) {
-    setDraft((d) => ({
-      ...d,
-      roles: checked ? [...d.roles, role] : d.roles.filter((r) => r !== role),
-    }));
+  const role = draft.roles[0] ?? "";
+  const autoPassword = defaultPasswordFor(role, draft.date_of_birth, guardianStudents[0]?.student_code ?? null);
+
+  function pickAvatar(file: File | null) {
+    setAvatarPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return file ? URL.createObjectURL(file) : null;
+    });
+    setAvatarFile(file);
   }
 
-  function toggleTitle(titleId: string, checked: boolean) {
-    setDraft((d) => ({
-      ...d,
-      positionTitleIds: checked
-        ? [...d.positionTitleIds, titleId]
-        : d.positionTitleIds.filter((t) => t !== titleId),
-    }));
+  function validate(): Record<string, string> {
+    const e: Record<string, string> = {};
+    if (draft.loginId.replace(/\D/g, "").length !== 10) e.loginId = "เบอร์โทรต้องเป็นตัวเลข 10 หลัก";
+    if (!draft.first_name.trim()) e.first_name = "กรอกชื่อ";
+    if (!draft.last_name.trim()) e.last_name = "กรอกนามสกุล";
+    if ((draft.national_id ?? "").replace(/\D/g, "").length !== 13) {
+      e.national_id = "เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก";
+    }
+    if (!draft.date_of_birth) e.date_of_birth = "เลือกวันเดือนปีเกิดให้ครบ";
+    if (!role) e.role = "เลือกสิทธิ์";
+    if (role === "teacher" && !draft.learning_area_id) e.learning_area_id = "เลือกกลุ่มสาระ";
+    if (role === "parent" && guardianStudents.length === 0) {
+      e.guardianStudents = "เลือกนักเรียนที่ดูแลอย่างน้อย 1 คน";
+    }
+    if (draft.password && draft.password.length < 8) {
+      e.password = "รหัสผ่านอย่างน้อย 8 ตัวอักษร";
+    } else if (!draft.password && !autoPassword) {
+      e.password =
+        role === "super_admin" ? "ผู้ดูแลระบบต้องตั้งรหัสผ่านเอง" : "กรอกวันเดือนปีเกิดก่อน เพื่อตั้งรหัสผ่านเริ่มต้น";
+    }
+    return e;
+  }
+
+  // Re-validates live once the admin has tried to submit at least once —
+  // avoids nagging with red text before they've touched anything.
+  useEffect(() => {
+    if (attempted) setErrors(validate());
+  }, [attempted, draft, guardianStudents]);
+
+  function setRole(role: Role | "") {
+    setDraft((d) => ({ ...d, roles: role ? [role] : [] }));
+    if (role !== "parent") setGuardianStudents([]);
+  }
+
+  function addTitle(titleId: string) {
+    setDraft((d) => (d.positionTitleIds.includes(titleId) ? d : { ...d, positionTitleIds: [...d.positionTitleIds, titleId] }));
+  }
+
+  function removeTitle(titleId: string) {
+    setDraft((d) => ({ ...d, positionTitleIds: d.positionTitleIds.filter((t) => t !== titleId) }));
+  }
+
+  function addGuardianStudent(s: Pick<Student, "id" | "student_code" | "first_name" | "last_name">) {
+    setGuardianStudents((gs) => (gs.some((g) => g.id === s.id) ? gs : [...gs, s]));
+  }
+
+  function removeGuardianStudent(id: string) {
+    setGuardianStudents((gs) => gs.filter((g) => g.id !== id));
   }
 
   function close() {
     setDraft(blankInvite(me?.department_id ?? null));
+    setGuardianStudents([]);
+    pickAvatar(null);
     setFailReason(null);
+    setErrors({});
+    setAttempted(false);
     onClose();
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setFailReason(null);
+    setAttempted(true);
+    const errs = validate();
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    const avatarBase64 = avatarFile ? await blobToBase64(await compressImage(avatarFile)) : undefined;
     const phone = draft.loginId.replace(/\D/g, "");
     const nationalId = (draft.national_id ?? "").replace(/\D/g, "");
-    if (phone.length !== 10) {
-      setFailReason("เบอร์โทรต้องเป็นตัวเลข 10 หลัก");
-      return;
-    }
-    if (nationalId.length !== 13) {
-      setFailReason("เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก");
-      return;
-    }
-    const outcome = await invite.mutateAsync([{ ...draft, loginId: phone, national_id: nationalId }]);
+    const password = draft.password || autoPassword!;
+    const outcome = await invite.mutateAsync([
+      {
+        ...draft,
+        loginId: phone,
+        national_id: nationalId,
+        password,
+        mustChangePassword: !draft.password,
+        guardianStudentIds: guardianStudents.map((s) => s.id),
+        avatarBase64,
+      },
+    ]);
     if (outcome.inserted > 0) {
+      toast("เพิ่มผู้ใช้งานสำเร็จ");
       close();
     } else {
       setFailReason(outcome.skipped[0]?.reason ?? "เพิ่มผู้ใช้งานไม่สำเร็จ");
@@ -675,7 +920,7 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
       open={open}
       onOpenChange={(next) => !next && close()}
       title="เพิ่มผู้ใช้งาน"
-      description="เบอร์โทรเป็นรหัสผู้ใช้เข้าระบบ — ตั้งรหัสผ่านให้ตรงนี้เลย"
+      description="เบอร์โทรเป็นรหัสผู้ใช้เข้าระบบ — เว้นรหัสผ่านว่างไว้ได้ ระบบตั้งให้อัตโนมัติตามบทบาท"
       footer={
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={close}>
@@ -687,8 +932,35 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
         </div>
       }
     >
-      <form id="create-user" onSubmit={submit} className="space-y-4">
-        <Field label="เบอร์โทร (รหัสผู้ใช้)">
+      <form id="create-user" onSubmit={submit} className="space-y-4" noValidate>
+        <Field label="รูปโปรไฟล์ (ไม่บังคับ)">
+          <div className="flex items-center gap-3">
+            <Avatar
+              name={`${draft.first_name} ${draft.last_name}`.trim() || "?"}
+              src={avatarPreview}
+              className="h-14 w-14 text-base"
+            />
+            <input
+              ref={avatarFileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => pickAvatar(e.target.files?.[0] ?? null)}
+            />
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => avatarFileRef.current?.click()}>
+                {avatarFile ? "เปลี่ยนรูป" : "เลือกรูป"}
+              </Button>
+              {avatarFile && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => pickAvatar(null)}>
+                  ลบรูป
+                </Button>
+              )}
+            </div>
+          </div>
+        </Field>
+
+        <Field label="เบอร์โทร (รหัสผู้ใช้)" error={errors.loginId} required>
           <Input
             type="tel"
             inputMode="numeric"
@@ -697,20 +969,7 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
             onChange={(e) =>
               setDraft({ ...draft, loginId: e.target.value.replace(/\D/g, "").slice(0, 10) })
             }
-            pattern="[0-9]{10}"
-            minLength={10}
             maxLength={10}
-            title="เบอร์โทรต้องเป็นตัวเลข 10 หลัก"
-            required
-          />
-        </Field>
-
-        <Field label="รหัสผ่าน">
-          <PasswordInput
-            value={draft.password}
-            onChange={(e) => setDraft({ ...draft, password: e.target.value })}
-            minLength={8}
-            required
           />
         </Field>
 
@@ -719,6 +978,7 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
           firstName={draft.first_name}
           lastName={draft.last_name}
           onChange={(patch) => setDraft({ ...draft, ...patch })}
+          errors={errors}
         />
 
         <Field label="อีเมล (ข้อมูลติดต่อ ไม่บังคับ)">
@@ -729,7 +989,7 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
           />
         </Field>
 
-        <Field label="เลขบัตรประชาชน (ใช้ยืนยันตอนลืมรหัสผ่าน)">
+        <Field label="เลขบัตรประชาชน (ใช้ยืนยันตอนลืมรหัสผ่าน)" error={errors.national_id} required>
           <Input
             inputMode="numeric"
             autoComplete="off"
@@ -740,29 +1000,26 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
                 national_id: e.target.value.replace(/\D/g, "").slice(0, 13) || null,
               })
             }
-            pattern="[0-9]{13}"
-            minLength={13}
             maxLength={13}
-            title="เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก"
-            required
           />
         </Field>
 
-        <Field label="วันเดือนปีเกิด">
-          <Input
-            type="date"
+        <Field label="วันเดือนปีเกิด" error={errors.date_of_birth} required>
+          <BuddhistDateSelect
+            key={open ? "open" : "closed"}
             value={draft.date_of_birth ?? ""}
-            onChange={(e) => setDraft({ ...draft, date_of_birth: e.target.value || null })}
-            required
+            onChange={(v) => setDraft({ ...draft, date_of_birth: v || null })}
           />
         </Field>
 
         <RolePicker
-          roles={draft.roles}
+          role={draft.roles[0] ?? ""}
           positionTitleIds={draft.positionTitleIds}
           positionTitles={positionTitles}
-          onToggleRole={toggleRole}
-          onToggleTitle={toggleTitle}
+          onRoleChange={setRole}
+          onAddTitle={addTitle}
+          onRemoveTitle={removeTitle}
+          roleError={errors.role}
         />
 
         {draft.roles.includes("teacher") && (
@@ -770,8 +1027,34 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
             teacherCode={draft.teacher_code}
             learningAreaId={draft.learning_area_id}
             onChange={(patch) => setDraft({ ...draft, ...patch })}
+            error={errors.learning_area_id}
           />
         )}
+
+        {role === "parent" && (
+          <LinkedStudentsField
+            selected={guardianStudents}
+            onAdd={addGuardianStudent}
+            onRemove={removeGuardianStudent}
+            error={errors.guardianStudents}
+          />
+        )}
+
+        <Field label="รหัสผ่าน (เว้นว่างได้)" error={errors.password} required={role === "super_admin"}>
+          <PasswordInput
+            value={draft.password}
+            onChange={(e) => setDraft({ ...draft, password: e.target.value })}
+          />
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {role === "super_admin"
+              ? "ผู้ดูแลระบบต้องตั้งรหัสผ่านเอง"
+              : autoPassword
+                ? <>ถ้าเว้นว่าง รหัสผ่านเริ่มต้นคือ <span className="font-mono">{autoPassword}</span></>
+                : role === "parent"
+                  ? "เลือกนักเรียนที่ดูแลก่อน เพื่อดูรหัสผ่านเริ่มต้น"
+                  : "กรอกวันเดือนปีเกิดก่อน เพื่อดูรหัสผ่านเริ่มต้น"}
+          </p>
+        </Field>
 
         {me && isOrgWide(me.roles) && (
           <Field label="แผนก">

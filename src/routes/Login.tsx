@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { lazy, Suspense, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, Field, Input, PasswordInput, Spinner } from "@/components/ui";
+import { Button, BuddhistDateSelect, Field, Input, PasswordInput, Spinner } from "@/components/ui";
 
 const Beams = lazy(() => import("@/components/Beams/Beams"));
 
@@ -112,10 +112,9 @@ export function Login() {
                     />
                   </Field>
                   <Field label="วันเดือนปีเกิด">
-                    <Input
-                      type="date"
+                    <BuddhistDateSelect
                       value={dateOfBirth}
-                      onChange={(e) => setDateOfBirth(e.target.value)}
+                      onChange={setDateOfBirth}
                       required
                       className={inputClass}
                     />

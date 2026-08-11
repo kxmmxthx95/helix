@@ -30,6 +30,10 @@ export type Profile = {
   is_active: boolean;
   teacher_code: string | null; // display/reference code — not the login id
   learning_area_id: string | null; // required iff role includes 'teacher', see migration 0017
+  /** Forces the onboarding gate until cleared — see migration 0022. Students only; always false for staff. */
+  must_change_password: boolean;
+  /** Object path in the avatars storage bucket — always the profile's own id, see migration 0024. */
+  avatar_path: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -69,7 +73,7 @@ export type ProfileRole = {
 /** A profile plus the role names it holds — enough for every permission check. */
 export type ProfileWithRoles = Profile & { roles: Role[] };
 
-export type BloodType = "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-";
+export type BloodType = "A+" | "A-" | "B+" | "B-" | "AB+" | "AB-" | "O+" | "O-" | "unknown";
 
 export type Student = {
   id: string;
@@ -153,6 +157,8 @@ export type StudentGuardianFinancial = {
 
 export type SubjectType = "basic" | "additional" | "activity"; // พื้นฐาน / เพิ่มเติม / กิจกรรม
 export type DevelopmentDomain = "physical" | "emotional" | "social" | "cognitive"; // ร่างกาย / อารมณ์-จิตใจ / สังคม / สติปัญญา
+/** ตัดเกรดปกติ vs ผ่าน/ไม่ผ่าน — settable per subject, defaults by subject_type. See migration 0023. */
+export type GradingMethod = "graded" | "pass_fail";
 
 export type LearningArea = {
   id: string;
@@ -171,6 +177,7 @@ export type Subject = {
   department_id: string; // subjects don't cross departments — each belongs to exactly one
   learning_area_id: string;
   subject_type: SubjectType;
+  grading_method: GradingMethod;
   credits: number;
   hours_per_week: number;
   // Advisory hint shown when adding this subject into a cohort's curriculum — not enforced.
@@ -460,6 +467,8 @@ export type Database = {
           | "is_active"
           | "teacher_code"
           | "learning_area_id"
+          | "must_change_password"
+          | "avatar_path"
         > &
           Partial<
             Pick<
@@ -474,6 +483,8 @@ export type Database = {
               | "is_active"
               | "teacher_code"
               | "learning_area_id"
+              | "must_change_password"
+              | "avatar_path"
             >
           >
       >;
@@ -510,7 +521,10 @@ export type Database = {
       learning_areas: Table<LearningArea, InsertOf<LearningArea, "parent_id">>;
       subjects: Table<
         Subject,
-        InsertOf<Subject, "name_en" | "is_active" | "suggested_grade_level_id" | "suggested_term">
+        InsertOf<
+          Subject,
+          "name_en" | "is_active" | "suggested_grade_level_id" | "suggested_term" | "grading_method"
+        >
       >;
       study_plans: Table<StudyPlan, InsertOf<StudyPlan, never>>;
       grade_levels: Table<GradeLevel, InsertOf<GradeLevel, "sort_order" | "is_entry_point">>;
@@ -588,6 +602,7 @@ export type Database = {
       app_role: Role;
       student_status: StudentStatus;
       subject_type: SubjectType;
+      grading_method: GradingMethod;
       development_domain: DevelopmentDomain;
       blood_type: BloodType;
       guardian_relationship: GuardianRelationship;

@@ -80,6 +80,7 @@ export function resolveUserRow(
       kind: "staff",
       loginId: row.phone!,
       password: row.password!,
+      mustChangePassword: false, // CSV always supplies a real password column
       prefix: row.prefix || null,
       first_name: row.first_name!,
       last_name: row.last_name!,

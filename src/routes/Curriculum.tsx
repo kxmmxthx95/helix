@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { CheckboxIcon, CheckboxOutlineIcon, HelpCircleIcon, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
+import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useFillPageSize } from "@/hooks/useFillPageSize";
@@ -753,6 +754,7 @@ function EditScoreSheet({
   subjectName?: string;
   onClose: () => void;
 }) {
+  const toast = useToast();
   const save = useSaveCurriculumSubject();
   const [collectPct, setCollectPct] = useState("");
 
@@ -777,7 +779,12 @@ function EditScoreSheet({
         score_collect_pct,
         score_exam_pct,
       },
-      { onSuccess: onClose },
+      {
+        onSuccess: () => {
+          toast("บันทึกสำเร็จ");
+          onClose();
+        },
+      },
     );
   }
 
@@ -1133,6 +1140,7 @@ function NewStudyPlanField({
   onCreated: (plan: StudyPlan) => void;
   onCancel: () => void;
 }) {
+  const toast = useToast();
   const save = useSaveStudyPlan();
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -1153,7 +1161,17 @@ function NewStudyPlanField({
             size="sm"
             className="flex-1"
             disabled={!code.trim() || !name.trim() || save.isPending}
-            onClick={() => save.mutate({ code: code.trim(), name: name.trim() }, { onSuccess: onCreated })}
+            onClick={() =>
+              save.mutate(
+                { code: code.trim(), name: name.trim() },
+                {
+                  onSuccess: (plan) => {
+                    toast("บันทึกแผนการเรียนสำเร็จ");
+                    onCreated(plan);
+                  },
+                },
+              )
+            }
           >
             {save.isPending ? <Spinner className="h-3 w-3" /> : "บันทึกแผน"}
           </Button>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
+import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
 import {
   useAcademicTerms,
@@ -44,6 +45,7 @@ const TERM_STATUS_LABEL: Record<TermStatus, string> = {
 };
 
 function SchoolSettingsCard() {
+  const toast = useToast();
   const { data: settings, isLoading } = useSchoolSettings();
   const update = useUpdateSchoolSettings();
   const upload = useUploadLogo();
@@ -103,7 +105,7 @@ function SchoolSettingsCard() {
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
-          update.mutate(form);
+          update.mutate(form, { onSuccess: () => toast("บันทึกสำเร็จ") });
         }}
       >
         <Field label="ชื่อโรงเรียน (ไทย)">
@@ -128,6 +130,7 @@ function SchoolSettingsCard() {
 }
 
 function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId: string; departmentName: string }) {
+  const toast = useToast();
   const { data: settings, isLoading } = useDepartmentSettings(departmentId);
   const update = useUpdateDepartmentSettings(departmentId);
   const [form, setForm] = useState<DepartmentSettingsEdit | null>(null);
@@ -156,7 +159,7 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
       className="space-y-3"
       onSubmit={(e) => {
         e.preventDefault();
-        update.mutate(form);
+        update.mutate(form, { onSuccess: () => toast("บันทึกสำเร็จ") });
       }}
     >
       {departmentName && <p className="text-sm text-muted-foreground">{departmentName}</p>}
@@ -353,6 +356,7 @@ function AcademicTermsCard({
 }
 
 function EditTermSheet({ term, onClose }: { term: AcademicTerm | null; onClose: () => void }) {
+  const toast = useToast();
   const save = useSaveAcademicTerm();
   const [dates, setDates] = useState<{ start_date: string | null; end_date: string | null } | null>(null);
   const current = dates ?? (term ? { start_date: term.start_date, end_date: term.end_date } : null);
@@ -370,7 +374,12 @@ function EditTermSheet({ term, onClose }: { term: AcademicTerm | null; onClose: 
         term_type: term.term_type,
         ...current,
       },
-      { onSuccess: onClose },
+      {
+        onSuccess: () => {
+          toast("บันทึกสำเร็จ");
+          onClose();
+        },
+      },
     );
   }
 
@@ -415,6 +424,7 @@ function CreateTermSheet({
   departmentId: string;
   onClose: () => void;
 }) {
+  const toast = useToast();
   const save = useSaveAcademicTerm();
   const [draft, setDraft] = useState<Omit<AcademicTermDraft, "department_id">>({
     academic_year: new Date().getFullYear() + 543,
@@ -425,7 +435,15 @@ function CreateTermSheet({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    save.mutate({ ...draft, department_id: departmentId }, { onSuccess: onClose });
+    save.mutate(
+      { ...draft, department_id: departmentId },
+      {
+        onSuccess: () => {
+          toast("เพิ่มภาคเรียนสำเร็จ");
+          onClose();
+        },
+      },
+    );
   }
 
   return (
@@ -601,6 +619,7 @@ function PeriodSheet({
   departmentId: string;
   onClose: () => void;
 }) {
+  const toast = useToast();
   const save = useSavePeriodDefinition();
   const del = useDeletePeriodDefinition();
 
@@ -637,7 +656,15 @@ function PeriodSheet({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!draft.label.trim()) return;
-    save.mutate({ id: period?.id, ...draft }, { onSuccess: onClose });
+    save.mutate(
+      { id: period?.id, ...draft },
+      {
+        onSuccess: () => {
+          toast("บันทึกสำเร็จ");
+          onClose();
+        },
+      },
+    );
   }
 
   return (

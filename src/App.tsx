@@ -2,9 +2,11 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { AppShell } from "@/components/AppShell";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ToastProvider } from "@/components/Toast";
 import { Spinner } from "@/components/ui";
 import { Dashboard } from "@/routes/Dashboard";
 import { Login } from "@/routes/Login";
+import { Onboarding } from "@/routes/Onboarding";
 import { Curriculum } from "@/routes/Curriculum";
 import { Enrollment } from "@/routes/Enrollment";
 import { Roster } from "@/routes/Roster";
@@ -19,9 +21,9 @@ import { Timetable } from "@/routes/Timetable";
 import { Users } from "@/routes/Users";
 
 function Gate() {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, onboardingStep, onboardingLoading } = useAuth();
 
-  if (loading || (session && !profile)) {
+  if (loading || (session && !profile) || (session && onboardingLoading)) {
     return (
       <div className="flex h-dvh items-center justify-center">
         <Spinner className="h-5 w-5 text-muted-foreground" />
@@ -30,6 +32,11 @@ function Gate() {
   }
 
   if (!session) return <Login />;
+
+  // Blocks the whole menu until the student's required data is filled in and
+  // their password changed — regardless of which path they're on. See
+  // migration 0022 / src/lib/onboarding.ts.
+  if (onboardingStep) return <Onboarding step={onboardingStep} />;
 
   return (
     <Routes>
@@ -56,11 +63,13 @@ function Gate() {
 export default function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <AuthProvider>
-          <Gate />
-        </AuthProvider>
-      </BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <Gate />
+          </AuthProvider>
+        </BrowserRouter>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

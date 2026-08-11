@@ -72,6 +72,7 @@ export type SubjectDraft = Pick<
   | "is_active"
   | "suggested_grade_level_id"
   | "suggested_term"
+  | "grading_method"
 > & {
   /** Empty string while the create form hasn't chosen a type yet. */
   subject_type: SubjectType | "";

@@ -84,6 +84,8 @@ export function resolveSubjectRow(
       department_id: departmentId,
       learning_area_id: areaId,
       subject_type: subjectType,
+      // Same default the manual form suggests — editable afterward via Subjects.
+      grading_method: subjectType === "activity" ? "pass_fail" : "graded",
       credits,
       hours_per_week: hoursPerWeek,
       is_active: true,

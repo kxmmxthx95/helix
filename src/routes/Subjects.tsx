@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSubjectsSheet } from "@/components/ImportSubjectsSheet";
 import { Sheet } from "@/components/Sheet";
+import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import {
   useDeleteSubject,
@@ -17,7 +18,7 @@ import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useFillPageSize } from "@/hooks/useFillPageSize";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
-import type { LearningArea, Subject, SubjectType } from "@/lib/database.types";
+import type { GradingMethod, LearningArea, Subject, SubjectType } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
 
 const EMPTY: Omit<SubjectFilters, "departmentId"> = {
@@ -37,6 +38,12 @@ const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
   basic: "bg-blue-600 text-blue-50 dark:bg-blue-500 dark:text-blue-50",
   additional: "bg-sky-600 text-sky-50 dark:bg-sky-500 dark:text-sky-50",
   activity: "bg-violet-600 text-violet-50 dark:bg-violet-500 dark:text-violet-50",
+};
+
+/** ตัดเกรดปกติ vs ผ่าน/ไม่ผ่าน — settable per subject, defaults by subject_type. See migration 0023. */
+const GRADING_METHOD_LABEL: Record<GradingMethod, string> = {
+  graded: "ตัดเกรด",
+  pass_fail: "ผ่าน/ไม่ผ่าน",
 };
 
 /** M1 → ม.1 · P2 → ป.2 · K3 → อ.3 */
@@ -439,6 +446,7 @@ function blankDraft(departmentId: string): SubjectDraft {
     department_id: departmentId,
     learning_area_id: "",
     subject_type: "",
+    grading_method: "graded",
     credits: 1,
     hours_per_week: 1,
     is_active: true,
@@ -455,6 +463,7 @@ function pickDraft(s: Subject): SubjectDraft {
     department_id: s.department_id,
     learning_area_id: s.learning_area_id,
     subject_type: s.subject_type,
+    grading_method: s.grading_method,
     credits: s.credits,
     hours_per_week: s.hours_per_week,
     is_active: s.is_active,
@@ -475,6 +484,7 @@ function EditSubjectSheet({
   departmentName: string;
 }) {
   const { profile: me } = useAuth();
+  const toast = useToast();
   const { data: learningAreas = [] } = useLearningAreas();
   const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
   const save = useSaveSubject();
@@ -506,7 +516,13 @@ function EditSubjectSheet({
     e.preventDefault();
     if (!current) return;
     if (!current.learning_area_id || !current.subject_type) return;
-    save.mutate({ ...current, ...(isNew ? {} : { id: (target as Subject).id }) });
+    save.mutate(
+      { ...current, ...(isNew ? {} : { id: (target as Subject).id }) },
+      {
+        onSuccess: () => toast("บันทึกวิชาสำเร็จ"),
+        onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
+      },
+    );
     close();
   }
 
@@ -618,13 +634,35 @@ function EditSubjectSheet({
           <Field label="ประเภทวิชา">
             <Select
               value={current.subject_type}
-              onChange={(e) => setDraft({ ...current, subject_type: e.target.value as SubjectType })}
+              onChange={(e) => {
+                const subject_type = e.target.value as SubjectType;
+                setDraft({
+                  ...current,
+                  subject_type,
+                  // Suggest pass/fail for activity subjects — still overridable below.
+                  grading_method: subject_type === "activity" ? "pass_fail" : "graded",
+                });
+              }}
               required
               placeholder="เลือกประเภทวิชา"
             >
               {(Object.keys(SUBJECT_TYPE_LABEL) as SubjectType[]).map((t) => (
                 <option key={t} value={t}>
                   {SUBJECT_TYPE_LABEL[t]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="วิธีประเมินผล">
+            <Select
+              value={current.grading_method}
+              onChange={(e) => setDraft({ ...current, grading_method: e.target.value as GradingMethod })}
+              required
+            >
+              {(Object.keys(GRADING_METHOD_LABEL) as GradingMethod[]).map((g) => (
+                <option key={g} value={g}>
+                  {GRADING_METHOD_LABEL[g]}
                 </option>
               ))}
             </Select>
@@ -706,6 +744,7 @@ function NewSubLearningAreaField({
   onCreated: (area: LearningArea) => void;
   onCancel: () => void;
 }) {
+  const toast = useToast();
   const save = useSaveLearningArea();
   const [name, setName] = useState("");
 
@@ -729,7 +768,12 @@ function NewSubLearningAreaField({
                 name: name.trim(),
                 parent_id: parentId,
               },
-              { onSuccess: onCreated },
+              {
+                onSuccess: (area) => {
+                  toast("บันทึกสาระย่อยสำเร็จ");
+                  onCreated(area);
+                },
+              },
             )
           }
         >

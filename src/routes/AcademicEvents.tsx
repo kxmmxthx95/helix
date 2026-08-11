@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronBack, ChevronForward, Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
+import { useToast } from "@/components/Toast";
 import { Button, Field, Input, Select, Spinner } from "@/components/ui";
 import {
   useAcademicEvents,
@@ -222,6 +223,7 @@ function EventSheet({
   onDelete?: () => void;
 }) {
   const { data: departments = [] } = useDepartments();
+  const toast = useToast();
   const save = useSaveAcademicEvent();
 
   const blank = (): AcademicEventDraft & { departmentIds: string[] } => ({
@@ -269,7 +271,15 @@ function EventSheet({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!draft.name.trim() || !draft.start_date || !draft.end_date) return;
-    save.mutate({ id: event?.id, ...draft }, { onSuccess: onClose });
+    save.mutate(
+      { id: event?.id, ...draft },
+      {
+        onSuccess: () => {
+          toast(mode === "create" ? "เพิ่ม Event สำเร็จ" : "บันทึกสำเร็จ");
+          onClose();
+        },
+      },
+    );
   }
 
   return (

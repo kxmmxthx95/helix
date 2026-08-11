@@ -3,10 +3,12 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, EmptyState, Field, Input, Pagination, PasswordInput, Select, Spinner } from "@/components/ui";
+import { useToast } from "@/components/Toast";
+import { Button, BuddhistDateSelect, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments, useInviteUsers, type UserInvite } from "@/hooks/useProfiles";
+import { passwordFromNationalId } from "@/lib/password";
 import {
   useDeleteStudentContact,
   useGuardianFinancials,
@@ -42,18 +44,28 @@ const STATUS_LABEL: Record<StudentStatus, string> = {
   dropped: "พ้นสภาพ",
 };
 
-const RELATIONSHIP_LABEL: Record<GuardianRelationship, string> = {
+export const RELATIONSHIP_LABEL: Record<GuardianRelationship, string> = {
   father: "บิดา",
   mother: "มารดา",
   other: "ผู้ปกครอง (อื่นๆ)",
 };
 
-const BLOOD_TYPES: BloodType[] = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+export const BLOOD_TYPE_LABEL: Record<BloodType, string> = {
+  "A+": "A+",
+  "A-": "A-",
+  "B+": "B+",
+  "B-": "B-",
+  "AB+": "AB+",
+  "AB-": "AB-",
+  "O+": "O+",
+  "O-": "O-",
+  unknown: "ไม่ทราบ",
+};
 
 // สถานภาพครอบครัว — free text column (0015), UI narrows it to a fixed
 // list to avoid typo'd variants of the same status; adjust the list
 // freely since nothing else depends on exact values.
-const FAMILY_STATUSES = [
+export const FAMILY_STATUSES = [
   "อยู่ด้วยกัน",
   "หย่าร้าง",
   "แยกกันอยู่",
@@ -63,10 +75,10 @@ const FAMILY_STATUSES = [
   "อื่นๆ",
 ];
 
-const textareaClass =
+export const textareaClass =
   "flex min-h-16 w-full rounded-lg border border-input bg-background px-2.5 py-2 text-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring disabled:opacity-50";
 
-const ADDRESS_KEYS: (keyof AddressFields)[] = [
+export const ADDRESS_KEYS: (keyof AddressFields)[] = [
   "house_no",
   "village_no",
   "alley",
@@ -77,18 +89,26 @@ const ADDRESS_KEYS: (keyof AddressFields)[] = [
   "postal_code",
 ];
 
-function pickAddress(v: AddressFields): AddressFields {
+export function pickAddress(v: AddressFields): AddressFields {
   return Object.fromEntries(ADDRESS_KEYS.map((k) => [k, v[k]])) as AddressFields;
 }
 
-/** Standard Thai postal address — บ้านเลขที่/หมู่ที่/ตรอกซอย/ถนน/ตำบล/อำเภอ/จังหวัด/รหัสไปรษณีย์. */
-function AddressInputs({
+/**
+ * Standard Thai postal address — บ้านเลขที่/หมู่ที่/ตรอกซอย/ถนน/ตำบล/อำเภอ/
+ * จังหวัด/รหัสไปรษณีย์. `required` marks which subfields are mandatory —
+ * หมู่ที่/ตรอกซอย/ถนน are legitimately blank for many addresses (grill
+ * decision, migration 0022's onboarding gate uses this to require only 5/8).
+ */
+export function AddressInputs({
   value,
   onChange,
+  required = [],
 }: {
   value: AddressFields;
   onChange: (patch: Partial<AddressFields>) => void;
+  required?: (keyof AddressFields)[];
 }) {
+  const isRequired = (k: keyof AddressFields) => required.includes(k);
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
@@ -96,21 +116,31 @@ function AddressInputs({
           <Input
             value={value.house_no ?? ""}
             onChange={(e) => onChange({ house_no: e.target.value || null })}
+            required={isRequired("house_no")}
           />
         </Field>
         <Field label="หมู่ที่">
           <Input
             value={value.village_no ?? ""}
             onChange={(e) => onChange({ village_no: e.target.value || null })}
+            required={isRequired("village_no")}
           />
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="ตรอก/ซอย">
-          <Input value={value.alley ?? ""} onChange={(e) => onChange({ alley: e.target.value || null })} />
+          <Input
+            value={value.alley ?? ""}
+            onChange={(e) => onChange({ alley: e.target.value || null })}
+            required={isRequired("alley")}
+          />
         </Field>
         <Field label="ถนน">
-          <Input value={value.road ?? ""} onChange={(e) => onChange({ road: e.target.value || null })} />
+          <Input
+            value={value.road ?? ""}
+            onChange={(e) => onChange({ road: e.target.value || null })}
+            required={isRequired("road")}
+          />
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -118,12 +148,14 @@ function AddressInputs({
           <Input
             value={value.subdistrict ?? ""}
             onChange={(e) => onChange({ subdistrict: e.target.value || null })}
+            required={isRequired("subdistrict")}
           />
         </Field>
         <Field label="อำเภอ/เขต">
           <Input
             value={value.district ?? ""}
             onChange={(e) => onChange({ district: e.target.value || null })}
+            required={isRequired("district")}
           />
         </Field>
       </div>
@@ -132,12 +164,14 @@ function AddressInputs({
           <Input
             value={value.province ?? ""}
             onChange={(e) => onChange({ province: e.target.value || null })}
+            required={isRequired("province")}
           />
         </Field>
         <Field label="รหัสไปรษณีย์">
           <Input
             value={value.postal_code ?? ""}
             onChange={(e) => onChange({ postal_code: e.target.value || null })}
+            required={isRequired("postal_code")}
           />
         </Field>
       </div>
@@ -424,6 +458,7 @@ function EditStudentSheet({
   onClose: () => void;
 }) {
   const { profile: me } = useAuth();
+  const toast = useToast();
   const { data: departments = [] } = useDepartments();
   const save = useSaveStudent();
   const [draft, setDraft] = useState<StudentDraft | null>(null);
@@ -455,12 +490,19 @@ function EditStudentSheet({
       !current.prefix ||
       !current.first_name.trim() ||
       !current.last_name.trim() ||
-      !current.department_id
+      !current.department_id ||
+      !current.grade_level_id
     ) {
       setSection("basic");
       return;
     }
-    save.mutate({ ...current, ...(isNew ? {} : { id: (target as Student).id }) });
+    save.mutate(
+      { ...current, ...(isNew ? {} : { id: (target as Student).id }) },
+      {
+        onSuccess: () => toast("บันทึกข้อมูลนักเรียนสำเร็จ"),
+        onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
+      },
+    );
     close();
   }
 
@@ -567,8 +609,9 @@ function EditStudentSheet({
                     <Select
                       value={current.grade_level_id ?? ""}
                       onChange={(e) => setDraft({ ...current, grade_level_id: e.target.value || null })}
+                      required
+                      placeholder="เลือกชั้น"
                     >
-                      <option value="">ยังไม่จัดชั้น</option>
                       {gradeLevels.map((g) => (
                         <option key={g.id} value={g.id}>
                           {g.name}
@@ -623,9 +666,9 @@ function EditStudentSheet({
                     }
                   >
                     <option value="">— ไม่ระบุ —</option>
-                    {BLOOD_TYPES.map((b) => (
+                    {(Object.keys(BLOOD_TYPE_LABEL) as BloodType[]).map((b) => (
                       <option key={b} value={b}>
-                        {b}
+                        {BLOOD_TYPE_LABEL[b]}
                       </option>
                     ))}
                   </Select>
@@ -868,6 +911,7 @@ function ContactForm({
   onDone: () => void;
 }) {
   const isNew = !("id" in target);
+  const toast = useToast();
   const save = useSaveStudentContact();
   const saveFinancial = useSaveGuardianFinancial();
 
@@ -925,7 +969,10 @@ function ContactForm({
           monthly_income: monthlyIncome.trim() ? Number(monthlyIncome) : null,
         });
       }
+      toast("บันทึกข้อมูลผู้ปกครองสำเร็จ");
       onDone();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error");
     } finally {
       setPending(false);
     }
@@ -1047,19 +1094,21 @@ function ContactForm({
 }
 
 type StudentLoginDraft = {
-  password: string;
   national_id: string;
   date_of_birth: string;
 };
 
 function blankStudentLoginDraft(s: Student): StudentLoginDraft {
-  return { password: "", national_id: s.national_id ?? "", date_of_birth: "" };
+  return { national_id: s.national_id ?? "", date_of_birth: "" };
 }
 
 /**
  * Creates a login for an existing roster row — student_code becomes the
  * login id, name/department come straight from the roster (fix those there,
  * not here). super_admin-only, same as every other account-creation path.
+ * Initial password is derived from national_id; the student is forced to
+ * set a real password (and fill the rest of their profile) on first login —
+ * see must_change_password / Onboarding.
  */
 function CreateStudentLoginSheet({
   student,
@@ -1069,6 +1118,7 @@ function CreateStudentLoginSheet({
   onClose: () => void;
 }) {
   const invite = useInviteUsers();
+  const toast = useToast();
   const [draft, setDraft] = useState<StudentLoginDraft | null>(null);
   const [failReason, setFailReason] = useState<string | null>(null);
 
@@ -1084,16 +1134,22 @@ function CreateStudentLoginSheet({
     e.preventDefault();
     if (!student || !current) return;
     setFailReason(null);
+    const nationalId = current.national_id.replace(/\D/g, "");
+    if (nationalId.length !== 13) {
+      setFailReason("เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก");
+      return;
+    }
 
     const payload: UserInvite = {
       kind: "student",
       loginId: student.student_code,
-      password: current.password,
+      password: passwordFromNationalId(nationalId),
+      mustChangePassword: true,
       prefix: student.prefix,
       first_name: student.first_name,
       last_name: student.last_name,
       email: null,
-      national_id: current.national_id || null,
+      national_id: nationalId,
       date_of_birth: current.date_of_birth || null,
       department_id: student.department_id,
       roles: [],
@@ -1105,6 +1161,7 @@ function CreateStudentLoginSheet({
 
     const outcome = await invite.mutateAsync([payload]);
     if (outcome.inserted > 0) {
+      toast("สร้างบัญชีเข้าใช้สำเร็จ");
       close();
     } else {
       setFailReason(outcome.skipped[0]?.reason ?? "สร้างบัญชีไม่สำเร็จ");
@@ -1137,31 +1194,36 @@ function CreateStudentLoginSheet({
             จะเป็นรหัสผู้ใช้เข้าระบบ
           </p>
 
-          <Field label="รหัสผ่าน">
-            <PasswordInput
-              value={current.password}
-              onChange={(e) => setDraft({ ...current, password: e.target.value })}
-              minLength={8}
-              required
-            />
-          </Field>
-
-          <Field label="เลขบัตรประชาชน (ใช้ยืนยันตอนลืมรหัสผ่าน)">
+          <Field label="เลขบัตรประชาชน (ใช้เป็นรหัสผ่านเริ่มต้น)">
             <Input
+              inputMode="numeric"
+              autoComplete="off"
               value={current.national_id}
-              onChange={(e) => setDraft({ ...current, national_id: e.target.value })}
+              onChange={(e) => setDraft({ ...current, national_id: e.target.value.replace(/\D/g, "").slice(0, 13) })}
+              pattern="[0-9]{13}"
+              minLength={13}
+              maxLength={13}
+              title="เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก"
               required
             />
           </Field>
 
-          <Field label="วันเดือนปีเกิด">
-            <Input
-              type="date"
+          <Field label="วันเดือนปีเกิด (ใช้ยืนยันตอนลืมรหัสผ่าน)">
+            <BuddhistDateSelect
+              key={student?.id}
               value={current.date_of_birth}
-              onChange={(e) => setDraft({ ...current, date_of_birth: e.target.value })}
+              onChange={(v) => setDraft({ ...current, date_of_birth: v })}
               required
             />
           </Field>
+
+          <p className="text-sm text-muted-foreground">
+            รหัสผ่านเริ่มต้น (จากเลขบัตรประชาชน):{" "}
+            <span className="font-mono">
+              {current.national_id.length === 13 ? passwordFromNationalId(current.national_id) : "— กรอกเลขบัตรประชาชนก่อน —"}
+            </span>{" "}
+            นักเรียนตั้งรหัสผ่านใหม่ของตัวเองตอน login ครั้งแรก
+          </p>
 
           {failReason && <p className="text-sm text-destructive">{failReason}</p>}
         </form>
