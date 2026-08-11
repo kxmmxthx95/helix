@@ -107,14 +107,14 @@ export function useDeletePlanUnit() {
   });
 }
 
-/** Marks the current unit taught — สอนตามแผน (true) or ไม่ตามแผน (false) today. */
+/** Marks the current unit taught — สอนตามแผน (true) or ไม่ตามแผน (false) today, with an optional บันทึกหลังการสอน note. */
 export function useMarkPlanUnitTaught() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, onPlan }: { id: string; onPlan: boolean }) => {
+    mutationFn: async ({ id, onPlan, note }: { id: string; onPlan: boolean; note?: string }) => {
       const { error } = await supabase
         .from("teaching_plan_units")
-        .update({ completed_at: new Date().toISOString(), completed_on_plan: onPlan })
+        .update({ completed_at: new Date().toISOString(), completed_on_plan: onPlan, note: note?.trim() || null })
         .eq("id", id);
       if (error) throw error;
     },

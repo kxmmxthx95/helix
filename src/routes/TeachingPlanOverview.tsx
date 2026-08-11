@@ -208,6 +208,7 @@ function PlanDetail({ label, units }: { label: { title: string; subtitle: string
                   หน่วยที่ {u.unit_no} · {u.title}
                 </span>
                 {u.description && <span className="text-xs text-muted-foreground">{u.description}</span>}
+                {u.note && <span className="block text-xs text-muted-foreground">บันทึก: {u.note}</span>}
               </span>
               <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs", s.className)}>{s.text}</span>
             </li>

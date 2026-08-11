@@ -374,6 +374,8 @@ export type TeachingPlanUnit = {
   description: string | null;
   completed_at: string | null;
   completed_on_plan: boolean | null;
+  /** บันทึกหลังการสอน — reflection note captured alongside completed_at. See migration 0021. */
+  note: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -536,7 +538,7 @@ export type Database = {
       teaching_assignments: Table<TeachingAssignment, InsertOf<TeachingAssignment, "term" | "group_id">>;
       teaching_plan_units: Table<
         TeachingPlanUnit,
-        InsertOf<TeachingPlanUnit, "description" | "completed_at" | "completed_on_plan">
+        InsertOf<TeachingPlanUnit, "description" | "completed_at" | "completed_on_plan" | "note">
       >;
       period_definitions: Table<PeriodDefinition, InsertOf<PeriodDefinition, never>>;
       schedule_entries: Table<ScheduleEntry, InsertOf<ScheduleEntry, never>>;

@@ -106,6 +106,7 @@ function PlanBoard({
   const mark = useMarkPlanUnitTaught();
   const del = useDeletePlanUnit();
   const reopen = useReopenPlanUnit();
+  const [note, setNote] = useState("");
 
   return (
     <Card className="space-y-3">
@@ -125,14 +126,24 @@ function PlanBoard({
           <p className="text-xs text-muted-foreground">แผนวันนี้ — หน่วยที่ {current.unit_no}</p>
           <p className="text-sm font-medium">{current.title}</p>
           {current.description && <p className="text-xs text-muted-foreground">{current.description}</p>}
+          <Input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="บันทึกหลังการสอน (ถ้ามี)"
+            className="mt-2"
+          />
           <div className="mt-2 flex gap-1.5">
-            <Button size="sm" onClick={() => mark.mutate({ id: current.id, onPlan: true })} disabled={mark.isPending}>
+            <Button
+              size="sm"
+              onClick={() => mark.mutate({ id: current.id, onPlan: true, note }, { onSuccess: () => setNote("") })}
+              disabled={mark.isPending}
+            >
               สอนตามแผน
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => mark.mutate({ id: current.id, onPlan: false })}
+              onClick={() => mark.mutate({ id: current.id, onPlan: false, note }, { onSuccess: () => setNote("") })}
               disabled={mark.isPending}
             >
               ไม่ตามแผน
@@ -217,6 +228,7 @@ function PlanUnitRow({
       <span className="min-w-0 flex-1">
         <span className="block truncate">หน่วยที่ {unit.unit_no} · {unit.title}</span>
         {unit.description && <span className="text-xs text-muted-foreground">{unit.description}</span>}
+        {unit.note && <span className="block text-xs text-muted-foreground">บันทึก: {unit.note}</span>}
       </span>
       <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs", status.className)}>{status.text}</span>
       <div className="flex shrink-0 items-center gap-1.5">
