@@ -1,4 +1,4 @@
-import { KeyIcon, Plus, Search, SlidersHorizontal, Upload, X } from "@/components/icons";
+import { AlertTriangle, KeyIcon, Plus, Search, SlidersHorizontal, Upload, X } from "@/components/icons";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
@@ -7,7 +7,7 @@ import { useToast } from "@/components/Toast";
 import { Button, BuddhistDateSelect, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
-import { useDepartments, useInviteUsers, type UserInvite } from "@/hooks/useProfiles";
+import { useDepartments, useInviteUsers, type InviteOutcome, type UserInvite } from "@/hooks/useProfiles";
 import { passwordFromNationalId } from "@/lib/password";
 import {
   useDeleteStudentContact,
@@ -179,6 +179,25 @@ export function AddressInputs({
   );
 }
 
+/**
+ * Splits a roster page's rows into who a bulk login-creation pass can act
+ * on. Excludes anyone with an account already (not this action's business)
+ * and anyone without a well-formed 13-digit national ID — student login
+ * passwords are derived from it (passwordFromNationalId), so there's no
+ * password to issue without one. Pure and exported so this — the only real
+ * decision in the bulk-create flow — has a test without a rendered sheet.
+ */
+export function splitLoginEligibility(students: Student[]): { ready: Student[]; skipped: Student[] } {
+  const ready: Student[] = [];
+  const skipped: Student[] = [];
+  for (const s of students) {
+    if (s.profile_id) continue;
+    if (s.national_id && /^\d{13}$/.test(s.national_id)) ready.push(s);
+    else skipped.push(s);
+  }
+  return { ready, skipped };
+}
+
 export function Roster() {
   const { profile: me } = useAuth();
   const [filters, setFilters] = useState<StudentFilters>(EMPTY);
@@ -186,6 +205,7 @@ export function Roster() {
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<Student | "new" | null>(null);
   const [creatingLoginFor, setCreatingLoginFor] = useState<Student | null>(null);
+  const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
 
   const { data: departments = [] } = useDepartments();
   const { data: rows, isLoading, error } = useStudents(filters);
@@ -230,6 +250,17 @@ export function Roster() {
             </span>
           )}
         </Button>
+        {mayManageUsers && (
+          <Button
+            variant="outline"
+            size="icon"
+            className="shrink-0"
+            onClick={() => setBulkCreateOpen(true)}
+            aria-label="สร้างบัญชีทุกคน"
+          >
+            <KeyIcon className="h-3 w-3" />
+          </Button>
+        )}
         {mayEdit && (
           <>
             <Button variant="outline" size="icon" className="shrink-0" onClick={() => setImportOpen(true)} aria-label="นำเข้า CSV">
@@ -410,6 +441,11 @@ export function Roster() {
       <EditStudentSheet target={editing} onClose={() => setEditing(null)} />
       <ImportSheet open={importOpen} onOpenChange={setImportOpen} />
       <CreateStudentLoginSheet student={creatingLoginFor} onClose={() => setCreatingLoginFor(null)} />
+      <BulkCreateLoginsSheet
+        open={bulkCreateOpen}
+        students={rows ?? []}
+        onClose={() => setBulkCreateOpen(false)}
+      />
     </div>
   );
 }
@@ -551,6 +587,20 @@ function EditStudentSheet({
                     value={current.student_code}
                     onChange={(e) => setDraft({ ...current, student_code: e.target.value })}
                     required
+                  />
+                </Field>
+
+                <Field label="เลขบัตรประจำตัวประชาชน">
+                  <Input
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={current.national_id ?? ""}
+                    onChange={(e) =>
+                      setDraft({ ...current, national_id: e.target.value.replace(/\D/g, "").slice(0, 13) || null })
+                    }
+                    pattern="[0-9]{13}"
+                    maxLength={13}
+                    title="เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก"
                   />
                 </Field>
 
@@ -1228,6 +1278,173 @@ function CreateStudentLoginSheet({
           {failReason && <p className="text-sm text-destructive">{failReason}</p>}
         </form>
       )}
+    </Sheet>
+  );
+}
+
+const BULK_LOGIN_CHUNK_SIZE = 50;
+
+function studentToInvite(s: Student): UserInvite {
+  return {
+    kind: "student",
+    loginId: s.student_code,
+    password: passwordFromNationalId(s.national_id!),
+    mustChangePassword: true,
+    prefix: s.prefix,
+    first_name: s.first_name,
+    last_name: s.last_name,
+    email: null,
+    national_id: s.national_id,
+    // No source for a student's date of birth anywhere in the roster (grill
+    // decision, 2026-08-11) — these accounts just can't use self-service
+    // "ลืมรหัสผ่าน" (needs national_id + date_of_birth both) until a
+    // super_admin fills it in later; reset stays a manual admin job for them.
+    date_of_birth: null,
+    department_id: s.department_id,
+    roles: [],
+    positionTitleIds: [],
+    studentRowId: s.id,
+    teacher_code: null,
+    learning_area_id: null,
+  };
+}
+
+/**
+ * Creates logins for every eligible student currently in view (grill
+ * decision: scoped to the roster's active filters, not the whole school).
+ * Sent in chunks — invite-user creates auth users one at a time server-side,
+ * so a filtered set of several hundred students in one request risks the
+ * edge function's own timeout.
+ */
+function BulkCreateLoginsSheet({
+  open,
+  students,
+  onClose,
+}: {
+  open: boolean;
+  students: Student[];
+  onClose: () => void;
+}) {
+  const invite = useInviteUsers();
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(0);
+  const [outcome, setOutcome] = useState<InviteOutcome | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  const { ready, skipped } = useMemo(() => splitLoginEligibility(students), [students]);
+
+  function reset() {
+    setRunning(false);
+    setDone(0);
+    setOutcome(null);
+    setFailed(false);
+  }
+
+  async function confirm() {
+    setRunning(true);
+    setFailed(false);
+    const result: InviteOutcome = { inserted: 0, skipped: [] };
+    try {
+      for (let i = 0; i < ready.length; i += BULK_LOGIN_CHUNK_SIZE) {
+        const batch = ready.slice(i, i + BULK_LOGIN_CHUNK_SIZE).map(studentToInvite);
+        const batchOutcome = await invite.mutateAsync(batch);
+        result.inserted += batchOutcome.inserted;
+        result.skipped.push(...batchOutcome.skipped);
+        setDone(Math.min(i + BULK_LOGIN_CHUNK_SIZE, ready.length));
+      }
+      setOutcome(result);
+    } catch {
+      setFailed(true);
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) {
+          reset();
+          onClose();
+        }
+      }}
+      title="สร้างบัญชีทุกคน"
+      description="ตามรายชื่อที่กรองอยู่ในหน้านี้"
+      footer={
+        outcome ? (
+          <Button className="w-full" onClick={onClose}>
+            เสร็จสิ้น
+          </Button>
+        ) : (
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={running}>
+              ยกเลิก
+            </Button>
+            <Button className="flex-1" onClick={confirm} disabled={ready.length === 0 || running}>
+              {running ? <Spinner /> : `สร้างบัญชี ${ready.length} คน`}
+            </Button>
+          </div>
+        )
+      }
+    >
+      <div className="space-y-4">
+        {!outcome && (
+          <>
+            {skipped.length > 0 && (
+              <Card className="space-y-1 border-warning/40">
+                <p className="flex items-center gap-2 text-sm font-medium text-warning">
+                  <AlertTriangle className="h-3 w-3" />
+                  ข้าม {skipped.length} คน (ไม่มีเลขบัตรประชาชน 13 หลัก)
+                </p>
+                <ul className="space-y-0.5 text-xs text-muted-foreground">
+                  {skipped.slice(0, 5).map((s) => (
+                    <li key={s.id}>
+                      {s.student_code} — {s.first_name} {s.last_name}
+                    </li>
+                  ))}
+                  {skipped.length > 5 && <li>และอีก {skipped.length - 5} คน</li>}
+                </ul>
+              </Card>
+            )}
+
+            {ready.length > 0 ? (
+              <p className="text-sm text-muted-foreground">
+                จะสร้างบัญชีให้ {ready.length} คน — รหัสผ่านเริ่มต้นคือเลขบัตรประชาชนของแต่ละคน
+                นักเรียนตั้งรหัสผ่านใหม่ของตัวเองตอน login ครั้งแรก
+              </p>
+            ) : (
+              <Card className="text-sm text-destructive">ไม่มีนักเรียนที่จะสร้างบัญชีได้ในรายการนี้</Card>
+            )}
+
+            {running && (
+              <p className="text-sm text-muted-foreground">
+                กำลังสร้างบัญชี... {done}/{ready.length}
+              </p>
+            )}
+
+            {failed && <p className="text-sm text-destructive">สร้างบัญชีไม่สำเร็จ ลองใหม่อีกครั้ง</p>}
+          </>
+        )}
+
+        {outcome && (
+          <Card className="space-y-1">
+            <p className="text-lg font-semibold text-success">สร้างบัญชีสำเร็จ {outcome.inserted} คน</p>
+            {outcome.skipped.length > 0 && (
+              <div className="space-y-0.5 text-sm text-muted-foreground">
+                <p>ข้าม {outcome.skipped.length} คน:</p>
+                <ul className="space-y-0.5 text-xs">
+                  {outcome.skipped.map((s, i) => (
+                    <li key={i}>
+                      {s.loginId}: {s.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Card>
+        )}
+      </div>
     </Sheet>
   );
 }
