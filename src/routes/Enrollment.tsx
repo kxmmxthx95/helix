@@ -5,12 +5,12 @@ import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Select, Spinner } from "@/components/ui";
 import {
-  useCohortStudyPlans,
   useCohorts,
   useCurrentEnrollments,
   useDeleteEnrollment,
   useEnrollStudents,
   useGradeLevels,
+  useStudyPlans,
   type EnrollmentDraft,
 } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
@@ -72,7 +72,7 @@ export function Enrollment() {
       <div className="flex flex-wrap items-center gap-2">
         {orgWide && departments.length > 0 && (
           <Select
-            className="w-auto min-w-[10rem] shrink-0"
+            className="min-w-0 flex-1"
             value={pickedDept}
             onChange={(e) => setPickedDept(e.target.value)}
             aria-label="แผนก"
@@ -87,7 +87,7 @@ export function Enrollment() {
         )}
 
         <Select
-          className="w-auto min-w-[10rem] shrink-0"
+          className="min-w-0 flex-1"
           value={pickedYear === null ? "" : String(pickedYear)}
           onChange={(e) => {
             setPickedYear(Number(e.target.value));
@@ -105,7 +105,7 @@ export function Enrollment() {
         </Select>
 
         <Select
-          className="w-auto min-w-[10rem] shrink-0"
+          className="min-w-0 flex-1"
           value={pickedCohort}
           onChange={(e) => setPickedCohort(e.target.value)}
           aria-label="หลักสูตร"
@@ -121,7 +121,7 @@ export function Enrollment() {
 
         {mayEdit && (
           <Button
-            className="ml-auto shrink-0"
+            className="shrink-0"
             disabled={!pickedCohort}
             onClick={() => setEnrollAllOpen(true)}
           >
@@ -180,7 +180,7 @@ function EnrollAllSheet({
   const enroll = useEnrollStudents();
   const { data: enrollments = [] } = useCurrentEnrollments(cohortId);
   const { data: students = [] } = useStudents({ search: "", departmentId, status: "" });
-  const { data: studyPlans = [] } = useCohortStudyPlans(cohortId);
+  const { data: studyPlans = [] } = useStudyPlans();
   const [studyPlanId, setStudyPlanId] = useState("");
 
   const pendingIds = useMemo(() => {
@@ -277,7 +277,7 @@ function CohortEnrollmentPanel({
 }) {
   const { data: enrollments = [] } = useCurrentEnrollments(cohortId);
   const { data: students = [] } = useStudents({ search: "", departmentId, status: "" });
-  const { data: studyPlans = [] } = useCohortStudyPlans(cohortId);
+  const { data: studyPlans = [] } = useStudyPlans();
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
   const { data: activeYear } = useActiveAcademicYear(departmentId);
   const enroll = useEnrollStudents();
@@ -341,7 +341,7 @@ function CohortEnrollmentPanel({
 
   return (
     <div className="space-y-4">
-      {mayEdit && studyPlans.length > 0 && (
+      {mayEdit && (
         <Field label="แผนการเรียน (ใช้ตอนลงทะเบียน)">
           <Select
             className="max-w-xs"
