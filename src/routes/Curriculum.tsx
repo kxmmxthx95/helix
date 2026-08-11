@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Plus, X } from "@/components/icons";
+import { CheckboxIcon, CheckboxOutlineIcon, HelpCircleIcon, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useDepartments } from "@/hooks/useProfiles";
+import { useFillPageSize } from "@/hooks/useFillPageSize";
 import { usePagination } from "@/hooks/usePagination";
-import { useSubjects } from "@/hooks/useCurriculum";
+import { useSubjects, useLearningAreas } from "@/hooks/useCurriculum";
 import {
   DOMAIN_LABEL,
   useCohorts,
@@ -20,6 +21,7 @@ import {
   useLearningUnits,
   useSaveCohort,
   useSaveCurriculumSubject,
+  useSaveCurriculumSubjects,
   useSaveKgAssessmentTopic,
   useSaveLearningUnit,
   useSaveStudyPlan,
@@ -30,7 +32,7 @@ import {
   type LearningUnitDraft,
 } from "@/hooks/useCurriculumStructure";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
-import type { CurriculumSubject, DevelopmentDomain, StudyPlan, Subject } from "@/lib/database.types";
+import type { CurriculumSubject, DevelopmentDomain, StudyPlan, Subject, SubjectType } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
@@ -108,8 +110,8 @@ export function Curriculum() {
   const showYearToolbar = !!departmentId;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="page-fill">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         {orgWide && departments.length > 0 && (
           <Select
             className="w-auto min-w-[10rem] shrink-0"
@@ -238,7 +240,7 @@ export function Curriculum() {
       </div>
 
       {((isKg && kgAcademicYear !== null) || pickedCohort) && gradeLevels.length > 0 && (
-        <div className="flex w-full gap-0 overflow-x-auto border-b border-border" role="tablist">
+        <div className="flex w-full shrink-0 gap-0 overflow-x-auto border-b border-border" role="tablist">
           {gradeLevels.map((g) => (
             <button
               key={g.id}
@@ -486,6 +488,18 @@ function CreateCohortForm({
 
 const TERM_LABEL: Record<number, string> = { 1: "ภาคเรียน 1", 2: "ภาคเรียน 2" };
 
+const SUBJECT_TYPE_LABEL: Record<SubjectType, string> = {
+  basic: "พื้นฐาน",
+  additional: "เพิ่มเติม",
+  activity: "กิจกรรม",
+};
+
+const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
+  basic: "bg-blue-600 text-blue-50 dark:bg-blue-500 dark:text-blue-50",
+  additional: "bg-sky-600 text-sky-50 dark:bg-sky-500 dark:text-sky-50",
+  activity: "bg-violet-600 text-violet-50 dark:bg-violet-500 dark:text-violet-50",
+};
+
 function SubjectPanel({
   gradeLevelId,
   cohortId,
@@ -514,22 +528,41 @@ function SubjectPanel({
     includeInactive: true,
   });
   const { data: studyPlans = [] } = useStudyPlans();
+  const { data: learningAreas = [] } = useLearningAreas();
   const del = useDeleteCurriculumSubject();
 
   const subjectById = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
+  const planById = useMemo(() => new Map(studyPlans.map((p) => [p.id, p.name])), [studyPlans]);
+  const areaById = useMemo(() => new Map(learningAreas.map((a) => [a.id, a])), [learningAreas]);
   const activeSubjects = useMemo(() => subjects.filter((s) => s.is_active), [subjects]);
 
-  const visible = (rows ?? []).filter((r) => !splitsByTerm || r.term === term);
-  // Core = shared by every track (study_plan_id null); Track = specific to one study plan.
-  const coreRows = visible.filter((r) => r.study_plan_id === null);
-  const trackGroups = studyPlans
-    .map((p) => ({ plan: p, rows: visible.filter((r) => r.study_plan_id === p.id) }))
-    .filter((g) => g.rows.length > 0);
+  function topAreaLabel(learningAreaId: string) {
+    const area = areaById.get(learningAreaId);
+    if (!area) return "—";
+    if (area.parent_id) return areaById.get(area.parent_id)?.name ?? "—";
+    return area.name;
+  }
+
+  const visible = useMemo(() => {
+    const list = (rows ?? []).filter((r) => !splitsByTerm || r.term === term);
+    return [...list].sort((a, b) => {
+      if ((a.study_plan_id === null) !== (b.study_plan_id === null)) {
+        return a.study_plan_id === null ? -1 : 1;
+      }
+      if (a.study_plan_id && b.study_plan_id) {
+        const cmp = (planById.get(a.study_plan_id) ?? "").localeCompare(planById.get(b.study_plan_id) ?? "", "th");
+        if (cmp) return cmp;
+      }
+      const ac = subjectById.get(a.subject_id)?.code ?? "";
+      const bc = subjectById.get(b.subject_id)?.code ?? "";
+      return ac.localeCompare(bc, "th", { numeric: true });
+    });
+  }, [rows, splitsByTerm, term, planById, subjectById]);
 
   return (
-    <div className="space-y-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       {(splitsByTerm || mayEdit) && (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex shrink-0 items-center justify-end gap-2">
           {splitsByTerm && (
             <Select
               className="w-auto min-w-[10rem]"
@@ -553,50 +586,37 @@ function SubjectPanel({
       )}
 
       {isLoading && (
-        <div className="flex justify-center py-8">
+        <div className="flex flex-1 items-center justify-center py-12">
           <Spinner className="h-5 w-5 text-muted-foreground" />
         </div>
       )}
 
       {!isLoading && visible.length === 0 && (
-        <EmptyState
-          title="ไม่พบข้อมูล"
-          description="ยังไม่มีวิชาในโครงสร้างนี้"
-          action={
-            mayEdit ? (
-              <Button variant="outline" size="icon" onClick={() => setAdding(true)} aria-label="เพิ่มวิชา">
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
-            ) : undefined
-          }
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState
+            title="ไม่พบข้อมูล"
+            description="ยังไม่มีวิชาในโครงสร้างนี้"
+            action={
+              mayEdit ? (
+                <Button variant="outline" size="icon" onClick={() => setAdding(true)} aria-label="เพิ่มวิชา">
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              ) : undefined
+            }
+          />
+        </div>
+      )}
+
+      {!isLoading && visible.length > 0 && (
+        <SubjectTable
+          rows={visible}
+          subjectById={subjectById}
+          planById={planById}
+          areaLabel={topAreaLabel}
+          mayEdit={mayEdit}
+          onDelete={(id) => del.mutate(id)}
         />
       )}
-
-      {coreRows.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm font-medium">วิชาแกนบังคับ (Core)</p>
-          <SubjectTable
-            rows={coreRows}
-            subjectById={subjectById}
-            planLabel="Core"
-            mayEdit={mayEdit}
-            onDelete={(id) => del.mutate(id)}
-          />
-        </div>
-      )}
-
-      {trackGroups.map(({ plan, rows }) => (
-        <div key={plan.id} className="space-y-2">
-          <p className="text-sm font-medium">{plan.name} (Track)</p>
-          <SubjectTable
-            rows={rows}
-            subjectById={subjectById}
-            planLabel={plan.name}
-            mayEdit={mayEdit}
-            onDelete={(id) => del.mutate(id)}
-          />
-        </div>
-      ))}
 
       <AddCurriculumSubjectSheet
         open={adding}
@@ -605,6 +625,7 @@ function SubjectPanel({
         cohortId={cohortId}
         term={splitsByTerm ? term : null}
         subjects={activeSubjects}
+        existing={visible}
         studyPlans={studyPlans}
         gradeLevels={gradeLevels}
         showStudyPlan
@@ -616,74 +637,198 @@ function SubjectPanel({
 function SubjectTable({
   rows,
   subjectById,
-  planLabel,
+  planById,
+  areaLabel,
   mayEdit,
   onDelete,
 }: {
   rows: CurriculumSubject[];
   subjectById: Map<string, Subject>;
-  planLabel: string;
+  planById: Map<string, string>;
+  areaLabel: (learningAreaId: string) => string;
   mayEdit: boolean;
   onDelete: (id: string) => void;
 }) {
-  const { page, setPage, pageCount, pageRows } = usePagination(rows, [rows.length]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const tableReady = rows.length > 0;
+  const pageSize = useFillPageSize(scrollRef, tableReady);
+  const { page, setPage, pageCount, pageRows } = usePagination(rows, [rows.length, pageSize], pageSize);
+  const [editingScore, setEditingScore] = useState<CurriculumSubject | null>(null);
+
   return (
-    <div className="space-y-2">
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full min-w-[28rem] text-xs">
-          <thead className="bg-muted text-left text-xs text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2 font-medium">รหัส</th>
-              <th className="px-3 py-2 font-medium">วิชา</th>
-              <th className="px-3 py-2 font-medium">แผน</th>
-              <th className="px-3 py-2 font-medium">สัดส่วนคะแนน</th>
-              {mayEdit && <th className="px-3 py-2" />}
-            </tr>
-          </thead>
-          <tbody>
-            {pageRows.map((row) => {
-              const subject = subjectById.get(row.subject_id);
-              return (
-              <tr key={row.id} className="h-[40px] border-t border-border">
-                <td className="px-3 py-0 tabular-nums text-muted-foreground">{subject?.code ?? "—"}</td>
-                <td className="px-3 py-0 font-medium">{subject?.name_th ?? "—"}</td>
-                <td className="px-3 py-0">
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-0.5 text-xs",
-                      row.study_plan_id === null
-                        ? "bg-foreground/10 text-foreground"
-                        : "bg-accent/10 text-accent",
-                    )}
-                  >
-                    {planLabel}
-                  </span>
-                </td>
-                <td className="px-3 py-0 text-muted-foreground">
-                  {row.score_collect_pct !== null
-                    ? `เก็บ ${row.score_collect_pct} : สอบ ${row.score_exam_pct}`
-                    : "ค่า default แผนก"}
-                </td>
-                {mayEdit && (
-                  <td className="px-3 py-0 text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="ลบ"
-                      onClick={() => onDelete(row.id)}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </td>
-                )}
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="table-panel">
+        <div ref={scrollRef} className="table-panel-scroll">
+          <table className="w-full min-w-[40rem] text-xs">
+            <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">รหัส</th>
+                <th className="px-3 py-2 font-medium">วิชา</th>
+                <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
+                <th className="px-3 py-2 font-medium">ประเภทวิชา</th>
+                <th className="px-3 py-2 font-medium">แผน</th>
+                <th className="px-3 py-2 font-medium">สัดส่วนคะแนน</th>
+                {mayEdit && <th className="px-3 py-2" />}
               </tr>
-              );
-            })}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {pageRows.map((row) => {
+                const subject = subjectById.get(row.subject_id);
+                const planLabel = row.study_plan_id ? (planById.get(row.study_plan_id) ?? "—") : "บังคับ";
+                return (
+                  <tr key={row.id} className="h-[40px] border-t border-border">
+                    <td className="px-3 py-0 tabular-nums text-muted-foreground">{subject?.code ?? "—"}</td>
+                    <td className="px-3 py-0 font-medium">{subject?.name_th ?? "—"}</td>
+                    <td className="px-3 py-0">{subject ? areaLabel(subject.learning_area_id) : "—"}</td>
+                    <td className="px-3 py-0">
+                      {subject ? (
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-medium leading-none ${SUBJECT_TYPE_BADGE[subject.subject_type]}`}
+                        >
+                          {SUBJECT_TYPE_LABEL[subject.subject_type]}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-3 py-0">
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-xs",
+                          row.study_plan_id === null
+                            ? "bg-foreground/10 text-foreground"
+                            : "bg-accent/10 text-accent",
+                        )}
+                      >
+                        {planLabel}
+                      </span>
+                    </td>
+                    <td
+                      className={cn(
+                        "px-3 py-0 text-muted-foreground",
+                        mayEdit && "cursor-pointer hover:text-foreground",
+                      )}
+                      onClick={() => mayEdit && setEditingScore(row)}
+                    >
+                      {row.score_collect_pct !== null
+                        ? `เก็บ ${row.score_collect_pct} : สอบ ${row.score_exam_pct}`
+                        : "ค่า default แผนก"}
+                    </td>
+                    {mayEdit && (
+                      <td className="px-3 py-0 text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="ลบ"
+                          onClick={() => onDelete(row.id)}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
       <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+
+      <EditScoreSheet
+        row={editingScore}
+        subjectName={editingScore ? subjectById.get(editingScore.subject_id)?.name_th : undefined}
+        onClose={() => setEditingScore(null)}
+      />
     </div>
+  );
+}
+
+function EditScoreSheet({
+  row,
+  subjectName,
+  onClose,
+}: {
+  row: CurriculumSubject | null;
+  subjectName?: string;
+  onClose: () => void;
+}) {
+  const save = useSaveCurriculumSubject();
+  const [collectPct, setCollectPct] = useState("");
+
+  useEffect(() => {
+    if (!row) return;
+    setCollectPct(row.score_collect_pct === null ? "" : String(row.score_collect_pct));
+  }, [row]);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!row) return;
+    const score_collect_pct = collectPct === "" ? null : Number(collectPct);
+    const score_exam_pct = collectPct === "" ? null : 100 - Number(collectPct);
+    save.mutate(
+      {
+        id: row.id,
+        subject_id: row.subject_id,
+        grade_level_id: row.grade_level_id,
+        study_plan_id: row.study_plan_id,
+        term: row.term,
+        cohort_id: row.cohort_id,
+        score_collect_pct,
+        score_exam_pct,
+      },
+      { onSuccess: onClose },
+    );
+  }
+
+  return (
+    <Sheet
+      open={row !== null}
+      onOpenChange={(o) => !o && onClose()}
+      title="แก้ไขสัดส่วนคะแนน"
+      description={subjectName}
+      footer={
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+            ยกเลิก
+          </Button>
+          <Button type="submit" form="edit-curriculum-score" className="flex-1" disabled={save.isPending}>
+            {save.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
+          </Button>
+        </div>
+      }
+    >
+      {row && (
+        <form id="edit-curriculum-score" onSubmit={submit} className="space-y-4">
+          <p className="text-xs text-muted-foreground">เว้นว่างเพื่อใช้ค่า default ของแผนก</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="เก็บ (%)">
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                placeholder="default แผนก"
+                value={collectPct}
+                onChange={(e) => setCollectPct(e.target.value)}
+              />
+            </Field>
+            <Field label="สอบ (%)">
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                placeholder="default แผนก"
+                value={collectPct === "" ? "" : String(100 - Number(collectPct))}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setCollectPct(raw === "" ? "" : String(100 - Number(raw)));
+                }}
+              />
+            </Field>
+          </div>
+        </form>
+      )}
+    </Sheet>
   );
 }
 
@@ -694,6 +839,7 @@ function AddCurriculumSubjectSheet({
   cohortId,
   term,
   subjects,
+  existing,
   studyPlans,
   gradeLevels,
   showStudyPlan,
@@ -710,30 +856,59 @@ function AddCurriculumSubjectSheet({
     suggested_grade_level_id: string | null;
     suggested_term: number | null;
   }[];
+  existing: CurriculumSubject[];
   studyPlans: { id: string; code: string; name: string }[];
   gradeLevels: { id: string; name: string }[];
   showStudyPlan: boolean;
 }) {
-  const save = useSaveCurriculumSubject();
-  const [subjectId, setSubjectId] = useState("");
+  const save = useSaveCurriculumSubjects();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [subjectSearch, setSubjectSearch] = useState("");
   const [studyPlanId, setStudyPlanId] = useState("");
   const [collectPct, setCollectPct] = useState("");
   const [addingPlan, setAddingPlan] = useState(false);
 
   const gradeLevelName = useMemo(() => new Map(gradeLevels.map((g) => [g.id, g.name])), [gradeLevels]);
-  const selectedSubject = subjects.find((s) => s.id === subjectId);
 
-  const filteredSubjects = useMemo(() => {
-    const term = subjectSearch.trim().toLowerCase();
-    if (!term) return subjects;
-    return subjects.filter(
-      (s) => s.code.toLowerCase().includes(term) || s.name_th.toLowerCase().includes(term),
+  const alreadyAdded = useMemo(() => {
+    const plan = studyPlanId || null;
+    return new Set(
+      existing
+        .filter((r) => r.study_plan_id === plan && r.term === term)
+        .map((r) => r.subject_id),
     );
-  }, [subjects, subjectSearch]);
+  }, [existing, studyPlanId, term]);
+
+  const available = useMemo(() => {
+    const list = subjects.filter((s) => !alreadyAdded.has(s.id));
+    list.sort((a, b) => {
+      const aMatch = a.suggested_grade_level_id === gradeLevelId ? 0 : 1;
+      const bMatch = b.suggested_grade_level_id === gradeLevelId ? 0 : 1;
+      if (aMatch !== bMatch) return aMatch - bMatch;
+      return a.code.localeCompare(b.code, "th", { numeric: true });
+    });
+    return list;
+  }, [subjects, alreadyAdded, gradeLevelId]);
+
+  const visible = useMemo(() => {
+    const q = subjectSearch.trim().toLowerCase();
+    if (!q) return available;
+    return available.filter(
+      (s) => s.code.toLowerCase().includes(q) || s.name_th.toLowerCase().includes(q),
+    );
+  }, [available, subjectSearch]);
+
+  // Drop selections that disappeared when plan/term filter hid them.
+  useEffect(() => {
+    setSelected((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set([...prev].filter((id) => !alreadyAdded.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [alreadyAdded]);
 
   function close() {
-    setSubjectId("");
+    setSelected(new Set());
     setSubjectSearch("");
     setStudyPlanId("");
     setCollectPct("");
@@ -741,21 +916,50 @@ function AddCurriculumSubjectSheet({
     onClose();
   }
 
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectVisible() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const s of visible) next.add(s.id);
+      return next;
+    });
+  }
+
+  function clearVisible() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const s of visible) next.delete(s.id);
+      return next;
+    });
+  }
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!subjectId) return;
-    const draft: CurriculumSubjectDraft = {
-      subject_id: subjectId,
+    if (selected.size === 0) return;
+    const score_collect_pct = collectPct === "" ? null : Number(collectPct);
+    const score_exam_pct = collectPct === "" ? null : 100 - Number(collectPct);
+    const drafts: CurriculumSubjectDraft[] = [...selected].map((subject_id) => ({
+      subject_id,
       grade_level_id: gradeLevelId,
       study_plan_id: studyPlanId || null,
       term,
       cohort_id: cohortId,
-      score_collect_pct: collectPct === "" ? null : Number(collectPct),
-      score_exam_pct: collectPct === "" ? null : 100 - Number(collectPct),
-    };
-    save.mutate(draft);
-    close();
+      score_collect_pct,
+      score_exam_pct,
+    }));
+    save.mutate(drafts, { onSuccess: close });
   }
+
+  const count = selected.size;
+  const allVisibleSelected = visible.length > 0 && visible.every((s) => selected.has(s.id));
 
   return (
     <Sheet
@@ -767,41 +971,18 @@ function AddCurriculumSubjectSheet({
           <Button type="button" variant="outline" className="flex-1" onClick={close}>
             ยกเลิก
           </Button>
-          <Button type="submit" form="add-curriculum-subject" className="flex-1" disabled={save.isPending}>
-            {save.isPending ? <Spinner className="h-3 w-3" /> : "เพิ่ม"}
+          <Button
+            type="submit"
+            form="add-curriculum-subject"
+            className="flex-1"
+            disabled={count === 0 || save.isPending}
+          >
+            {save.isPending ? <Spinner className="h-3 w-3" /> : `เพิ่ม (${count})`}
           </Button>
         </div>
       }
     >
       <form id="add-curriculum-subject" onSubmit={submit} className="space-y-4">
-        <Field label="รายวิชา">
-          <div className="space-y-1.5">
-            <Input
-              type="search"
-              value={subjectSearch}
-              onChange={(e) => setSubjectSearch(e.target.value)}
-              placeholder="ค้นหารหัสหรือชื่อวิชา..."
-            />
-            <Select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} required>
-              <option value="">เลือกวิชา ({filteredSubjects.length})</option>
-              {filteredSubjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.code} · {s.name_th}
-                </option>
-              ))}
-            </Select>
-            {selectedSubject && (selectedSubject.suggested_grade_level_id || selectedSubject.suggested_term) && (
-              <p className="text-xs text-muted-foreground">
-                แนะนำ:{" "}
-                {selectedSubject.suggested_grade_level_id
-                  ? gradeLevelName.get(selectedSubject.suggested_grade_level_id) ?? "—"
-                  : "ไม่ระบุระดับชั้น"}
-                {selectedSubject.suggested_term ? ` เทอม ${selectedSubject.suggested_term}` : ""}
-              </p>
-            )}
-          </div>
-        </Field>
-
         {showStudyPlan && !addingPlan && (
           <Field label="แผนการเรียน">
             <div className="flex gap-2">
@@ -810,7 +991,7 @@ function AddCurriculumSubjectSheet({
                 onChange={(e) => setStudyPlanId(e.target.value)}
                 className="flex-1"
               >
-                <option value="">วิชาแกนบังคับ (Core — ทุกแผน)</option>
+                <option value="">วิชาแกนบังคับ</option>
                 {studyPlans.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -834,9 +1015,85 @@ function AddCurriculumSubjectSheet({
           />
         )}
 
+        <Field label="รายวิชา">
+          <div className="space-y-1.5">
+            <Input
+              type="search"
+              value={subjectSearch}
+              onChange={(e) => setSubjectSearch(e.target.value)}
+              placeholder="ค้นหารหัสหรือชื่อวิชา..."
+            />
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                แสดง {visible.length} จาก {available.length} วิชาที่ยังไม่ถูกเพิ่ม
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={visible.length === 0}
+                onClick={() => (allVisibleSelected ? clearVisible() : selectVisible())}
+                aria-label={allVisibleSelected ? "ล้างที่เลือก" : "เลือกทั้งหมด"}
+                title={allVisibleSelected ? "ล้างที่เลือก" : "เลือกทั้งหมด"}
+              >
+                {allVisibleSelected ? (
+                  <CheckboxIcon className="h-3.5 w-3.5" />
+                ) : (
+                  <CheckboxOutlineIcon className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </div>
+            <div className="max-h-64 space-y-0.5 overflow-y-auto rounded-lg border border-border p-1">
+              {visible.length === 0 ? (
+                <p className="px-2 py-3 text-xs text-muted-foreground">ไม่พบวิชาตามเงื่อนไข</p>
+              ) : (
+                visible.map((s) => {
+                  const suggested =
+                    s.suggested_grade_level_id === gradeLevelId
+                      ? null
+                      : s.suggested_grade_level_id
+                        ? gradeLevelName.get(s.suggested_grade_level_id)
+                        : null;
+                  return (
+                    <label
+                      key={s.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.has(s.id)}
+                        onChange={() => toggle(s.id)}
+                      />
+                      <span className="min-w-0 flex-1 truncate">
+                        <span className="tabular-nums text-muted-foreground">{s.code}</span>
+                        {" · "}
+                        {s.name_th}
+                      </span>
+                      {suggested && (
+                        <span className="shrink-0 text-[10px] text-muted-foreground">{suggested}</span>
+                      )}
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </Field>
+
         <div className="space-y-2">
-          <p className="text-sm font-medium">สัดส่วนคะแนนเก็บ : สอบ</p>
-          <p className="text-xs text-muted-foreground">เว้นว่างทั้งคู่เพื่อใช้ค่า default ของแผนก</p>
+          <div className="flex items-center gap-1">
+            <p className="text-xs font-medium">สัดส่วนคะแนนเก็บ : สอบ</p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground"
+              aria-label="คู่มือ"
+              title="ใช้กับทุกวิชาที่เลือก — เว้นว่างเพื่อใช้ค่า default ของแผนก"
+            >
+              <HelpCircleIcon className="h-3.5 w-3.5" />
+            </Button>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="เก็บ (%)">
               <Input

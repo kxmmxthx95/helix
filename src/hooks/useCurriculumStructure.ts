@@ -170,6 +170,19 @@ export function useSaveCurriculumSubject() {
   });
 }
 
+/** Batch insert — shared plan/score settings across many subjects in one submit. */
+export function useSaveCurriculumSubjects() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (drafts: CurriculumSubjectDraft[]) => {
+      if (drafts.length === 0) return;
+      const { error } = await supabase.from("curriculum_subjects").insert(drafts);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["curriculum_subjects"] }),
+  });
+}
+
 export function useDeleteCurriculumSubject() {
   const qc = useQueryClient();
   return useMutation({
