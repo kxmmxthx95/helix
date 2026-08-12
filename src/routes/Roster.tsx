@@ -1,4 +1,4 @@
-import { AlertTriangle, KeyIcon, Plus, Search, SlidersHorizontal, Upload, X } from "@/components/icons";
+import { AlertTriangle, CheckmarkCircleIcon, KeyIcon, Plus, Search, SlidersHorizontal, Upload, X } from "@/components/icons";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
@@ -314,41 +314,47 @@ export function Roster() {
                     }
                   >
                     <td className="px-3 py-0 text-xs">{row.student_code}</td>
-                    <td className="px-3 py-0 text-muted-foreground">{row.prefix ?? "—"}</td>
+                    <td className="px-3 py-0">{row.prefix ?? "—"}</td>
                     <td className="px-3 py-0 font-medium">
                       {row.first_name} {row.last_name}
                     </td>
-                    <td className="px-3 py-0 text-muted-foreground">
+                    <td className="px-3 py-0">
                       {deptName.get(row.department_id) ?? "—"}
                     </td>
-                    <td className="px-3 py-0 text-muted-foreground">
+                    <td className="px-3 py-0">
                       {row.grade_level_id ? gradeLevelName.get(row.grade_level_id) ?? "—" : "—"}
                     </td>
                     <td className="px-3 py-0">
-                      <span
-                        className={
-                          row.status === "studying"
-                            ? "rounded-full bg-success/15 px-2 py-0.5 text-[10px] text-success"
-                            : "rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
-                        }
-                      >
-                        {STATUS_LABEL[row.status]}
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className={
+                            row.status === "studying"
+                              ? "size-2 rounded-full bg-success"
+                              : "size-2 rounded-full bg-muted-foreground"
+                          }
+                        />
+                        <span className="text-xs">
+                          {STATUS_LABEL[row.status]}
+                        </span>
                       </span>
                     </td>
                     {mayManageUsers && (
                       <td className="px-3 py-0">
                         {row.profile_id ? (
-                          <span className="text-xs text-muted-foreground">มีบัญชีแล้ว</span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] text-blue-500">
+                            <CheckmarkCircleIcon className="size-3" />
+                            มีบัญชีแล้ว
+                          </span>
                         ) : (
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="xs"
                             onClick={(e) => {
                               e.stopPropagation();
                               setCreatingLoginFor(row);
                             }}
                           >
-                            <KeyIcon className="h-3.5 w-3.5" />
+                            <KeyIcon className="h-3 w-3" />
                             สร้างบัญชี
                           </Button>
                         )}

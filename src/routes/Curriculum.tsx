@@ -505,10 +505,10 @@ const SUBJECT_TYPE_ORDER: Record<SubjectType, number> = {
   activity: 2,
 };
 
-const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
-  basic: "bg-blue-600 text-blue-50 dark:bg-blue-500 dark:text-blue-50",
-  additional: "bg-sky-600 text-sky-50 dark:bg-sky-500 dark:text-sky-50",
-  activity: "bg-violet-600 text-violet-50 dark:bg-violet-500 dark:text-violet-50",
+const SUBJECT_TYPE_DOT: Record<SubjectType, string> = {
+  basic: "bg-blue-500",
+  additional: "bg-pink-500",
+  activity: "bg-violet-500",
 };
 
 function SubjectPanel({
@@ -535,6 +535,8 @@ function SubjectPanel({
     search: "",
     departmentId,
     learningAreaId: "",
+    gradeLevelId: "",
+    term: "",
     subjectType: "",
     includeInactive: true,
   });
@@ -543,7 +545,6 @@ function SubjectPanel({
   const del = useDeleteCurriculumSubject();
 
   const subjectById = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
-  const planById = useMemo(() => new Map(studyPlans.map((p) => [p.id, p.name])), [studyPlans]);
   const areaById = useMemo(() => new Map(learningAreas.map((a) => [a.id, a])), [learningAreas]);
   const activeSubjects = useMemo(() => subjects.filter((s) => s.is_active), [subjects]);
 
@@ -618,7 +619,7 @@ function SubjectPanel({
         <SubjectTable
           rows={visible}
           subjectById={subjectById}
-          planById={planById}
+          studyPlans={studyPlans}
           areaLabel={topAreaLabel}
           mayEdit={mayEdit}
           onDelete={(id) => del.mutate(id)}
@@ -644,18 +645,20 @@ function SubjectPanel({
 function SubjectTable({
   rows,
   subjectById,
-  planById,
+  studyPlans,
   areaLabel,
   mayEdit,
   onDelete,
 }: {
   rows: CurriculumSubject[];
   subjectById: Map<string, Subject>;
-  planById: Map<string, string>;
+  studyPlans: StudyPlan[];
   areaLabel: (learningAreaId: string) => string;
   mayEdit: boolean;
   onDelete: (id: string) => void;
 }) {
+  const toast = useToast();
+  const save = useSaveCurriculumSubject();
   const scrollRef = useRef<HTMLDivElement>(null);
   const tableReady = rows.length > 0;
   const pageSize = useFillPageSize(scrollRef, tableReady);
@@ -673,7 +676,7 @@ function SubjectTable({
                 <th className="px-3 py-2 font-medium">วิชา</th>
                 <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
                 <th className="px-3 py-2 font-medium">ประเภทวิชา</th>
-                <th className="px-3 py-2 font-medium">แผน</th>
+                <th className="px-3 py-2 font-medium">แผนการเรียน</th>
                 <th className="px-3 py-2 font-medium">สัดส่วนคะแนน</th>
                 {mayEdit && <th className="px-3 py-2" />}
               </tr>
@@ -681,7 +684,26 @@ function SubjectTable({
             <tbody>
               {pageRows.map((row) => {
                 const subject = subjectById.get(row.subject_id);
-                const planLabel = row.study_plan_id ? (planById.get(row.study_plan_id) ?? "—") : "ทั่วไป";
+                const planLabel = row.study_plan_id
+                  ? (studyPlans.find((p) => p.id === row.study_plan_id)?.name ?? "—")
+                  : "ทั่วไป";
+
+                function onPlanChange(studyPlanId: string) {
+                  save.mutate(
+                    {
+                      id: row.id,
+                      subject_id: row.subject_id,
+                      grade_level_id: row.grade_level_id,
+                      study_plan_id: studyPlanId || null,
+                      term: row.term,
+                      cohort_id: row.cohort_id,
+                      score_collect_pct: row.score_collect_pct,
+                      score_exam_pct: row.score_exam_pct,
+                    },
+                    { onError: () => toast("บันทึกแผนการเรียนไม่สำเร็จ") },
+                  );
+                }
+
                 return (
                   <tr key={row.id} className="h-[40px] border-t border-border">
                     <td className="px-3 py-0 tabular-nums text-muted-foreground">{subject?.code ?? "—"}</td>
@@ -689,26 +711,41 @@ function SubjectTable({
                     <td className="px-3 py-0">{subject ? areaLabel(subject.learning_area_id) : "—"}</td>
                     <td className="px-3 py-0">
                       {subject ? (
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-medium leading-none ${SUBJECT_TYPE_BADGE[subject.subject_type]}`}
-                        >
-                          {SUBJECT_TYPE_LABEL[subject.subject_type]}
+                        <span className="flex items-center gap-1.5">
+                          <span className={`size-2 rounded-full ${SUBJECT_TYPE_DOT[subject.subject_type]}`} />
+                          <span className="text-xs">{SUBJECT_TYPE_LABEL[subject.subject_type]}</span>
                         </span>
                       ) : (
                         "—"
                       )}
                     </td>
                     <td className="px-3 py-0">
-                      <span
-                        className={cn(
-                          "rounded-full px-2 py-0.5 text-xs",
-                          row.study_plan_id === null
-                            ? "bg-foreground/10 text-foreground"
-                            : "bg-accent/10 text-accent",
-                        )}
-                      >
-                        {planLabel}
-                      </span>
+                      {mayEdit ? (
+                        <Select
+                          value={row.study_plan_id ?? ""}
+                          onChange={(e) => onPlanChange(e.target.value)}
+                          className="h-7 w-auto min-w-[6rem]"
+                          aria-label="แผนการเรียน"
+                        >
+                          <option value="">ทั่วไป</option>
+                          {studyPlans.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </Select>
+                      ) : (
+                        <span
+                          className={cn(
+                            "rounded-full px-2 py-0.5 text-xs",
+                            row.study_plan_id === null
+                              ? "bg-foreground/10 text-foreground"
+                              : "bg-accent/10 text-accent",
+                          )}
+                        >
+                          {planLabel}
+                        </span>
+                      )}
                     </td>
                     <td
                       className={cn(

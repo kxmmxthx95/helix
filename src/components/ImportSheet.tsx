@@ -186,7 +186,12 @@ export function ImportSheet({
           <Button className="w-full" onClick={() => onOpenChange(false)}>
             เสร็จสิ้น
           </Button>
-        ) : undefined
+        ) : (
+          <Button size="lg" className="w-full" onClick={() => fileInput.current?.click()}>
+            <FileUp className="h-3 w-3" />
+            เลือกไฟล์ CSV
+          </Button>
+        )
       }
     >
       <div className="space-y-4">
@@ -210,10 +215,6 @@ export function ImportSheet({
               onChange={onFile}
               className="hidden"
             />
-            <Button size="lg" className="w-full" onClick={() => fileInput.current?.click()}>
-              <FileUp className="h-3 w-3" />
-              เลือกไฟล์ CSV
-            </Button>
           </>
         )}
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { X } from "@/components/icons";
+import { ChevronBack, ChevronForward, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Pagination, Select, Spinner } from "@/components/ui";
@@ -21,6 +21,19 @@ import { useStudents } from "@/hooks/useStudents";
 import type { StudentCohortEnrollment } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { gradeShortLabel } from "@/lib/gradeLevels";
+
+function cohortExpectedGradeLevelId(
+  gradeLevels: { id: string; sort_order: number }[],
+  entryGradeLevelId: string,
+  entryYear: number,
+  activeYear: number | undefined,
+): string | null {
+  if (!entryGradeLevelId || activeYear === undefined) return null;
+  const entryLevel = gradeLevels.find((g) => g.id === entryGradeLevelId);
+  if (!entryLevel) return null;
+  const elapsed = Math.max(0, activeYear - entryYear);
+  return gradeLevels.find((g) => g.sort_order === entryLevel.sort_order + elapsed)?.id ?? entryGradeLevelId;
+}
 
 export function Enrollment() {
   const { profile: me } = useAuth();
@@ -160,6 +173,8 @@ export function Enrollment() {
           open={enrollAllOpen}
           onClose={() => setEnrollAllOpen(false)}
           cohortId={pickedCohort}
+          entryGradeLevelId={cohorts.find((c) => c.id === pickedCohort)?.entry_grade_level_id ?? ""}
+          entryYear={cohorts.find((c) => c.id === pickedCohort)?.entry_year ?? 0}
           departmentId={departmentId}
         />
       )}
@@ -171,11 +186,15 @@ function EnrollAllSheet({
   open,
   onClose,
   cohortId,
+  entryGradeLevelId,
+  entryYear,
   departmentId,
 }: {
   open: boolean;
   onClose: () => void;
   cohortId: string;
+  entryGradeLevelId: string;
+  entryYear: number;
   departmentId: string;
 }) {
   const toast = useToast();
@@ -183,20 +202,33 @@ function EnrollAllSheet({
   const { data: enrollments = [] } = useCurrentEnrollments(cohortId);
   const { data: students = [] } = useStudents({ search: "", departmentId, status: "" });
   const { data: studyPlans = [] } = useStudyPlans();
+  const { data: gradeLevels = [] } = useGradeLevels(departmentId);
+  const { data: activeYear } = useActiveAcademicYear(departmentId);
   const [studyPlanId, setStudyPlanId] = useState("");
   const [planOverride, setPlanOverride] = useState<Record<string, string>>({});
+  const [wide, setWide] = useState(false);
+
+  const expectedGradeLevelId = useMemo(
+    () => cohortExpectedGradeLevelId(gradeLevels, entryGradeLevelId, entryYear, activeYear),
+    [gradeLevels, entryGradeLevelId, entryYear, activeYear],
+  );
 
   const pendingStudents = useMemo(() => {
     const enrolled = new Set(enrollments.map((e) => e.student_id));
     return students
-      .filter((s) => !enrolled.has(s.id))
+      .filter(
+        (s) =>
+          !enrolled.has(s.id) &&
+          (!expectedGradeLevelId || s.grade_level_id === expectedGradeLevelId),
+      )
       .sort((a, b) => a.student_code.localeCompare(b.student_code, "th"));
-  }, [students, enrollments]);
+  }, [students, enrollments, expectedGradeLevelId]);
   const pendingIds = useMemo(() => pendingStudents.map((s) => s.id), [pendingStudents]);
 
   function close() {
     setStudyPlanId("");
     setPlanOverride({});
+    setWide(false);
     onClose();
   }
 
@@ -222,11 +254,24 @@ function EnrollAllSheet({
       open={open}
       onOpenChange={(o) => !o && close()}
       title="ลงทะเบียนทั้งหมด"
+      wide={wide}
+      headerEnd={
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label={wide ? "ย่อ Drawer" : "ขยาย Drawer"}
+          onClick={() => setWide((w) => !w)}
+        >
+          {wide ? <ChevronForward className="h-3 w-3" /> : <ChevronBack className="h-3 w-3" />}
+        </Button>
+      }
       description={
         pendingIds.length > 0
           ? `จะลงทะเบียนนักเรียนที่ยังไม่อยู่ในรุ่น ${pendingIds.length} คน`
           : "นักเรียนในแผนกนี้อยู่ในรุ่นครบแล้ว"
       }
+      bodyClassName="flex min-h-0 flex-col overflow-hidden"
       footer={
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={close}>
@@ -243,7 +288,7 @@ function EnrollAllSheet({
         </div>
       }
     >
-      <form id="enroll-all" onSubmit={submit} className="space-y-4">
+      <form id="enroll-all" onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-4">
         <Field label="แผนการเรียน (ค่าเริ่มต้นสำหรับทุกคน)">
           <Select value={studyPlanId} onChange={(e) => setStudyPlanId(e.target.value)}>
             <option value="">ทั่วไป</option>
@@ -256,38 +301,54 @@ function EnrollAllSheet({
         </Field>
 
         {studyPlans.length > 0 && pendingStudents.length > 0 && (
-          <Field label="แก้ไขเฉพาะราย (ถ้าไม่ตรงค่าเริ่มต้น)">
-            <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-border p-1.5">
-              {pendingStudents.map((s) => (
-                <div key={s.id} className="flex items-center gap-2 text-xs">
-                  <span className="min-w-0 flex-1 truncate">
-                    {s.student_code} {s.first_name} {s.last_name}
-                  </span>
-                  <Select
-                    className="h-7 w-36 shrink-0 px-1.5 text-[11px]"
-                    aria-label={`แผนการเรียนของ ${s.first_name} ${s.last_name}`}
-                    value={planOverride[s.id] ?? ""}
-                    onChange={(e) =>
-                      setPlanOverride((prev) => {
-                        if (!e.target.value) {
-                          const { [s.id]: _, ...rest } = prev;
-                          return rest;
-                        }
-                        return { ...prev, [s.id]: e.target.value };
-                      })
-                    }
-                  >
-                    <option value="">(ใช้ค่าเริ่มต้น)</option>
-                    {studyPlans.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              ))}
+          <div className="flex min-h-0 flex-1 flex-col gap-1">
+            <span className="font-ui text-xs font-medium">แก้ไขเฉพาะราย (ถ้าไม่ตรงค่าเริ่มต้น)</span>
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border">
+              <table className={wide ? "w-full min-w-[36rem] text-xs" : "w-full text-xs"}>
+                <thead className="sticky top-0 z-10 bg-muted text-left text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">รหัส</th>
+                    <th className="px-3 py-2 font-medium">รายชื่อ</th>
+                    <th className="px-3 py-2 font-medium">แผนการเรียน</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingStudents.map((s) => (
+                    <tr key={s.id} className="border-t border-border">
+                      <td className="px-3 py-1.5 tabular-nums text-muted-foreground">{s.student_code}</td>
+                      <td className="px-3 py-1.5 text-[10px] font-medium leading-tight">
+                        <div>{s.first_name}</div>
+                        <div>{s.last_name}</div>
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <Select
+                          className={wide ? "h-7 w-full min-w-[12rem] px-1.5 text-[11px]" : "h-7 w-full min-w-[7rem] px-1.5 text-[11px]"}
+                          aria-label={`แผนการเรียนของ ${s.first_name} ${s.last_name}`}
+                          value={planOverride[s.id] ?? ""}
+                          onChange={(e) =>
+                            setPlanOverride((prev) => {
+                              if (!e.target.value) {
+                                const { [s.id]: _, ...rest } = prev;
+                                return rest;
+                              }
+                              return { ...prev, [s.id]: e.target.value };
+                            })
+                          }
+                        >
+                          <option value="">(ใช้ค่าเริ่มต้น)</option>
+                          {studyPlans.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </Select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </Field>
+          </div>
         )}
       </form>
     </Sheet>
@@ -327,17 +388,10 @@ function CohortEnrollmentPanel({
   const [pendingStudentId, setPendingStudentId] = useState<string | null>(null);
   const [planSelection, setPlanSelection] = useState<Record<string, string>>({});
 
-  // Cohort's entry grade is fixed at creation; students actually advance a
-  // grade each academic year. Shift by elapsed years so the mismatch check
-  // compares against where this cohort's students should be *now*, not where
-  // they started.
-  const expectedGradeLevelId = useMemo(() => {
-    const entryLevel = gradeLevels.find((g) => g.id === entryGradeLevelId);
-    if (!entryLevel || activeYear === undefined) return entryGradeLevelId;
-    const elapsed = activeYear - entryYear;
-    const expected = gradeLevels.find((g) => g.sort_order === entryLevel.sort_order + elapsed);
-    return expected?.id ?? entryGradeLevelId;
-  }, [gradeLevels, activeYear, entryGradeLevelId, entryYear]);
+  const expectedGradeLevelId = useMemo(
+    () => cohortExpectedGradeLevelId(gradeLevels, entryGradeLevelId, entryYear, activeYear),
+    [gradeLevels, entryGradeLevelId, entryYear, activeYear],
+  );
 
   const planName = useMemo(() => new Map(studyPlans.map((p) => [p.id, p.name])), [studyPlans]);
   const gradeLevelName = useMemo(
@@ -351,20 +405,27 @@ function CohortEnrollmentPanel({
   }, [enrollments]);
 
   const rows = useMemo(() => {
-    return [...students].sort((a, b) => {
-      const aEnrolled = enrollmentByStudent.has(a.id) ? 1 : 0;
-      const bEnrolled = enrollmentByStudent.has(b.id) ? 1 : 0;
-      if (aEnrolled !== bEnrolled) return aEnrolled - bEnrolled; // not enrolled first
-      return a.student_code.localeCompare(b.student_code, "th");
-    });
-  }, [students, enrollmentByStudent]);
+    return students
+      .filter(
+        (s) =>
+          enrollmentByStudent.has(s.id) ||
+          !expectedGradeLevelId ||
+          s.grade_level_id === expectedGradeLevelId,
+      )
+      .sort((a, b) => {
+        const aEnrolled = enrollmentByStudent.has(a.id) ? 1 : 0;
+        const bEnrolled = enrollmentByStudent.has(b.id) ? 1 : 0;
+        if (aEnrolled !== bEnrolled) return aEnrolled - bEnrolled; // not enrolled first
+        return a.student_code.localeCompare(b.student_code, "th");
+      });
+  }, [students, enrollmentByStudent, expectedGradeLevelId]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const tableReady = rows.length > 0;
   const pageSize = useFillPageSize(scrollRef, tableReady);
   const { page, setPage, pageCount, pageRows } = usePagination(
     rows,
-    [cohortId, departmentId, pageSize],
+    [cohortId, departmentId, expectedGradeLevelId, pageSize],
     pageSize,
   );
 
@@ -413,7 +474,7 @@ function CohortEnrollmentPanel({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       {rows.length === 0 ? (
-        <EmptyState title="ไม่พบข้อมูล" description="ไม่มีนักเรียนในแผนกนี้" />
+        <EmptyState title="ไม่พบข้อมูล" description="ไม่มีนักเรียนชั้นที่ตรงกับรุ่นนี้" />
       ) : (
         <>
           <div className="table-panel">

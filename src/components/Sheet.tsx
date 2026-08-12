@@ -15,6 +15,8 @@ export function Sheet({
   children,
   footer,
   className,
+  bodyClassName,
+  wide = false,
   side = "right",
 }: {
   open: boolean;
@@ -27,6 +29,10 @@ export function Sheet({
   /** Sticky actions below the scroll body (cancel / save, etc.). */
   footer?: React.ReactNode;
   className?: string;
+  /** Extra classes on the scroll body (e.g. flex column fill for long inline lists). */
+  bodyClassName?: string;
+  /** Wider drawer — for tables that need more horizontal space. */
+  wide?: boolean;
   side?: "left" | "right";
 }) {
   return (
@@ -35,7 +41,8 @@ export function Sheet({
         <Drawer.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
         <Drawer.Content
           className={cn(
-            "glass-sidebar fixed inset-y-2 z-50 flex w-[calc(100%-1rem)] max-w-sm flex-col rounded-2xl outline-none",
+            "glass-sidebar fixed inset-y-2 z-50 flex w-[calc(100%-1rem)] flex-col rounded-2xl outline-none",
+            wide ? "max-w-2xl" : "max-w-sm",
             side === "left" ? "left-2" : "right-2",
             className,
           )}
@@ -58,6 +65,7 @@ export function Sheet({
             className={cn(
               "scrollbar-hidden flex-1 overflow-y-auto overscroll-contain px-3 pt-3",
               footer ? "pb-3" : "pb-6 pb-safe",
+              bodyClassName,
             )}
           >
             {children}

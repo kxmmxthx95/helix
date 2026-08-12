@@ -33,6 +33,8 @@ export type SubjectFilters = {
   search: string;
   departmentId: string;
   learningAreaId: string;
+  gradeLevelId: string;
+  term: number | "";
   subjectType: SubjectType | "";
   includeInactive: boolean;
 };
@@ -46,6 +48,8 @@ export function useSubjects(filters: SubjectFilters) {
 
       if (!filters.includeInactive) q = q.eq("is_active", true);
       if (filters.learningAreaId) q = q.eq("learning_area_id", filters.learningAreaId);
+      if (filters.gradeLevelId) q = q.eq("suggested_grade_level_id", filters.gradeLevelId);
+      if (filters.term) q = q.eq("suggested_term", filters.term);
       if (filters.subjectType) q = q.eq("subject_type", filters.subjectType);
       if (filters.search.trim()) {
         const term = `%${filters.search.trim()}%`;

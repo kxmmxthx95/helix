@@ -1,5 +1,5 @@
 import { FileUp, Plus, Search, SlidersHorizontal, X } from "@/components/icons";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSubjectsSheet } from "@/components/ImportSubjectsSheet";
 import { Sheet } from "@/components/Sheet";
@@ -14,17 +14,19 @@ import {
   type SubjectDraft,
   type SubjectFilters,
 } from "@/hooks/useCurriculum";
-import { useGradeLevels } from "@/hooks/useCurriculumStructure";
+import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useFillPageSize } from "@/hooks/useFillPageSize";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
-import type { GradingMethod, LearningArea, Subject, SubjectType } from "@/lib/database.types";
+import type { GradingMethod, GradeLevel, LearningArea, Subject, SubjectType } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 
 const EMPTY: Omit<SubjectFilters, "departmentId"> = {
   search: "",
   learningAreaId: "",
+  gradeLevelId: "",
+  term: "",
   subjectType: "",
   includeInactive: false,
 };
@@ -42,10 +44,10 @@ const SUBJECT_TYPE_ORDER: Record<SubjectType, number> = {
   activity: 2,
 };
 
-const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
-  basic: "bg-blue-600 text-blue-50 dark:bg-blue-500 dark:text-blue-50",
-  additional: "bg-sky-600 text-sky-50 dark:bg-sky-500 dark:text-sky-50",
-  activity: "bg-violet-600 text-violet-50 dark:bg-violet-500 dark:text-violet-50",
+const SUBJECT_TYPE_DOT: Record<SubjectType, string> = {
+  basic: "bg-blue-500",
+  additional: "bg-pink-500",
+  activity: "bg-violet-500",
 };
 
 /** ตัดเกรดปกติ vs ผ่าน/ไม่ผ่าน — settable per subject, defaults by subject_type. See migration 0023. */
@@ -202,9 +204,13 @@ export function Subjects() {
     }
   }
 
-  const activeFilterCount = [filters.learningAreaId, filters.subjectType, filters.includeInactive ? "1" : ""].filter(
-    Boolean,
-  ).length;
+  const activeFilterCount = [
+    filters.learningAreaId,
+    filters.gradeLevelId,
+    filters.term ? String(filters.term) : "",
+    filters.subjectType,
+    filters.includeInactive ? "1" : "",
+  ].filter(Boolean).length;
 
   return (
     <div className="page-fill">
@@ -254,7 +260,13 @@ export function Subjects() {
           </Button>
         )}
         {mayEdit && (
-          <Button size="icon" className="shrink-0" onClick={() => setEditing("new")} aria-label="เพิ่มรายวิชา">
+          <Button
+            size="icon"
+            className="shrink-0"
+            onClick={() => setEditing("new")}
+            disabled={!departmentId}
+            aria-label="เพิ่มรายวิชา"
+          >
             <Plus className="h-3 w-3" />
           </Button>
         )}
@@ -328,10 +340,9 @@ export function Subjects() {
                       <td className="px-3 py-0">{row.credits}</td>
                       <td className="px-3 py-0">{row.hours_per_week}</td>
                       <td className="px-3 py-0">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-1 text-[10px] font-medium leading-none ${SUBJECT_TYPE_BADGE[row.subject_type]}`}
-                        >
-                          {SUBJECT_TYPE_LABEL[row.subject_type]}
+                        <span className="flex items-center gap-1.5">
+                          <span className={`size-2 rounded-full ${SUBJECT_TYPE_DOT[row.subject_type]}`} />
+                          <span className="text-xs">{SUBJECT_TYPE_LABEL[row.subject_type]}</span>
                         </span>
                       </td>
                       {mayEdit && (
@@ -397,6 +408,33 @@ export function Subjects() {
             </Select>
           </Field>
 
+          <Field label="ระดับชั้น">
+            <Select
+              value={filters.gradeLevelId}
+              onChange={(e) => setFilters({ ...filters, gradeLevelId: e.target.value })}
+            >
+              <option value="">ทุกระดับชั้น</option>
+              {gradeLevels.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="ภาคเรียน">
+            <Select
+              value={filters.term ? String(filters.term) : ""}
+              onChange={(e) =>
+                setFilters({ ...filters, term: e.target.value ? Number(e.target.value) : "" })
+              }
+            >
+              <option value="">ทุกภาคเรียน</option>
+              <option value="1">ภาคเรียนที่ 1</option>
+              <option value="2">ภาคเรียนที่ 2</option>
+            </Select>
+          </Field>
+
           <Field label="ประเภทวิชา">
             <Select
               value={filters.subjectType}
@@ -428,6 +466,7 @@ export function Subjects() {
         onClose={() => setEditing(null)}
         departmentId={departmentId}
         departmentName={departmentName}
+        gradeLevels={gradeLevels}
       />
 
       <ImportSubjectsSheet
@@ -479,16 +518,18 @@ function EditSubjectSheet({
   onClose,
   departmentId,
   departmentName,
+  gradeLevels: gradeLevelsProp,
 }: {
   target: Subject | "new" | null;
   onClose: () => void;
   departmentId: string;
   departmentName: string;
+  gradeLevels: GradeLevel[];
 }) {
   const { profile: me } = useAuth();
   const toast = useToast();
   const { data: learningAreas = [] } = useLearningAreas();
-  const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
+  const { data: allGradeLevels = [] } = useAllGradeLevels();
   const save = useSaveSubject();
   const [draft, setDraft] = useState<SubjectDraft | null>(null);
   const [addingSubArea, setAddingSubArea] = useState(false);
@@ -497,9 +538,29 @@ function EditSubjectSheet({
   const topLevelAreas = useMemo(() => learningAreas.filter((a) => !a.parent_id), [learningAreas]);
 
   const isNew = target === "new";
+  const subjectDeptId = target && target !== "new" ? target.department_id : departmentId;
+  const gradeLevels = useMemo(() => {
+    if (gradeLevelsProp.length > 0) return gradeLevelsProp;
+    return allGradeLevels.filter((g) => g.department_id === subjectDeptId);
+  }, [gradeLevelsProp, allGradeLevels, subjectDeptId]);
   const base: SubjectDraft | null =
     target === null ? null : isNew ? blankDraft(departmentId) : pickDraft(target);
   const current = draft ?? base;
+
+  const gradeLevelOptions = useMemo(() => {
+    const byId = new Map(gradeLevels.map((g) => [g.id, g]));
+    const selectedId = current?.suggested_grade_level_id;
+    if (selectedId && !byId.has(selectedId)) {
+      const orphan = allGradeLevels.find((g) => g.id === selectedId);
+      if (orphan) byId.set(orphan.id, orphan);
+    }
+    return [...byId.values()].sort((a, b) => a.sort_order - b.sort_order);
+  }, [gradeLevels, allGradeLevels, current?.suggested_grade_level_id]);
+
+  useEffect(() => {
+    setDraft(null);
+    setAddingSubArea(false);
+  }, [target]);
 
   const selectedArea = learningAreas.find((a) => a.id === current?.learning_area_id);
   const selectedTopId = selectedArea ? selectedArea.parent_id ?? selectedArea.id : "";
@@ -700,7 +761,7 @@ function EditSubjectSheet({
                 onChange={(e) => setDraft({ ...current, suggested_grade_level_id: e.target.value || null })}
               >
                 <option value="">ไม่ระบุ</option>
-                {gradeLevels.map((g) => (
+                {gradeLevelOptions.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}
                   </option>

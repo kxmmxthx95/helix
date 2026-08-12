@@ -124,7 +124,7 @@ export function AcademicEvents() {
         </div>
       </div>
 
-      <div className="grid grid-cols-7 border-l border-t border-border">
+      <div className="grid grid-cols-7 border-l border-t border-border overflow-hidden rounded-lg">
         {WEEKDAY_LABEL.map((w) => (
           <div
             key={w}
