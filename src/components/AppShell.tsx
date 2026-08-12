@@ -28,11 +28,20 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { useTheme } from "@/components/ThemeProvider";
 import { useToast } from "@/components/Toast";
-import { Avatar, Button } from "@/components/ui";
+import { Avatar, Button, Select } from "@/components/ui";
 import { avatarUrl, useUploadAvatar } from "@/hooks/useAvatar";
 import { useOutboxSync } from "@/hooks/useOutboxSync";
 import { profileFullName } from "@/lib/database.types";
-import { canManage, canManageAcademic, canManageUsers, isOrgWide, roleLabels } from "@/lib/roles";
+import {
+  canManage,
+  canManageAcademic,
+  canManageUsers,
+  isOrgWide,
+  ROLE_LABEL,
+  ROLES,
+  roleLabels,
+  type Role,
+} from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -197,7 +206,8 @@ const SIDEBAR_KEY = "helix-sidebar-collapsed";
  * Outer frame never scrolls — only the main pane does.
  */
 export function AppShell() {
-  const { profile, signOut, refreshProfile } = useAuth();
+  const { profile, actualRoles, viewAsRole, setViewAsRole, signOut, refreshProfile } = useAuth();
+  const isActualSuperAdmin = actualRoles.includes("super_admin");
   const displayName = profile ? profileFullName(profile) : "Helix";
   const { preference, cycle } = useTheme();
   const { online } = useOutboxSync();
@@ -374,6 +384,22 @@ export function AppShell() {
               {userLabel}
             </div>
           )}
+          {isActualSuperAdmin && !collapsed && (
+            <Select
+              className="mb-2 h-7 text-[10px]"
+              value={viewAsRole ?? ""}
+              onChange={(e) => setViewAsRole((e.target.value || null) as Role | null)}
+              aria-label="ดูมุมมองบทบาท"
+              title="ดูมุมมองบทบาท (เมนู/สิทธิ์เท่านั้น ข้อมูลยังเป็นของผู้ดูแลระบบสูงสุด)"
+            >
+              <option value="">มุมมอง: ผู้ดูแลระบบสูงสุด (จริง)</option>
+              {ROLES.filter((r) => r !== "super_admin").map((r) => (
+                <option key={r} value={r}>
+                  มุมมอง: {ROLE_LABEL[r]}
+                </option>
+              ))}
+            </Select>
+          )}
           <div className={cn("flex items-center gap-1", collapsed && "flex-col")}>
             {settingsButton}
             {themeButton}
@@ -413,6 +439,17 @@ export function AppShell() {
           >
             <CloudOff className="h-3.5 w-3.5" />
             ออฟไลน์ — บันทึกไว้ในเครื่อง จะซิงก์เมื่อกลับมาออนไลน์
+          </div>
+        )}
+
+        {isActualSuperAdmin && viewAsRole && (
+          <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 bg-accent/15 py-1.5 text-xs text-accent px-3">
+            <span>
+              กำลังดูมุมมองแบบ <strong>{ROLE_LABEL[viewAsRole]}</strong> (เมนู/สิทธิ์เท่านั้น — ข้อมูลที่เห็นยังเป็นของผู้ดูแลระบบสูงสุด)
+            </span>
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-accent" onClick={() => setViewAsRole(null)}>
+              กลับเป็นตัวเอง
+            </Button>
           </div>
         )}
 

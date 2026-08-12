@@ -2,10 +2,22 @@ import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ProfileWithRoles, Student } from "@/lib/database.types";
 import { missingOnboardingStep, type OnboardingStep } from "@/lib/onboarding";
+import type { Role } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 
 /** Auto sign-out after this much inactivity. Tune here, nowhere else. */
 export const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+
+/**
+ * super_admin-only nav/UI preview (grill-lite decision, 2026-08-12): swaps
+ * profile.roles client-side so every existing canManage()/isOrgWide()/role
+ * check throughout the app renders as that role would see it — a real
+ * super_admin session still backs every Supabase query, so RLS keeps
+ * granting org-wide DATA access underneath. This previews menus/routes, not
+ * a real "log in as" — never touches auth, never scopes queries down.
+ * sessionStorage (not localStorage) so it can't silently outlive the tab.
+ */
+const VIEW_AS_KEY = "helix-view-as-role";
 
 type AuthState = {
   session: Session | null;
@@ -21,6 +33,12 @@ type AuthState = {
   refreshOnboarding: () => Promise<void>;
   /** Re-fetches the profile row (e.g. after an avatar upload) — roles are left untouched. */
   refreshProfile: () => Promise<void>;
+  /** The signed-in account's real roles — never swapped by viewAsRole, unlike profile.roles. */
+  actualRoles: Role[];
+  /** Non-null while a super_admin is previewing another role's nav/routes. See VIEW_AS_KEY above. */
+  viewAsRole: Role | null;
+  /** No-ops for anyone whose actualRoles doesn't include super_admin. */
+  setViewAsRole: (role: Role | null) => void;
   /** loginId is a student_code or a phone number — never a real email. */
   signIn: (loginId: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -42,13 +60,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [myStudent, setMyStudent] = useState<Student | null>(null);
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep | null>(null);
   const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [viewAsRole, setViewAsRoleState] = useState<Role | null>(() => {
+    try {
+      return (sessionStorage.getItem(VIEW_AS_KEY) as Role | null) ?? null;
+    } catch {
+      return null;
+    }
+  });
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setProfile(null);
     setMyStudent(null);
     setOnboardingStep(null);
+    try {
+      sessionStorage.removeItem(VIEW_AS_KEY);
+    } catch {
+      /* ignore private mode */
+    }
+    setViewAsRoleState(null);
   }, []);
+
+  const setViewAsRole = useCallback(
+    (role: Role | null) => {
+      if (!profile?.roles.includes("super_admin")) return;
+      try {
+        if (role) sessionStorage.setItem(VIEW_AS_KEY, role);
+        else sessionStorage.removeItem(VIEW_AS_KEY);
+      } catch {
+        /* ignore quota / private mode */
+      }
+      setViewAsRoleState(role);
+    },
+    [profile],
+  );
+
+  // Only takes effect for an actual super_admin — a stale sessionStorage
+  // value left over from a different account on the same tab is inert here.
+  const effectiveProfile = useMemo(() => {
+    if (!profile) return null;
+    if (viewAsRole && profile.roles.includes("super_admin")) return { ...profile, roles: [viewAsRole] };
+    return profile;
+  }, [profile, viewAsRole]);
 
   // Session bootstrap + subscription.
   useEffect(() => {
@@ -143,11 +196,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthState>(
     () => ({
       session,
-      profile,
+      profile: effectiveProfile,
       loading,
       myStudent,
       onboardingStep,
       onboardingLoading,
+      actualRoles: profile?.roles ?? [],
+      viewAsRole,
+      setViewAsRole,
       refreshOnboarding: () => (profile ? loadOnboarding(profile) : Promise.resolve()),
       refreshProfile: async () => {
         if (!session || !profile) return;
@@ -184,7 +240,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       },
     }),
-    [session, profile, loading, myStudent, onboardingStep, onboardingLoading, loadOnboarding, signOut],
+    [
+      session,
+      effectiveProfile,
+      profile,
+      loading,
+      myStudent,
+      onboardingStep,
+      onboardingLoading,
+      viewAsRole,
+      setViewAsRole,
+      loadOnboarding,
+      signOut,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
