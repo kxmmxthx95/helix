@@ -1,8 +1,10 @@
 import { useAuth } from "@/auth/AuthProvider";
 import { Card, Spinner } from "@/components/ui";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
+import { STARTING_SCORE, summarizeBehaviorScore, useBehaviorRecords } from "@/hooks/useBehaviorRecords";
 import type { AttendanceStatus, Student } from "@/lib/database.types";
 import { roleLabels } from "@/lib/roles";
+import { cn } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
 
 const STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent", "leave"];
@@ -13,6 +15,11 @@ function currentMonthRange() {
   const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
   return { start, end };
+}
+
+function currentAcademicYearRange() {
+  const now = new Date();
+  return { start: `${now.getFullYear()}-01-01`, end: `${now.getFullYear()}-12-31` };
 }
 
 export function Dashboard() {
@@ -30,6 +37,10 @@ export function Dashboard() {
       {myStudent && <AttendanceSummaryCard student={myStudent} />}
       {children.map((child) => (
         <AttendanceSummaryCard key={child.id} student={child} />
+      ))}
+      {myStudent && <BehaviorScoreCard student={myStudent} />}
+      {children.map((child) => (
+        <BehaviorScoreCard key={child.id} student={child} />
       ))}
       {/* Stat tiles land here once the dashboard design is settled. */}
     </div>
@@ -62,6 +73,32 @@ function AttendanceSummaryCard({ student }: { student: Student }) {
             </div>
           ))}
         </div>
+      )}
+    </Card>
+  );
+}
+
+/** role="student"/"parent" only — teacher/admin get the roster workspace at /behavior instead. */
+function BehaviorScoreCard({ student }: { student: Student }) {
+  const { start, end } = currentAcademicYearRange();
+  const { data: records = [], isLoading } = useBehaviorRecords({
+    studentId: student.id,
+    startDate: start,
+    endDate: end,
+  });
+  const score = summarizeBehaviorScore(records);
+
+  return (
+    <Card>
+      <p className="text-sm text-muted-foreground">
+        คะแนนพฤติกรรมของ {student.first_name} {student.last_name}
+      </p>
+      {isLoading ? (
+        <Spinner className="mt-2 h-4 w-4 text-muted-foreground" />
+      ) : (
+        <p className={cn("mt-1 text-2xl font-semibold", score < STARTING_SCORE ? "text-destructive" : "text-success")}>
+          {score} <span className="text-sm font-normal text-muted-foreground">/ {STARTING_SCORE}</span>
+        </p>
       )}
     </Card>
   );

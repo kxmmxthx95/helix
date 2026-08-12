@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { ToastProvider } from "@/components/Toast";
 import { Spinner } from "@/components/ui";
 import { Attendance } from "@/routes/Attendance";
+import { BehaviorScore } from "@/routes/BehaviorScore";
 import { Dashboard } from "@/routes/Dashboard";
 import { Login } from "@/routes/Login";
 import { Onboarding } from "@/routes/Onboarding";
@@ -46,6 +47,7 @@ function Gate() {
         <Route path="users" element={<Users />} />
         <Route path="roster" element={<Roster />} />
         <Route path="attendance" element={<Attendance />} />
+        <Route path="behavior" element={<BehaviorScore />} />
         <Route path="subjects" element={<Subjects />} />
         <Route path="curriculum" element={<Curriculum />} />
         <Route path="enrollment" element={<Enrollment />} />

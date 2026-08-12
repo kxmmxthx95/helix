@@ -406,6 +406,34 @@ export type AttendanceRecord = {
   updated_at: string;
 };
 
+// ----------------------------------------------------------------- behavior
+// คะแนนพฤติกรรม — event log, not one row per day. See
+// supabase/migrations/0027_behavior_records.sql.
+
+/** classroom_id is a snapshot at record time, same rationale as AttendanceRecord. */
+export type BehaviorRecord = {
+  id: string;
+  student_id: string;
+  classroom_id: string;
+  date: string;
+  points: number;
+  reason: string;
+  recorded_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BehaviorSeverity = "minor" | "moderate" | "severe";
+
+/** Preset (label + fixed points) a teacher can pick instead of typing freehand. Not FK'd from BehaviorRecord. severity is only ever set when points < 0. */
+export type BehaviorCategory = {
+  id: string;
+  label: string;
+  points: number;
+  severity: BehaviorSeverity | null;
+  created_at: string;
+};
+
 // ------------------------------------------------------------- academic_terms
 // See supabase/migrations/0018_academic_terms.sql for the full grill rationale.
 
@@ -605,6 +633,8 @@ export type Database = {
         InsertOf<StudentGuardianFinancial, "occupation" | "workplace" | "monthly_income">
       >;
       attendance_records: Table<AttendanceRecord, InsertOf<AttendanceRecord, "note">>;
+      behavior_records: Table<BehaviorRecord, InsertOf<BehaviorRecord, never>>;
+      behavior_categories: Table<BehaviorCategory, InsertOf<BehaviorCategory, "severity">>;
       audit_logs: Table<{
         id: number;
         actor_id: string | null;
@@ -629,6 +659,7 @@ export type Database = {
       term_type: TermType;
       term_status: TermStatus;
       academic_event_type: AcademicEventType;
+      behavior_severity: BehaviorSeverity;
     };
     CompositeTypes: Record<string, never>;
   };
