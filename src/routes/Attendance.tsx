@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button, Card, EmptyState, Input, Select, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
@@ -172,7 +172,6 @@ export function Attendance() {
       ) : view === "checkin" ? (
         <CheckInPanel
           classroomId={classroomId}
-          classroomLabel={classroomLabel}
           academicYear={academicYear}
           departmentId={departmentId}
           recorderId={me.id}
@@ -188,18 +187,17 @@ export function Attendance() {
 
 function CheckInPanel({
   classroomId,
-  classroomLabel,
   academicYear,
   departmentId,
   recorderId,
 }: {
   classroomId: string;
-  classroomLabel: string;
   academicYear: number;
   departmentId: string;
   recorderId: string;
 }) {
   const [date, setDate] = useState(todayIso());
+  const markAllRef = useRef<(() => void) | null>(null);
   const { data: roster = [], isLoading: rosterLoading } = useClassroomRoster(classroomId, academicYear);
   const { data: records, isLoading: recordsLoading } = useAttendanceForDate(classroomId, date);
   const { data: events = [] } = useAcademicEvents();
@@ -226,7 +224,16 @@ function CheckInPanel({
           className="w-40"
           aria-label="วันที่"
         />
-        <span className="text-xs text-muted-foreground">{classroomLabel}</span>
+        {!blockedEvent && !rosterLoading && !recordsLoading && roster.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-auto shrink-0"
+            onClick={() => markAllRef.current?.()}
+          >
+            มาทั้งหมด
+          </Button>
+        )}
       </div>
 
       {blockedEvent ? (
@@ -249,6 +256,7 @@ function CheckInPanel({
           roster={roster}
           existing={records ?? []}
           recorderId={recorderId}
+          markAllRef={markAllRef}
         />
       )}
     </div>
@@ -261,12 +269,14 @@ function CheckInGrid({
   roster,
   existing,
   recorderId,
+  markAllRef,
 }: {
   classroomId: string;
   date: string;
   roster: Student[];
   existing: AttendanceRecord[];
   recorderId: string;
+  markAllRef: MutableRefObject<(() => void) | null>;
 }) {
   const toast = useToast();
   const save = useSaveAttendance();
@@ -283,10 +293,18 @@ function CheckInGrid({
 
   const remaining = roster.filter((s) => !marks.get(s.id)?.status).length;
 
+  markAllRef.current = () => {
+    setMarks(new Map(roster.map((s) => [s.id, { status: "present" as AttendanceStatus, note: "" }])));
+  };
+  useEffect(() => () => {
+    markAllRef.current = null;
+  }, [markAllRef]);
+
   function setStatus(id: string, status: AttendanceStatus) {
     setMarks((prev) => {
       const next = new Map(prev);
-      next.set(id, { status, note: prev.get(id)?.note ?? "" });
+      const current = prev.get(id)?.status ?? null;
+      next.set(id, { status: current === status ? null : status, note: prev.get(id)?.note ?? "" });
       return next;
     });
   }
@@ -297,10 +315,6 @@ function CheckInGrid({
       next.set(id, { status: prev.get(id)?.status ?? null, note });
       return next;
     });
-  }
-
-  function markAllPresent() {
-    setMarks(new Map(roster.map((s) => [s.id, { status: "present" as AttendanceStatus, note: "" }])));
   }
 
   function submit() {
@@ -323,39 +337,35 @@ function CheckInGrid({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex shrink-0 justify-end">
-        <Button variant="outline" size="sm" onClick={markAllPresent}>
-          เช็คมาทั้งหมด
-        </Button>
-      </div>
       <div className="table-panel">
         <div className="table-panel-scroll">
-          <table className="w-full min-w-[36rem] text-xs">
+          <table className="w-full min-w-[36rem] table-fixed text-xs">
             <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
               <tr>
-                <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
-                <th className="px-3 py-2 font-medium">รายชื่อ</th>
-                <th className="px-3 py-2 font-medium">สถานะ</th>
-                <th className="px-3 py-2 font-medium">หมายเหตุ</th>
+                <th className="w-24 px-3 py-2 font-medium">รหัสนักเรียน</th>
+                <th className="w-48 px-3 py-2 font-medium">รายชื่อ</th>
+                <th className="w-36 px-3 py-2 text-center font-medium">สถานะ</th>
+                <th className="px-3 py-2 text-center font-medium">หมายเหตุ</th>
               </tr>
             </thead>
             <tbody>
               {roster.map((s) => {
                 const name = `${s.first_name} ${s.last_name}`;
                 const mark = marks.get(s.id) ?? { status: null, note: "" };
+                const noteOpen = Boolean(mark.status && mark.status !== "present");
                 return (
                   <tr key={s.id} className="border-t border-border">
                     <td className="px-3 py-2">{s.student_code}</td>
-                    <td className="px-3 py-2 font-medium">{name}</td>
+                    <td className="truncate px-3 py-2 font-medium">{name}</td>
                     <td className="px-3 py-2">
-                      <div className="flex gap-1">
+                      <div className="flex justify-center gap-1">
                         {STATUS_ORDER.map((st) => (
                           <button
                             key={st}
                             type="button"
                             onClick={() => setStatus(s.id, st)}
                             className={cn(
-                              "tappable rounded-full px-2 py-0.5 text-[10px]",
+                              "tappable inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-medium",
                               mark.status === st
                                 ? STATUS_STYLE[st]
                                 : "bg-muted text-muted-foreground hover:bg-muted/70",
@@ -367,15 +377,15 @@ function CheckInGrid({
                       </div>
                     </td>
                     <td className="px-3 py-2">
-                      {mark.status && mark.status !== "present" && (
-                        <Input
-                          value={mark.note}
-                          onChange={(e) => setNote(s.id, e.target.value)}
-                          placeholder="หมายเหตุ (ถ้ามี)"
-                          className="h-7 text-[10px]"
-                          aria-label={`หมายเหตุของ ${name}`}
-                        />
-                      )}
+                      <Input
+                        value={mark.note}
+                        onChange={(e) => setNote(s.id, e.target.value)}
+                        placeholder="หมายเหตุ (ถ้ามี)"
+                        disabled={!noteOpen}
+                        className={cn("h-7 text-[10px]", !noteOpen && "invisible")}
+                        aria-label={`หมายเหตุของ ${name}`}
+                        tabIndex={noteOpen ? undefined : -1}
+                      />
                     </td>
                   </tr>
                 );

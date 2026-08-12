@@ -35,6 +35,13 @@ const SUBJECT_TYPE_LABEL: Record<SubjectType, string> = {
   activity: "กิจกรรม",
 };
 
+/** Pedagogical order: พื้นฐาน → เพิ่มเติม → กิจกรรม */
+const SUBJECT_TYPE_ORDER: Record<SubjectType, number> = {
+  basic: 0,
+  additional: 1,
+  activity: 2,
+};
+
 const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
   basic: "bg-blue-600 text-blue-50 dark:bg-blue-500 dark:text-blue-50",
   additional: "bg-sky-600 text-sky-50 dark:bg-sky-500 dark:text-sky-50",
@@ -97,7 +104,8 @@ export function Subjects() {
   const [editing, setEditing] = useState<Subject | "new" | null>(null);
   const [importing, setImporting] = useState(false);
   const [pickedDept, setPickedDept] = useState("");
-  const [sortKey, setSortKey] = useState<SubjectSortKey>("code");
+  // Default cascade: ระดับชั้น → ภาคเรียน → ประเภท → รหัส (header click overrides primary).
+  const [sortKey, setSortKey] = useState<SubjectSortKey>("grade_level");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const orgWide = me ? isOrgWide(me.roles) : false;
@@ -140,38 +148,39 @@ export function Subjects() {
     if (!rows) return [];
     const list = [...rows];
     const dir = sortDir === "asc" ? 1 : -1;
-    list.sort((a, b) => {
-      let cmp = 0;
-      switch (sortKey) {
+    const cascade: SubjectSortKey[] = ["grade_level", "term", "subject_type", "code"];
+    const keys = [sortKey, ...cascade.filter((k) => k !== sortKey)];
+
+    function cmpKey(a: Subject, b: Subject, key: SubjectSortKey): number {
+      switch (key) {
         case "code":
-          cmp = a.code.localeCompare(b.code, "th", { numeric: true });
-          break;
+          return a.code.localeCompare(b.code, "th", { numeric: true });
         case "name_th":
-          cmp = a.name_th.localeCompare(b.name_th, "th");
-          break;
+          return a.name_th.localeCompare(b.name_th, "th");
         case "learning_area":
-          cmp = topAreaLabel(a.learning_area_id).localeCompare(topAreaLabel(b.learning_area_id), "th");
-          break;
+          return topAreaLabel(a.learning_area_id).localeCompare(topAreaLabel(b.learning_area_id), "th");
         case "grade_level": {
           const ao = a.suggested_grade_level_id ? (gradeSort.get(a.suggested_grade_level_id) ?? 999) : 999;
           const bo = b.suggested_grade_level_id ? (gradeSort.get(b.suggested_grade_level_id) ?? 999) : 999;
-          cmp = ao - bo;
-          break;
+          return ao - bo;
         }
         case "term":
-          cmp = (a.suggested_term ?? 999) - (b.suggested_term ?? 999);
-          break;
+          return (a.suggested_term ?? 999) - (b.suggested_term ?? 999);
         case "subject_type":
-          cmp = SUBJECT_TYPE_LABEL[a.subject_type].localeCompare(SUBJECT_TYPE_LABEL[b.subject_type], "th");
-          break;
+          return SUBJECT_TYPE_ORDER[a.subject_type] - SUBJECT_TYPE_ORDER[b.subject_type];
         case "credits":
-          cmp = a.credits - b.credits;
-          break;
+          return a.credits - b.credits;
         case "hours_per_week":
-          cmp = a.hours_per_week - b.hours_per_week;
-          break;
+          return a.hours_per_week - b.hours_per_week;
       }
-      return cmp * dir;
+    }
+
+    list.sort((a, b) => {
+      for (let i = 0; i < keys.length; i++) {
+        const cmp = cmpKey(a, b, keys[i]!);
+        if (cmp !== 0) return i === 0 ? cmp * dir : cmp;
+      }
+      return 0;
     });
     return list;
   }, [rows, sortKey, sortDir, areaById, gradeSort]);

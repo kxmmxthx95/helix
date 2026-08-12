@@ -498,6 +498,13 @@ const SUBJECT_TYPE_LABEL: Record<SubjectType, string> = {
   activity: "กิจกรรม",
 };
 
+/** Pedagogical order: พื้นฐาน → เพิ่มเติม → กิจกรรม */
+const SUBJECT_TYPE_ORDER: Record<SubjectType, number> = {
+  basic: 0,
+  additional: 1,
+  activity: 2,
+};
+
 const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
   basic: "bg-blue-600 text-blue-50 dark:bg-blue-500 dark:text-blue-50",
   additional: "bg-sky-600 text-sky-50 dark:bg-sky-500 dark:text-sky-50",
@@ -550,18 +557,14 @@ function SubjectPanel({
   const visible = useMemo(() => {
     const list = (rows ?? []).filter((r) => !splitsByTerm || r.term === term);
     return [...list].sort((a, b) => {
-      if ((a.study_plan_id === null) !== (b.study_plan_id === null)) {
-        return a.study_plan_id === null ? -1 : 1;
-      }
-      if (a.study_plan_id && b.study_plan_id) {
-        const cmp = (planById.get(a.study_plan_id) ?? "").localeCompare(planById.get(b.study_plan_id) ?? "", "th");
-        if (cmp) return cmp;
-      }
-      const ac = subjectById.get(a.subject_id)?.code ?? "";
-      const bc = subjectById.get(b.subject_id)?.code ?? "";
-      return ac.localeCompare(bc, "th", { numeric: true });
+      const sa = subjectById.get(a.subject_id);
+      const sb = subjectById.get(b.subject_id);
+      const typeCmp =
+        SUBJECT_TYPE_ORDER[sa?.subject_type ?? "activity"] - SUBJECT_TYPE_ORDER[sb?.subject_type ?? "activity"];
+      if (typeCmp) return typeCmp;
+      return (sa?.code ?? "").localeCompare(sb?.code ?? "", "th", { numeric: true });
     });
-  }, [rows, splitsByTerm, term, planById, subjectById]);
+  }, [rows, splitsByTerm, term, subjectById]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -678,7 +681,7 @@ function SubjectTable({
             <tbody>
               {pageRows.map((row) => {
                 const subject = subjectById.get(row.subject_id);
-                const planLabel = row.study_plan_id ? (planById.get(row.study_plan_id) ?? "—") : "บังคับ";
+                const planLabel = row.study_plan_id ? (planById.get(row.study_plan_id) ?? "—") : "ทั่วไป";
                 return (
                   <tr key={row.id} className="h-[40px] border-t border-border">
                     <td className="px-3 py-0 tabular-nums text-muted-foreground">{subject?.code ?? "—"}</td>
@@ -710,13 +713,19 @@ function SubjectTable({
                     <td
                       className={cn(
                         "px-3 py-0 text-muted-foreground",
-                        mayEdit && "cursor-pointer hover:text-foreground",
+                        mayEdit &&
+                          subject?.grading_method !== "pass_fail" &&
+                          "cursor-pointer hover:text-foreground",
                       )}
-                      onClick={() => mayEdit && setEditingScore(row)}
+                      onClick={() =>
+                        mayEdit && subject?.grading_method !== "pass_fail" && setEditingScore(row)
+                      }
                     >
-                      {row.score_collect_pct !== null
-                        ? `เก็บ ${row.score_collect_pct} : สอบ ${row.score_exam_pct}`
-                        : "ค่า default แผนก"}
+                      {subject?.grading_method === "pass_fail"
+                        ? "ผ่าน/ไม่ผ่าน"
+                        : row.score_collect_pct !== null
+                          ? `เก็บ ${row.score_collect_pct} : สอบ ${row.score_exam_pct}`
+                          : "ค่า default แผนก"}
                     </td>
                     {mayEdit && (
                       <td className="px-3 py-0 text-right">
@@ -874,6 +883,9 @@ function AddCurriculumSubjectSheet({
   const save = useSaveCurriculumSubjects();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [subjectSearch, setSubjectSearch] = useState("");
+  // Catalog browse filters — default to the slot being filled so the list starts narrow.
+  const [filterGradeId, setFilterGradeId] = useState(gradeLevelId);
+  const [filterTerm, setFilterTerm] = useState(term != null ? String(term) : "");
   const [studyPlanId, setStudyPlanId] = useState("");
   const [collectPct, setCollectPct] = useState("");
   const [addingPlan, setAddingPlan] = useState(false);
@@ -902,11 +914,13 @@ function AddCurriculumSubjectSheet({
 
   const visible = useMemo(() => {
     const q = subjectSearch.trim().toLowerCase();
-    if (!q) return available;
-    return available.filter(
-      (s) => s.code.toLowerCase().includes(q) || s.name_th.toLowerCase().includes(q),
-    );
-  }, [available, subjectSearch]);
+    return available.filter((s) => {
+      if (filterGradeId && s.suggested_grade_level_id !== filterGradeId) return false;
+      if (filterTerm && s.suggested_term !== Number(filterTerm)) return false;
+      if (!q) return true;
+      return s.code.toLowerCase().includes(q) || s.name_th.toLowerCase().includes(q);
+    });
+  }, [available, subjectSearch, filterGradeId, filterTerm]);
 
   // Drop selections that disappeared when plan/term filter hid them.
   useEffect(() => {
@@ -920,6 +934,8 @@ function AddCurriculumSubjectSheet({
   function close() {
     setSelected(new Set());
     setSubjectSearch("");
+    setFilterGradeId(gradeLevelId);
+    setFilterTerm(term != null ? String(term) : "");
     setStudyPlanId("");
     setCollectPct("");
     setAddingPlan(false);
@@ -1027,6 +1043,29 @@ function AddCurriculumSubjectSheet({
 
         <Field label="รายวิชา">
           <div className="space-y-1.5">
+            <div className="grid grid-cols-2 gap-2">
+              <Select
+                value={filterGradeId}
+                onChange={(e) => setFilterGradeId(e.target.value)}
+                aria-label="กรองระดับชั้น"
+              >
+                <option value="">ทุกระดับชั้น</option>
+                {gradeLevels.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={filterTerm}
+                onChange={(e) => setFilterTerm(e.target.value)}
+                aria-label="กรองภาคเรียน"
+              >
+                <option value="">ทุกภาคเรียน</option>
+                <option value="1">ภาคเรียน 1</option>
+                <option value="2">ภาคเรียน 2</option>
+              </Select>
+            </div>
             <Input
               type="search"
               value={subjectSearch}
@@ -1053,7 +1092,7 @@ function AddCurriculumSubjectSheet({
                 )}
               </Button>
             </div>
-            <div className="max-h-64 space-y-0.5 overflow-y-auto rounded-lg border border-border p-1">
+            <div className="max-h-[28rem] space-y-0.5 overflow-y-auto rounded-lg border border-border p-1">
               {visible.length === 0 ? (
                 <p className="px-2 py-3 text-xs text-muted-foreground">ไม่พบวิชาตามเงื่อนไข</p>
               ) : (
