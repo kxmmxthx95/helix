@@ -5,18 +5,11 @@ import { Sheet } from "@/components/Sheet";
 import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useSubjects } from "@/hooks/useCurriculum";
-import {
-  useCohorts,
-  useCurriculumSubjects,
-  useGradeLevels,
-  useStudyPlans,
-} from "@/hooks/useCurriculumStructure";
+import { useCurriculumSubjectsAtGrade, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments, useProfiles, type ProfileRow } from "@/hooks/useProfiles";
 import { useDepartmentSettings } from "@/hooks/useSettings";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import {
-  useCohortIdsInClassroom,
-  useCohortIdsWithCurriculumAtGrade,
   useCreateTeachingAssignment,
   useDeleteTeachingAssignment,
   useDepartmentTeachingAssignments,
@@ -486,19 +479,17 @@ function NewAssignmentForm({
 }) {
   const [open, setOpen] = useState(false);
   const [classroomId, setClassroomId] = useState("");
-  const [cohortId, setCohortId] = useState("");
-  const [planId, setPlanId] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [periods, setPeriods] = useState("");
 
   const { data: classrooms = [] } = useClassroomsByDepartment(departmentId);
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
-  const { data: cohorts = [] } = useCohorts(departmentId);
-  const { data: studyPlans = [] } = useStudyPlans();
   const { data: subjects = [] } = useSubjects({
     search: "",
     departmentId,
     learningAreaId: "",
+    gradeLevelId: "",
+    term: "",
     subjectType: "",
     includeInactive: false,
   });
@@ -506,28 +497,12 @@ function NewAssignmentForm({
 
   const classroom = classrooms.find((c) => c.id === classroomId);
   const gradeLevelId = classroom?.grade_level_id ?? null;
-
-  const { data: cohortIdsInRoom = [] } = useCohortIdsInClassroom(classroomId || null, academicYear);
-  const { data: cohortIdsAtGrade = [] } = useCohortIdsWithCurriculumAtGrade(gradeLevelId);
-  const { data: curriculumRows = [] } = useCurriculumSubjects(gradeLevelId, cohortId || null);
-
-  const eligibleCohorts = useMemo(() => {
-    const ids = cohortIdsInRoom.length > 0 ? cohortIdsInRoom : cohortIdsAtGrade;
-    const idSet = new Set(ids);
-    return cohorts.filter((c) => idSet.has(c.id));
-  }, [cohorts, cohortIdsInRoom, cohortIdsAtGrade]);
+  const { data: curriculumRows = [] } = useCurriculumSubjectsAtGrade(gradeLevelId);
 
   const termRows = useMemo(
     () => curriculumRows.filter((r) => (term === null ? r.term === null : r.term === term)),
     [curriculumRows, term],
   );
-
-  const planOptions = useMemo(() => {
-    const ids = [...new Set(termRows.map((r) => r.study_plan_id).filter((id): id is string => !!id))];
-    return studyPlans.filter((p) => ids.includes(p.id));
-  }, [termRows, studyPlans]);
-
-  const planRequired = planOptions.length > 0;
 
   const subjectById = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
 
@@ -539,16 +514,11 @@ function NewAssignmentForm({
   }, [existingAssignments, classroomId]);
 
   const availableSubjects = useMemo(() => {
-    if (!cohortId || (planRequired && !planId)) return [];
-    const list = termRows.filter((r) => {
-      if (assignedSubjectIds.has(r.subject_id)) return false;
-      if (!planRequired) return true;
-      return r.study_plan_id === null || r.study_plan_id === planId;
-    });
+    if (!classroomId) return [];
     const seen = new Set<string>();
     const out: { id: string; code: string; name_th: string; hours_per_week: number }[] = [];
-    for (const r of list) {
-      if (seen.has(r.subject_id)) continue;
+    for (const r of termRows) {
+      if (assignedSubjectIds.has(r.subject_id) || seen.has(r.subject_id)) continue;
       seen.add(r.subject_id);
       const s = subjectById.get(r.subject_id);
       if (!s) continue;
@@ -556,52 +526,18 @@ function NewAssignmentForm({
     }
     out.sort((a, b) => a.code.localeCompare(b.code, "th", { numeric: true }));
     return out;
-  }, [cohortId, planRequired, planId, termRows, assignedSubjectIds, subjectById]);
-
-  function resetFilters() {
-    setClassroomId("");
-    setCohortId("");
-    setPlanId("");
-    setSubjectId("");
-    setPeriods("");
-  }
+  }, [classroomId, termRows, assignedSubjectIds, subjectById]);
 
   useEffect(() => {
-    resetFilters();
+    setClassroomId("");
+    setSubjectId("");
+    setPeriods("");
   }, [teacherId]);
 
   useEffect(() => {
-    setCohortId("");
-    setPlanId("");
     setSubjectId("");
     setPeriods("");
   }, [classroomId]);
-
-  useEffect(() => {
-    setPlanId("");
-    setSubjectId("");
-    setPeriods("");
-  }, [cohortId]);
-
-  useEffect(() => {
-    setSubjectId("");
-    setPeriods("");
-  }, [planId]);
-
-  // Auto-select when only one eligible cohort / plan (grill 2026-08-12).
-  useEffect(() => {
-    if (!classroomId) return;
-    if (eligibleCohorts.length === 1 && cohortId !== eligibleCohorts[0]!.id) {
-      setCohortId(eligibleCohorts[0]!.id);
-    }
-  }, [classroomId, eligibleCohorts, cohortId]);
-
-  useEffect(() => {
-    if (!cohortId || !planRequired) return;
-    if (planOptions.length === 1 && planId !== planOptions[0]!.id) {
-      setPlanId(planOptions[0]!.id);
-    }
-  }, [cohortId, planRequired, planOptions, planId]);
 
   function selectSubject(id: string, hours: number) {
     setSubjectId(id);
@@ -646,7 +582,6 @@ function NewAssignmentForm({
     });
   }, [classrooms, gradeSort]);
 
-  const canPickSubject = !!cohortId && (!planRequired || !!planId);
   const selectedSubject = availableSubjects.find((s) => s.id === subjectId);
 
   return (
@@ -698,46 +633,13 @@ function NewAssignmentForm({
             </Select>
           </Field>
 
-          <Field label="เลือกหลักสูตร">
-            <Select
-              value={cohortId}
-              onChange={(e) => setCohortId(e.target.value)}
-              disabled={!classroomId || eligibleCohorts.length === 0}
-            >
-              <option value="">— เลือกหลักสูตร —</option>
-              {eligibleCohorts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-
-          {planRequired && (
-            <Field label="แผนการเรียน">
-              <Select value={planId} onChange={(e) => setPlanId(e.target.value)} disabled={!cohortId}>
-                <option value="">— เลือกแผน —</option>
-                {planOptions.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          )}
-
           {!classroomId && (
             <p className="py-6 text-center text-sm text-muted-foreground">เลือกห้องเพื่อดูรายวิชา</p>
           )}
-          {classroomId && eligibleCohorts.length === 0 && (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              ไม่พบหลักสูตรสำหรับห้องนี้
-            </p>
-          )}
-          {canPickSubject && availableSubjects.length === 0 && (
+          {classroomId && availableSubjects.length === 0 && (
             <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีรายวิชาให้มอบหมาย</p>
           )}
-          {canPickSubject && availableSubjects.length > 0 && (
+          {classroomId && availableSubjects.length > 0 && (
             <ul className="divide-y divide-border rounded-lg border border-border text-xs">
               {availableSubjects.map((s) => (
                 <li key={s.id}>

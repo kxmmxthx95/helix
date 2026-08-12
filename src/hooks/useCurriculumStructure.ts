@@ -142,6 +142,22 @@ export function useCurriculumSubjects(gradeLevelId: string | null, cohortId: str
   });
 }
 
+/** All curriculum rows at a grade — used when the assignment drawer skips cohort/plan picks. */
+export function useCurriculumSubjectsAtGrade(gradeLevelId: string | null) {
+  return useQuery({
+    queryKey: ["curriculum_subjects", "at_grade", gradeLevelId],
+    enabled: !!gradeLevelId,
+    queryFn: async (): Promise<CurriculumSubject[]> => {
+      const { data, error } = await supabase
+        .from("curriculum_subjects")
+        .select("*")
+        .eq("grade_level_id", gradeLevelId!);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export type CurriculumSubjectDraft = Pick<
   CurriculumSubject,
   "subject_id" | "grade_level_id" | "study_plan_id" | "term" | "cohort_id" | "score_collect_pct" | "score_exam_pct"
