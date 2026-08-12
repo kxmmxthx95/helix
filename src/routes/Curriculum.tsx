@@ -1001,7 +1001,7 @@ function AddCurriculumSubjectSheet({
                 onChange={(e) => setStudyPlanId(e.target.value)}
                 className="flex-1"
               >
-                <option value="">วิชาแกนบังคับ</option>
+                <option value="">ทั่วไป</option>
                 {studyPlans.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
