@@ -169,6 +169,27 @@ export function useUpdateProfile() {
   });
 }
 
+export type MyProfileEdit = Pick<
+  Profile,
+  "prefix" | "first_name" | "last_name" | "email" | "national_id" | "date_of_birth"
+>;
+
+/**
+ * Self-service edit (โปรไฟล์ของฉัน) — deliberately separate from
+ * useUpdateProfile: profiles_update_self RLS lets a signed-in user patch
+ * their own row directly, but profile_roles has no self-service write
+ * policy at all (role escalation must go through an admin), so this never
+ * touches roles/positionTitleIds the way the admin mutation does.
+ */
+export function useUpdateMyProfile() {
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: MyProfileEdit & { id: string }) => {
+      const { error } = await supabase.from("profiles").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+  });
+}
+
 export type UserInvite = {
   kind: "staff" | "student";
   /** student_code (kind="student") or phone (kind="staff") — also the login id. */

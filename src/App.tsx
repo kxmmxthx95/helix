@@ -7,6 +7,7 @@ import { Spinner } from "@/components/ui";
 import { Attendance } from "@/routes/Attendance";
 import { BehaviorScore } from "@/routes/BehaviorScore";
 import { ScoreRecording } from "@/routes/ScoreRecording";
+import { Profile } from "@/routes/Profile";
 import { Dashboard } from "@/routes/Dashboard";
 import { Login } from "@/routes/Login";
 import { Onboarding } from "@/routes/Onboarding";
@@ -60,6 +61,7 @@ function Gate() {
         <Route path="academic-events" element={<AcademicEvents />} />
         <Route path="status" element={<StatusManagement />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="profile" element={<Profile />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

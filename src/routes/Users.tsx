@@ -395,7 +395,7 @@ function RolePicker({
   );
 }
 
-function PrefixNameFields({
+export function PrefixNameFields({
   prefix,
   firstName,
   lastName,

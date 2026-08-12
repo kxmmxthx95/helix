@@ -289,12 +289,12 @@ export function AppShell() {
   );
 
   const userLabel = (
-    <div className="min-w-0">
+    <button type="button" onClick={() => navigate("/profile")} className="min-w-0 text-left tappable">
       <p className="truncate text-sm font-semibold">{displayName}</p>
       {profile && (
         <p className="truncate text-xs text-muted-foreground">{roleLabels(profile.roles)}</p>
       )}
-    </div>
+    </button>
   );
 
   const avatarButton = (avatarClassName?: string) => (
