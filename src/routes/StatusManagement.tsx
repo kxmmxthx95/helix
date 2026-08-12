@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Plus, Search } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner, Switch } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
+import { useFillPageSize } from "@/hooks/useFillPageSize";
+import { usePagination } from "@/hooks/usePagination";
 import { useDepartments, useProfiles } from "@/hooks/useProfiles";
 import {
   useAssignClassroom,
@@ -51,80 +53,155 @@ export function StatusManagement() {
 
   const [pickedDept, setPickedDept] = useState("");
   const [subTab, setSubTab] = useState<SubTab | "">("");
+  const [pickedGrade, setPickedGrade] = useState("");
+  const { data: gradeLevels = [] } = useGradeLevels(pickedDept || null);
+
+  useEffect(() => setPickedGrade(""), [pickedDept, subTab]);
 
   if (!me || !orgWide) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
   }
 
   return (
-    <div className="space-y-4">
-      {departments.length > 0 && (
+    <div className="page-fill">
+      <div className="grid shrink-0 grid-cols-3 gap-2">
+        {departments.length > 0 && (
+          <Select
+            className="min-w-0"
+            value={pickedDept}
+            onChange={(e) => setPickedDept(e.target.value)}
+            aria-label="แผนก"
+            placeholder="เลือกแผนก"
+          >
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
+        )}
+
         <Select
-          className="w-auto min-w-[10rem]"
-          value={pickedDept}
-          onChange={(e) => setPickedDept(e.target.value)}
-          aria-label="แผนก"
-          placeholder="เลือกแผนก"
+          className="min-w-0"
+          value={subTab}
+          onChange={(e) => setSubTab(e.target.value as SubTab)}
+          aria-label="เมนูจัดการสถานภาพ"
+          placeholder="เลือกเมนู"
         >
-          {departments.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
+          {SUB_TABS.map((t) => (
+            <option key={t.key} value={t.key}>
+              {t.label}
             </option>
           ))}
         </Select>
+
+        {subTab ? (
+          <Select
+            className="min-w-0"
+            value={pickedGrade}
+            onChange={(e) => setPickedGrade(e.target.value)}
+            aria-label="ชั้น"
+            placeholder="เลือกชั้น"
+            disabled={!pickedDept || gradeLevels.length === 0}
+          >
+            {gradeLevels.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          <div className="min-w-0" aria-hidden />
+        )}
+      </div>
+
+      {!pickedDept && (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="เลือกแผนก" description="เลือกแผนกด้านบนเพื่อจัดการสถานภาพ" />
+        </div>
+      )}
+      {pickedDept && !subTab && (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="เลือกเมนู" description="เลือกเมนูด้านบนเพื่อดำเนินการต่อ" />
+        </div>
       )}
 
-      <Select
-        className="w-auto min-w-[12rem]"
-        value={subTab}
-        onChange={(e) => setSubTab(e.target.value as SubTab)}
-        aria-label="เมนูจัดการสถานภาพ"
-        placeholder="เลือกเมนู"
-      >
-        {SUB_TABS.map((t) => (
-          <option key={t.key} value={t.key}>
-            {t.label}
-          </option>
-        ))}
-      </Select>
-
-      {pickedDept && subTab === "promote" && <PromotionPanel departmentId={pickedDept} />}
-      {pickedDept && subTab === "classroom" && <ClassroomPanel departmentId={pickedDept} />}
-      {pickedDept && subTab === "status" && <BulkStatusPanel departmentId={pickedDept} />}
-      {pickedDept && subTab === "transfer" && <TransferIntakePanel departmentId={pickedDept} />}
+      {pickedDept && subTab === "promote" && pickedGrade && (
+        <PromotionPanel
+          departmentId={pickedDept}
+          sourceGradeLevelId={pickedGrade}
+          onPromoted={() => setPickedGrade("")}
+        />
+      )}
+      {pickedDept && subTab === "classroom" && pickedGrade && (
+        <ClassroomPanel departmentId={pickedDept} gradeLevelId={pickedGrade} />
+      )}
+      {pickedDept && subTab === "status" && pickedGrade && (
+        <BulkStatusPanel departmentId={pickedDept} gradeLevelId={pickedGrade} />
+      )}
+      {pickedDept && subTab === "transfer" && (
+        <TransferIntakePanel departmentId={pickedDept} gradeLevelId={pickedGrade} />
+      )}
     </div>
   );
 }
 
 // ------------------------------------------------------------- promotion
 
-function PromotionPanel({ departmentId }: { departmentId: string }) {
+function PromotionPanel({
+  departmentId,
+  sourceGradeLevelId,
+  onPromoted,
+}: {
+  departmentId: string;
+  sourceGradeLevelId: string;
+  onPromoted: () => void;
+}) {
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
   const { data: students = [] } = useStudents({ search: "", departmentId, status: "studying" });
   const promote = usePromoteStudents();
 
-  const [sourceId, setSourceId] = useState("");
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [previewing, setPreviewing] = useState(false);
 
   useEffect(() => {
-    setSourceId("");
     setExcluded(new Set());
     setPreviewing(false);
-  }, [departmentId]);
+  }, [departmentId, sourceGradeLevelId]);
 
-  const source = gradeLevels.find((g) => g.id === sourceId);
+  const source = gradeLevels.find((g) => g.id === sourceGradeLevelId);
   const target = source ? gradeLevels.find((g) => g.sort_order === source.sort_order + 1) : undefined;
   const isTop = !!source && !target;
 
-  const inGrade = useMemo(() => students.filter((s) => s.grade_level_id === sourceId), [students, sourceId]);
+  const inGrade = useMemo(
+    () => students.filter((s) => s.grade_level_id === sourceGradeLevelId),
+    [students, sourceGradeLevelId],
+  );
   const promoting = inGrade.filter((s) => !excluded.has(s.id));
 
-  function pickSource(id: string) {
-    setSourceId(id);
-    setExcluded(new Set());
-    setPreviewing(false);
-  }
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const previewScrollRef = useRef<HTMLDivElement>(null);
+  const tableReady = !previewing && inGrade.length > 0;
+  const previewReady = previewing && promoting.length > 0;
+  const pageSize = useFillPageSize(scrollRef, tableReady);
+  const previewPageSize = useFillPageSize(previewScrollRef, previewReady);
+  const { page, setPage, pageCount, pageRows } = usePagination(
+    inGrade,
+    [sourceGradeLevelId, departmentId, pageSize],
+    pageSize,
+  );
+  const {
+    page: previewPage,
+    setPage: setPreviewPage,
+    pageCount: previewPageCount,
+    pageRows: previewPageRows,
+  } = usePagination(
+    promoting,
+    [sourceGradeLevelId, departmentId, previewPageSize, previewing],
+    previewPageSize,
+  );
+
+  const allPageIncluded = pageRows.length > 0 && pageRows.every((s) => !excluded.has(s.id));
 
   function toggleExclude(id: string) {
     setExcluded((prev) => {
@@ -135,99 +212,159 @@ function PromotionPanel({ departmentId }: { departmentId: string }) {
     });
   }
 
+  function toggleAllPage() {
+    setExcluded((prev) => {
+      const next = new Set(prev);
+      if (allPageIncluded) pageRows.forEach((s) => next.add(s.id));
+      else pageRows.forEach((s) => next.delete(s.id));
+      return next;
+    });
+  }
+
   function confirm() {
     promote.mutate(
       { studentIds: promoting.map((s) => s.id), targetGradeLevelId: target?.id ?? null },
       {
         onSuccess: () => {
           setPreviewing(false);
-          setSourceId("");
           setExcluded(new Set());
+          onPromoted();
         },
       },
     );
   }
 
-  return (
-    <Card className="space-y-4">
-      <Field label="ชั้นต้นทาง">
-        <Select value={sourceId} onChange={(e) => pickSource(e.target.value)}>
-          <option value="">— เลือกชั้น —</option>
-          {gradeLevels.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
-            </option>
-          ))}
-        </Select>
-      </Field>
+  if (!source) return null;
 
-      {source && !previewing && (
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      {!previewing && (
         <>
-          <p className="text-sm text-muted-foreground">
-            {isTop
-              ? `นักเรียนที่ติ๊กไว้จะจบการศึกษา (${source.name})`
-              : `นักเรียนที่ติ๊กไว้จะเลื่อนจาก ${source.name} ไป ${target!.name}`}
-          </p>
-          {inGrade.length === 0 && (
-            <p className="text-sm text-muted-foreground">ไม่มีนักเรียนกำลังศึกษาชั้นนี้</p>
+          {inGrade.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center">
+              <EmptyState title="ไม่พบข้อมูล" description="ไม่มีนักเรียนกำลังศึกษาชั้นนี้" />
+            </div>
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col gap-2">
+              <div className="table-panel">
+                <div ref={scrollRef} className="table-panel-scroll">
+                  <table className="w-full min-w-[40rem] text-xs">
+                    <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                      <tr>
+                        <th className="w-8 px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={allPageIncluded}
+                            onChange={toggleAllPage}
+                            aria-label={allPageIncluded ? "ยกเลิกทั้งหมดในหน้า" : "เลือกทั้งหมดในหน้า"}
+                          />
+                        </th>
+                        <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
+                        <th className="px-3 py-2 font-medium">คำนำหน้า</th>
+                        <th className="px-3 py-2 font-medium">รายชื่อ</th>
+                        <th className="px-3 py-2 font-medium">สถานะ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pageRows.map((s) => {
+                        const name = `${s.first_name} ${s.last_name}`;
+                        const skipped = excluded.has(s.id);
+                        return (
+                          <tr key={s.id} className="h-[40px] border-t border-border">
+                            <td className="px-3 py-0">
+                              <input
+                                type="checkbox"
+                                checked={!skipped}
+                                onChange={() => toggleExclude(s.id)}
+                                aria-label={`เลื่อน ${name}`}
+                              />
+                            </td>
+                            <td className="px-3 py-0">{s.student_code}</td>
+                            <td className="px-3 py-0 font-medium">{s.prefix ?? "—"}</td>
+                            <td className="px-3 py-0 font-medium">{name}</td>
+                            <td className="px-3 py-0">
+                              {skipped ? (
+                                <span className="text-[10px] text-warning">ซ้ำชั้น — ไม่เลื่อน</span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+              <Button
+                className="shrink-0 self-start"
+                disabled={promoting.length === 0}
+                onClick={() => setPreviewing(true)}
+              >
+                ตรวจสอบก่อนเลื่อน ({promoting.length} คน)
+              </Button>
+            </div>
           )}
-          {inGrade.length > 0 && (
-            <ul className="max-h-96 divide-y divide-border overflow-y-auto text-sm">
-              {inGrade.map((s) => (
-                <li key={s.id} className="flex items-center gap-2 py-1.5">
-                  <input
-                    type="checkbox"
-                    checked={!excluded.has(s.id)}
-                    onChange={() => toggleExclude(s.id)}
-                  />
-                  <span className="flex-1">
-                    {s.first_name} {s.last_name}{" "}
-                    <span className="text-xs text-muted-foreground">({s.student_code})</span>
-                  </span>
-                  {excluded.has(s.id) && (
-                    <span className="text-xs text-warning">ซ้ำชั้น — ไม่เลื่อน</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-          <Button disabled={promoting.length === 0} onClick={() => setPreviewing(true)}>
-            ตรวจสอบก่อนเลื่อน ({promoting.length} คน)
-          </Button>
         </>
       )}
 
-      {source && previewing && (
+      {previewing && (
         <>
-          <p className="text-sm font-medium">
+          <p className="shrink-0 text-sm font-medium">
             ยืนยันเลื่อน {promoting.length} คน{" "}
             {isTop ? "→ จบการศึกษา" : `จาก ${source.name} → ${target!.name}`}
           </p>
-          <ul className="max-h-96 divide-y divide-border overflow-y-auto text-sm">
-            {promoting.map((s) => (
-              <li key={s.id} className="py-1.5">
-                {s.first_name} {s.last_name}{" "}
-                <span className="text-xs text-muted-foreground">({s.student_code})</span>
-              </li>
-            ))}
-          </ul>
-          <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setPreviewing(false)}>
-              ย้อนกลับ
-            </Button>
-            <Button className="flex-1" onClick={confirm} disabled={promote.isPending}>
-              {promote.isPending ? <Spinner className="h-3 w-3" /> : "ยืนยันเลื่อนชั้น"}
-            </Button>
+          <div className="flex min-h-0 flex-1 flex-col gap-2">
+            <div className="table-panel">
+              <div ref={previewScrollRef} className="table-panel-scroll">
+                <table className="w-full min-w-[40rem] text-xs">
+                  <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
+                      <th className="px-3 py-2 font-medium">คำนำหน้า</th>
+                      <th className="px-3 py-2 font-medium">รายชื่อ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewPageRows.map((s) => (
+                      <tr key={s.id} className="h-[40px] border-t border-border">
+                        <td className="px-3 py-0">{s.student_code}</td>
+                        <td className="px-3 py-0 font-medium">{s.prefix ?? "—"}</td>
+                        <td className="px-3 py-0 font-medium">
+                          {s.first_name} {s.last_name}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <Pagination page={previewPage} pageCount={previewPageCount} onChange={setPreviewPage} />
+            <div className="flex shrink-0 gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setPreviewing(false)}>
+                ย้อนกลับ
+              </Button>
+              <Button className="flex-1" onClick={confirm} disabled={promote.isPending}>
+                {promote.isPending ? <Spinner className="h-3 w-3" /> : "ยืนยันเลื่อนชั้น"}
+              </Button>
+            </div>
           </div>
         </>
       )}
-    </Card>
+    </div>
   );
 }
 
 // ------------------------------------------------------------- classroom
 
-function ClassroomPanel({ departmentId }: { departmentId: string }) {
+function ClassroomPanel({
+  departmentId,
+  gradeLevelId,
+}: {
+  departmentId: string;
+  gradeLevelId: string;
+}) {
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
   const { data: activeYear } = useActiveAcademicYear(departmentId);
   const { data: students = [] } = useStudents({ search: "", departmentId, status: "studying" });
@@ -235,16 +372,20 @@ function ClassroomPanel({ departmentId }: { departmentId: string }) {
   const setActive = useSetClassroomActive();
   const assign = useAssignClassroom();
 
-  const [gradeLevelId, setGradeLevelId] = useState("");
   const [newRoomName, setNewRoomName] = useState("");
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [targetRoomId, setTargetRoomId] = useState("");
+  const [pickedRoomId, setPickedRoomId] = useState("");
+  const [homeroomOpen, setHomeroomOpen] = useState(false);
 
-  useEffect(() => setGradeLevelId(""), [departmentId]);
   useEffect(() => {
     setSelected(new Set());
     setTargetRoomId("");
     setNewRoomName("");
+    setSearch("");
+    setPickedRoomId("");
+    setHomeroomOpen(false);
   }, [gradeLevelId]);
 
   const academicYear = activeYear ?? new Date().getFullYear() + 543;
@@ -252,22 +393,58 @@ function ClassroomPanel({ departmentId }: { departmentId: string }) {
   const { data: enrollments = [] } = useCurrentClassroomEnrollments(gradeLevelId || null, academicYear);
 
   const gradeLevel = gradeLevels.find((g) => g.id === gradeLevelId);
-  const inGrade = useMemo(
-    () => students.filter((s) => s.grade_level_id === gradeLevelId),
-    [students, gradeLevelId],
-  );
+  const query = search.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    return students.filter((s) => {
+      if (s.grade_level_id !== gradeLevelId) return false;
+      if (!query) return true;
+      const hay = `${s.student_code} ${s.prefix ?? ""} ${s.first_name} ${s.last_name}`.toLowerCase();
+      return hay.includes(query);
+    });
+  }, [students, gradeLevelId, query]);
   const roomByStudent = useMemo(
     () => new Map(enrollments.map((e) => [e.student_id, e.classroom_id])),
     [enrollments],
   );
   const roomName = useMemo(() => new Map(classrooms.map((c) => [c.id, c.name])), [classrooms]);
   const activeRooms = classrooms.filter((c) => c.is_active);
+  const pickedRoom = classrooms.find((c) => c.id === pickedRoomId);
+
+  useEffect(() => {
+    if (pickedRoomId && !classrooms.some((c) => c.id === pickedRoomId)) {
+      setPickedRoomId("");
+      setHomeroomOpen(false);
+    }
+  }, [classrooms, pickedRoomId]);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const tableReady = filtered.length > 0;
+  const pageSize = useFillPageSize(scrollRef, tableReady);
+  const { page, setPage, pageCount, pageRows } = usePagination(
+    filtered,
+    [gradeLevelId, departmentId, query, pageSize],
+    pageSize,
+  );
+  useEffect(() => {
+    setSelected(new Set());
+  }, [gradeLevelId, query]);
+
+  const allPageSelected = pageRows.length > 0 && pageRows.every((s) => selected.has(s.id));
 
   function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) pageRows.forEach((s) => next.delete(s.id));
+      else pageRows.forEach((s) => next.add(s.id));
       return next;
     });
   }
@@ -294,207 +471,310 @@ function ClassroomPanel({ departmentId }: { departmentId: string }) {
   }
 
   return (
-    <div className="space-y-4">
-      <Field label="ชั้น">
-        <Select value={gradeLevelId} onChange={(e) => setGradeLevelId(e.target.value)}>
-          <option value="">— เลือกชั้น —</option>
-          {gradeLevels.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name}
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <Select
+          className="min-w-0 flex-1"
+          value={pickedRoomId}
+          onChange={(e) => setPickedRoomId(e.target.value)}
+          aria-label="ห้อง"
+          placeholder="เลือกห้อง"
+        >
+          {classrooms.map((c) => (
+            <option key={c.id} value={c.id}>
+              {gradeLevel?.name}/{c.name}
+              {c.is_active ? "" : " (ปิดใช้งาน)"}
             </option>
           ))}
         </Select>
-      </Field>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!pickedRoom}
+          onClick={() => setHomeroomOpen(true)}
+        >
+          ครูประจำชั้น
+        </Button>
+        <form onSubmit={submitNewRoom} className="flex gap-2">
+          <Input
+            value={newRoomName}
+            onChange={(e) => setNewRoomName(e.target.value)}
+            placeholder="เลขห้อง เช่น 1"
+            className="w-28"
+          />
+          <Button
+            type="submit"
+            size="icon"
+            disabled={!newRoomName.trim() || createRoom.isPending}
+            aria-label="เพิ่มห้อง"
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+        </form>
+        <Switch
+          checked={pickedRoom?.is_active ?? false}
+          disabled={!pickedRoom || setActive.isPending}
+          label={pickedRoom?.is_active ? "ปิดใช้งาน" : "เปิดใช้งาน"}
+          onChange={(is_active) =>
+            pickedRoom && setActive.mutate({ id: pickedRoom.id, is_active })
+          }
+        />
+      </div>
 
-      {gradeLevelId && (
-        <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
-          <Card className="space-y-3">
-            <h3 className="text-sm font-semibold">ห้องเรียนของ{gradeLevel?.name}</h3>
-            <ul className="divide-y divide-border text-sm">
-              {classrooms.map((c) => (
-                <li key={c.id} className="flex items-center justify-between gap-2 py-1.5">
-                  <span className={c.is_active ? "" : "text-muted-foreground line-through"}>
-                    {gradeLevel?.name}/{c.name}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setActive.mutate({ id: c.id, is_active: !c.is_active })}
-                  >
-                    {c.is_active ? "ปิดใช้งาน" : "เปิดใช้งาน"}
-                  </Button>
-                </li>
-              ))}
-              {classrooms.length === 0 && (
-                <p className="py-2 text-sm text-muted-foreground">ยังไม่มีห้อง</p>
-              )}
-            </ul>
-            <form onSubmit={submitNewRoom} className="flex gap-2">
-              <Input
-                value={newRoomName}
-                onChange={(e) => setNewRoomName(e.target.value)}
-                placeholder="เลขห้อง เช่น 1"
-                className="flex-1"
-              />
-              <Button type="submit" size="icon" disabled={createRoom.isPending} aria-label="เพิ่มห้อง">
-                <Plus className="h-3 w-3" />
-              </Button>
-            </form>
-          </Card>
+      <div className="relative shrink-0">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="ค้นหาชื่อหรือรหัสนักเรียน"
+          className="pl-9"
+          type="search"
+        />
+      </div>
 
-          <Card className="space-y-3">
-            <h3 className="text-sm font-semibold">จัดนักเรียนเข้าห้อง (ปีการศึกษา {academicYear})</h3>
-            <ul className="max-h-80 divide-y divide-border overflow-y-auto text-xs">
-              {inGrade.map((s) => (
-                <li key={s.id} className="flex items-center gap-2 py-1.5">
-                  <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} />
-                  <span className="flex-1">
-                    {s.first_name} {s.last_name}
-                  </span>
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                    {roomByStudent.has(s.id)
-                      ? `${gradeLevel?.name}/${roomName.get(roomByStudent.get(s.id)!) ?? "—"}`
-                      : "ยังไม่จัดห้อง"}
-                  </span>
-                </li>
-              ))}
-              {inGrade.length === 0 && (
-                <p className="py-2 text-sm text-muted-foreground">ไม่มีนักเรียนกำลังศึกษาชั้นนี้</p>
-              )}
-            </ul>
-            <div className="flex gap-2">
-              <Select value={targetRoomId} onChange={(e) => setTargetRoomId(e.target.value)} className="flex-1">
-                <option value="">— เลือกห้องปลายทาง —</option>
-                {activeRooms.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {gradeLevel?.name}/{c.name}
-                  </option>
-                ))}
-              </Select>
-              <Button onClick={submitAssign} disabled={selected.size === 0 || !targetRoomId || assign.isPending}>
-                {assign.isPending ? <Spinner className="h-3 w-3" /> : `ย้าย ${selected.size} คน`}
-              </Button>
+      {filtered.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState
+            title="ไม่พบข้อมูล"
+            description={query ? "ไม่พบนักเรียนตามคำค้น" : "ไม่มีนักเรียนกำลังศึกษาชั้นนี้"}
+          />
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+          <div className="table-panel">
+            <div ref={scrollRef} className="table-panel-scroll">
+              <table className="w-full min-w-[40rem] text-xs">
+                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="w-8 px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={allPageSelected}
+                        onChange={toggleAll}
+                        aria-label={allPageSelected ? "ล้างที่เลือก" : "เลือกทั้งหมด"}
+                      />
+                    </th>
+                    <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
+                    <th className="px-3 py-2 font-medium">คำนำหน้า</th>
+                    <th className="px-3 py-2 font-medium">รายชื่อ</th>
+                    <th className="px-3 py-2 font-medium">ห้อง</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map((s) => {
+                    const roomId = roomByStudent.get(s.id);
+                    const name = `${s.first_name} ${s.last_name}`;
+                    return (
+                      <tr key={s.id} className="h-[40px] border-t border-border">
+                        <td className="px-3 py-0">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(s.id)}
+                            onChange={() => toggle(s.id)}
+                            aria-label={`เลือก ${name}`}
+                          />
+                        </td>
+                        <td className="px-3 py-0">{s.student_code}</td>
+                        <td className="px-3 py-0 font-medium">{s.prefix ?? "—"}</td>
+                        <td className="px-3 py-0 font-medium">{name}</td>
+                        <td className="px-3 py-0">
+                          {roomId ? (
+                            <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] text-success">
+                              {gradeLevel?.name}/{roomName.get(roomId) ?? "—"}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">ยังไม่จัดห้อง</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          </Card>
+          </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+          <div className="flex shrink-0 gap-2">
+            <Select value={targetRoomId} onChange={(e) => setTargetRoomId(e.target.value)} className="flex-1">
+              <option value="">— เลือกห้องปลายทาง —</option>
+              {activeRooms.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {gradeLevel?.name}/{c.name}
+                </option>
+              ))}
+            </Select>
+            <Button onClick={submitAssign} disabled={selected.size === 0 || !targetRoomId || assign.isPending}>
+              {assign.isPending ? <Spinner className="h-3 w-3" /> : `ย้าย ${selected.size} คน`}
+            </Button>
+          </div>
         </div>
       )}
 
-      {gradeLevelId && (
-        <HomeroomCard
-          departmentId={departmentId}
-          gradeLevelName={gradeLevel?.name ?? ""}
-          activeRooms={activeRooms}
-          academicYear={academicYear}
-        />
-      )}
+      <HomeroomSheet
+        open={homeroomOpen && !!pickedRoom}
+        onClose={() => setHomeroomOpen(false)}
+        classroomId={pickedRoom?.id ?? null}
+        classroomLabel={pickedRoom ? `${gradeLevel?.name}/${pickedRoom.name}` : ""}
+        departmentId={departmentId}
+        academicYear={academicYear}
+      />
     </div>
   );
 }
 
-function HomeroomCard({
+function HomeroomSheet({
+  open,
+  onClose,
+  classroomId,
+  classroomLabel,
   departmentId,
-  gradeLevelName,
-  activeRooms,
   academicYear,
 }: {
+  open: boolean;
+  onClose: () => void;
+  classroomId: string | null;
+  classroomLabel: string;
   departmentId: string;
-  gradeLevelName: string;
-  activeRooms: { id: string; name: string }[];
   academicYear: number;
 }) {
-  const [roomId, setRoomId] = useState("");
+  const [filterDept, setFilterDept] = useState(departmentId);
   const [addingTeacherId, setAddingTeacherId] = useState("");
 
   useEffect(() => {
-    setRoomId("");
     setAddingTeacherId("");
-  }, [activeRooms]);
+    setFilterDept(departmentId);
+  }, [classroomId, departmentId, open]);
 
-  // Default filter to the room's own department — DB doesn't enforce it (grill
-  // decision), but same-department is the normal case and a much shorter list.
-  const { data: teachers = [] } = useProfiles({ search: "", departmentId, role: "teacher", active: "true" });
-  const { data: homerooms = [] } = useHomeroomTeachers(roomId || null, academicYear);
+  // DB doesn't enforce same-department (grill decision); filter defaults to the
+  // room's department but can widen so a teacher from another dept can be set.
+  const { data: departments = [] } = useDepartments();
+  const { data: teachers = [] } = useProfiles({
+    search: "",
+    departmentId: "",
+    role: "teacher",
+    active: "true",
+  });
+  const { data: homerooms = [] } = useHomeroomTeachers(classroomId, academicYear);
   const setTeacher = useSetHomeroomTeacher();
   const removeTeacher = useRemoveHomeroomTeacher();
 
   const teacherName = useMemo(() => new Map(teachers.map((t) => [t.id, profileFullName(t)])), [teachers]);
   const assignedIds = useMemo(() => new Set(homerooms.map((h) => h.teacher_id)), [homerooms]);
-  const pickable = teachers.filter((t) => !assignedIds.has(t.id));
-  const room = activeRooms.find((c) => c.id === roomId);
+  const pickable = teachers.filter(
+    (t) => !assignedIds.has(t.id) && (!filterDept || t.department_id === filterDept),
+  );
 
   function addTeacher() {
-    if (!roomId || !addingTeacherId) return;
+    if (!classroomId || !addingTeacherId) return;
     setTeacher.mutate(
-      { classroom_id: roomId, teacher_id: addingTeacherId, academic_year: academicYear },
+      { classroom_id: classroomId, teacher_id: addingTeacherId, academic_year: academicYear },
       { onSuccess: () => setAddingTeacherId("") },
     );
   }
 
   return (
-    <Card className="space-y-3">
-      <h3 className="text-sm font-semibold">ครูประจำชั้น (ปีการศึกษา {academicYear})</h3>
-      <Field label="ห้อง">
-        <Select value={roomId} onChange={(e) => setRoomId(e.target.value)}>
-          <option value="">— เลือกห้อง —</option>
-          {activeRooms.map((c) => (
-            <option key={c.id} value={c.id}>
-              {gradeLevelName}/{c.name}
+    <Sheet
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      side="right"
+      title="ครูประจำชั้น"
+      description={`${classroomLabel} · ปีการศึกษา ${academicYear}`}
+    >
+      <div className="space-y-3">
+        <ul className="divide-y divide-border text-sm">
+          {homerooms.map((h) => (
+            <li key={h.id} className="flex items-center justify-between gap-2 py-1.5">
+              <span>{teacherName.get(h.teacher_id) ?? "—"}</span>
+              <Button variant="outline" size="sm" onClick={() => removeTeacher.mutate(h.id)}>
+                ลบ
+              </Button>
+            </li>
+          ))}
+          {homerooms.length === 0 && (
+            <p className="py-2 text-sm text-muted-foreground">ยังไม่มีครูประจำชั้น</p>
+          )}
+        </ul>
+        <Select
+          value={filterDept}
+          onChange={(e) => {
+            setFilterDept(e.target.value);
+            setAddingTeacherId("");
+          }}
+          aria-label="แผนก"
+        >
+          <option value="">ทุกแผนก</option>
+          {departments.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
             </option>
           ))}
         </Select>
-      </Field>
-
-      {room && (
-        <>
-          <ul className="divide-y divide-border text-sm">
-            {homerooms.map((h) => (
-              <li key={h.id} className="flex items-center justify-between gap-2 py-1.5">
-                <span>{teacherName.get(h.teacher_id) ?? "—"}</span>
-                <Button variant="outline" size="sm" onClick={() => removeTeacher.mutate(h.id)}>
-                  ลบ
-                </Button>
-              </li>
+        <div className="flex gap-2">
+          <Select value={addingTeacherId} onChange={(e) => setAddingTeacherId(e.target.value)} className="flex-1">
+            <option value="">— เลือกครู —</option>
+            {pickable.map((t) => (
+              <option key={t.id} value={t.id}>
+                {profileFullName(t)}
+              </option>
             ))}
-            {homerooms.length === 0 && (
-              <p className="py-2 text-sm text-muted-foreground">ยังไม่มีครูประจำชั้น</p>
-            )}
-          </ul>
-          <div className="flex gap-2">
-            <Select value={addingTeacherId} onChange={(e) => setAddingTeacherId(e.target.value)} className="flex-1">
-              <option value="">— เลือกครู —</option>
-              {pickable.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {profileFullName(t)}
-                </option>
-              ))}
-            </Select>
-            <Button onClick={addTeacher} disabled={!addingTeacherId || setTeacher.isPending}>
-              {setTeacher.isPending ? <Spinner className="h-3 w-3" /> : "เพิ่ม"}
-            </Button>
-          </div>
-        </>
-      )}
-    </Card>
+          </Select>
+          <Button onClick={addTeacher} disabled={!addingTeacherId || setTeacher.isPending}>
+            {setTeacher.isPending ? <Spinner className="h-3 w-3" /> : "เพิ่ม"}
+          </Button>
+        </div>
+      </div>
+    </Sheet>
   );
 }
 
 // ------------------------------------------------------------- bulk status
 
-function BulkStatusPanel({ departmentId }: { departmentId: string }) {
+function BulkStatusPanel({
+  departmentId,
+  gradeLevelId,
+}: {
+  departmentId: string;
+  gradeLevelId: string;
+}) {
   const [search, setSearch] = useState("");
   const { data: students = [] } = useStudents({ search, departmentId, status: "" });
   const bulkSet = useBulkSetStudentStatus();
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [targetStatus, setTargetStatus] = useState<StudentStatus>("transferred");
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
-  useEffect(() => setSelected(new Set()), [departmentId]);
+  const rows = useMemo(
+    () => (gradeLevelId ? students.filter((s) => s.grade_level_id === gradeLevelId) : students),
+    [students, gradeLevelId],
+  );
+
+  useEffect(() => setSelected(new Set()), [departmentId, gradeLevelId, search]);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const tableReady = rows.length > 0;
+  const pageSize = useFillPageSize(scrollRef, tableReady);
+  const { page, setPage, pageCount, pageRows } = usePagination(
+    rows,
+    [departmentId, gradeLevelId, search, pageSize],
+    pageSize,
+  );
+  const allPageSelected = pageRows.length > 0 && pageRows.every((s) => selected.has(s.id));
 
   function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) pageRows.forEach((s) => next.delete(s.id));
+      else pageRows.forEach((s) => next.add(s.id));
       return next;
     });
   }
@@ -508,9 +788,19 @@ function BulkStatusPanel({ departmentId }: { departmentId: string }) {
     );
   }
 
+  function changeOne(studentId: string, name: string, status: StudentStatus, current: StudentStatus) {
+    if (status === current) return;
+    if (!confirm(`เปลี่ยนสถานะของ "${name}" เป็น "${STATUS_LABEL[status]}"?`)) return;
+    setPendingId(studentId);
+    bulkSet.mutate(
+      { studentIds: [studentId], status },
+      { onSettled: () => setPendingId(null) },
+    );
+  }
+
   return (
-    <Card className="space-y-3">
-      <div className="relative">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <div className="relative shrink-0">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={search}
@@ -521,39 +811,91 @@ function BulkStatusPanel({ departmentId }: { departmentId: string }) {
         />
       </div>
 
-      <ul className="max-h-96 divide-y divide-border overflow-y-auto text-sm">
-        {students.map((s) => (
-          <li key={s.id} className="flex items-center gap-2 py-1.5">
-            <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} />
-            <span className="flex-1">
-              {s.first_name} {s.last_name}{" "}
-              <span className="text-xs text-muted-foreground">({s.student_code})</span>
-            </span>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-              {STATUS_LABEL[s.status]}
-            </span>
-          </li>
-        ))}
-        {students.length === 0 && <p className="py-2 text-sm text-muted-foreground">ไม่มีนักเรียน</p>}
-      </ul>
-
-      <div className="flex gap-2">
-        <Select
-          value={targetStatus}
-          onChange={(e) => setTargetStatus(e.target.value as StudentStatus)}
-          className="flex-1"
-        >
-          {(Object.keys(STATUS_LABEL) as StudentStatus[]).map((s) => (
-            <option key={s} value={s}>
-              {STATUS_LABEL[s]}
-            </option>
-          ))}
-        </Select>
-        <Button onClick={submit} disabled={selected.size === 0 || bulkSet.isPending}>
-          {bulkSet.isPending ? <Spinner className="h-3 w-3" /> : `เปลี่ยนสถานะ ${selected.size} คน`}
-        </Button>
-      </div>
-    </Card>
+      {rows.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="ไม่พบข้อมูล" description="ไม่มีนักเรียนตามเงื่อนไขที่เลือก" />
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+          <div className="table-panel">
+            <div ref={scrollRef} className="table-panel-scroll">
+              <table className="w-full min-w-[40rem] text-xs">
+                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="w-8 px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={allPageSelected}
+                        onChange={toggleAll}
+                        aria-label={allPageSelected ? "ล้างที่เลือก" : "เลือกทั้งหมด"}
+                      />
+                    </th>
+                    <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
+                    <th className="px-3 py-2 font-medium">คำนำหน้า</th>
+                    <th className="px-3 py-2 font-medium">รายชื่อ</th>
+                    <th className="px-3 py-2 font-medium">สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map((s) => {
+                    const name = `${s.first_name} ${s.last_name}`;
+                    return (
+                      <tr key={s.id} className="h-[40px] border-t border-border">
+                        <td className="px-3 py-0">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(s.id)}
+                            onChange={() => toggle(s.id)}
+                            aria-label={`เลือก ${name}`}
+                          />
+                        </td>
+                        <td className="px-3 py-0">{s.student_code}</td>
+                        <td className="px-3 py-0 font-medium">{s.prefix ?? "—"}</td>
+                        <td className="px-3 py-0 font-medium">{name}</td>
+                        <td className="px-3 py-0">
+                          <Select
+                            className="h-6 min-w-[7rem] px-1.5 text-[10px]"
+                            aria-label={`สถานะของ ${name}`}
+                            value={s.status}
+                            disabled={pendingId === s.id || bulkSet.isPending}
+                            onChange={(e) =>
+                              changeOne(s.id, name, e.target.value as StudentStatus, s.status)
+                            }
+                          >
+                            {(Object.keys(STATUS_LABEL) as StudentStatus[]).map((st) => (
+                              <option key={st} value={st}>
+                                {STATUS_LABEL[st]}
+                              </option>
+                            ))}
+                          </Select>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+          <div className="flex shrink-0 gap-2">
+            <Select
+              value={targetStatus}
+              onChange={(e) => setTargetStatus(e.target.value as StudentStatus)}
+              className="flex-1"
+            >
+              {(Object.keys(STATUS_LABEL) as StudentStatus[]).map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_LABEL[s]}
+                </option>
+              ))}
+            </Select>
+            <Button onClick={submit} disabled={selected.size === 0 || bulkSet.isPending}>
+              {bulkSet.isPending ? <Spinner className="h-3 w-3" /> : `เปลี่ยนสถานะ ${selected.size} คน`}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -564,58 +906,78 @@ function BulkStatusPanel({ departmentId }: { departmentId: string }) {
 // single ad-hoc student. This panel just remembers source_school and
 // shows whether those two steps are done, derived live rather than stored.
 
-function TransferIntakePanel({ departmentId }: { departmentId: string }) {
+function TransferIntakePanel({
+  departmentId,
+  gradeLevelId,
+}: {
+  departmentId: string;
+  gradeLevelId: string;
+}) {
   const [creating, setCreating] = useState(false);
   const { data: intakes = [] } = useTransferIntakes();
   const { data: students = [] } = useStudents({ search: "", departmentId, status: "" });
 
   const studentById = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
   const deptIntakes = useMemo(
-    () => intakes.filter((i) => studentById.has(i.student_id)),
-    [intakes, studentById],
+    () =>
+      intakes.filter((i) => {
+        const s = studentById.get(i.student_id);
+        if (!s) return false;
+        if (gradeLevelId && s.grade_level_id !== gradeLevelId) return false;
+        return true;
+      }),
+    [intakes, studentById, gradeLevelId],
   );
   const studentIds = useMemo(() => deptIntakes.map((i) => i.student_id), [deptIntakes]);
   const { data: progress } = useTransferProgress(studentIds);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">เคสรับย้ายเข้า</h3>
-        <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="h-3.5 w-3.5" />
-          เพิ่มเคสใหม่
-        </Button>
-      </div>
-
-      <Card className="divide-y divide-border p-0">
-        {deptIntakes.length === 0 && (
-          <p className="p-4 text-sm text-muted-foreground">ยังไม่มีเคสรับย้ายเข้าในแผนกนี้</p>
-        )}
-        {deptIntakes.map((intake) => {
-          const student = studentById.get(intake.student_id);
-          const hasClassroom = progress?.hasClassroom.has(intake.student_id) ?? false;
-          const hasCohort = progress?.hasCohort.has(intake.student_id) ?? false;
-          return (
-            <div key={intake.id} className="flex flex-wrap items-center gap-2 p-3 text-sm">
-              <div className="min-w-0 flex-1">
-                <div>
-                  {student ? `${student.first_name} ${student.last_name}` : "—"}{" "}
-                  <span className="text-xs text-muted-foreground">({student?.student_code ?? "—"})</span>
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      {deptIntakes.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState
+            title="ยังไม่มีเคสรับย้ายเข้า"
+            description='จัดห้อง: ไปแท็บ "จัดห้องเรียน" · ลงทะเบียน: ไปหน้า "ลงทะเบียน"'
+            action={
+              <Button size="sm" onClick={() => setCreating(true)}>
+                <Plus className="h-3.5 w-3.5" />
+                ย้ายเข้า
+              </Button>
+            }
+          />
+        </div>
+      ) : (
+        <>
+          <div className="flex shrink-0 items-center justify-end">
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              ย้ายเข้า
+            </Button>
+          </div>
+          <Card className="divide-y divide-border p-0">
+            {deptIntakes.map((intake) => {
+              const student = studentById.get(intake.student_id);
+              const hasClassroom = progress?.hasClassroom.has(intake.student_id) ?? false;
+              const hasCohort = progress?.hasCohort.has(intake.student_id) ?? false;
+              return (
+                <div key={intake.id} className="flex flex-wrap items-center gap-2 p-3 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <div>
+                      {student ? `${student.first_name} ${student.last_name}` : "—"}{" "}
+                      <span className="text-xs text-muted-foreground">({student?.student_code ?? "—"})</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      จาก {intake.source_school} · รับเข้า {intake.intake_date}
+                    </div>
+                  </div>
+                  <TransferStatusBadge done={hasClassroom} doneLabel="จัดห้องแล้ว" pendingLabel="ยังไม่จัดห้อง" />
+                  <TransferStatusBadge done={hasCohort} doneLabel="ลงทะเบียนแล้ว" pendingLabel="ยังไม่ลงทะเบียน" />
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  จาก {intake.source_school} · รับเข้า {intake.intake_date}
-                </div>
-              </div>
-              <TransferStatusBadge done={hasClassroom} doneLabel="จัดห้องแล้ว" pendingLabel="ยังไม่จัดห้อง" />
-              <TransferStatusBadge done={hasCohort} doneLabel="ลงทะเบียนแล้ว" pendingLabel="ยังไม่ลงทะเบียน" />
-            </div>
-          );
-        })}
-      </Card>
-
-      <p className="text-xs text-muted-foreground">
-        จัดห้อง: ไปแท็บ "จัดห้องเรียน" ด้านบน · ลงทะเบียนเข้าหลักสูตร: ไปหน้า "ลงทะเบียน"
-      </p>
+              );
+            })}
+          </Card>
+        </>
+      )}
 
       <NewIntakeSheet open={creating} onClose={() => setCreating(false)} departmentId={departmentId} />
     </div>

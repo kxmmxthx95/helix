@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Pagination, Select, Spinner } from "@/components/ui";
 import {
   useCohorts,
   useCurrentEnrollments,
@@ -13,6 +13,8 @@ import {
   useStudyPlans,
   type EnrollmentDraft,
 } from "@/hooks/useCurriculumStructure";
+import { useFillPageSize } from "@/hooks/useFillPageSize";
+import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useStudents } from "@/hooks/useStudents";
@@ -68,8 +70,8 @@ export function Enrollment() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="page-fill">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         {orgWide && departments.length > 0 && (
           <Select
             className="min-w-0 flex-1"
@@ -357,6 +359,15 @@ function CohortEnrollmentPanel({
     });
   }, [students, enrollmentByStudent]);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const tableReady = rows.length > 0;
+  const pageSize = useFillPageSize(scrollRef, tableReady);
+  const { page, setPage, pageCount, pageRows } = usePagination(
+    rows,
+    [cohortId, departmentId, pageSize],
+    pageSize,
+  );
+
   function enrollOne(studentId: string) {
     const draft: EnrollmentDraft = {
       student_id: studentId,
@@ -400,24 +411,26 @@ function CohortEnrollmentPanel({
   const busy = enroll.isPending || deleteEnrollment.isPending;
 
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       {rows.length === 0 ? (
         <EmptyState title="ไม่พบข้อมูล" description="ไม่มีนักเรียนในแผนกนี้" />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[40rem] text-xs">
-            <thead className="bg-muted text-left text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">รหัส</th>
-                <th className="px-3 py-2 font-medium">ชื่อ-นามสกุล</th>
-                <th className="px-3 py-2 font-medium">ชั้น</th>
-                <th className="px-3 py-2 font-medium">แผนการเรียน</th>
-                <th className="px-3 py-2 font-medium">สถานะ</th>
-                {mayEdit && <th className="px-3 py-2 font-medium" />}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((s) => {
+        <>
+          <div className="table-panel">
+            <div ref={scrollRef} className="table-panel-scroll">
+              <table className="w-full min-w-[40rem] text-xs">
+                <thead className="sticky top-0 z-10 bg-muted text-left text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
+                    <th className="px-3 py-2 font-medium">รายชื่อ</th>
+                    <th className="px-3 py-2 font-medium">ระดับชั้น</th>
+                    <th className="px-3 py-2 font-medium">แผนการเรียน</th>
+                    <th className="px-3 py-2 font-medium">สถานะ</th>
+                    {mayEdit && <th className="px-3 py-2 font-medium" />}
+                  </tr>
+                </thead>
+                <tbody>
+              {pageRows.map((s) => {
                 const enrollment = enrollmentByStudent.get(s.id);
                 const gradeMismatch =
                   !enrollment && expectedGradeLevelId && s.grade_level_id !== expectedGradeLevelId;
@@ -477,18 +490,17 @@ function CohortEnrollmentPanel({
                       <td className="px-3 py-0 text-right">
                         {enrollment ? (
                           <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 gap-1 px-1.5 text-[10px]"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="ลบ"
                             disabled={busy}
                             onClick={() => removeOne(enrollment, name)}
                           >
                             {rowBusy && deleteEnrollment.isPending ? (
-                              <Spinner className="h-2.5 w-2.5" />
+                              <Spinner className="h-3.5 w-3.5" />
                             ) : (
-                              <X className="h-2.5 w-2.5" />
+                              <X className="h-3.5 w-3.5" />
                             )}
-                            ลบ
                           </Button>
                         ) : (
                           <Button
@@ -509,9 +521,12 @@ function CohortEnrollmentPanel({
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+        </>
       )}
     </div>
   );

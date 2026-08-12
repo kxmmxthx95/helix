@@ -46,44 +46,46 @@ export function TeachingLoad() {
 
   return (
     <div className="space-y-4">
-      {orgWide && departments.length > 0 && (
-        <Select
-          className="w-auto min-w-[10rem]"
-          value={pickedDept}
-          onChange={(e) => {
-            setPickedDept(e.target.value);
-            setSelectedTeacherId("");
-          }}
-          aria-label="แผนก"
-          placeholder="เลือกแผนก"
-        >
-          {departments.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </Select>
-      )}
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {orgWide && departments.length > 0 && (
+          <Select
+            className="w-auto min-w-[10rem]"
+            value={pickedDept}
+            onChange={(e) => {
+              setPickedDept(e.target.value);
+              setSelectedTeacherId("");
+            }}
+            aria-label="แผนก"
+            placeholder="เลือกแผนก"
+          >
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
+        )}
 
-      {splitsByTerm && (
-        <div className="inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
-          {[1, 2].map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTerm(t as 1 | 2)}
-              className={cn(
-                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                term === t
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              {TERM_LABEL[t]}
-            </button>
-          ))}
-        </div>
-      )}
+        {splitsByTerm && (
+          <div className="ml-auto inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
+            {[1, 2].map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTerm(t as 1 | 2)}
+                className={cn(
+                  "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                  term === t
+                    ? "bg-foreground/10 text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                {TERM_LABEL[t]}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {departmentId && (
         <TeachingLoadBoard
