@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { CheckboxIcon, CheckboxOutlineIcon, HelpCircleIcon, Plus, X } from "@/components/icons";
+import { CheckboxIcon, CheckboxOutlineIcon, HelpCircleIcon, PencilIcon, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
@@ -20,6 +20,7 @@ import {
   useKgAcademicYears,
   useKgAssessmentTopics,
   useLearningUnits,
+  useRenameCohort,
   useSaveCohort,
   useSaveCurriculumSubject,
   useSaveCurriculumSubjects,
@@ -36,6 +37,7 @@ import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import type { CurriculumSubject, DevelopmentDomain, StudyPlan, Subject, SubjectType } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
+import { gradesInEntryPath } from "@/lib/gradeLevels";
 
 export function Curriculum() {
   const { profile: me } = useAuth();
@@ -63,6 +65,12 @@ export function Curriculum() {
   const { data: cohorts = [] } = useCohorts(!isKg ? departmentId || null : null);
   const { data: kgYears = [] } = useKgAcademicYears(isKg ? gradeLevels.map((g) => g.id) : []);
 
+  const pickedCohortRow = cohorts.find((c) => c.id === pickedCohort);
+  const visibleGradeLevels = useMemo(() => {
+    if (isKg || !pickedCohortRow) return gradeLevels;
+    return gradesInEntryPath(gradeLevels, pickedCohortRow.entry_grade_level_id);
+  }, [isKg, gradeLevels, pickedCohortRow]);
+
   // Only years with real data (plus the current academic year) get a tab —
   // same "no phantom year" rule as curriculum_cohorts (grill decision, 2026-08-08).
   const kgYearTabs = useMemo(() => {
@@ -88,10 +96,10 @@ export function Curriculum() {
   }, [departmentId]);
 
   useEffect(() => {
-    if (gradeLevels.length > 0 && !gradeLevels.some((g) => g.id === pickedGradeLevel)) {
-      setPickedGradeLevel(gradeLevels[0]!.id);
+    if (visibleGradeLevels.length > 0 && !visibleGradeLevels.some((g) => g.id === pickedGradeLevel)) {
+      setPickedGradeLevel(visibleGradeLevels[0]!.id);
     }
-  }, [gradeLevels, pickedGradeLevel]);
+  }, [visibleGradeLevels, pickedGradeLevel]);
 
   useEffect(() => {
     setPickedCohort("");
@@ -236,9 +244,9 @@ export function Curriculum() {
         </div>
       </div>
 
-      {((isKg && kgAcademicYear !== null) || pickedCohort) && gradeLevels.length > 0 && (
+      {((isKg && kgAcademicYear !== null) || pickedCohort) && visibleGradeLevels.length > 0 && (
         <div className="flex w-full shrink-0 gap-0 overflow-x-auto border-b border-border" role="tablist">
-          {gradeLevels.map((g) => (
+          {visibleGradeLevels.map((g) => (
             <button
               key={g.id}
               type="button"
@@ -275,6 +283,7 @@ export function Curriculum() {
           key={`${pickedGradeLevel}-${pickedCohort}`}
           gradeLevelId={pickedGradeLevel}
           cohortId={pickedCohort}
+          cohortName={pickedCohortRow?.name ?? ""}
           departmentId={department.id}
           departmentCode={department.code}
           gradeLevels={gradeLevels}
@@ -514,6 +523,7 @@ const SUBJECT_TYPE_DOT: Record<SubjectType, string> = {
 function SubjectPanel({
   gradeLevelId,
   cohortId,
+  cohortName,
   departmentId,
   departmentCode,
   gradeLevels,
@@ -521,6 +531,7 @@ function SubjectPanel({
 }: {
   gradeLevelId: string;
   cohortId: string;
+  cohortName: string;
   departmentId: string;
   departmentCode: string;
   gradeLevels: { id: string; name: string }[];
@@ -529,6 +540,15 @@ function SubjectPanel({
   const splitsByTerm = departmentCode === "SEC";
   const [term, setTerm] = useState<1 | 2>(1);
   const [adding, setAdding] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState(cohortName);
+  const toast = useToast();
+  const rename = useRenameCohort();
+
+  useEffect(() => {
+    setDraftName(cohortName);
+    setRenaming(false);
+  }, [cohortId, cohortName]);
 
   const { data: rows, isLoading } = useCurriculumSubjects(gradeLevelId, cohortId);
   const { data: subjects = [] } = useSubjects({
@@ -569,29 +589,104 @@ function SubjectPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      {(splitsByTerm || mayEdit) && (
-        <div className="flex shrink-0 items-center justify-end gap-2">
-          {splitsByTerm && (
-            <Select
-              className="w-auto min-w-[10rem]"
-              value={String(term)}
-              onChange={(e) => setTerm(Number(e.target.value) as 1 | 2)}
-              aria-label="ภาคเรียน"
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{cohortName}</span>
+        {mayEdit && (
+          <Button
+            variant="outline"
+            size="icon"
+            className="shrink-0"
+            onClick={() => setRenaming(true)}
+            aria-label="แก้ไขชื่อหลักสูตร"
+          >
+            <PencilIcon className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        {splitsByTerm && (
+          <Select
+            className="w-auto min-w-[10rem] shrink-0"
+            value={String(term)}
+            onChange={(e) => setTerm(Number(e.target.value) as 1 | 2)}
+            aria-label="ภาคเรียน"
+          >
+            {[1, 2].map((t) => (
+              <option key={t} value={t}>
+                {TERM_LABEL[t]}
+              </option>
+            ))}
+          </Select>
+        )}
+        {mayEdit && (
+          <Button variant="outline" size="icon" className="shrink-0" onClick={() => setAdding(true)} aria-label="เพิ่มวิชา">
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+
+      <Sheet
+        open={renaming}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRenaming(false);
+            setDraftName(cohortName);
+          }
+        }}
+        title="แก้ไขชื่อหลักสูตร"
+        footer={
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                setRenaming(false);
+                setDraftName(cohortName);
+              }}
             >
-              {[1, 2].map((t) => (
-                <option key={t} value={t}>
-                  {TERM_LABEL[t]}
-                </option>
-              ))}
-            </Select>
-          )}
-          {mayEdit && (
-            <Button variant="outline" size="icon" onClick={() => setAdding(true)} aria-label="เพิ่มวิชา">
-              <Plus className="h-3.5 w-3.5" />
+              ยกเลิก
             </Button>
-          )}
-        </div>
-      )}
+            <Button
+              type="submit"
+              form="rename-cohort"
+              className="flex-1"
+              disabled={!draftName.trim() || draftName.trim() === cohortName || rename.isPending}
+            >
+              {rename.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
+            </Button>
+          </div>
+        }
+      >
+        <form
+          id="rename-cohort"
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const name = draftName.trim();
+            if (!name || name === cohortName) return;
+            rename.mutate(
+              { id: cohortId, name },
+              {
+                onSuccess: () => {
+                  toast("บันทึกสำเร็จ");
+                  setRenaming(false);
+                },
+                onError: (err) =>
+                  toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
+              },
+            );
+          }}
+        >
+          <Field label="ชื่อหลักสูตร">
+            <Input
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              placeholder="เช่น SHS69"
+              required
+              autoFocus
+            />
+          </Field>
+        </form>
+      </Sheet>
 
       {isLoading && (
         <div className="flex flex-1 items-center justify-center py-12">

@@ -4,9 +4,11 @@ import { ChevronBack, ChevronForward, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Pagination, Select, Spinner } from "@/components/ui";
+import { useSubjects } from "@/hooks/useCurriculum";
 import {
   useCohorts,
   useCurrentEnrollments,
+  useCurriculumSubjects,
   useDeleteEnrollment,
   useEnrollStudents,
   useGradeLevels,
@@ -18,10 +20,28 @@ import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useStudents } from "@/hooks/useStudents";
-import type { StudentCohortEnrollment } from "@/lib/database.types";
+import type { Student, StudentCohortEnrollment, SubjectType } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { gradeShortLabel } from "@/lib/gradeLevels";
+import { cn } from "@/lib/utils";
 
+const SUBJECT_TYPE_LABEL: Record<SubjectType, string> = {
+  basic: "พื้นฐาน",
+  additional: "เพิ่มเติม",
+  activity: "กิจกรรม",
+};
+
+const SUBJECT_TYPE_ORDER: Record<SubjectType, number> = {
+  basic: 0,
+  additional: 1,
+  activity: 2,
+};
+
+const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
+  basic: "bg-blue-600 text-blue-50 dark:bg-blue-500 dark:text-blue-50",
+  additional: "bg-sky-600 text-sky-50 dark:bg-sky-500 dark:text-sky-50",
+  activity: "bg-violet-600 text-violet-50 dark:bg-violet-500 dark:text-violet-50",
+};
 function cohortExpectedGradeLevelId(
   gradeLevels: { id: string; sort_order: number }[],
   entryGradeLevelId: string,
@@ -387,23 +407,41 @@ function CohortEnrollmentPanel({
   const deleteEnrollment = useDeleteEnrollment();
   const [pendingStudentId, setPendingStudentId] = useState<string | null>(null);
   const [planSelection, setPlanSelection] = useState<Record<string, string>>({});
+  const [viewingStudentId, setViewingStudentId] = useState<string | null>(null);
 
   const expectedGradeLevelId = useMemo(
     () => cohortExpectedGradeLevelId(gradeLevels, entryGradeLevelId, entryYear, activeYear),
     [gradeLevels, entryGradeLevelId, entryYear, activeYear],
   );
 
+  const { data: curriculumRows = [], isLoading: curriculumLoading } = useCurriculumSubjects(
+    expectedGradeLevelId,
+    cohortId,
+  );
+  const { data: subjects = [] } = useSubjects({
+    search: "",
+    departmentId,
+    learningAreaId: "",
+    gradeLevelId: "",
+    term: "",
+    subjectType: "",
+    includeInactive: true,
+  });
+
   const planName = useMemo(() => new Map(studyPlans.map((p) => [p.id, p.name])), [studyPlans]);
   const gradeLevelName = useMemo(
     () => new Map(gradeLevels.map((g) => [g.id, gradeShortLabel(g.code)])),
     [gradeLevels],
   );
+  const subjectById = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
   const enrollmentByStudent = useMemo(() => {
     const map = new Map<string, StudentCohortEnrollment>();
     for (const e of enrollments) map.set(e.student_id, e);
     return map;
   }, [enrollments]);
 
+  const viewingStudent = viewingStudentId ? students.find((s) => s.id === viewingStudentId) ?? null : null;
+  const viewingEnrollment = viewingStudentId ? enrollmentByStudent.get(viewingStudentId) ?? null : null;
   const rows = useMemo(() => {
     return students
       .filter(
@@ -501,13 +539,25 @@ function CohortEnrollmentPanel({
                 return (
                   <tr key={s.id} className="h-[40px] border-t border-border">
                     <td className="px-3 py-0">{s.student_code}</td>
-                    <td className="px-3 py-0 font-medium">{name}</td>
-                    <td className="px-3 py-0 text-muted-foreground">
+                    <td className="px-3 py-0 font-medium">
+                      {enrollment ? (
+                        <button
+                          type="button"
+                          className="tappable text-left hover:underline"
+                          onClick={() => setViewingStudentId(s.id)}
+                        >
+                          {name}
+                        </button>
+                      ) : (
+                        name
+                      )}
+                    </td>
+                    <td className="px-3 py-0">
                       {s.grade_level_id ? gradeLevelName.get(s.grade_level_id) ?? "—" : "—"}
                     </td>
-                    <td className="px-3 py-0 text-muted-foreground">
+                    <td className="px-3 py-0">
                       {enrollment && !mayEdit ? (
-                        enrollment.study_plan_id ? planName.get(enrollment.study_plan_id) ?? "—" : "—"
+                        enrollment.study_plan_id ? planName.get(enrollment.study_plan_id) ?? "—" : "ทั่วไป"
                       ) : mayEdit ? (
                         <Select
                           className="h-6 min-w-[7rem] px-1.5 text-[10px]"
@@ -589,6 +639,113 @@ function CohortEnrollmentPanel({
           <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </>
       )}
+
+      <StudentSubjectsSheet
+        open={viewingStudent !== null && viewingEnrollment !== null}
+        onClose={() => setViewingStudentId(null)}
+        student={viewingStudent}
+        enrollment={viewingEnrollment}
+        curriculumRows={curriculumRows}
+        subjectById={subjectById}
+        planName={planName}
+        expectedGradeLabel={
+          expectedGradeLevelId ? (gradeLevelName.get(expectedGradeLevelId) ?? "—") : "—"
+        }
+        loading={curriculumLoading}
+      />
     </div>
+  );
+}
+
+function StudentSubjectsSheet({
+  open,
+  onClose,
+  student,
+  enrollment,
+  curriculumRows,
+  subjectById,
+  planName,
+  expectedGradeLabel,
+  loading,
+}: {
+  open: boolean;
+  onClose: () => void;
+  student: Student | null;
+  enrollment: StudentCohortEnrollment | null;
+  curriculumRows: { id: string; subject_id: string; study_plan_id: string | null; term: number | null }[];
+  subjectById: Map<string, { code: string; name_th: string; subject_type: SubjectType }>;
+  planName: Map<string, string>;
+  expectedGradeLabel: string;
+  loading: boolean;
+}) {
+  const planLabel = enrollment?.study_plan_id
+    ? (planName.get(enrollment.study_plan_id) ?? "—")
+    : "ทั่วไป";
+
+  const rows = useMemo(() => {
+    if (!enrollment) return [];
+    const planId = enrollment.study_plan_id;
+    return curriculumRows
+      .filter((r) => r.study_plan_id === null || r.study_plan_id === planId)
+      .map((r) => {
+        const subject = subjectById.get(r.subject_id);
+        return {
+          id: r.id,
+          code: subject?.code ?? "—",
+          name_th: subject?.name_th ?? "—",
+          subject_type: subject?.subject_type ?? ("activity" as SubjectType),
+          term: r.term,
+        };
+      })
+      .sort((a, b) => {
+        const termCmp = (a.term ?? 999) - (b.term ?? 999);
+        if (termCmp) return termCmp;
+        const typeCmp = SUBJECT_TYPE_ORDER[a.subject_type] - SUBJECT_TYPE_ORDER[b.subject_type];
+        if (typeCmp) return typeCmp;
+        return a.code.localeCompare(b.code, "th", { numeric: true });
+      });
+  }, [curriculumRows, enrollment, subjectById]);
+
+  const title = student ? `${student.first_name} ${student.last_name}` : "";
+  const description = student
+    ? `${student.student_code} · ${planLabel} · ${expectedGradeLabel}`
+    : undefined;
+
+  return (
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()} title={title} description={description}>
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Spinner className="h-5 w-5 text-muted-foreground" />
+        </div>
+      ) : rows.length === 0 ? (
+        <EmptyState title="ไม่พบวิชา" description="ยังไม่มีวิชาในโครงสร้างหลักสูตรของชั้น/แผนนี้" />
+      ) : (
+        <div className="space-y-2">
+          {rows.map((r) => (
+            <div key={r.id} className="rounded-xl border border-border px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] tabular-nums text-muted-foreground">{r.code}</p>
+                  <p className="text-sm font-medium leading-snug">{r.name_th}</p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span
+                    className={cn(
+                      "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium leading-none",
+                      SUBJECT_TYPE_BADGE[r.subject_type],
+                    )}
+                  >
+                    {SUBJECT_TYPE_LABEL[r.subject_type]}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {r.term === 1 || r.term === 2 ? `เทอม ${r.term}` : "—"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Sheet>
   );
 }

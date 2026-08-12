@@ -4,7 +4,11 @@ import { Plus, Search } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner, Switch } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
-import { useGradeLevels } from "@/hooks/useCurriculumStructure";
+import {
+  useDepartmentStudentEnrollments,
+  useGradeLevels,
+  useStudyPlans,
+} from "@/hooks/useCurriculumStructure";
 import { useFillPageSize } from "@/hooks/useFillPageSize";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments, useProfiles } from "@/hooks/useProfiles";
@@ -368,6 +372,8 @@ function ClassroomPanel({
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
   const { data: activeYear } = useActiveAcademicYear(departmentId);
   const { data: students = [] } = useStudents({ search: "", departmentId, status: "studying" });
+  const { data: studyPlans = [] } = useStudyPlans();
+  const { data: cohortEnrollments = [] } = useDepartmentStudentEnrollments(departmentId || null);
   const createRoom = useCreateClassroom();
   const setActive = useSetClassroomActive();
   const assign = useAssignClassroom();
@@ -394,19 +400,26 @@ function ClassroomPanel({
 
   const gradeLevel = gradeLevels.find((g) => g.id === gradeLevelId);
   const query = search.trim().toLowerCase();
-  const filtered = useMemo(() => {
-    return students.filter((s) => {
-      if (s.grade_level_id !== gradeLevelId) return false;
-      if (!query) return true;
-      const hay = `${s.student_code} ${s.prefix ?? ""} ${s.first_name} ${s.last_name}`.toLowerCase();
-      return hay.includes(query);
-    });
-  }, [students, gradeLevelId, query]);
   const roomByStudent = useMemo(
     () => new Map(enrollments.map((e) => [e.student_id, e.classroom_id])),
     [enrollments],
   );
+  const filtered = useMemo(() => {
+    return students.filter((s) => {
+      if (s.grade_level_id !== gradeLevelId) return false;
+      if (pickedRoomId && roomByStudent.get(s.id) !== pickedRoomId) return false;
+      if (!query) return true;
+      const hay = `${s.student_code} ${s.prefix ?? ""} ${s.first_name} ${s.last_name}`.toLowerCase();
+      return hay.includes(query);
+    });
+  }, [students, gradeLevelId, query, pickedRoomId, roomByStudent]);
   const roomName = useMemo(() => new Map(classrooms.map((c) => [c.id, c.name])), [classrooms]);
+  const planName = useMemo(() => new Map(studyPlans.map((p) => [p.id, p.name])), [studyPlans]);
+  const planByStudent = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const e of cohortEnrollments) map.set(e.student_id, e.study_plan_id);
+    return map;
+  }, [cohortEnrollments]);
   const activeRooms = classrooms.filter((c) => c.is_active);
   const pickedRoom = classrooms.find((c) => c.id === pickedRoomId);
 
@@ -422,12 +435,12 @@ function ClassroomPanel({
   const pageSize = useFillPageSize(scrollRef, tableReady);
   const { page, setPage, pageCount, pageRows } = usePagination(
     filtered,
-    [gradeLevelId, departmentId, query, pageSize],
+    [gradeLevelId, departmentId, query, pickedRoomId, pageSize],
     pageSize,
   );
   useEffect(() => {
     setSelected(new Set());
-  }, [gradeLevelId, query]);
+  }, [gradeLevelId, query, pickedRoomId]);
 
   const allPageSelected = pageRows.length > 0 && pageRows.every((s) => selected.has(s.id));
 
@@ -557,6 +570,7 @@ function ClassroomPanel({
                     <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
                     <th className="px-3 py-2 font-medium">คำนำหน้า</th>
                     <th className="px-3 py-2 font-medium">รายชื่อ</th>
+                    <th className="px-3 py-2 font-medium">แผนการเรียน</th>
                     <th className="px-3 py-2 font-medium">ห้อง</th>
                   </tr>
                 </thead>
@@ -564,6 +578,8 @@ function ClassroomPanel({
                   {pageRows.map((s) => {
                     const roomId = roomByStudent.get(s.id);
                     const name = `${s.first_name} ${s.last_name}`;
+                    const hasPlan = planByStudent.has(s.id);
+                    const studyPlanId = planByStudent.get(s.id);
                     return (
                       <tr key={s.id} className="h-[40px] border-t border-border">
                         <td className="px-3 py-0">
@@ -578,9 +594,19 @@ function ClassroomPanel({
                         <td className="px-3 py-0 font-medium">{s.prefix ?? "—"}</td>
                         <td className="px-3 py-0 font-medium">{name}</td>
                         <td className="px-3 py-0">
+                          {!hasPlan
+                            ? "—"
+                            : studyPlanId
+                              ? (planName.get(studyPlanId) ?? "—")
+                              : "ทั่วไป"}
+                        </td>
+                        <td className="px-3 py-0">
                           {roomId ? (
-                            <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] text-success">
-                              {gradeLevel?.name}/{roomName.get(roomId) ?? "—"}
+                            <span className="flex items-center gap-1.5">
+                              <span className="size-2 rounded-full bg-success" />
+                              <span className="text-xs">
+                                {gradeLevel?.name}/{roomName.get(roomId) ?? "—"}
+                              </span>
                             </span>
                           ) : (
                             <span className="text-muted-foreground">ยังไม่จัดห้อง</span>

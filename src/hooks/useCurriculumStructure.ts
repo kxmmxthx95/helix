@@ -102,6 +102,17 @@ export function useSaveCohort() {
   });
 }
 
+export function useRenameCohort() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase.from("curriculum_cohorts").update({ name }).eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["curriculum_cohorts"] }),
+  });
+}
+
 export function useDeleteCohort() {
   const qc = useQueryClient();
   return useMutation({
@@ -303,6 +314,33 @@ export function useCurrentEnrollments(cohortId: string | null) {
         .order("created_at", { ascending: false });
       if (error) throw error;
       // Latest row per student wins — a transfer/ซ้ำชั้น leaves the old row in place.
+      const latest = new Map<string, StudentCohortEnrollment>();
+      for (const row of data) if (!latest.has(row.student_id)) latest.set(row.student_id, row);
+      return [...latest.values()];
+    },
+  });
+}
+
+/** Latest cohort enrollment per student in a department — for study-plan lookup outside the enrollment page. */
+export function useDepartmentStudentEnrollments(departmentId: string | null) {
+  return useQuery({
+    queryKey: ["student_cohort_enrollments", "by_department", departmentId],
+    enabled: !!departmentId,
+    queryFn: async (): Promise<StudentCohortEnrollment[]> => {
+      const { data: cohorts, error: cohortErr } = await supabase
+        .from("curriculum_cohorts")
+        .select("id")
+        .eq("department_id", departmentId!);
+      if (cohortErr) throw cohortErr;
+      const cohortIds = (cohorts ?? []).map((c) => c.id);
+      if (cohortIds.length === 0) return [];
+
+      const { data, error } = await supabase
+        .from("student_cohort_enrollments")
+        .select("*")
+        .in("cohort_id", cohortIds)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
       const latest = new Map<string, StudentCohortEnrollment>();
       for (const row of data) if (!latest.has(row.student_id)) latest.set(row.student_id, row);
       return [...latest.values()];
