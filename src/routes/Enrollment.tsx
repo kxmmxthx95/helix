@@ -375,6 +375,20 @@ function CohortEnrollmentPanel({
     });
   }
 
+  // Enrollment history is append-only (see useCurrentEnrollments) — changing
+  // an already-enrolled student's track inserts a new row, the latest wins.
+  function changeTrack(studentId: string, studyPlanId: string) {
+    const draft: EnrollmentDraft = {
+      student_id: studentId,
+      cohort_id: cohortId,
+      study_plan_id: studyPlanId || null,
+    };
+    setPendingStudentId(studentId);
+    enroll.mutate([draft], {
+      onSettled: () => setPendingStudentId(null),
+    });
+  }
+
   function removeOne(enrollment: StudentCohortEnrollment, label: string) {
     if (!confirm(`ลบนักเรียน "${label}" ออกจากรุ่นนี้?`)) return;
     setPendingStudentId(enrollment.student_id);
@@ -418,19 +432,17 @@ function CohortEnrollmentPanel({
                       {s.grade_level_id ? gradeLevelName.get(s.grade_level_id) ?? "—" : "—"}
                     </td>
                     <td className="px-3 py-0 text-muted-foreground">
-                      {enrollment ? (
-                        enrollment.study_plan_id ? (
-                          planName.get(enrollment.study_plan_id) ?? "—"
-                        ) : (
-                          "—"
-                        )
+                      {enrollment && !mayEdit ? (
+                        enrollment.study_plan_id ? planName.get(enrollment.study_plan_id) ?? "—" : "—"
                       ) : mayEdit ? (
                         <Select
                           className="h-6 min-w-[7rem] px-1.5 text-[10px]"
                           aria-label={`แผนการเรียนของ ${name}`}
-                          value={planSelection[s.id] ?? ""}
+                          value={(enrollment ? enrollment.study_plan_id : planSelection[s.id]) ?? ""}
                           onChange={(e) =>
-                            setPlanSelection((prev) => ({ ...prev, [s.id]: e.target.value }))
+                            enrollment
+                              ? changeTrack(s.id, e.target.value)
+                              : setPlanSelection((prev) => ({ ...prev, [s.id]: e.target.value }))
                           }
                           disabled={rowBusy}
                         >
