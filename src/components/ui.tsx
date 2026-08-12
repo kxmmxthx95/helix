@@ -367,12 +367,15 @@ export function Switch({
   onChange,
   disabled,
   label,
+  size = "default",
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
   label?: string;
+  size?: "default" | "sm";
 }) {
+  const sm = size === "sm";
   return (
     <button
       type="button"
@@ -382,14 +385,16 @@ export function Switch({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
+        "relative inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
+        sm ? "h-4 w-7" : "h-5 w-9",
         checked ? "bg-accent" : "bg-input",
       )}
     >
       <span
         className={cn(
-          "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
-          checked ? "translate-x-4" : "translate-x-0",
+          "pointer-events-none block rounded-full bg-background shadow-lg ring-0 transition-transform",
+          sm ? "h-3 w-3" : "h-4 w-4",
+          checked ? (sm ? "translate-x-3" : "translate-x-4") : "translate-x-0",
         )}
       />
     </button>

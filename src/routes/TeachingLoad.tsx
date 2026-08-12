@@ -1,15 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Plus } from "@/components/icons";
+import { Plus, Users, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useSubjects } from "@/hooks/useCurriculum";
-import { useGradeLevels } from "@/hooks/useCurriculumStructure";
+import {
+  useCohorts,
+  useCurriculumSubjects,
+  useGradeLevels,
+  useStudyPlans,
+} from "@/hooks/useCurriculumStructure";
 import { useDepartments, useProfiles, type ProfileRow } from "@/hooks/useProfiles";
 import { useDepartmentSettings } from "@/hooks/useSettings";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import {
+  useCohortIdsInClassroom,
+  useCohortIdsWithCurriculumAtGrade,
   useCreateTeachingAssignment,
   useDeleteTeachingAssignment,
   useDepartmentTeachingAssignments,
@@ -17,6 +24,7 @@ import {
   useUnlinkAssignmentGroup,
 } from "@/hooks/useTeachingLoad";
 import { profileFullName, type TeachingAssignment } from "@/lib/database.types";
+import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +53,7 @@ export function TeachingLoad() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="page-fill">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         {orgWide && departments.length > 0 && (
           <Select
@@ -123,6 +131,41 @@ function LoadBadge({ total, min, max }: { total: number; min: number | null; max
   );
 }
 
+type TeacherSortKey = "name" | "code" | "load";
+
+function SortTh({
+  label,
+  column,
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  label: string;
+  column: TeacherSortKey;
+  sortKey: TeacherSortKey;
+  sortDir: "asc" | "desc";
+  onSort: (key: TeacherSortKey) => void;
+}) {
+  const active = sortKey === column;
+  return (
+    <th
+      className="px-3 py-2 font-medium"
+      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button
+        type="button"
+        className="tappable inline-flex items-center gap-1 text-left hover:text-foreground"
+        onClick={() => onSort(column)}
+      >
+        {label}
+        <span className={active ? "text-foreground" : "text-muted-foreground/40"} aria-hidden>
+          {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+        </span>
+      </button>
+    </th>
+  );
+}
+
 function TeachingLoadBoard({
   departmentId,
   academicYear,
@@ -149,6 +192,8 @@ function TeachingLoadBoard({
     term,
   );
   const del = useDeleteTeachingAssignment();
+  const [sortKey, setSortKey] = useState<TeacherSortKey>("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const totalByTeacher = useMemo(() => {
     const totals = new Map<string, number>();
@@ -156,67 +201,89 @@ function TeachingLoadBoard({
     return totals;
   }, [assignments]);
 
+  const sortedTeachers = useMemo(() => {
+    const list = [...teachers];
+    const dir = sortDir === "asc" ? 1 : -1;
+    list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case "name":
+          cmp = profileFullName(a).localeCompare(profileFullName(b), "th");
+          break;
+        case "code":
+          cmp = (a.teacher_code ?? "").localeCompare(b.teacher_code ?? "", "th", { numeric: true });
+          break;
+        case "load":
+          cmp = (totalByTeacher.get(a.id) ?? 0) - (totalByTeacher.get(b.id) ?? 0);
+          break;
+      }
+      return cmp * dir;
+    });
+    return list;
+  }, [teachers, sortKey, sortDir, totalByTeacher]);
+
+  function onSort(key: TeacherSortKey) {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
   const selectedTeacher = teachers.find((t) => t.id === selectedTeacherId);
   const rows = assignments.filter((a) => a.teacher_id === selectedTeacherId);
 
   return (
-    <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
-      <Card className="space-y-3 p-0">
-        <ul className="max-h-[32rem] divide-y divide-border overflow-y-auto text-sm">
-          {teachers.map((t) => (
-            <li key={t.id}>
-              <button
-                type="button"
-                onClick={() => onSelectTeacher(t.id)}
-                className={cn(
-                  "flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors",
-                  selectedTeacherId === t.id ? "bg-foreground/10" : "hover:bg-muted",
-                )}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate">{profileFullName(t)}</span>
-                  {t.teacher_code && (
-                    <span className="text-xs text-muted-foreground">{t.teacher_code}</span>
+    <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2 lg:items-stretch">
+      <div className="table-panel">
+        <div className="table-panel-scroll">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <SortTh label="รายชื่อ" column="name" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                <SortTh label="รหัส" column="code" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                <SortTh label="ภาระงานสอน" column="load" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+              </tr>
+            </thead>
+            <tbody>
+              {sortedTeachers.map((t) => (
+                <tr
+                  key={t.id}
+                  onClick={() => onSelectTeacher(t.id)}
+                  className={cn(
+                    "cursor-pointer border-t border-border",
+                    selectedTeacherId === t.id ? "bg-foreground/10" : "hover:bg-muted active:bg-muted",
                   )}
-                </span>
-                <LoadBadge total={totalByTeacher.get(t.id) ?? 0} min={minPeriods} max={maxPeriods} />
-              </button>
-            </li>
-          ))}
-          {isLoading && (
-            <li className="flex justify-center py-8">
-              <Spinner className="h-5 w-5 text-muted-foreground" />
-            </li>
-          )}
-          {!isLoading && teachers.length === 0 && (
-            <li className="px-3 py-8 text-center text-sm text-muted-foreground">ยังไม่มีครูในแผนกนี้</li>
-          )}
-        </ul>
-      </Card>
+                >
+                  <td className="px-3 py-2 font-medium">{profileFullName(t)}</td>
+                  <td className="px-3 py-2">{t.teacher_code || "—"}</td>
+                  <td className="px-3 py-2">
+                    <LoadBadge total={totalByTeacher.get(t.id) ?? 0} min={minPeriods} max={maxPeriods} />
+                  </td>
+                </tr>
+              ))}
+              {isLoading && (
+                <tr>
+                  <td colSpan={3} className="px-3 py-8 text-center">
+                    <Spinner className="mx-auto h-5 w-5 text-muted-foreground" />
+                  </td>
+                </tr>
+              )}
+              {!isLoading && teachers.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                    ยังไม่มีครูในแผนกนี้
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {selectedTeacher ? (
-        <Card className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold">{profileFullName(selectedTeacher)}</h3>
-            <LoadBadge total={totalByTeacher.get(selectedTeacher.id) ?? 0} min={minPeriods} max={maxPeriods} />
-          </div>
-
-          <ul className="divide-y divide-border text-sm">
-            {rows.map((a) => (
-              <AssignmentRow
-                key={a.id}
-                assignment={a}
-                allAssignments={assignments}
-                teachers={teachers}
-                departmentId={departmentId}
-                mayEdit={mayEdit}
-                onDelete={() => del.mutate(a.id)}
-              />
-            ))}
-            {rows.length === 0 && (
-              <p className="py-2 text-sm text-muted-foreground">ยังไม่มีวิชาที่มอบหมาย</p>
-            )}
-          </ul>
+        <div className="flex min-h-0 flex-col gap-3">
+          <h3 className="shrink-0 text-sm font-semibold">{profileFullName(selectedTeacher)}</h3>
 
           {mayEdit && (
             <NewAssignmentForm
@@ -224,13 +291,50 @@ function TeachingLoadBoard({
               teacherId={selectedTeacher.id}
               academicYear={academicYear}
               term={term}
+              existingAssignments={rows}
             />
           )}
-        </Card>
+
+          {rows.length === 0 ? (
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              <EmptyState title="ยังไม่มีวิชาที่มอบหมาย" description="กดเพิ่มรายวิชาเพื่อมอบหมายภาระงานสอน" />
+            </div>
+          ) : (
+            <div className="table-panel">
+              <div className="table-panel-scroll">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-muted text-left text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">วิชา</th>
+                      <th className="px-3 py-2 font-medium">ห้อง</th>
+                      <th className="px-3 py-2 font-medium">คาบ/สัปดาห์</th>
+                      {mayEdit && <th className="w-px px-3 py-2 font-medium" />}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((a) => (
+                      <AssignmentRow
+                        key={a.id}
+                        assignment={a}
+                        allAssignments={assignments}
+                        teachers={teachers}
+                        departmentId={departmentId}
+                        mayEdit={mayEdit}
+                        onDelete={() => del.mutate(a.id)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
       ) : (
-        <Card className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-          เลือกครูทางซ้ายเพื่อดู/มอบหมายภาระงานสอน
-        </Card>
+        <div className="table-panel">
+          <div className="flex flex-1 items-center justify-center px-3 py-8 text-sm text-muted-foreground">
+            เลือกครูทางซ้ายเพื่อดู/มอบหมายภาระงานสอน
+          </div>
+        </div>
       )}
     </div>
   );
@@ -265,7 +369,8 @@ function AssignmentRow({
 
   const subject = subjects.find((s) => s.id === assignment.subject_id);
   const classroom = classrooms.find((c) => c.id === assignment.classroom_id);
-  const gradeLevelName = gradeLevels.find((g) => g.id === classroom?.grade_level_id)?.name;
+  const gradeLevel = gradeLevels.find((g) => g.id === classroom?.grade_level_id);
+  const gradeLabel = gradeLevel ? gradeShortLabel(gradeLevel.code) : null;
 
   const groupMates = assignment.group_id
     ? allAssignments.filter((a) => a.id !== assignment.id && a.group_id === assignment.group_id)
@@ -274,49 +379,51 @@ function AssignmentRow({
   function label(a: TeachingAssignment) {
     const s = subjects.find((x) => x.id === a.subject_id);
     const c = classrooms.find((x) => x.id === a.classroom_id);
-    const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.name;
+    const g = gradeLevels.find((x) => x.id === c?.grade_level_id);
+    const gLabel = g ? gradeShortLabel(g.code) : null;
     const t = teachers.find((x) => x.id === a.teacher_id);
-    return `${t ? profileFullName(t) : "—"} · ${s ? s.code : "—"} · ${c ? `${g ?? "—"}/${c.name}` : "—"}`;
+    return `${t ? profileFullName(t) : "—"} · ${s ? s.code : "—"} · ${c ? `${gLabel ?? "—"}/${c.name}` : "—"}`;
   }
 
   return (
-    <li className="flex items-center justify-between gap-2 py-1.5">
-      <span className="min-w-0 flex-1">
-        <span className="block truncate">{subject ? `${subject.code} · ${subject.name_th}` : "—"}</span>
-        <span className="text-xs text-muted-foreground">
-          {classroom ? `${gradeLevelName ?? "—"}/${classroom.name}` : "—"} · {assignment.periods_per_week}{" "}
-          คาบ/สัปดาห์
-        </span>
+    <tr className="border-t border-border">
+      <td className="px-3 py-2">
+        <span className="block font-medium">{subject?.code ?? "—"}</span>
+        {subject && <span className="block text-muted-foreground">{subject.name_th}</span>}
         {groupMates.length > 0 && (
-          <span className="mt-0.5 block text-xs text-accent">
+          <span className="mt-0.5 block text-[10px] text-accent">
             เรียนรวม/แบ่งคาบกับ {groupMates.map(label).join(", ")}
           </span>
         )}
-      </span>
+      </td>
+      <td className="px-3 py-2">{classroom ? `${gradeLabel ?? "—"}/${classroom.name}` : "—"}</td>
+      <td className="px-3 py-2">{assignment.periods_per_week}</td>
       {mayEdit && (
-        <div className="flex shrink-0 items-center gap-1.5">
-          {assignment.group_id ? (
-            <Button variant="outline" size="sm" onClick={() => unlink.mutate(assignment.id)}>
-              ยกเลิกผูก
+        <td className="px-3 py-2">
+          <div className="flex shrink-0 items-center justify-end gap-1.5">
+            {assignment.group_id ? (
+              <Button variant="outline" size="sm" onClick={() => unlink.mutate(assignment.id)}>
+                ยกเลิกผูก
+              </Button>
+            ) : (
+              <Button variant="ghost" size="icon" aria-label="ผูกกลุ่ม" onClick={() => setLinking(true)}>
+                <Users className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" aria-label="ลบ" onClick={onDelete}>
+              <X className="h-3.5 w-3.5" />
             </Button>
-          ) : (
-            <Button variant="outline" size="sm" onClick={() => setLinking(true)}>
-              ผูกกลุ่ม
-            </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={onDelete}>
-            ลบ
-          </Button>
-        </div>
+          </div>
+          <GroupLinkSheet
+            open={linking}
+            assignment={assignment}
+            candidates={allAssignments.filter((a) => a.id !== assignment.id)}
+            label={label}
+            onClose={() => setLinking(false)}
+          />
+        </td>
       )}
-      <GroupLinkSheet
-        open={linking}
-        assignment={assignment}
-        candidates={allAssignments.filter((a) => a.id !== assignment.id)}
-        label={label}
-        onClose={() => setLinking(false)}
-      />
-    </li>
+    </tr>
   );
 }
 
@@ -369,12 +476,25 @@ function NewAssignmentForm({
   teacherId,
   academicYear,
   term,
+  existingAssignments,
 }: {
   departmentId: string;
   teacherId: string;
   academicYear: number;
   term: number | null;
+  existingAssignments: TeachingAssignment[];
 }) {
+  const [open, setOpen] = useState(false);
+  const [classroomId, setClassroomId] = useState("");
+  const [cohortId, setCohortId] = useState("");
+  const [planId, setPlanId] = useState("");
+  const [subjectId, setSubjectId] = useState("");
+  const [periods, setPeriods] = useState("");
+
+  const { data: classrooms = [] } = useClassroomsByDepartment(departmentId);
+  const { data: gradeLevels = [] } = useGradeLevels(departmentId);
+  const { data: cohorts = [] } = useCohorts(departmentId);
+  const { data: studyPlans = [] } = useStudyPlans();
   const { data: subjects = [] } = useSubjects({
     search: "",
     departmentId,
@@ -382,23 +502,113 @@ function NewAssignmentForm({
     subjectType: "",
     includeInactive: false,
   });
-  const { data: classrooms = [] } = useClassroomsByDepartment(departmentId);
-  const { data: gradeLevels = [] } = useGradeLevels(departmentId);
-  const gradeLevelName = new Map(gradeLevels.map((g) => [g.id, g.name]));
   const create = useCreateTeachingAssignment();
 
-  const [subjectId, setSubjectId] = useState("");
-  const [classroomId, setClassroomId] = useState("");
-  const [periods, setPeriods] = useState("");
+  const classroom = classrooms.find((c) => c.id === classroomId);
+  const gradeLevelId = classroom?.grade_level_id ?? null;
+
+  const { data: cohortIdsInRoom = [] } = useCohortIdsInClassroom(classroomId || null, academicYear);
+  const { data: cohortIdsAtGrade = [] } = useCohortIdsWithCurriculumAtGrade(gradeLevelId);
+  const { data: curriculumRows = [] } = useCurriculumSubjects(gradeLevelId, cohortId || null);
+
+  const eligibleCohorts = useMemo(() => {
+    const ids = cohortIdsInRoom.length > 0 ? cohortIdsInRoom : cohortIdsAtGrade;
+    const idSet = new Set(ids);
+    return cohorts.filter((c) => idSet.has(c.id));
+  }, [cohorts, cohortIdsInRoom, cohortIdsAtGrade]);
+
+  const termRows = useMemo(
+    () => curriculumRows.filter((r) => (term === null ? r.term === null : r.term === term)),
+    [curriculumRows, term],
+  );
+
+  const planOptions = useMemo(() => {
+    const ids = [...new Set(termRows.map((r) => r.study_plan_id).filter((id): id is string => !!id))];
+    return studyPlans.filter((p) => ids.includes(p.id));
+  }, [termRows, studyPlans]);
+
+  const planRequired = planOptions.length > 0;
+
+  const subjectById = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
+
+  const assignedSubjectIds = useMemo(() => {
+    if (!classroomId) return new Set<string>();
+    return new Set(
+      existingAssignments.filter((a) => a.classroom_id === classroomId).map((a) => a.subject_id),
+    );
+  }, [existingAssignments, classroomId]);
+
+  const availableSubjects = useMemo(() => {
+    if (!cohortId || (planRequired && !planId)) return [];
+    const list = termRows.filter((r) => {
+      if (assignedSubjectIds.has(r.subject_id)) return false;
+      if (!planRequired) return true;
+      return r.study_plan_id === null || r.study_plan_id === planId;
+    });
+    const seen = new Set<string>();
+    const out: { id: string; code: string; name_th: string; hours_per_week: number }[] = [];
+    for (const r of list) {
+      if (seen.has(r.subject_id)) continue;
+      seen.add(r.subject_id);
+      const s = subjectById.get(r.subject_id);
+      if (!s) continue;
+      out.push({ id: s.id, code: s.code, name_th: s.name_th, hours_per_week: s.hours_per_week });
+    }
+    out.sort((a, b) => a.code.localeCompare(b.code, "th", { numeric: true }));
+    return out;
+  }, [cohortId, planRequired, planId, termRows, assignedSubjectIds, subjectById]);
+
+  function resetFilters() {
+    setClassroomId("");
+    setCohortId("");
+    setPlanId("");
+    setSubjectId("");
+    setPeriods("");
+  }
+
+  useEffect(() => {
+    resetFilters();
+  }, [teacherId]);
+
+  useEffect(() => {
+    setCohortId("");
+    setPlanId("");
+    setSubjectId("");
+    setPeriods("");
+  }, [classroomId]);
+
+  useEffect(() => {
+    setPlanId("");
+    setSubjectId("");
+    setPeriods("");
+  }, [cohortId]);
 
   useEffect(() => {
     setSubjectId("");
-    setClassroomId("");
     setPeriods("");
-  }, [teacherId]);
+  }, [planId]);
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
+  // Auto-select when only one eligible cohort / plan (grill 2026-08-12).
+  useEffect(() => {
+    if (!classroomId) return;
+    if (eligibleCohorts.length === 1 && cohortId !== eligibleCohorts[0]!.id) {
+      setCohortId(eligibleCohorts[0]!.id);
+    }
+  }, [classroomId, eligibleCohorts, cohortId]);
+
+  useEffect(() => {
+    if (!cohortId || !planRequired) return;
+    if (planOptions.length === 1 && planId !== planOptions[0]!.id) {
+      setPlanId(planOptions[0]!.id);
+    }
+  }, [cohortId, planRequired, planOptions, planId]);
+
+  function selectSubject(id: string, hours: number) {
+    setSubjectId(id);
+    setPeriods(String(hours));
+  }
+
+  function submit() {
     const periodsPerWeek = Number(periods);
     if (!subjectId || !classroomId || !periodsPerWeek) return;
     create.mutate(
@@ -410,47 +620,132 @@ function NewAssignmentForm({
         term,
         periods_per_week: periodsPerWeek,
       },
-      { onSuccess: () => setSubjectId("") },
+      {
+        onSuccess: () => {
+          setSubjectId("");
+          setPeriods("");
+        },
+      },
     );
   }
 
+  const gradeLevelName = useMemo(
+    () => new Map(gradeLevels.map((g) => [g.id, gradeShortLabel(g.code)])),
+    [gradeLevels],
+  );
+
+  const canPickSubject = !!cohortId && (!planRequired || !!planId);
+  const selectedSubject = availableSubjects.find((s) => s.id === subjectId);
+
   return (
-    <form onSubmit={submit} className="space-y-2 border-t border-border pt-3">
-      <div className="grid grid-cols-2 gap-2">
-        <Field label="วิชา">
-          <Select value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
-            <option value="">— เลือกวิชา —</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} · {s.name_th}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="ห้อง">
-          <Select value={classroomId} onChange={(e) => setClassroomId(e.target.value)}>
-            <option value="">— เลือกห้อง —</option>
-            {classrooms.map((c) => (
-              <option key={c.id} value={c.id}>
-                {gradeLevelName.get(c.grade_level_id) ?? "—"}/{c.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      </div>
-      <div className="flex gap-2">
-        <Input
-          type="number"
-          min={1}
-          placeholder="คาบ/สัปดาห์"
-          value={periods}
-          onChange={(e) => setPeriods(e.target.value)}
-          className="flex-1"
-        />
-        <Button type="submit" disabled={!subjectId || !classroomId || !periods || create.isPending}>
-          {create.isPending ? <Spinner className="h-3 w-3" /> : <Plus className="h-3.5 w-3.5" />}
-        </Button>
-      </div>
-    </form>
+    <>
+      <Button className="w-full shrink-0" onClick={() => setOpen(true)}>
+        <Plus className="h-3.5 w-3.5" />
+        เพิ่มรายวิชา
+      </Button>
+
+      <Sheet
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o);
+          if (!o) {
+            setSubjectId("");
+            setPeriods("");
+          }
+        }}
+        side="left"
+        title="เพิ่มรายวิชา"
+        footer={
+          selectedSubject ? (
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min={1}
+                placeholder="คาบ/สัปดาห์"
+                value={periods}
+                onChange={(e) => setPeriods(e.target.value)}
+                className="flex-1"
+                aria-label="คาบต่อสัปดาห์"
+              />
+              <Button onClick={submit} disabled={!periods || create.isPending}>
+                {create.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
+              </Button>
+            </div>
+          ) : undefined
+        }
+      >
+        <div className="space-y-3">
+          <Field label="ห้อง">
+            <Select value={classroomId} onChange={(e) => setClassroomId(e.target.value)}>
+              <option value="">— เลือกห้อง —</option>
+              {classrooms.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {gradeLevelName.get(c.grade_level_id) ?? "—"}/{c.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="รุ่นหลักสูตร">
+            <Select
+              value={cohortId}
+              onChange={(e) => setCohortId(e.target.value)}
+              disabled={!classroomId || eligibleCohorts.length === 0}
+            >
+              <option value="">— เลือกรุ่น —</option>
+              {eligibleCohorts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          {planRequired && (
+            <Field label="แผนการเรียน">
+              <Select value={planId} onChange={(e) => setPlanId(e.target.value)} disabled={!cohortId}>
+                <option value="">— เลือกแผน —</option>
+                {planOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          {!classroomId && (
+            <p className="py-6 text-center text-sm text-muted-foreground">เลือกห้องเพื่อดูรายวิชา</p>
+          )}
+          {classroomId && eligibleCohorts.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              ไม่พบรุ่นหลักสูตรสำหรับห้องนี้
+            </p>
+          )}
+          {canPickSubject && availableSubjects.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีรายวิชาให้มอบหมาย</p>
+          )}
+          {canPickSubject && availableSubjects.length > 0 && (
+            <ul className="divide-y divide-border rounded-lg border border-border text-xs">
+              {availableSubjects.map((s) => (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onClick={() => selectSubject(s.id, s.hours_per_week)}
+                    className={cn(
+                      "flex w-full flex-col px-3 py-2 text-left transition-colors",
+                      subjectId === s.id ? "bg-foreground/10" : "hover:bg-muted",
+                    )}
+                  >
+                    <span className="font-medium">{s.code}</span>
+                    <span className="text-[10px] text-muted-foreground">{s.name_th}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </Sheet>
+    </>
   );
 }

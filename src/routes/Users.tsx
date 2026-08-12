@@ -38,7 +38,7 @@ import type { PositionTitle, Student } from "@/lib/database.types";
 import { profileFullName } from "@/lib/database.types";
 import { blobToBase64, compressImage } from "@/lib/image";
 import { passwordFromDob } from "@/lib/password";
-import { canManageUsers, isOrgWide, PREFIXES, ROLE_LABEL, ROLES, roleLabels, type Role } from "@/lib/roles";
+import { canManageUsers, isOrgWide, PREFIXES, ROLE_LABEL, ROLES, STUDENT_PREFIXES, roleLabels, type Role } from "@/lib/roles";
 
 const EMPTY: ProfileFilters = { search: "", departmentId: "", role: "", active: "" };
 
@@ -58,6 +58,7 @@ export function Users() {
   const { data: rows, isLoading, error } = useProfiles(filters);
   const { page, setPage, pageCount, pageRows } = usePagination(rows ?? [], [filters]);
   const deleteUser = useDeleteUser();
+  const updateUser = useUpdateProfile();
 
   const mayManage = me ? canManageUsers(me.roles) : false;
 
@@ -172,16 +173,28 @@ export function Users() {
                     <td className="px-3 py-2 text-muted-foreground">
                       {row.department_id ? (deptName.get(row.department_id) ?? "—") : "ทุกแผนก"}
                     </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={
-                          row.is_active
-                            ? "rounded-full bg-success/15 px-2 py-0.5 text-[10px] text-success"
-                            : "rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
-                        }
-                      >
-                        {row.is_active ? "ใช้งาน" : "ปิด"}
-                      </span>
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                      {mayManage ? (
+                        <Switch
+                          size="sm"
+                          checked={row.is_active}
+                          disabled={updateUser.isPending}
+                          label={row.is_active ? "ใช้งาน" : "ปิด"}
+                          onChange={(is_active) =>
+                            updateUser.mutate({ id: row.id, ...pickEditable(row), is_active })
+                          }
+                        />
+                      ) : (
+                        <span
+                          className={
+                            row.is_active
+                              ? "rounded-full bg-success/15 px-2 py-0.5 text-[10px] text-success"
+                              : "rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
+                          }
+                        >
+                          {row.is_active ? "ใช้งาน" : "ปิด"}
+                        </span>
+                      )}
                     </td>
                     {mayManage && (
                       <td className="px-3 py-2">
@@ -388,19 +401,24 @@ function PrefixNameFields({
   lastName,
   onChange,
   errors,
+  prefixes = PREFIXES,
 }: {
   prefix: string | null;
   firstName: string;
   lastName: string;
   onChange: (patch: { prefix?: string | null; first_name?: string; last_name?: string }) => void;
   errors?: { first_name?: string; last_name?: string };
+  prefixes?: readonly string[];
 }) {
+  const options =
+    prefix && !prefixes.includes(prefix) ? [prefix, ...prefixes] : prefixes;
+
   return (
     <>
       <Field label="คำนำหน้า">
         <Select value={prefix ?? ""} onChange={(e) => onChange({ prefix: e.target.value || null })}>
           <option value="">— ไม่ระบุ —</option>
-          {PREFIXES.map((p) => (
+          {options.map((p) => (
             <option key={p} value={p}>
               {p}
             </option>
@@ -688,6 +706,7 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
             prefix={current.prefix}
             firstName={current.first_name}
             lastName={current.last_name}
+            prefixes={profile.roles.includes("student") ? STUDENT_PREFIXES : PREFIXES}
             onChange={(patch) => setDraft({ ...current, ...patch })}
           />
 
