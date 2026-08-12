@@ -33,7 +33,7 @@ import {
   type ProfileRow,
   type UserInvite,
 } from "@/hooks/useProfiles";
-import { useStudents } from "@/hooks/useStudents";
+import { useStudentByProfile, useStudents } from "@/hooks/useStudents";
 import type { PositionTitle, Student } from "@/lib/database.types";
 import { profileFullName } from "@/lib/database.types";
 import { blobToBase64, compressImage } from "@/lib/image";
@@ -642,6 +642,8 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
   const { data: positionTitles = [] } = usePositionTitles();
   const update = useUpdateProfile();
   const [draft, setDraft] = useState<ProfileEdit | null>(null);
+  const isStudent = profile?.roles.includes("student") ?? false;
+  const { data: linkedStudent } = useStudentByProfile(isStudent ? (profile?.id ?? null) : null);
 
   // draft is cleared on close, so a freshly opened row always starts from its
   // own values rather than the previously edited row's.
@@ -721,6 +723,12 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
           <Field label="เบอร์โทร (รหัสผู้ใช้เข้าระบบ — แก้ที่นี่ไม่ได้)">
             <Input type="tel" value={current.phone ?? ""} disabled readOnly />
           </Field>
+
+          {isStudent && (
+            <Field label="รหัสนักเรียน">
+              <Input value={linkedStudent?.student_code ?? "—"} disabled readOnly />
+            </Field>
+          )}
 
           <Field label="เลขบัตรประชาชน">
             <Input

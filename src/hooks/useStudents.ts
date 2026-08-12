@@ -58,6 +58,23 @@ export function useStudents(filters: StudentFilters) {
   });
 }
 
+/** The roster row a student's login account is linked to (students.profile_id is unique). */
+export function useStudentByProfile(profileId: string | null) {
+  return useQuery({
+    queryKey: ["students", "by_profile", profileId],
+    enabled: !!profileId,
+    queryFn: async (): Promise<Student | null> => {
+      const { data, error } = await supabase
+        .from("students")
+        .select("*")
+        .eq("profile_id", profileId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useSaveStudent() {
   const qc = useQueryClient();
 
