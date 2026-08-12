@@ -633,6 +633,18 @@ function NewAssignmentForm({
     () => new Map(gradeLevels.map((g) => [g.id, gradeShortLabel(g.code)])),
     [gradeLevels],
   );
+  const gradeSort = useMemo(
+    () => new Map(gradeLevels.map((g) => [g.id, g.sort_order])),
+    [gradeLevels],
+  );
+  const sortedClassrooms = useMemo(() => {
+    return [...classrooms].sort((a, b) => {
+      const ga = gradeSort.get(a.grade_level_id) ?? 0;
+      const gb = gradeSort.get(b.grade_level_id) ?? 0;
+      if (ga !== gb) return ga - gb;
+      return a.name.localeCompare(b.name, "th", { numeric: true });
+    });
+  }, [classrooms, gradeSort]);
 
   const canPickSubject = !!cohortId && (!planRequired || !!planId);
   const selectedSubject = availableSubjects.find((s) => s.id === subjectId);
@@ -678,7 +690,7 @@ function NewAssignmentForm({
           <Field label="ห้อง">
             <Select value={classroomId} onChange={(e) => setClassroomId(e.target.value)}>
               <option value="">— เลือกห้อง —</option>
-              {classrooms.map((c) => (
+              {sortedClassrooms.map((c) => (
                 <option key={c.id} value={c.id}>
                   {gradeLevelName.get(c.grade_level_id) ?? "—"}/{c.name}
                 </option>
@@ -686,13 +698,13 @@ function NewAssignmentForm({
             </Select>
           </Field>
 
-          <Field label="รุ่นหลักสูตร">
+          <Field label="เลือกหลักสูตร">
             <Select
               value={cohortId}
               onChange={(e) => setCohortId(e.target.value)}
               disabled={!classroomId || eligibleCohorts.length === 0}
             >
-              <option value="">— เลือกรุ่น —</option>
+              <option value="">— เลือกหลักสูตร —</option>
               {eligibleCohorts.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -719,7 +731,7 @@ function NewAssignmentForm({
           )}
           {classroomId && eligibleCohorts.length === 0 && (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              ไม่พบรุ่นหลักสูตรสำหรับห้องนี้
+              ไม่พบหลักสูตรสำหรับห้องนี้
             </p>
           )}
           {canPickSubject && availableSubjects.length === 0 && (

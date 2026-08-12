@@ -56,7 +56,7 @@ export function Sheet({
           </div>
           <div
             className={cn(
-              "flex-1 overflow-y-auto overscroll-contain px-3 pt-3",
+              "scrollbar-hidden flex-1 overflow-y-auto overscroll-contain px-3 pt-3",
               footer ? "pb-3" : "pb-6 pb-safe",
             )}
           >

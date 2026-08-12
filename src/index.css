@@ -236,6 +236,15 @@
     @apply transition-transform duration-100 active:scale-95;
   }
 
+  /* Scroll without a visible scrollbar (Sheet body, etc.) */
+  .scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Empty list / no-results placeholder — flex:1 centers in .page-fill */
   .empty-state {
     display: flex;
