@@ -244,7 +244,7 @@ function EnrollAllSheet({
       <form id="enroll-all" onSubmit={submit} className="space-y-4">
         <Field label="แผนการเรียน (ค่าเริ่มต้นสำหรับทุกคน)">
           <Select value={studyPlanId} onChange={(e) => setStudyPlanId(e.target.value)}>
-            <option value="">ไม่ระบุ</option>
+            <option value="">ทั่วไป</option>
             {studyPlans.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -434,7 +434,7 @@ function CohortEnrollmentPanel({
                           }
                           disabled={rowBusy}
                         >
-                          <option value="">ไม่ระบุ</option>
+                          <option value="">ทั่วไป</option>
                           {studyPlans.map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.name}
