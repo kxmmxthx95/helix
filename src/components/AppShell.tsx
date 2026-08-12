@@ -5,6 +5,7 @@ import {
   BookIcon,
   CalendarIcon,
   ChevronBack,
+  CheckmarkCircleIcon,
   ClipboardIcon,
   ChevronForward,
   CloudOff,
@@ -41,6 +42,7 @@ const TABS = [
     orgWideOnly: false,
     deptManagerOnly: false,
     academicManagerOnly: false,
+    teacherOrManagerOnly: false,
   },
   {
     to: "/users",
@@ -50,6 +52,7 @@ const TABS = [
     orgWideOnly: false,
     deptManagerOnly: false,
     academicManagerOnly: false,
+    teacherOrManagerOnly: false,
   },
   {
     to: "/roster",
@@ -59,6 +62,7 @@ const TABS = [
     orgWideOnly: false,
     deptManagerOnly: false,
     academicManagerOnly: false,
+    teacherOrManagerOnly: false,
   },
   {
     to: "/subjects",
@@ -68,6 +72,7 @@ const TABS = [
     orgWideOnly: true,
     deptManagerOnly: false,
     academicManagerOnly: false,
+    teacherOrManagerOnly: false,
   },
   {
     to: "/curriculum",
@@ -77,6 +82,7 @@ const TABS = [
     orgWideOnly: false,
     deptManagerOnly: true,
     academicManagerOnly: false,
+    teacherOrManagerOnly: false,
   },
   {
     to: "/enrollment",
@@ -86,6 +92,7 @@ const TABS = [
     orgWideOnly: false,
     deptManagerOnly: true,
     academicManagerOnly: false,
+    teacherOrManagerOnly: false,
   },
   {
     to: "/teaching-load",
@@ -95,6 +102,7 @@ const TABS = [
     orgWideOnly: false,
     deptManagerOnly: true,
     academicManagerOnly: false,
+    teacherOrManagerOnly: false,
   },
   {
     to: "/timetable",
@@ -104,6 +112,7 @@ const TABS = [
     orgWideOnly: false,
     deptManagerOnly: false,
     academicManagerOnly: false,
+    teacherOrManagerOnly: false,
   },
   {
     to: "/teaching-plan",
@@ -113,6 +122,7 @@ const TABS = [
     orgWideOnly: false,
     deptManagerOnly: false,
     academicManagerOnly: false,
+    teacherOrManagerOnly: false,
   },
   {
     to: "/teaching-plan-overview",
@@ -122,6 +132,17 @@ const TABS = [
     orgWideOnly: false,
     deptManagerOnly: false,
     academicManagerOnly: true,
+    teacherOrManagerOnly: false,
+  },
+  {
+    to: "/attendance",
+    label: "เช็คชื่อ",
+    icon: CheckmarkCircleIcon,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: true,
   },
   {
     to: "/status",
@@ -131,6 +152,7 @@ const TABS = [
     orgWideOnly: true,
     deptManagerOnly: false,
     academicManagerOnly: false,
+    teacherOrManagerOnly: false,
   },
   {
     to: "/academic-events",
@@ -140,6 +162,7 @@ const TABS = [
     orgWideOnly: false,
     deptManagerOnly: false,
     academicManagerOnly: false,
+    teacherOrManagerOnly: false,
   },
 ];
 
@@ -201,7 +224,9 @@ export function AppShell() {
       (!t.managerOnly || (profile && canManageUsers(profile.roles))) &&
       (!t.orgWideOnly || (profile && isOrgWide(profile.roles))) &&
       (!t.deptManagerOnly || (profile && canManage(profile.roles))) &&
-      (!t.academicManagerOnly || (profile && canManageAcademic(profile.roles))),
+      (!t.academicManagerOnly || (profile && canManageAcademic(profile.roles))) &&
+      (!t.teacherOrManagerOnly ||
+        (profile && (profile.roles.includes("teacher") || canManage(profile.roles)))),
   );
 
   const themeButton = (

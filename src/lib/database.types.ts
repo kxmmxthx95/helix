@@ -387,6 +387,25 @@ export type TeachingPlanUnit = {
   updated_at: string;
 };
 
+// ---------------------------------------------------------------- attendance
+// เช็คชื่อเข้าโรงเรียน — homeroom, once per student per day. See
+// supabase/migrations/0026_attendance.sql for the full grill rationale.
+
+export type AttendanceStatus = "present" | "late" | "absent" | "leave";
+
+/** classroom_id is a snapshot at check-in time, not derived from enrollment — see migration 0026. */
+export type AttendanceRecord = {
+  id: string;
+  student_id: string;
+  classroom_id: string;
+  date: string;
+  status: AttendanceStatus;
+  note: string | null;
+  recorded_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
 // ------------------------------------------------------------- academic_terms
 // See supabase/migrations/0018_academic_terms.sql for the full grill rationale.
 
@@ -585,6 +604,7 @@ export type Database = {
         StudentGuardianFinancial,
         InsertOf<StudentGuardianFinancial, "occupation" | "workplace" | "monthly_income">
       >;
+      attendance_records: Table<AttendanceRecord, InsertOf<AttendanceRecord, "note">>;
       audit_logs: Table<{
         id: number;
         actor_id: string | null;
