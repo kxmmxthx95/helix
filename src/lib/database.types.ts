@@ -332,6 +332,60 @@ export type TeachingAssignment = {
   // schedule_entries conflict trigger they're not a real conflict. See
   // migration 0019.
   group_id: string | null;
+  // Per-assignment override of curriculum_subjects/department_settings
+  // score_collect_pct/score_exam_pct — null = fall back to those. See
+  // migration 0030.
+  score_collect_pct: number | null;
+  score_exam_pct: number | null;
+  // Whether the exam side is itemized (teacher makes their own กลางภาค/
+  // ปลายภาค items) instead of a single plain exam score. See migration 0030.
+  split_exam_items: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+// ----------------------------------------------------------- score_recording
+// ระบบบันทึกคะแนน — คะแนนเก็บ+สอบ per teaching_assignment. See
+// supabase/migrations/0030_score_recording.sql for the full grill rationale.
+
+export type ScoreItemKind = "collect" | "exam";
+
+/** A teacher's own line item (e.g. "ใบงาน 1") for one assignment. max_score is informational, not enforced against the assignment's pct target. */
+export type ScoreItem = {
+  id: string;
+  teaching_assignment_id: string;
+  kind: ScoreItemKind;
+  label: string;
+  max_score: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StudentItemScore = {
+  id: string;
+  score_item_id: string;
+  student_id: string;
+  score: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GradeStatusCode = "ร" | "มส";
+
+/** Presence of a row = override active; absence = grade computed normally from item scores. */
+export type StudentGradeStatus = {
+  teaching_assignment_id: string;
+  student_id: string;
+  status: GradeStatusCode;
+  created_at: string;
+  updated_at: string;
+};
+
+/** The entire grade for a grading_method='pass_fail' assignment — no score_items involved. */
+export type StudentPassFailScore = {
+  teaching_assignment_id: string;
+  student_id: string;
+  passed: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -596,7 +650,17 @@ export type Database = {
         ClassroomHomeroomTeacher,
         InsertOf<ClassroomHomeroomTeacher, never>
       >;
-      teaching_assignments: Table<TeachingAssignment, InsertOf<TeachingAssignment, "term" | "group_id">>;
+      teaching_assignments: Table<
+        TeachingAssignment,
+        InsertOf<
+          TeachingAssignment,
+          "term" | "group_id" | "score_collect_pct" | "score_exam_pct" | "split_exam_items"
+        >
+      >;
+      score_items: Table<ScoreItem, InsertOf<ScoreItem, never>>;
+      student_item_scores: Table<StudentItemScore, InsertOf<StudentItemScore, never>>;
+      student_grade_status: Table<StudentGradeStatus, InsertOf<StudentGradeStatus, never>>;
+      student_pass_fail_scores: Table<StudentPassFailScore, InsertOf<StudentPassFailScore, never>>;
       teaching_plan_units: Table<
         TeachingPlanUnit,
         InsertOf<TeachingPlanUnit, "description" | "completed_at" | "completed_on_plan" | "note">
@@ -660,6 +724,7 @@ export type Database = {
       term_status: TermStatus;
       academic_event_type: AcademicEventType;
       behavior_severity: BehaviorSeverity;
+      score_item_kind: ScoreItemKind;
     };
     CompositeTypes: Record<string, never>;
   };

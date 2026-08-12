@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/Toast";
 import { Spinner } from "@/components/ui";
 import { Attendance } from "@/routes/Attendance";
 import { BehaviorScore } from "@/routes/BehaviorScore";
+import { ScoreRecording } from "@/routes/ScoreRecording";
 import { Dashboard } from "@/routes/Dashboard";
 import { Login } from "@/routes/Login";
 import { Onboarding } from "@/routes/Onboarding";
@@ -46,6 +47,7 @@ function Gate() {
         <Route index element={<Dashboard />} />
         <Route path="users" element={<Users />} />
         <Route path="roster" element={<Roster />} />
+        <Route path="score-recording" element={<ScoreRecording />} />
         <Route path="attendance" element={<Attendance />} />
         <Route path="behavior" element={<BehaviorScore />} />
         <Route path="subjects" element={<Subjects />} />
