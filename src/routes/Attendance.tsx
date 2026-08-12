@@ -358,7 +358,7 @@ function CheckInGrid({
                     <td className="px-3 py-2">{s.student_code}</td>
                     <td className="truncate px-3 py-2 font-medium">{name}</td>
                     <td className="px-3 py-2">
-                      <div className="flex justify-center gap-1">
+                      <div className="flex justify-center gap-2">
                         {STATUS_ORDER.map((st) => (
                           <button
                             key={st}
