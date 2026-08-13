@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { CheckboxIcon, CheckboxOutlineIcon, HelpCircleIcon, PencilIcon, Plus, X } from "@/components/icons";
+import { CheckboxIcon, CheckboxOutlineIcon, ClipboardIcon, HelpCircleIcon, PencilIcon, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
@@ -34,8 +34,16 @@ import {
   type LearningUnitDraft,
 } from "@/hooks/useCurriculumStructure";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
-import type { CurriculumSubject, DevelopmentDomain, StudyPlan, Subject, SubjectType } from "@/lib/database.types";
+import type {
+  CurriculumSubject,
+  DevelopmentDomain,
+  GradeLevel,
+  StudyPlan,
+  Subject,
+  SubjectType,
+} from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { gradesInEntryPath } from "@/lib/gradeLevels";
 
@@ -534,12 +542,13 @@ function SubjectPanel({
   cohortName: string;
   departmentId: string;
   departmentCode: string;
-  gradeLevels: { id: string; name: string }[];
+  gradeLevels: GradeLevel[];
   mayEdit: boolean;
 }) {
   const splitsByTerm = departmentCode === "SEC";
   const [term, setTerm] = useState<1 | 2>(1);
   const [adding, setAdding] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(cohortName);
   const toast = useToast();
@@ -615,6 +624,18 @@ function SubjectPanel({
               </option>
             ))}
           </Select>
+        )}
+        {mayEdit && visible.length > 0 && (
+          <Button
+            variant="outline"
+            size="icon"
+            className="shrink-0"
+            onClick={() => setCopying(true)}
+            aria-label="คัดลอกวิชาไปหลักสูตรอื่น"
+            title="คัดลอกวิชาไปหลักสูตรอื่น"
+          >
+            <ClipboardIcon className="h-3.5 w-3.5" />
+          </Button>
         )}
         {mayEdit && (
           <Button variant="outline" size="icon" className="shrink-0" onClick={() => setAdding(true)} aria-label="เพิ่มวิชา">
@@ -732,6 +753,18 @@ function SubjectPanel({
         studyPlans={studyPlans}
         gradeLevels={gradeLevels}
         showStudyPlan
+      />
+
+      <CopySubjectsSheet
+        open={copying}
+        onClose={() => setCopying(false)}
+        sourceRows={visible}
+        departmentId={departmentId}
+        splitsByTerm={splitsByTerm}
+        gradeLevels={gradeLevels}
+        sourceCohortId={cohortId}
+        sourceGradeLevelId={gradeLevelId}
+        sourceTerm={splitsByTerm ? term : null}
       />
     </div>
   );
@@ -886,6 +919,201 @@ function SubjectTable({
         onClose={() => setEditingScore(null)}
       />
     </div>
+  );
+}
+
+/** Copy the currently-shown subject list into another cohort/grade/term within the same department. */
+function CopySubjectsSheet({
+  open,
+  onClose,
+  sourceRows,
+  departmentId,
+  splitsByTerm,
+  gradeLevels,
+  sourceCohortId,
+  sourceGradeLevelId,
+  sourceTerm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  sourceRows: CurriculumSubject[];
+  departmentId: string;
+  splitsByTerm: boolean;
+  gradeLevels: GradeLevel[];
+  sourceCohortId: string;
+  sourceGradeLevelId: string;
+  sourceTerm: number | null;
+}) {
+  const toast = useToast();
+  const copy = useSaveCurriculumSubjects();
+  const { data: cohorts = [] } = useCohorts(departmentId || null);
+  const [year, setYear] = useState<number | "">("");
+  const [cohortId, setCohortId] = useState("");
+  const [gradeLevelId, setGradeLevelId] = useState("");
+  const [term, setTerm] = useState<1 | 2 | "">("");
+  const [pending, setPending] = useState(false);
+
+  const years = useMemo(
+    () => [...new Set(cohorts.map((c) => c.entry_year))].sort((a, b) => b - a),
+    [cohorts],
+  );
+  const cohortsInYear = useMemo(() => cohorts.filter((c) => c.entry_year === year), [cohorts, year]);
+  const pickedCohort = cohorts.find((c) => c.id === cohortId);
+  const gradesForCohort = useMemo(
+    () => (pickedCohort ? gradesInEntryPath(gradeLevels, pickedCohort.entry_grade_level_id) : []),
+    [pickedCohort, gradeLevels],
+  );
+
+  function reset() {
+    setYear("");
+    setCohortId("");
+    setGradeLevelId("");
+    setTerm("");
+  }
+
+  function close() {
+    reset();
+    onClose();
+  }
+
+  const targetTerm = splitsByTerm ? (term === "" ? null : term) : null;
+  const isSameAsSource =
+    cohortId === sourceCohortId && gradeLevelId === sourceGradeLevelId && targetTerm === sourceTerm;
+  const canSubmit = !!cohortId && !!gradeLevelId && (!splitsByTerm || term !== "") && !isSameAsSource;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setPending(true);
+    try {
+      const { data: existing, error: exErr } = await supabase
+        .from("curriculum_subjects")
+        .select("subject_id, study_plan_id, term")
+        .eq("cohort_id", cohortId)
+        .eq("grade_level_id", gradeLevelId);
+      if (exErr) throw exErr;
+      const existingKeys = new Set(
+        (existing ?? [])
+          .filter((r) => r.term === targetTerm)
+          .map((r) => `${r.subject_id}|${r.study_plan_id ?? ""}`),
+      );
+      const drafts: CurriculumSubjectDraft[] = sourceRows
+        .filter((r) => !existingKeys.has(`${r.subject_id}|${r.study_plan_id ?? ""}`))
+        .map((r) => ({
+          subject_id: r.subject_id,
+          grade_level_id: gradeLevelId,
+          study_plan_id: r.study_plan_id,
+          term: targetTerm,
+          cohort_id: cohortId,
+          score_collect_pct: r.score_collect_pct,
+          score_exam_pct: r.score_exam_pct,
+        }));
+      if (drafts.length === 0) {
+        toast("มีวิชาเหล่านี้อยู่แล้วในหลักสูตรปลายทาง");
+        return;
+      }
+      await copy.mutateAsync(drafts);
+      toast(`คัดลอกวิชาสำเร็จ (${drafts.length})`);
+      close();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "คัดลอกไม่สำเร็จ", "error");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(o) => !o && close()}
+      title="คัดลอกวิชาไปหลักสูตรอื่น"
+      description={`${sourceRows.length} วิชาที่แสดงอยู่ตอนนี้`}
+      footer={
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={close}>
+            ยกเลิก
+          </Button>
+          <Button type="submit" form="copy-curriculum-subjects" className="flex-1" disabled={!canSubmit || pending}>
+            {pending ? <Spinner className="h-3 w-3" /> : "คัดลอก"}
+          </Button>
+        </div>
+      }
+    >
+      <form id="copy-curriculum-subjects" className="space-y-4" onSubmit={submit}>
+        <Field label="ปีการศึกษา (พ.ศ.)">
+          <Select
+            value={year === "" ? "" : String(year)}
+            onChange={(e) => {
+              setYear(e.target.value ? Number(e.target.value) : "");
+              setCohortId("");
+              setGradeLevelId("");
+            }}
+            placeholder="เลือกปีการศึกษา"
+            required
+          >
+            {years.map((y) => (
+              <option key={y} value={y}>
+                ปี {y}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <Field label="หลักสูตร (รุ่น)">
+          <Select
+            value={cohortId}
+            onChange={(e) => {
+              setCohortId(e.target.value);
+              setGradeLevelId("");
+            }}
+            placeholder="เลือกหลักสูตร"
+            disabled={year === ""}
+            required
+          >
+            {cohortsInYear.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <Field label="ระดับชั้น">
+          <Select
+            value={gradeLevelId}
+            onChange={(e) => setGradeLevelId(e.target.value)}
+            placeholder="เลือกระดับชั้น"
+            disabled={!cohortId}
+            required
+          >
+            {gradesForCohort.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        {splitsByTerm && (
+          <Field label="ภาคเรียน">
+            <Select
+              value={term === "" ? "" : String(term)}
+              onChange={(e) => setTerm(e.target.value ? (Number(e.target.value) as 1 | 2) : "")}
+              placeholder="เลือกภาคเรียน"
+              required
+            >
+              {[1, 2].map((t) => (
+                <option key={t} value={t}>
+                  {TERM_LABEL[t]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+
+        {isSameAsSource && <p className="text-xs text-destructive">ปลายทางเดียวกับต้นทาง เลือกที่อื่น</p>}
+      </form>
+    </Sheet>
   );
 }
 

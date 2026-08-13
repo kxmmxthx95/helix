@@ -36,8 +36,10 @@ import IonSearch from "react-ionicons/lib/Search";
 import School from "react-ionicons/lib/School";
 import IonSettings from "react-ionicons/lib/Settings";
 import Sunny from "react-ionicons/lib/Sunny";
+import AirplaneOutline from "react-ionicons/lib/AirplaneOutline";
 import IonTime from "react-ionicons/lib/Time";
 import Warning from "react-ionicons/lib/Warning";
+import WatchOutline from "react-ionicons/lib/WatchOutline";
 
 interface IconProps {
   className?: string;
@@ -97,6 +99,8 @@ export const PersonAddIcon = wrap(PersonAdd);
 export const PencilIcon = wrap(PencilOutline);
 export const TimeIcon = wrap(IonTime);
 export const CalendarIcon = wrap(CalendarOutline);
+export const WatchIcon = wrap(WatchOutline);
+export const AirplaneIcon = wrap(AirplaneOutline);
 export const CheckboxIcon = wrap(Checkbox);
 export const CheckboxOutlineIcon = wrap(CheckboxOutline);
 export const CheckmarkCircleIcon = wrap(CheckmarkCircleOutline);

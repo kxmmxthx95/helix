@@ -66,6 +66,8 @@ export function ScoreRecording() {
     search: "",
     departmentId,
     learningAreaId: "",
+    gradeLevelId: "",
+    term: "",
     subjectType: "",
     includeInactive: true,
   });

@@ -94,6 +94,8 @@ function OverviewBoard({
     search: "",
     departmentId,
     learningAreaId: "",
+    gradeLevelId: "",
+    term: "",
     subjectType: "",
     includeInactive: true,
   });

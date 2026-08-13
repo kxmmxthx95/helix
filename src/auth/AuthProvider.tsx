@@ -204,7 +204,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       actualRoles: profile?.roles ?? [],
       viewAsRole,
       setViewAsRole,
-      refreshOnboarding: () => (profile ? loadOnboarding(profile) : Promise.resolve()),
+      // Re-fetches the profile row before recomputing — loadOnboarding reads
+      // must_change_password off the object passed in, so a stale `profile`
+      // (e.g. right after PasswordStep writes the DB directly) would just
+      // re-lock the same step instead of advancing.
+      refreshOnboarding: async () => {
+        if (!session || !profile) return;
+        const { data: p } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
+        if (!p) return;
+        const withRoles: ProfileWithRoles = { ...profile, ...p };
+        setProfile(withRoles);
+        await loadOnboarding(withRoles);
+      },
       refreshProfile: async () => {
         if (!session || !profile) return;
         const { data: p } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();

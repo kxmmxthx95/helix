@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import {
+  AirplaneIcon,
   AppsIcon,
   BookIcon,
   CalendarIcon,
@@ -23,6 +24,7 @@ import {
   TimeIcon,
   TimetableIcon,
   Users,
+  WatchIcon,
 } from "@/components/icons";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
@@ -31,6 +33,7 @@ import { useToast } from "@/components/Toast";
 import { Avatar, Button, Select } from "@/components/ui";
 import { avatarUrl, useUploadAvatar } from "@/hooks/useAvatar";
 import { useOutboxSync } from "@/hooks/useOutboxSync";
+import { useSchoolSettings } from "@/hooks/useSettings";
 import { profileFullName } from "@/lib/database.types";
 import {
   canManage,
@@ -195,6 +198,28 @@ const TABS = [
     academicManagerOnly: false,
     teacherOrManagerOnly: false,
   },
+  {
+    to: "/time-tracking",
+    label: "เวลาทำงาน",
+    icon: WatchIcon,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    // "ทุก role ยกเว้น student/parent" คือ teacher หรือ canManage() พอดี — ไม่ต้องเพิ่ม flag ใหม่
+    // (ตัดรายบทบาทเพิ่มเติมด้วย school_settings.time_tracking_roles ในตัวกรอง `tabs` ข้างล่าง)
+    teacherOrManagerOnly: true,
+  },
+  {
+    to: "/leave",
+    label: "ลา",
+    icon: AirplaneIcon,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: true,
+  },
 ];
 
 const SIDEBAR_KEY = "helix-sidebar-collapsed";
@@ -218,6 +243,7 @@ export function AppShell() {
   const avatarFileRef = useRef<HTMLInputElement>(null);
   const avatarSrc = profile ? avatarUrl(profile) : null;
   const maySeeSettings = !!profile && (isOrgWide(profile.roles) || profile.roles.includes("dept_head"));
+  const { data: schoolSettings } = useSchoolSettings();
 
   const pickAvatar = () => avatarFileRef.current?.click();
   const onAvatarChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -258,7 +284,10 @@ export function AppShell() {
       (!t.deptManagerOnly || (profile && canManage(profile.roles))) &&
       (!t.academicManagerOnly || (profile && canManageAcademic(profile.roles))) &&
       (!t.teacherOrManagerOnly ||
-        (profile && (profile.roles.includes("teacher") || canManage(profile.roles)))),
+        (profile && (profile.roles.includes("teacher") || canManage(profile.roles)))) &&
+      // /time-tracking is further gated by the school-wide per-role toggle (migration 0032).
+      (t.to !== "/time-tracking" ||
+        (profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r)))),
   );
 
   const themeButton = (

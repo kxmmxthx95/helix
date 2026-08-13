@@ -29,6 +29,8 @@ export function TeachingPlan() {
     search: "",
     departmentId: departmentId ?? "",
     learningAreaId: "",
+    gradeLevelId: "",
+    term: "",
     subjectType: "",
     includeInactive: true,
   });

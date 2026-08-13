@@ -352,6 +352,8 @@ function AssignmentRow({
     search: "",
     departmentId,
     learningAreaId: "",
+    gradeLevelId: "",
+    term: "",
     subjectType: "",
     includeInactive: true,
   });

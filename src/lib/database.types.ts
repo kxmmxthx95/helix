@@ -48,6 +48,8 @@ export type SchoolSettings = {
   name_en: string | null;
   logo_path: string | null; // object path in the school-assets storage bucket
   updated_at: string;
+  /** Roles allowed to use the time-clock feature — empty = off for everyone. See migration 0032. */
+  time_tracking_roles: Role[];
 };
 
 /** One row per department, always present — see migration 0002 seed trigger. */
@@ -59,6 +61,95 @@ export type DepartmentSettings = {
   // Teaching-load alert thresholds — nullable, no alert when unset. See migration 0017.
   min_periods_per_week: number | null;
   max_periods_per_week: number | null;
+  // Time-clock: expected start time + geofence, all-or-nothing null. See migration 0032.
+  work_start_time: string | null;
+  checkin_lat: number | null;
+  checkin_lng: number | null;
+  checkin_radius_m: number | null;
+  updated_at: string;
+};
+
+export type PremisesExitStatus = "pending" | "approved" | "rejected";
+
+/** One row per person per day — see migration 0032. */
+export type TimeClockRecord = {
+  id: string;
+  profile_id: string;
+  date: string;
+  clock_in_time: string | null;
+  clock_in_lat: number | null;
+  clock_in_lng: number | null;
+  clock_out_time: string | null;
+  clock_out_lat: number | null;
+  clock_out_lng: number | null;
+  recorded_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** "ขอออกนอกโรงเรียน" — approval requested async, multiple per day. See migration 0032. */
+export type PremisesExitRequest = {
+  id: string;
+  profile_id: string;
+  date: string;
+  reason: string;
+  exit_time: string;
+  exit_lat: number | null;
+  exit_lng: number | null;
+  return_time: string | null;
+  status: PremisesExitStatus;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Lookup table — schools add categories over time. See migration 0033. */
+export type LeaveType = {
+  id: string;
+  code: string;
+  name: string;
+  max_days_per_year: number | null;
+  requires_attachment_after_days: number | null;
+  created_at: string;
+};
+
+export type LeaveStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+/** One row per date-range request (not per day) — see migration 0033. */
+export type LeaveRequest = {
+  id: string;
+  profile_id: string;
+  leave_type_id: string;
+  start_date: string;
+  end_date: string;
+  /** Generated column (end_date - start_date + 1) — read-only. */
+  days: number;
+  reason: string;
+  attachment_path: string | null;
+  status: LeaveStatus;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StudentLeaveStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+/** Separate domain from LeaveRequest (staff) — see migration 0035. Approval auto-fills attendance_records. */
+export type StudentLeaveRequest = {
+  id: string;
+  student_id: string;
+  submitted_by: string;
+  start_date: string;
+  end_date: string;
+  /** Generated column (end_date - start_date + 1) — read-only. */
+  days: number;
+  reason: string;
+  status: StudentLeaveStatus;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
   updated_at: string;
 };
 
@@ -399,6 +490,8 @@ export type PeriodType = "teaching" | "break";
 export type PeriodDefinition = {
   id: string;
   department_id: string;
+  /** Null = department default; set = overrides the default for this one grade. See migration 0031. */
+  grade_level_id: string | null;
   day_of_week: number; // 1(จันทร์)..6(เสาร์)
   period_no: number;
   period_type: PeriodType;
@@ -452,6 +545,26 @@ export type AttendanceRecord = {
   id: string;
   student_id: string;
   classroom_id: string;
+  date: string;
+  status: AttendanceStatus;
+  note: string | null;
+  recorded_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * เช็คชื่อรายคาบ — one row per (student, schedule_entry, date), separate
+ * from AttendanceRecord (homeroom, once per day). schedule_entry_id is the
+ * anchor, not a classroom snapshot — see migration 0037. Force-set to
+ * 'leave' server-side when an approved StudentLeaveRequest covers the date;
+ * synced/un-synced into AttendanceRecord('leave') by a trigger when ALL of
+ * the student's scheduled periods that day are 'leave'.
+ */
+export type PeriodAttendanceRecord = {
+  id: string;
+  schedule_entry_id: string;
+  student_id: string;
   date: string;
   status: AttendanceStatus;
   note: string | null;
@@ -667,6 +780,26 @@ export type Database = {
       >;
       period_definitions: Table<PeriodDefinition, InsertOf<PeriodDefinition, never>>;
       schedule_entries: Table<ScheduleEntry, InsertOf<ScheduleEntry, never>>;
+      time_clock_records: Table<
+        TimeClockRecord,
+        InsertOf<
+          TimeClockRecord,
+          "clock_in_lat" | "clock_in_lng" | "clock_out_time" | "clock_out_lat" | "clock_out_lng"
+        >
+      >;
+      premises_exit_requests: Table<
+        PremisesExitRequest,
+        InsertOf<PremisesExitRequest, "status" | "approved_by" | "approved_at" | "return_time">
+      >;
+      leave_types: Table<LeaveType, InsertOf<LeaveType, never>>;
+      leave_requests: Table<
+        LeaveRequest,
+        InsertOf<LeaveRequest, "days" | "attachment_path" | "status" | "approved_by" | "approved_at">
+      >;
+      student_leave_requests: Table<
+        StudentLeaveRequest,
+        InsertOf<StudentLeaveRequest, "days" | "status" | "approved_by" | "approved_at">
+      >;
       academic_terms: Table<AcademicTerm, InsertOf<AcademicTerm, "start_date" | "end_date" | "status">>;
       academic_events: Table<
         AcademicEvent,
@@ -697,6 +830,7 @@ export type Database = {
         InsertOf<StudentGuardianFinancial, "occupation" | "workplace" | "monthly_income">
       >;
       attendance_records: Table<AttendanceRecord, InsertOf<AttendanceRecord, "note">>;
+      period_attendance_records: Table<PeriodAttendanceRecord, InsertOf<PeriodAttendanceRecord, "note">>;
       behavior_records: Table<BehaviorRecord, InsertOf<BehaviorRecord, never>>;
       behavior_categories: Table<BehaviorCategory, InsertOf<BehaviorCategory, "severity">>;
       audit_logs: Table<{

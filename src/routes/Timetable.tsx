@@ -4,7 +4,7 @@ import { GraduationCap, Plus, Users, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { Card, EmptyState, Select, Spinner } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
-import { useDepartmentPeriods } from "@/hooks/usePeriodDefinitions";
+import { useDepartmentPeriods, usePeriodsForGrade } from "@/hooks/usePeriodDefinitions";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments, useProfiles, type ProfileRow } from "@/hooks/useProfiles";
@@ -198,13 +198,26 @@ function ClassroomTimetable({
   gradeLevels: GradeLevel[];
   teachers: ProfileRow[];
 }) {
-  const { data: periods = [], isLoading: loadingPeriods } = useDepartmentPeriods(departmentId);
+  const classroomGradeLevelId = classrooms.find((c) => c.id === classroomId)?.grade_level_id ?? null;
+  const { data: defaultPeriods = [], isLoading: loadingDefaultPeriods } = useDepartmentPeriods(departmentId);
+  const { data: gradePeriods = [], isLoading: loadingGradePeriods } = usePeriodsForGrade(
+    departmentId,
+    classroomGradeLevelId,
+  );
+  // Grade-specific rows (0031) override the department default at the same day+period_no.
+  const periods = useMemo(() => {
+    const map = new Map(defaultPeriods.map((p) => [`${p.day_of_week}-${p.period_no}`, p]));
+    for (const p of gradePeriods) map.set(`${p.day_of_week}-${p.period_no}`, p);
+    return [...map.values()];
+  }, [defaultPeriods, gradePeriods]);
   const { data: entries = [], isLoading: loadingEntries } = useClassroomSchedule(classroomId, academicYear, term);
   const { data: assignments = [] } = useDepartmentTeachingAssignments(departmentId, academicYear, term);
   const { data: subjects = [] } = useSubjects({
     search: "",
     departmentId,
     learningAreaId: "",
+    gradeLevelId: "",
+    term: "",
     subjectType: "",
     includeInactive: true,
   });
@@ -221,7 +234,7 @@ function ClassroomTimetable({
       candidates={candidates}
       mode="classroom"
       mayEdit={mayEdit}
-      isLoading={loadingPeriods || loadingEntries}
+      isLoading={loadingDefaultPeriods || loadingGradePeriods || loadingEntries}
       subjectLabel={(id) => subjects.find((s) => s.id === id)?.code ?? "—"}
       teacherLabel={(id) => {
         const t = teachers.find((x) => x.id === id);
@@ -262,6 +275,8 @@ function TeacherTimetable({
     search: "",
     departmentId,
     learningAreaId: "",
+    gradeLevelId: "",
+    term: "",
     subjectType: "",
     includeInactive: true,
   });

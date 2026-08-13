@@ -15,7 +15,7 @@ export function useSchoolSettings() {
   });
 }
 
-export type SchoolSettingsEdit = Pick<SchoolSettings, "name_th" | "name_en">;
+export type SchoolSettingsEdit = Pick<SchoolSettings, "name_th" | "name_en" | "time_tracking_roles">;
 
 export function useUpdateSchoolSettings() {
   const qc = useQueryClient();
@@ -72,7 +72,14 @@ export function useDepartmentSettings(departmentId: string | null) {
 
 export type DepartmentSettingsEdit = Pick<
   DepartmentSettings,
-  "score_collect_pct" | "score_exam_pct" | "min_periods_per_week" | "max_periods_per_week"
+  | "score_collect_pct"
+  | "score_exam_pct"
+  | "min_periods_per_week"
+  | "max_periods_per_week"
+  | "work_start_time"
+  | "checkin_lat"
+  | "checkin_lng"
+  | "checkin_radius_m"
 >;
 
 export function useUpdateDepartmentSettings(departmentId: string | null) {
