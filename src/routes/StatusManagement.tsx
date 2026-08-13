@@ -250,9 +250,39 @@ function PromotionPanel({
             </div>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col gap-2">
-              <div className="table-panel">
+              <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto lg:hidden">
+                {pageRows.map((s) => {
+                  const name = `${s.first_name} ${s.last_name}`;
+                  const skipped = excluded.has(s.id);
+                  return (
+                    <li key={s.id}>
+                      <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3">
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={!skipped}
+                          onChange={() => toggleExclude(s.id)}
+                          aria-label={`เลื่อน ${name}`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{name}</p>
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {s.student_code}
+                            {s.prefix ? ` · ${s.prefix}` : ""}
+                          </p>
+                          {skipped ? (
+                            <p className="mt-1 text-[10px] text-warning">ซ้ำชั้น — ไม่เลื่อน</p>
+                          ) : null}
+                        </div>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              <div className="table-panel hidden lg:flex">
                 <div ref={scrollRef} className="table-panel-scroll">
-                  <table className="w-full min-w-[40rem] text-xs">
+                  <table className="w-full text-xs">
                     <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
                       <tr>
                         <th className="w-8 px-3 py-2">
@@ -320,9 +350,23 @@ function PromotionPanel({
             {isTop ? "→ จบการศึกษา" : `จาก ${source.name} → ${target!.name}`}
           </p>
           <div className="flex min-h-0 flex-1 flex-col gap-2">
-            <div className="table-panel">
+            <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto lg:hidden">
+              {previewPageRows.map((s) => (
+                <li key={s.id} className="rounded-lg border border-border p-3">
+                  <p className="truncate text-sm font-medium">
+                    {s.first_name} {s.last_name}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {s.student_code}
+                    {s.prefix ? ` · ${s.prefix}` : ""}
+                  </p>
+                </li>
+              ))}
+            </ul>
+
+            <div className="table-panel hidden lg:flex">
               <div ref={previewScrollRef} className="table-panel-scroll">
-                <table className="w-full min-w-[40rem] text-xs">
+                <table className="w-full text-xs">
                   <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
                     <tr>
                       <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
