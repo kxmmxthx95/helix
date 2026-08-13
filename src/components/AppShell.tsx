@@ -15,7 +15,9 @@ import {
   LayoutDashboard,
   LibraryIcon,
   LogOut,
+  MenuIcon,
   Monitor,
+  ProfileIcon,
   Moon,
   PersonAddIcon,
   RibbonIcon,
@@ -28,6 +30,7 @@ import {
 } from "@/components/icons";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
+import { Sheet } from "@/components/Sheet";
 import { useTheme } from "@/components/ThemeProvider";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, Select } from "@/components/ui";
@@ -224,9 +227,15 @@ const TABS = [
 
 const SIDEBAR_KEY = "helix-sidebar-collapsed";
 
+const navDrawerLink = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    "font-ui tappable flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
+    isActive ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+  );
+
 /**
  * Adaptive shell:
- * - phone / tablet (< lg): top header + bottom tabs, shared px-3
+ * - phone / tablet (< lg): top header with hamburger -> left-side nav drawer, shared px-3
  * - desktop (lg+): equal p-2 gutter; sidebar can collapse to icon rail
  * Outer frame never scrolls — only the main pane does.
  */
@@ -261,6 +270,7 @@ export function AppShell() {
   const avatarInput = (
     <input ref={avatarFileRef} type="file" accept="image/*" className="hidden" onChange={onAvatarChosen} />
   );
+  const [navOpen, setNavOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_KEY) === "1";
@@ -324,6 +334,12 @@ export function AppShell() {
   const signOutButton = (
     <Button variant="ghost" size="icon" onClick={signOut} aria-label="ออกจากระบบ">
       <LogOut className="h-3 w-3" />
+    </Button>
+  );
+
+  const menuButton = (
+    <Button variant="ghost" size="icon" onClick={() => setNavOpen(true)} aria-label="เมนู" title="เมนู">
+      <MenuIcon className="h-3 w-3" />
     </Button>
   );
 
@@ -442,16 +458,42 @@ export function AppShell() {
       <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="glass sticky top-0 z-20 shrink-0 border-b border-border pt-safe lg:hidden">
           <div className={cn("flex h-12 items-center justify-between", "px-3")}>
-            <div className="flex min-w-0 items-center gap-3">
-              {avatarButton("h-8 w-8 text-[10px]")}
-              {userLabel}
-            </div>
+            <div className="flex min-w-0 items-center gap-2">{menuButton}</div>
             <div className="flex items-center gap-1">
               {themeButton}
               {signOutButton}
             </div>
           </div>
         </header>
+
+        <Sheet
+          open={navOpen}
+          onOpenChange={setNavOpen}
+          title="เมนู"
+          side="left"
+          className="bg-white/[0.85] dark:bg-white/[0.06]"
+        >
+          <nav className="flex flex-col gap-0.5">
+            {tabs.map(({ to, label, icon: Icon }) => (
+              <NavLink key={to} to={to} end={to === "/"} onClick={() => setNavOpen(false)} className={navDrawerLink}>
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{label}</span>
+              </NavLink>
+            ))}
+            <div className="mt-1 flex flex-col gap-0.5 border-t border-border/60 pt-2">
+              <NavLink to="/profile" onClick={() => setNavOpen(false)} className={navDrawerLink}>
+                <ProfileIcon className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{displayName}</span>
+              </NavLink>
+              {maySeeSettings && (
+                <NavLink to="/settings" onClick={() => setNavOpen(false)} className={navDrawerLink}>
+                  <SettingsIcon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">ตั้งค่าระบบ</span>
+                </NavLink>
+              )}
+            </div>
+          </nav>
+        </Sheet>
 
         <header className="sticky top-0 z-20 hidden h-12 shrink-0 border-b border-border/60 lg:block">
           <div className={cn("mx-auto flex h-full w-full max-w-6xl items-center", "px-3")}>
@@ -483,7 +525,7 @@ export function AppShell() {
         )}
 
         <main className="flex-1 overflow-y-auto overscroll-contain">
-          <div className={cn("mx-auto w-full max-w-6xl py-4", "px-3")}>
+          <div className={cn("mx-auto w-full max-w-6xl pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]", "px-3")}>
             <motion.div
               key={location.pathname}
               initial={{ opacity: 0, y: 8 }}
@@ -494,27 +536,6 @@ export function AppShell() {
             </motion.div>
           </div>
         </main>
-
-        <nav className="glass z-20 shrink-0 border-t border-border pb-safe lg:hidden">
-          <div className={cn("mx-auto flex h-16 max-w-2xl items-stretch", "px-3")}>
-            {tabs.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={to === "/"}
-                className={({ isActive }) =>
-                  cn(
-                    "tappable flex flex-1 flex-col items-center justify-center gap-1 text-xs",
-                    isActive ? "text-foreground" : "text-muted-foreground",
-                  )
-                }
-              >
-                <Icon className="h-3 w-3" />
-                {label}
-              </NavLink>
-            ))}
-          </div>
-        </nav>
       </div>
     </div>
   );

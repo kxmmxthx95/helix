@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Spinner } from "@/components/ui";
+import { Button, Field, Input, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
 import { STARTING_SCORE, summarizeBehaviorScore, useBehaviorRecords } from "@/hooks/useBehaviorRecords";
@@ -13,10 +13,11 @@ import {
   useStudentLeaveRequests,
 } from "@/hooks/useStudentLeave";
 import { useSchoolSettings } from "@/hooks/useSettings";
-import type { AttendanceStatus, StudentLeaveStatus, Student } from "@/lib/database.types";
+import { profileFullName, type AttendanceStatus, type StudentLeaveStatus, type Student } from "@/lib/database.types";
 import { roleLabels } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
+import { bangkokTime } from "@/routes/TimeTracking";
 
 const LEAVE_STATUS_LABEL: Record<StudentLeaveStatus, string> = {
   pending: "รออนุมัติ",
@@ -47,6 +48,13 @@ function currentAcademicYearRange() {
   return { start: `${now.getFullYear()}-01-01`, end: `${now.getFullYear()}-12-31` };
 }
 
+function greeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "สวัสดีตอนเช้า";
+  if (hour < 17) return "สวัสดีตอนบ่าย";
+  return "สวัสดีตอนเย็น";
+}
+
 export function Dashboard() {
   const { profile, myStudent } = useAuth();
   const isParent = profile?.roles.includes("parent") ?? false;
@@ -56,30 +64,31 @@ export function Dashboard() {
     !!profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r));
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <p className="text-sm text-muted-foreground">สิทธิ์การใช้งาน</p>
-        <p className="text-lg font-semibold">{profile && roleLabels(profile.roles)}</p>
-      </Card>
+    <div className="mx-auto max-w-xl space-y-6">
+      <div>
+        <p className="font-heading text-2xl font-semibold">
+          {greeting()}{profile && `, ${profileFullName(profile)}`}
+        </p>
+        {profile && <p className="text-sm text-muted-foreground">{roleLabels(profile.roles)}</p>}
+      </div>
 
       {showClockWidget && profile && (
-        <QuickClockCard profileId={profile.id} departmentId={profile.department_id} />
+        <QuickClockSection profileId={profile.id} departmentId={profile.department_id} />
       )}
 
-      {myStudent && profile && <StudentLeaveCard student={myStudent} submittedBy={profile.id} />}
+      {myStudent && profile && <StudentLeaveSection student={myStudent} submittedBy={profile.id} />}
       {children.map(
-        (child) => profile && <StudentLeaveCard key={child.id} student={child} submittedBy={profile.id} />,
+        (child) => profile && <StudentLeaveSection key={child.id} student={child} submittedBy={profile.id} />,
       )}
 
-      {myStudent && <AttendanceSummaryCard student={myStudent} />}
+      {myStudent && <AttendanceSummarySection student={myStudent} />}
       {children.map((child) => (
-        <AttendanceSummaryCard key={child.id} student={child} />
+        <AttendanceSummarySection key={child.id} student={child} />
       ))}
-      {myStudent && <BehaviorScoreCard student={myStudent} />}
+      {myStudent && <BehaviorScoreSection student={myStudent} />}
       {children.map((child) => (
-        <BehaviorScoreCard key={child.id} student={child} />
+        <BehaviorScoreSection key={child.id} student={child} />
       ))}
-      {/* Stat tiles land here once the dashboard design is settled. */}
     </div>
   );
 }
@@ -87,7 +96,7 @@ export function Dashboard() {
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
 /** Quick access to the full workspace at /time-tracking (history, ขอออกนอกโรงเรียน, approvals). */
-function QuickClockCard({ profileId, departmentId }: { profileId: string; departmentId: string | null }) {
+function QuickClockSection({ profileId, departmentId }: { profileId: string; departmentId: string | null }) {
   const navigate = useNavigate();
   const toast = useToast();
   const date = todayIso();
@@ -116,46 +125,57 @@ function QuickClockCard({ profileId, departmentId }: { profileId: string; depart
   }
 
   return (
-    <Card>
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">เวลาทำงานวันนี้</p>
+    <section>
+      {isLoading ? (
+        <Spinner className="h-4 w-4 text-muted-foreground" />
+      ) : (
+        <p className="text-sm">
+          เวลาทำงานวันนี้ —{" "}
+          {record?.clock_in_time ? (
+            <>
+              เข้างานเวลา <strong className="font-semibold">{bangkokTime(record.clock_in_time)}</strong>
+              {record.clock_out_time && (
+                <>
+                  {" "}
+                  ออกงานเวลา <strong className="font-semibold">{bangkokTime(record.clock_out_time)}</strong>
+                </>
+              )}
+            </>
+          ) : (
+            "ยังไม่ได้บันทึกเวลาเข้างาน"
+          )}
+        </p>
+      )}
+      <div className="mt-2 flex items-center gap-2">
+        <Button
+          size="sm"
+          disabled={!!record?.clock_in_time || clockIn.isPending}
+          onClick={onClockIn}
+        >
+          {clockIn.isPending ? <Spinner className="h-3.5 w-3.5" /> : "เข้างาน"}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!record?.clock_in_time || !!record?.clock_out_time || clockOut.isPending}
+          onClick={onClockOut}
+        >
+          {clockOut.isPending ? <Spinner className="h-3.5 w-3.5" /> : "ออกงาน"}
+        </Button>
         <button
           type="button"
-          className="tappable text-xs text-accent underline"
+          className="tappable ml-auto text-xs text-accent underline"
           onClick={() => navigate("/time-tracking")}
         >
           ดูทั้งหมด
         </button>
       </div>
-      {isLoading ? (
-        <Spinner className="mt-2 h-4 w-4 text-muted-foreground" />
-      ) : (
-        <div className="mt-2 flex items-center gap-2">
-          <Button
-            size="sm"
-            className="flex-1"
-            disabled={!!record?.clock_in_time || clockIn.isPending}
-            onClick={onClockIn}
-          >
-            {clockIn.isPending ? <Spinner className="h-3.5 w-3.5" /> : "เข้างาน"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-1"
-            disabled={!record?.clock_in_time || !!record?.clock_out_time || clockOut.isPending}
-            onClick={onClockOut}
-          >
-            {clockOut.isPending ? <Spinner className="h-3.5 w-3.5" /> : "ออกงาน"}
-          </Button>
-        </div>
-      )}
-    </Card>
+    </section>
   );
 }
 
 /** role="student"/"parent" only — teacher/admin get the full check-in workspace at /attendance instead. */
-function AttendanceSummaryCard({ student }: { student: Student }) {
+function AttendanceSummarySection({ student }: { student: Student }) {
   const { start, end } = currentMonthRange();
   const { data: records = [], isLoading } = useAttendanceRange({
     studentId: student.id,
@@ -165,28 +185,29 @@ function AttendanceSummaryCard({ student }: { student: Student }) {
   const counts = summarizeAttendance(records);
 
   return (
-    <Card>
+    <section>
       <p className="text-sm text-muted-foreground">
         การมาเรียนของ {student.first_name} {student.last_name} · {MONTH_LABEL}
       </p>
       {isLoading ? (
-        <Spinner className="mt-2 h-4 w-4 text-muted-foreground" />
+        <Spinner className="mt-1 h-4 w-4 text-muted-foreground" />
       ) : (
-        <div className="mt-2 grid grid-cols-4 gap-2 text-center">
-          {STATUS_ORDER.map((st) => (
-            <div key={st}>
-              <p className="text-lg font-semibold">{counts[st]}</p>
-              <p className="text-xs text-muted-foreground">{STATUS_LABEL[st]}</p>
-            </div>
-          ))}
-        </div>
+        <p className="mt-1 text-sm">
+          {STATUS_ORDER.map((st, i) => (
+            <span key={st}>
+              {i > 0 && " · "}
+              <strong className="font-semibold">{counts[st]}</strong> {STATUS_LABEL[st]}
+            </span>
+          ))}{" "}
+          วัน
+        </p>
       )}
-    </Card>
+    </section>
   );
 }
 
 /** role="student"/"parent" only — teacher/admin get the roster workspace at /behavior instead. */
-function BehaviorScoreCard({ student }: { student: Student }) {
+function BehaviorScoreSection({ student }: { student: Student }) {
   const { start, end } = currentAcademicYearRange();
   const { data: records = [], isLoading } = useBehaviorRecords({
     studentId: student.id,
@@ -196,23 +217,23 @@ function BehaviorScoreCard({ student }: { student: Student }) {
   const score = summarizeBehaviorScore(records);
 
   return (
-    <Card>
+    <section>
       <p className="text-sm text-muted-foreground">
         คะแนนพฤติกรรมของ {student.first_name} {student.last_name}
       </p>
       {isLoading ? (
-        <Spinner className="mt-2 h-4 w-4 text-muted-foreground" />
+        <Spinner className="mt-1 h-4 w-4 text-muted-foreground" />
       ) : (
-        <p className={cn("mt-1 text-2xl font-semibold", score < STARTING_SCORE ? "text-destructive" : "text-success")}>
-          {score} <span className="text-sm font-normal text-muted-foreground">/ {STARTING_SCORE}</span>
+        <p className={cn("mt-1 text-sm", score < STARTING_SCORE ? "text-destructive" : "text-success")}>
+          <strong className="text-lg font-semibold">{score}</strong> จาก {STARTING_SCORE} คะแนน
         </p>
       )}
-    </Card>
+    </section>
   );
 }
 
 /** role="student"/"parent" only — teacher/admin approve these at Attendance.tsx's "คำขอลา" view instead. */
-function StudentLeaveCard({ student, submittedBy }: { student: Student; submittedBy: string }) {
+function StudentLeaveSection({ student, submittedBy }: { student: Student; submittedBy: string }) {
   const toast = useToast();
   const { data: requests = [], isLoading } = useStudentLeaveRequests(student.id);
   const request = useRequestStudentLeave();
@@ -245,7 +266,7 @@ function StudentLeaveCard({ student, submittedBy }: { student: Student; submitte
   }
 
   return (
-    <Card className="space-y-3">
+    <section className="space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           การลาของ {student.first_name} {student.last_name}
@@ -257,7 +278,7 @@ function StudentLeaveCard({ student, submittedBy }: { student: Student; submitte
 
       {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
       {!isLoading && requests.length === 0 && (
-        <p className="text-xs text-muted-foreground">ยังไม่มีคำขอลา</p>
+        <p className="text-sm">ยังไม่มีคำขอลา</p>
       )}
       {requests.length > 0 && (
         <ul className="divide-y divide-border text-sm">
@@ -343,6 +364,6 @@ function StudentLeaveCard({ student, submittedBy }: { student: Student; submitte
           </Field>
         </form>
       </Sheet>
-    </Card>
+    </section>
   );
 }

@@ -25,7 +25,7 @@ import { canManage } from "@/lib/roles";
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
 /** Renders a timestamptz as Thailand wall-clock HH:MM regardless of the browser's own timezone (fixed UTC+7, no DST). */
-function bangkokTime(iso: string) {
+export function bangkokTime(iso: string) {
   return new Date(iso).toLocaleTimeString("th-TH", {
     timeZone: "Asia/Bangkok",
     hour: "2-digit",
