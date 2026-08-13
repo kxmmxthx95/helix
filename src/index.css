@@ -326,10 +326,16 @@
   }
 }
 
-/* Safe-area helpers for the fixed shell */
+/* Safe-area helpers for the fixed shell (viewport-fit=cover + iOS island / home indicator) */
 .pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .pt-safe {
-  padding-top: env(safe-area-inset-top);
+  /* Clears Dynamic Island / notch — content row sits below the inset */
+  padding-top: env(safe-area-inset-top, 0px);
+}
+/* Horizontal shell gutter: at least px-3, grow for landscape notch / home-indicator sides */
+.px-shell {
+  padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
 }

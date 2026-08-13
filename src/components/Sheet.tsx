@@ -2,8 +2,8 @@ import { Drawer } from "vaul";
 import { cn } from "@/lib/utils";
 
 /**
- * Side drawer, floated off the screen edges like the sidebar rather than
- * flush against them — same glass-sidebar treatment, same rounding.
+ * Side drawer with glass-sidebar treatment.
+ * Flush to the open edge (no gap / radius on that side) so it reads as one piece with the screen.
  * Drag-to-dismiss toward the open edge comes from Vaul.
  */
 export function Sheet({
@@ -41,9 +41,11 @@ export function Sheet({
         <Drawer.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
         <Drawer.Content
           className={cn(
-            "glass-sidebar fixed inset-y-2 z-50 flex w-[calc(100%-1rem)] flex-col rounded-2xl outline-none",
+            "glass-sidebar fixed z-50 flex w-[calc(100%-1rem)] flex-col bg-white/[0.85] outline-none dark:bg-white/[0.06]",
             wide ? "max-w-2xl" : "max-w-sm",
-            side === "left" ? "left-2" : "right-2",
+            side === "left"
+              ? "inset-y-0 left-0 rounded-l-none rounded-r-2xl"
+              : "inset-y-0 right-0 rounded-l-2xl rounded-r-none",
             className,
           )}
         >
@@ -64,7 +66,7 @@ export function Sheet({
           <div
             className={cn(
               "scrollbar-hidden flex-1 overflow-y-auto overscroll-contain px-3 pt-3",
-              footer ? "pb-3" : "pb-6 pb-safe",
+              footer ? "pb-3" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]",
               bodyClassName,
             )}
           >

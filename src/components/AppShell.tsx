@@ -17,7 +17,6 @@ import {
   LogOut,
   MenuIcon,
   Monitor,
-  ProfileIcon,
   Moon,
   PersonAddIcon,
   RibbonIcon,
@@ -31,6 +30,7 @@ import {
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
+import { MobileHeaderProvider, useMobileHeaderSlot } from "@/components/MobileHeaderSlot";
 import { useTheme } from "@/components/ThemeProvider";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, Select } from "@/components/ui";
@@ -240,6 +240,15 @@ const navDrawerLink = ({ isActive }: { isActive: boolean }) =>
  * Outer frame never scrolls — only the main pane does.
  */
 export function AppShell() {
+  return (
+    <MobileHeaderProvider>
+      <AppShellInner />
+    </MobileHeaderProvider>
+  );
+}
+
+function AppShellInner() {
+  const mobileHeaderEnd = useMobileHeaderSlot();
   const { profile, actualRoles, viewAsRole, setViewAsRole, signOut, refreshProfile } = useAuth();
   const isActualSuperAdmin = actualRoles.includes("super_admin");
   const displayName = profile ? profileFullName(profile) : "Helix";
@@ -300,6 +309,14 @@ export function AppShell() {
         (profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r)))),
   );
 
+  const pageTitle =
+    tabs.find((t) => t.to === location.pathname || (t.to === "/" && location.pathname === "/"))?.label ??
+    (location.pathname === "/settings"
+      ? "ตั้งค่าระบบ"
+      : location.pathname === "/profile"
+        ? "โปรไฟล์"
+        : "ระบบจัดการสถานศึกษา");
+
   const themeButton = (
     <Button
       variant="ghost"
@@ -322,7 +339,10 @@ export function AppShell() {
     <Button
       variant="ghost"
       size="icon"
-      onClick={() => navigate("/settings")}
+      onClick={() => {
+        setNavOpen(false);
+        navigate("/settings");
+      }}
       aria-label="ตั้งค่าระบบ"
       title="ตั้งค่าระบบ"
       className={location.pathname === "/settings" ? "text-foreground" : "text-muted-foreground"}
@@ -457,12 +477,13 @@ export function AppShell() {
       {/* Main pane: no frosted frame — work area is max-w-6xl column */}
       <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="glass sticky top-0 z-20 shrink-0 border-b border-border pt-safe lg:hidden">
-          <div className={cn("flex h-12 items-center justify-between", "px-3")}>
-            <div className="flex min-w-0 items-center gap-2">{menuButton}</div>
-            <div className="flex items-center gap-1">
-              {themeButton}
-              {signOutButton}
-            </div>
+          {/* Title stays leading (after menu) — never centered under the Dynamic Island */}
+          <div className="flex h-12 items-center gap-2 px-shell">
+            {menuButton}
+            <p className="font-heading min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+              {pageTitle}
+            </p>
+            {mobileHeaderEnd ? <div className="shrink-0">{mobileHeaderEnd}</div> : null}
           </div>
         </header>
 
@@ -471,7 +492,42 @@ export function AppShell() {
           onOpenChange={setNavOpen}
           title="เมนู"
           side="left"
-          className="bg-white/[0.85] dark:bg-white/[0.06]"
+          headerEnd={
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setNavOpen(false)}
+              aria-label="หุบเมนู"
+              title="หุบเมนู"
+            >
+              <ChevronBack className="h-3 w-3" />
+            </Button>
+          }
+          footer={
+            <div className="flex flex-col gap-0.5">
+              <div className="mb-1 flex items-center gap-3 px-1 py-1">
+                {avatarButton()}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNavOpen(false);
+                    navigate("/profile");
+                  }}
+                  className="min-w-0 flex-1 text-left tappable"
+                >
+                  <p className="truncate text-sm font-semibold">{displayName}</p>
+                  {profile && (
+                    <p className="truncate text-xs text-muted-foreground">{roleLabels(profile.roles)}</p>
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center justify-end gap-1 px-1 pt-1">
+                {settingsButton}
+                {themeButton}
+                {signOutButton}
+              </div>
+            </div>
+          }
         >
           <nav className="flex flex-col gap-0.5">
             {tabs.map(({ to, label, icon: Icon }) => (
@@ -480,24 +536,12 @@ export function AppShell() {
                 <span className="truncate">{label}</span>
               </NavLink>
             ))}
-            <div className="mt-1 flex flex-col gap-0.5 border-t border-border/60 pt-2">
-              <NavLink to="/profile" onClick={() => setNavOpen(false)} className={navDrawerLink}>
-                <ProfileIcon className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{displayName}</span>
-              </NavLink>
-              {maySeeSettings && (
-                <NavLink to="/settings" onClick={() => setNavOpen(false)} className={navDrawerLink}>
-                  <SettingsIcon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">ตั้งค่าระบบ</span>
-                </NavLink>
-              )}
-            </div>
           </nav>
         </Sheet>
 
         <header className="sticky top-0 z-20 hidden h-12 shrink-0 border-b border-border/60 lg:block">
-          <div className={cn("mx-auto flex h-full w-full max-w-6xl items-center", "px-3")}>
-            <p className="font-heading text-sm font-semibold text-foreground">{tabs.find(t => t.to === location.pathname || (t.to === "/" && location.pathname === "/"))?.label || "ระบบจัดการสถานศึกษา"}</p>
+          <div className="mx-auto flex h-full w-full max-w-6xl items-center px-shell">
+            <p className="font-heading text-sm font-semibold text-foreground">{pageTitle}</p>
           </div>
         </header>
 
@@ -505,7 +549,7 @@ export function AppShell() {
           <div
             className={cn(
               "flex shrink-0 items-center justify-center gap-2 bg-warning/15 py-1.5 text-xs text-warning",
-              "px-3",
+              "px-shell",
             )}
           >
             <CloudOff className="h-3.5 w-3.5" />
@@ -514,7 +558,7 @@ export function AppShell() {
         )}
 
         {isActualSuperAdmin && viewAsRole && (
-          <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 bg-accent/15 py-1.5 text-xs text-accent px-3">
+          <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 bg-accent/15 py-1.5 text-xs text-accent px-shell">
             <span>
               กำลังดูมุมมองแบบ <strong>{ROLE_LABEL[viewAsRole]}</strong> (เมนู/สิทธิ์เท่านั้น — ข้อมูลที่เห็นยังเป็นของผู้ดูแลระบบสูงสุด)
             </span>
@@ -525,7 +569,7 @@ export function AppShell() {
         )}
 
         <main className="flex-1 overflow-y-auto overscroll-contain">
-          <div className={cn("mx-auto w-full max-w-6xl pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]", "px-3")}>
+          <div className="mx-auto w-full max-w-6xl px-shell pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <motion.div
               key={location.pathname}
               initial={{ opacity: 0, y: 8 }}

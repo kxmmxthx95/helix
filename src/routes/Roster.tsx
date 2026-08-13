@@ -4,7 +4,8 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { Button, Avatar, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { avatarUrl } from "@/hooks/useAvatar";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments, useInviteUsers, type InviteOutcome, type UserInvite } from "@/hooks/useProfiles";
@@ -44,6 +45,13 @@ const STATUS_LABEL: Record<StudentStatus, string> = {
   graduated: "จบการศึกษา",
   dropped: "พ้นสภาพ",
 };
+
+/** Derive เพศ from Thai student name title (no separate gender column). */
+function studentGender(prefix: string | null): "ชาย" | "หญิง" | null {
+  if (prefix === "เด็กชาย" || prefix === "นาย") return "ชาย";
+  if (prefix === "เด็กหญิง" || prefix === "นางสาว") return "หญิง";
+  return null;
+}
 
 export const RELATIONSHIP_LABEL: Record<GuardianRelationship, string> = {
   father: "บิดา",
@@ -288,8 +296,122 @@ export function Roster() {
 
       {rows && rows.length > 0 && (
         <div className="space-y-2">
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full min-w-[40rem] text-xs">
+          <ul className="space-y-2 lg:hidden">
+            {pageRows.map((row) => {
+              const gender = studentGender(row.prefix);
+              const fullName = `${row.first_name} ${row.last_name}`;
+              return (
+              <li key={row.id}>
+                <div
+                  role={mayEdit ? "button" : undefined}
+                  tabIndex={mayEdit ? 0 : undefined}
+                  onClick={() => mayEdit && setEditing(row)}
+                  onKeyDown={(e) => {
+                    if (!mayEdit) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setEditing(row);
+                    }
+                  }}
+                  className={
+                    mayEdit
+                      ? "rounded-lg border border-border p-3 active:bg-muted"
+                      : "rounded-lg border border-border p-3"
+                  }
+                >
+                  <div className="flex items-start gap-3">
+                    <Avatar
+                      name={fullName}
+                      src={row.profile ? avatarUrl(row.profile) : null}
+                      className="h-10 w-10 text-xs"
+                    />
+                    <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{fullName}</p>
+                        <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="truncate">{row.student_code}</span>
+                          {gender && (
+                            <span
+                              className={
+                                gender === "ชาย"
+                                  ? "inline-flex shrink-0 items-center rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] text-blue-500"
+                                  : "inline-flex shrink-0 items-center rounded-full bg-pink-500/15 px-2 py-0.5 text-[10px] text-pink-500"
+                              }
+                            >
+                              {gender}
+                            </span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {deptName.get(row.department_id) ?? "—"}
+                          {" · "}
+                          {row.grade_level_id ? (gradeLevelName.get(row.grade_level_id) ?? "—") : "—"}
+                        </p>
+                      </div>
+                      <span className="flex shrink-0 items-center gap-1.5 pt-0.5 text-xs">
+                        <span
+                          className={
+                            row.status === "studying"
+                              ? "size-2 rounded-full bg-success"
+                              : "size-2 rounded-full bg-muted-foreground"
+                          }
+                        />
+                        {STATUS_LABEL[row.status]}
+                      </span>
+                    </div>
+                  </div>
+                  {(mayManageUsers || mayEdit) && (
+                    <div className="mt-2 flex items-center gap-2">
+                      {mayManageUsers &&
+                        (row.profile_id ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] text-blue-500">
+                            <CheckmarkCircleIcon className="size-3" />
+                            มีบัญชีแล้ว
+                          </span>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCreatingLoginFor(row);
+                            }}
+                          >
+                            <KeyIcon className="h-3 w-3" />
+                            สร้างบัญชี
+                          </Button>
+                        ))}
+                      {mayEdit && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="ml-auto"
+                          aria-label="ลบนักเรียน"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (
+                              confirm(
+                                `ลบ "${row.first_name} ${row.last_name}" ถาวร? ข้อมูลผู้ปกครอง, ประวัติลงทะเบียน, และการจัดห้องของนักเรียนคนนี้จะถูกลบไปด้วยทั้งหมด กู้คืนไม่ได้`,
+                              )
+                            ) {
+                              deleteStudent.mutate(row.id);
+                            }
+                          }}
+                          disabled={deleteStudent.isPending}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </li>
+              );
+            })}
+          </ul>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-border lg:block">
+            <table className="w-full text-xs">
               <thead className="bg-muted text-left text-xs text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">รหัส</th>

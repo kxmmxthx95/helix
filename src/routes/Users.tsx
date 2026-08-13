@@ -130,9 +130,108 @@ export function Users() {
 
       {rows && rows.length > 0 && (
         <div className="space-y-2">
-          {/* Table stays a table on mobile; the wrapper scrolls sideways so the page body never does. */}
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full min-w-[42rem] text-xs">
+          <ul className="space-y-2 lg:hidden">
+            {pageRows.map((row) => {
+              const name = profileFullName(row);
+              const rolesText = roleLabels(row.roles.filter((r) => r !== "dept_head"));
+              const titlesText = row.positionTitleIds.length
+                ? row.positionTitleIds.map((id) => titleName.get(id) ?? "—").join(", ")
+                : "—";
+              const deptText = row.department_id ? (deptName.get(row.department_id) ?? "—") : "ทุกแผนก";
+              return (
+                <li key={row.id}>
+                  <div
+                    role={mayManage ? "button" : undefined}
+                    tabIndex={mayManage ? 0 : undefined}
+                    onClick={() => mayManage && setEditing(row)}
+                    onKeyDown={(e) => {
+                      if (!mayManage) return;
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setEditing(row);
+                      }
+                    }}
+                    className={
+                      mayManage
+                        ? "rounded-lg border border-border p-3 active:bg-muted"
+                        : "rounded-lg border border-border p-3"
+                    }
+                  >
+                    <div className="flex items-start gap-3">
+                      <Avatar name={name} src={avatarUrl(row)} className="h-10 w-10 text-xs" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{name}</p>
+                            <p className="mt-0.5 truncate text-xs text-muted-foreground">{row.email}</p>
+                          </div>
+                          <div onClick={(e) => e.stopPropagation()}>
+                            {mayManage ? (
+                              <Switch
+                                size="sm"
+                                checked={row.is_active}
+                                disabled={updateUser.isPending}
+                                label={row.is_active ? "ใช้งาน" : "ปิด"}
+                                onChange={(is_active) =>
+                                  updateUser.mutate({ id: row.id, ...pickEditable(row), is_active })
+                                }
+                              />
+                            ) : (
+                              <span
+                                className={
+                                  row.is_active
+                                    ? "rounded-full bg-success/15 px-2 py-0.5 text-[10px] text-success"
+                                    : "rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground"
+                                }
+                              >
+                                {row.is_active ? "ใช้งาน" : "ปิด"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {rolesText || "—"}
+                          {" · "}
+                          {titlesText}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{deptText}</p>
+                      </div>
+                    </div>
+                    {mayManage && (
+                      <div className="mt-2 flex items-center justify-end">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="ลบผู้ใช้งาน"
+                          disabled={row.id === me?.id || deleteUser.isPending}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (row.id === me?.id) return;
+                            if (
+                              confirm(
+                                `ลบ "${name}" ถาวร? บัญชีเข้าสู่ระบบจะถูกลบด้วย กู้คืนไม่ได้`,
+                              )
+                            ) {
+                              deleteUser.mutate(row.id, {
+                                onError: (err) => {
+                                  alert(err instanceof Error ? err.message : "ลบไม่สำเร็จ");
+                                },
+                              });
+                            }
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-border lg:block">
+            <table className="w-full text-xs">
               <thead className="bg-muted text-left text-xs text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">ชื่อ</th>

@@ -1,11 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Student, StudentStatus } from "@/lib/database.types";
+import type { Profile, Student, StudentStatus } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
 export type StudentFilters = {
   search: string;
   departmentId: string;
   status: StudentStatus | "";
+};
+
+/** Roster list row — linked login avatar when the student has an account. */
+export type StudentListItem = Student & {
+  profile: Pick<Profile, "avatar_path" | "updated_at"> | null;
 };
 
 export type StudentDraft = Pick<
@@ -38,8 +43,11 @@ export type StudentDraft = Pick<
 export function useStudents(filters: StudentFilters) {
   return useQuery({
     queryKey: ["students", filters],
-    queryFn: async (): Promise<Student[]> => {
-      let q = supabase.from("students").select("*").order("student_code");
+    queryFn: async (): Promise<StudentListItem[]> => {
+      let q = supabase
+        .from("students")
+        .select("*, profile:profiles!profile_id(avatar_path, updated_at)")
+        .order("student_code");
 
       if (filters.departmentId) q = q.eq("department_id", filters.departmentId);
       if (filters.status) q = q.eq("status", filters.status);
@@ -52,7 +60,7 @@ export function useStudents(filters: StudentFilters) {
 
       const { data, error } = await q;
       if (error) throw error;
-      return data;
+      return data as StudentListItem[];
     },
     placeholderData: (previous) => previous,
   });

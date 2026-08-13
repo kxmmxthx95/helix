@@ -214,23 +214,55 @@ export function Subjects() {
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 gap-2">
-        {orgWide && pickableDepartments.length > 0 && (
-          <Select
-            className="w-auto min-w-[10rem] shrink-0"
-            value={pickedDept}
-            onChange={(e) => setPickedDept(e.target.value)}
-            aria-label="แผนก"
-            placeholder="เลือกแผนก"
+      <div className="flex shrink-0 flex-col gap-2">
+        <div className="flex gap-2">
+          {orgWide && pickableDepartments.length > 0 && (
+            <Select
+              className="min-w-0 flex-1"
+              value={pickedDept}
+              onChange={(e) => setPickedDept(e.target.value)}
+              aria-label="แผนก"
+              placeholder="เลือกแผนก"
+            >
+              {pickableDepartments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </Select>
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            className="relative shrink-0"
+            onClick={() => setFiltersOpen(true)}
+            aria-label="ตัวกรอง"
           >
-            {pickableDepartments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </Select>
-        )}
-        <div className="relative min-w-0 flex-1">
+            <SlidersHorizontal className="h-3 w-3" />
+            {activeFilterCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] text-accent-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+          {mayEdit && (
+            <Button variant="outline" size="icon" className="shrink-0" onClick={() => setImporting(true)} aria-label="นำเข้ารายวิชา">
+              <FileUp className="h-3 w-3" />
+            </Button>
+          )}
+          {mayEdit && (
+            <Button
+              size="icon"
+              className="shrink-0"
+              onClick={() => setEditing("new")}
+              disabled={!departmentId}
+              aria-label="เพิ่มรายวิชา"
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+        <div className="relative min-w-0">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={filters.search}
@@ -240,36 +272,6 @@ export function Subjects() {
             type="search"
           />
         </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="relative shrink-0"
-          onClick={() => setFiltersOpen(true)}
-          aria-label="ตัวกรอง"
-        >
-          <SlidersHorizontal className="h-3 w-3" />
-          {activeFilterCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] text-accent-foreground">
-              {activeFilterCount}
-            </span>
-          )}
-        </Button>
-        {mayEdit && (
-          <Button variant="outline" size="icon" className="shrink-0" onClick={() => setImporting(true)} aria-label="นำเข้ารายวิชา">
-            <FileUp className="h-3 w-3" />
-          </Button>
-        )}
-        {mayEdit && (
-          <Button
-            size="icon"
-            className="shrink-0"
-            onClick={() => setEditing("new")}
-            disabled={!departmentId}
-            aria-label="เพิ่มรายวิชา"
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
-        )}
       </div>
 
       {isLoading && (
@@ -294,9 +296,85 @@ export function Subjects() {
 
       {departmentId && rows && rows.length > 0 && (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
-          <div className="table-panel">
+          <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto lg:hidden">
+            {pageRows.map((row) => (
+              <li key={row.id}>
+                <div
+                  role={mayEdit ? "button" : undefined}
+                  tabIndex={mayEdit ? 0 : undefined}
+                  onClick={() => mayEdit && setEditing(row)}
+                  onKeyDown={(e) => {
+                    if (!mayEdit) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setEditing(row);
+                    }
+                  }}
+                  className={
+                    mayEdit
+                      ? "rounded-lg border border-border p-3 active:bg-muted"
+                      : "rounded-lg border border-border p-3"
+                  }
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs tabular-nums text-muted-foreground">{row.code}</span>
+                        <span className="flex items-center gap-1 text-xs">
+                          <span className={`size-2 rounded-full ${SUBJECT_TYPE_DOT[row.subject_type]}`} />
+                          {SUBJECT_TYPE_LABEL[row.subject_type]}
+                        </span>
+                        {!row.is_active && (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                            ปิดใช้งาน
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 truncate text-sm font-medium">{row.name_th}</p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {topAreaLabel(row.learning_area_id)}
+                        {" · "}
+                        {row.suggested_grade_level_id
+                          ? (gradeName.get(row.suggested_grade_level_id) ?? "—")
+                          : "—"}
+                        {" · "}
+                        {row.suggested_term != null ? `ภาค ${row.suggested_term}` : "—"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {row.credits} หน่วยกิต · {row.hours_per_week} ชม./สัปดาห์
+                      </p>
+                    </div>
+                    {mayEdit && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0"
+                        aria-label="ลบ"
+                        disabled={del.isPending}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`ลบรายวิชา "${row.name_th}" ถาวร? ข้อมูลนี้กู้คืนไม่ได้`)) {
+                            del.mutate(row.id, {
+                              onError: () =>
+                                alert(
+                                  `ลบไม่ได้ — "${row.name_th}" ถูกใช้อยู่ในโครงสร้างหลักสูตร ให้ปิดใช้งานแทน`,
+                                ),
+                            });
+                          }
+                        }}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="table-panel hidden lg:flex">
             <div ref={scrollRef} className="table-panel-scroll">
-              <table className="w-full min-w-[48rem] text-xs">
+              <table className="w-full text-xs">
                 <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
                   <tr>
                     <SortTh label="รหัส" column="code" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />

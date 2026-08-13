@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { BarChartIcon, Plus, SettingsIcon } from "@/components/icons";
+import { BarChartIcon, Plus, SettingsIcon, SlidersHorizontal } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
@@ -34,6 +34,7 @@ export function BehaviorScore() {
   const academicYear = currentAcademicYear();
   const years = Array.from({ length: 4 }, (_, i) => academicYear - i);
   const [year, setYear] = useState(academicYear);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Every teacher (not just homeroom) and every manager get the same
   // department → grade level → classroom cascade — any teacher may log a
@@ -50,21 +51,89 @@ export function BehaviorScore() {
   useEffect(() => setPickedGrade(""), [pickedDept]);
   useEffect(() => setPickedRoomId(""), [pickedGrade]);
 
-  if (!me || (!manager && !isTeacher)) {
+  const allowed = !!me && (manager || isTeacher);
+  const activeDeptRooms = deptClassrooms.filter((c) => c.is_active);
+  const showScopeFilters = mode !== "settings";
+
+  const activeFilterCount = [pickedDept, pickedGrade, pickedRoomId].filter(Boolean).length +
+    (year !== academicYear ? 1 : 0);
+
+  if (!allowed) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
   }
 
-  const activeDeptRooms = deptClassrooms.filter((c) => c.is_active);
   const classroomId = pickedRoomId;
   const ceYear = year - 543;
   const startDate = `${ceYear}-01-01`;
   const endDate = `${ceYear}-12-31`;
 
+  const scopeFields = (
+    <>
+      <Field label="แผนก">
+        <Select
+          value={pickedDept}
+          onChange={(e) => setPickedDept(e.target.value)}
+          aria-label="แผนก"
+          placeholder="เลือกแผนก"
+        >
+          {departments.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="ชั้น">
+        <Select
+          value={pickedGrade}
+          onChange={(e) => setPickedGrade(e.target.value)}
+          aria-label="ชั้น"
+          placeholder="เลือกชั้น"
+          disabled={!pickedDept}
+        >
+          {gradeLevels.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="ห้อง">
+        <Select
+          value={pickedRoomId}
+          onChange={(e) => setPickedRoomId(e.target.value)}
+          aria-label="ห้อง"
+          placeholder="เลือกห้อง"
+          disabled={!pickedGrade}
+        >
+          {activeDeptRooms.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="ปีการศึกษา">
+        <Select
+          value={String(year)}
+          onChange={(e) => setYear(Number(e.target.value))}
+          aria-label="ปีการศึกษา"
+        >
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </Select>
+      </Field>
+    </>
+  );
+
   return (
     <div className="page-fill">
       <div className="flex shrink-0 items-center gap-2">
-        {mode !== "settings" && (
-          <div className="grid flex-1 grid-cols-4 gap-2">
+        {showScopeFilters && (
+          <div className="hidden flex-1 grid-cols-4 gap-2 lg:grid">
             <Select
               className="min-w-0"
               value={pickedDept}
@@ -121,6 +190,23 @@ export function BehaviorScore() {
           </div>
         )}
         {mode === "settings" && <p className="flex-1 text-sm font-semibold">ตั้งค่าพฤติกรรม</p>}
+        <div className="flex-1 lg:hidden" />
+        {showScopeFilters && (
+          <Button
+            variant="outline"
+            size="icon"
+            className="relative shrink-0 lg:hidden"
+            onClick={() => setFiltersOpen(true)}
+            aria-label="ตัวกรอง"
+          >
+            <SlidersHorizontal className="h-3 w-3" />
+            {activeFilterCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] text-accent-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+        )}
         <Button
           variant={mode === "report" ? "default" : "outline"}
           size="icon"
@@ -145,11 +231,24 @@ export function BehaviorScore() {
         )}
       </div>
 
+      <Sheet
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        title="ตัวกรอง"
+        footer={
+          <Button className="w-full" onClick={() => setFiltersOpen(false)}>
+            ดูผลลัพธ์
+          </Button>
+        }
+      >
+        <div className="space-y-4">{scopeFields}</div>
+      </Sheet>
+
       {mode === "settings" ? (
         <CategorySettingsPanel />
       ) : !classroomId ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="เลือกห้องเรียน" description="เลือกห้องด้านบนเพื่อดูคะแนนพฤติกรรม" />
+          <EmptyState title="เลือกห้องเรียน" description="เลือกห้องจากตัวกรองเพื่อดูคะแนนพฤติกรรม" />
         </div>
       ) : mode === "report" ? (
         <ReportPanel
@@ -219,9 +318,40 @@ function RosterPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="table-panel">
+      <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto lg:hidden">
+        {roster.map((s) => {
+          const studentRecords = byStudent.get(s.id) ?? [];
+          const score = summarizeBehaviorScore(studentRecords);
+          const name = `${s.first_name} ${s.last_name}`;
+          return (
+            <li key={s.id} className="rounded-lg border border-border p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{name}</p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{s.student_code}</p>
+                </div>
+                <p
+                  className={cn(
+                    "shrink-0 text-base font-semibold tabular-nums",
+                    score < STARTING_SCORE ? "text-destructive" : "text-success",
+                  )}
+                >
+                  {score}
+                </p>
+              </div>
+              <div className="mt-2 flex justify-end">
+                <Button variant="outline" size="sm" onClick={() => setOpenStudent(s)}>
+                  รายการ
+                </Button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="table-panel hidden lg:flex">
         <div className="table-panel-scroll">
-          <table className="w-full min-w-[28rem] text-xs">
+          <table className="w-full text-xs">
             <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
