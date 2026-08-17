@@ -337,6 +337,7 @@ export function Attendance() {
       ) : view === "checkin" ? (
         <CheckInPanel
           classroomId={classroomId}
+          classroomLabel={classroomLabel}
           academicYear={academicYear}
           departmentId={departmentId}
           recorderId={me.id}
@@ -727,11 +728,13 @@ function PeriodCheckInGrid({
 
 function CheckInPanel({
   classroomId,
+  classroomLabel,
   academicYear,
   departmentId,
   recorderId,
 }: {
   classroomId: string;
+  classroomLabel: string;
   academicYear: number;
   departmentId: string;
   recorderId: string;
@@ -792,6 +795,7 @@ function CheckInPanel({
         <CheckInGrid
           key={`${classroomId}-${date}`}
           classroomId={classroomId}
+          classroomLabel={classroomLabel}
           date={date}
           roster={roster}
           existing={records ?? []}
@@ -805,6 +809,7 @@ function CheckInPanel({
 
 function CheckInGrid({
   classroomId,
+  classroomLabel,
   date,
   roster,
   existing,
@@ -812,6 +817,7 @@ function CheckInGrid({
   markAllRef,
 }: {
   classroomId: string;
+  classroomLabel: string;
   date: string;
   roster: Student[];
   existing: AttendanceRecord[];
@@ -905,8 +911,13 @@ function CheckInGrid({
           const mark = marks.get(s.id) ?? { status: null, note: "" };
           const noteOpen = Boolean(mark.status && mark.status !== "present");
           return (
-            <li key={s.id} className="rounded-lg border border-border p-3">
-              <p className="truncate text-sm font-medium">{name}</p>
+            <li key={s.id} className="relative rounded-lg border border-border p-3">
+              {classroomLabel && (
+                <span className="absolute right-3 top-3 shrink-0 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] text-blue-500">
+                  {classroomLabel}
+                </span>
+              )}
+              <p className="truncate pr-14 text-sm font-medium">{name}</p>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">{s.student_code}</p>
               <div className="mt-2">{statusButtons(s.id, mark)}</div>
               {noteOpen && (
