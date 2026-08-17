@@ -385,7 +385,7 @@ function AppShellInner() {
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          "font-ui glass-sidebar relative z-10 hidden shrink-0 flex-col rounded-2xl transition-[width] duration-200 lg:flex",
+          "font-ui glass-sidebar relative z-10 hidden shrink-0 flex-col overflow-hidden rounded-2xl transition-[width] duration-200 lg:flex",
           collapsed ? "w-14" : "w-56",
         )}
       >
@@ -412,7 +412,12 @@ function AppShellInner() {
           </Button>
         </div>
 
-        <nav className={cn("flex flex-1 flex-col gap-1 py-2", collapsed ? "px-1.5" : "px-3")}>
+        <nav
+          className={cn(
+            "flex flex-1 flex-col gap-1 overflow-y-auto py-2",
+            collapsed ? "px-1.5" : "px-3",
+          )}
+        >
           {tabs.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
