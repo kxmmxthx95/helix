@@ -170,8 +170,8 @@ const TABS = [
     orgWideOnly: false,
     deptManagerOnly: false,
     academicManagerOnly: false,
-    // Visible to everyone (like "/") — student/parent-only content, renders EmptyState for teacher/admin.
     teacherOrManagerOnly: false,
+    studentOrParentOnly: true,
   },
   {
     to: "/attendance",
@@ -316,6 +316,8 @@ function AppShellInner() {
       (!t.academicManagerOnly || (profile && canManageAcademic(profile.roles))) &&
       (!t.teacherOrManagerOnly ||
         (profile && (profile.roles.includes("teacher") || canManage(profile.roles)))) &&
+      (!t.studentOrParentOnly ||
+        (profile && (profile.roles.includes("student") || profile.roles.includes("parent")))) &&
       // /time-tracking is further gated by the school-wide per-role toggle (migration 0032).
       (t.to !== "/time-tracking" ||
         (profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r)))),

@@ -165,20 +165,20 @@ create extension if not exists pg_net;
 do $$
 begin
   if not exists (select 1 from vault.secrets where name = 'line_notify_cron_secret') then
-    perform vault.create_secret(encode(gen_random_bytes(32), 'hex'), 'line_notify_cron_secret');
+    perform vault.create_secret(
+      replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
+      'line_notify_cron_secret'
+    );
   end if;
 end $$;
 
--- IMPORTANT (manual step): replace YOUR_PROJECT_REF below with this
--- project's actual ref before applying, or reschedule the job afterward —
--- the functions URL isn't knowable from inside a migration file.
 select cron.schedule(
   'line-notify-drain',
   '*/5 * * * *',
   $$
   select enqueue_due_assignment_notifications();
   select net.http_post(
-    url := 'https://YOUR_PROJECT_REF.functions.supabase.co/line-notify',
+    url := 'https://hncabywwkvdekongabln.functions.supabase.co/line-notify',
     headers := jsonb_build_object(
       'content-type', 'application/json',
       'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'line_notify_cron_secret')

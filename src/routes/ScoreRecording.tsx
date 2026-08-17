@@ -62,7 +62,10 @@ export function ScoreRecording() {
 
   const [pickedDept, setPickedDept] = useState("");
   const [term, setTerm] = useState<1 | 2>(1);
-  const [selected, setSelected] = useState<TeachingAssignment | null>(null);
+  // An id, not the object itself — so saves (e.g. score ratio) that
+  // invalidate/refetch teaching_assignments show up immediately instead of
+  // staying stuck on the stale object captured at click time.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const departmentId = orgWide ? pickedDept : (me?.department_id ?? "");
   const department = departments.find((d) => d.id === departmentId);
@@ -94,6 +97,7 @@ export function ScoreRecording() {
   // Teachers only see their own assignments — grading is subject-specific,
   // not "any teacher" like /behavior (grill decision).
   const assignments = manager ? allAssignments : allAssignments.filter((a) => a.teacher_id === me.id);
+  const selected = assignments.find((a) => a.id === selectedId) ?? null;
 
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
   const classroomById = new Map(classrooms.map((c) => [c.id, c]));
@@ -108,7 +112,7 @@ export function ScoreRecording() {
             value={pickedDept}
             onChange={(e) => {
               setPickedDept(e.target.value);
-              setSelected(null);
+              setSelectedId(null);
             }}
             aria-label="แผนก"
             placeholder="เลือกแผนก"
@@ -128,7 +132,7 @@ export function ScoreRecording() {
                 type="button"
                 onClick={() => {
                   setTerm(t as 1 | 2);
-                  setSelected(null);
+                  setSelectedId(null);
                 }}
                 className={cn(
                   "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
@@ -150,6 +154,7 @@ export function ScoreRecording() {
         </div>
       ) : selected ? (
         <AssignmentPanel
+          key={selected.id}
           assignment={selected}
           subject={subjectById.get(selected.subject_id) ?? null}
           classroomLabel={(() => {
@@ -158,7 +163,7 @@ export function ScoreRecording() {
             return c ? `${g ? gradeShortLabel(g.code) : "—"}/${c.name}` : "—";
           })()}
           departmentId={departmentId}
-          onBack={() => setSelected(null)}
+          onBack={() => setSelectedId(null)}
         />
       ) : isLoading ? (
         <div className="flex flex-1 items-center justify-center">
@@ -190,7 +195,7 @@ export function ScoreRecording() {
                   return (
                     <tr
                       key={a.id}
-                      onClick={() => setSelected(a)}
+                      onClick={() => setSelectedId(a.id)}
                       className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
                     >
                       <td className="px-3 py-2">
@@ -336,19 +341,28 @@ function GradedPanel({
   const { data: gradeStatuses = [] } = useGradeStatuses(assignment.id);
   const [itemsOpen, setItemsOpen] = useState(false);
   const [openStudent, setOpenStudent] = useState<Student | null>(null);
+  const [listKind, setListKind] = useState<ScoreItemKind | null>(null);
 
   const pct = resolveScorePct(assignment, deptSettings);
   const statusByStudent = new Map(gradeStatuses.map((g) => [g.student_id, g.status]));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex shrink-0 items-center justify-between">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
           สัดส่วนคะแนนเก็บ:สอบ = {pct ? `${pct.collectPct}:${pct.examPct}` : "ยังไม่ได้ตั้งค่า"}
         </p>
-        <Button variant="outline" size="sm" onClick={() => setItemsOpen(true)}>
-          จัดการรายการคะแนน
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setListKind("collect")}>
+            สร้างใบงาน
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setListKind("exam")}>
+            สร้างการสอบ
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setItemsOpen(true)}>
+            จัดการรายการคะแนน
+          </Button>
+        </div>
       </div>
 
       <div className="table-panel flex-1">
@@ -416,6 +430,13 @@ function GradedPanel({
         status={openStudent ? (statusByStudent.get(openStudent.id) ?? null) : null}
         onClose={() => setOpenStudent(null)}
       />
+      <AssignmentListSheet
+        kind={listKind}
+        assignmentId={assignment.id}
+        items={items}
+        roster={roster}
+        onClose={() => setListKind(null)}
+      />
     </div>
   );
 }
@@ -440,7 +461,6 @@ function ItemManagerSheet({
   const toast = useToast();
   const create = useCreateScoreItem();
   const del = useDeleteScoreItem();
-  const addAttachment = useAddAssignmentAttachment();
   const savePct = useSaveAssignmentScorePct();
   const [collectCustom, setCollectCustom] = useState(String(assignment.score_collect_pct ?? ""));
   const [examCustom, setExamCustom] = useState(String(assignment.score_exam_pct ?? ""));
@@ -458,22 +478,6 @@ function ItemManagerSheet({
       { id: assignment.id, score_collect_pct: c, score_exam_pct: e, split_exam_items: splitExam },
       { onSuccess: () => toast("บันทึกสำเร็จ"), onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error") },
     );
-  }
-
-  async function createItem(draft: {
-    teaching_assignment_id: string;
-    kind: ScoreItemKind;
-    label: string;
-    max_score: number;
-    description?: string | null;
-    due_date?: string | null;
-    publish_at?: string;
-    requires_submission?: boolean;
-    files: File[];
-  }) {
-    const { files, ...rest } = draft;
-    const created = await create.mutateAsync(rest);
-    for (const file of files) await addAttachment.mutateAsync({ scoreItemId: created.id, file });
   }
 
   return (
@@ -502,7 +506,7 @@ function ItemManagerSheet({
           targetMax={pct?.collectPct ?? null}
           allowMultiple
           assignmentId={assignment.id}
-          onCreate={createItem}
+          onCreate={(draft) => create.mutate(draft)}
           onDelete={(id) => del.mutate(id)}
           onGrade={setGradingItem}
         />
@@ -513,7 +517,7 @@ function ItemManagerSheet({
           targetMax={pct?.examPct ?? null}
           allowMultiple={splitExam}
           assignmentId={assignment.id}
-          onCreate={createItem}
+          onCreate={(draft) => create.mutate(draft)}
           onDelete={(id) => del.mutate(id)}
           onGrade={setGradingItem}
         />
@@ -541,73 +545,21 @@ function ItemKindSection({
   targetMax: number | null;
   allowMultiple: boolean;
   assignmentId: string;
-  onCreate: (draft: {
-    teaching_assignment_id: string;
-    kind: ScoreItemKind;
-    label: string;
-    max_score: number;
-    description?: string | null;
-    due_date?: string | null;
-    publish_at?: string;
-    requires_submission?: boolean;
-    files: File[];
-  }) => void;
+  onCreate: (draft: { teaching_assignment_id: string; kind: ScoreItemKind; label: string; max_score: number }) => void;
   onDelete: (id: string) => void;
   onGrade: (item: ScoreItem) => void;
 }) {
-  const toast = useToast();
-  const fileRef = useRef<HTMLInputElement>(null);
   const [label, setLabel] = useState("");
   const [maxScore, setMaxScore] = useState("");
-  const [expanded, setExpanded] = useState(false);
-  const [description, setDescription] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [scheduled, setScheduled] = useState(false);
-  const [publishAt, setPublishAt] = useState("");
-  const [requiresSubmission, setRequiresSubmission] = useState(false);
-  const [files, setFiles] = useState<File[]>([]);
-  const [saving, setSaving] = useState(false);
   const sum = items.reduce((s, i) => s + i.max_score, 0);
   const canAdd = allowMultiple || items.length === 0;
 
-  function reset() {
-    setLabel("");
-    setMaxScore("");
-    setExpanded(false);
-    setDescription("");
-    setDueDate("");
-    setScheduled(false);
-    setPublishAt("");
-    setRequiresSubmission(false);
-    setFiles([]);
-  }
-
-  async function add() {
+  function add() {
     const n = Number(maxScore);
     if (!label.trim() || !n) return;
-    if (scheduled && !publishAt) {
-      toast("เลือกวันเวลาที่จะโพสต์", "error");
-      return;
-    }
-    setSaving(true);
-    try {
-      await onCreate({
-        teaching_assignment_id: assignmentId,
-        kind,
-        label: label.trim(),
-        max_score: n,
-        description: expanded && description.trim() ? description.trim() : null,
-        due_date: expanded && dueDate ? dueDate : null,
-        publish_at: expanded && scheduled && publishAt ? new Date(publishAt).toISOString() : undefined,
-        requires_submission: expanded ? requiresSubmission : false,
-        files,
-      });
-      reset();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error");
-    } finally {
-      setSaving(false);
-    }
+    onCreate({ teaching_assignment_id: assignmentId, kind, label: label.trim(), max_score: n });
+    setLabel("");
+    setMaxScore("");
   }
 
   return (
@@ -627,82 +579,273 @@ function ItemKindSection({
         {items.length === 0 && <li className="px-2 py-3 text-center text-muted-foreground">ยังไม่มีรายการ</li>}
       </ul>
       {canAdd && (
-        <div className="space-y-2 rounded-lg border border-dashed border-border p-2">
-          <div className="flex gap-2">
-            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="ชื่อรายการ" className="min-w-0 flex-1" />
-            <Input
-              type="number"
-              min="1"
-              value={maxScore}
-              onChange={(e) => setMaxScore(e.target.value)}
-              placeholder="เต็ม"
-              className="w-16 shrink-0"
-            />
-            {!expanded && (
-              <Button size="icon" className="shrink-0" onClick={add} disabled={!label.trim() || !maxScore || saving} aria-label="เพิ่มรายการ">
-                {saving ? <Spinner className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-              </Button>
-            )}
-          </div>
-          <button
-            type="button"
-            className="text-[10px] text-muted-foreground underline underline-offset-2"
-            onClick={() => setExpanded((v) => !v)}
-          >
-            {expanded ? "ซ่อนตัวเลือกโพสต์งาน" : "โพสต์เป็นงาน (กำหนดส่ง/ไฟล์แนบ)"}
-          </button>
-          {expanded && (
-            <div className="space-y-2">
-              <Field label="คำอธิบายงาน">
-                <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="รายละเอียดงาน" />
-              </Field>
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="กำหนดส่ง (ถ้ามี)">
-                  <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-                </Field>
-                <Field label="เวลาโพสต์">
-                  <Select
-                    value={scheduled ? "scheduled" : "now"}
-                    onChange={(e) => setScheduled(e.target.value === "scheduled")}
-                  >
-                    <option value="now">ทันที</option>
-                    <option value="scheduled">ตั้งเวลา</option>
-                  </Select>
-                </Field>
-              </div>
-              {scheduled && (
-                <Field label="วันเวลาที่จะโพสต์">
-                  <Input type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
-                </Field>
-              )}
-              <Switch checked={requiresSubmission} onChange={setRequiresSubmission} label="ต้องให้นักเรียนส่งออนไลน์" />
-              <div>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => {
-                    const picked = [...(e.target.files ?? [])].slice(0, MAX_ATTACHMENTS);
-                    if (picked.some((f) => f.size > MAX_ATTACHMENT_BYTES)) {
-                      toast("ไฟล์ต้องมีขนาดไม่เกิน 10MB", "error");
-                      return;
-                    }
-                    setFiles(picked);
-                  }}
-                />
-                <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                  {files.length ? `เลือกแล้ว ${files.length} ไฟล์` : "แนบไฟล์ (สูงสุด 5 ไฟล์)"}
-                </Button>
-              </div>
-              <Button size="sm" className="w-full" onClick={add} disabled={!label.trim() || !maxScore || saving}>
-                {saving ? <Spinner className="h-3 w-3" /> : "โพสต์งาน"}
-              </Button>
-            </div>
-          )}
+        <div className="flex gap-2">
+          <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="ชื่อรายการ" className="min-w-0 flex-1" />
+          <Input
+            type="number"
+            min="1"
+            value={maxScore}
+            onChange={(e) => setMaxScore(e.target.value)}
+            placeholder="เต็ม"
+            className="w-16 shrink-0"
+          />
+          <Button size="icon" className="shrink-0" onClick={add} disabled={!label.trim() || !maxScore} aria-label="เพิ่มรายการ">
+            <Plus className="h-3 w-3" />
+          </Button>
         </div>
       )}
     </div>
+  );
+}
+
+// ------------------------------------------------------------ assignment list
+
+/** Opened from GradedPanel's "สร้างใบงาน"/"สร้างการสอบ" — shows posted assignments of that kind first, "+ สร้างใหม่" opens AssignmentPostSheet on top. */
+function AssignmentListSheet({
+  kind,
+  assignmentId,
+  items,
+  roster,
+  onClose,
+}: {
+  kind: ScoreItemKind | null;
+  assignmentId: string;
+  items: ScoreItem[];
+  roster: Student[];
+  onClose: () => void;
+}) {
+  const del = useDeleteScoreItem();
+  const [creating, setCreating] = useState(false);
+  const [gradingItem, setGradingItem] = useState<ScoreItem | null>(null);
+  const title = kind === "exam" ? "การสอบ" : "ใบงาน";
+  const posted = items.filter((i) => i.kind === kind && i.description);
+
+  return (
+    <Sheet open={kind !== null} onOpenChange={(o) => !o && onClose()} title={title}>
+      <div className="space-y-3">
+        <Button size="sm" className="w-full" onClick={() => setCreating(true)}>
+          + สร้าง{title}ใหม่
+        </Button>
+
+        {posted.length === 0 ? (
+          <p className="py-6 text-center text-xs text-muted-foreground">ยังไม่มี{title}</p>
+        ) : (
+          <div className="table-panel">
+            <div className="table-panel-scroll">
+              <table className="w-full min-w-[26rem] text-xs">
+                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-2 py-1.5 font-medium">ชื่อ / รายละเอียด</th>
+                    <th className="px-2 py-1.5 font-medium">กำหนดส่ง</th>
+                    <th className="px-2 py-1.5 font-medium">ส่งออนไลน์</th>
+                    <th className="w-24 px-2 py-1.5" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {posted.map((i) => (
+                    <AssignmentTableRow
+                      key={i.id}
+                      item={i}
+                      onDelete={() => del.mutate(i.id)}
+                      onGrade={() => setGradingItem(i)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <AssignmentPostSheet kind={creating ? kind : null} assignmentId={assignmentId} onClose={() => setCreating(false)} />
+      <SubmissionsSheet item={gradingItem} roster={roster} onClose={() => setGradingItem(null)} />
+    </Sheet>
+  );
+}
+
+function AssignmentTableRow({ item, onDelete, onGrade }: { item: ScoreItem; onDelete: () => void; onGrade: () => void }) {
+  const { data: attachments = [] } = useAssignmentAttachments(item.id);
+
+  async function openAttachment(path: string) {
+    try {
+      window.open(await signedAssignmentAttachmentUrl(path), "_blank");
+    } catch {
+      /* best-effort — ignore */
+    }
+  }
+
+  return (
+    <tr className="border-t border-border align-top">
+      <td className="px-2 py-2">
+        <p className="font-medium">
+          {item.label} <span className="font-normal text-muted-foreground">(เต็ม {item.max_score})</span>
+        </p>
+        {item.description && <p className="text-muted-foreground">{item.description}</p>}
+        {attachments.length > 0 && (
+          <ul className="mt-0.5 space-y-0.5">
+            {attachments.map((a) => (
+              <li key={a.id}>
+                <button type="button" className="text-primary underline" onClick={() => openAttachment(a.storage_path)}>
+                  {a.file_name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </td>
+      <td className="px-2 py-2 whitespace-nowrap">{item.due_date ?? "—"}</td>
+      <td className="px-2 py-2">{item.requires_submission ? "ใช่" : "ไม่ใช่"}</td>
+      <td className="px-2 py-2 text-right">
+        <div className="flex flex-col items-end gap-1">
+          {item.requires_submission && (
+            <Button variant="outline" size="sm" onClick={onGrade}>
+              งานที่ส่ง
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onDelete}>
+            ลบ
+          </Button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+// ------------------------------------------------------------ post as assignment
+
+/** Dedicated entry points from GradedPanel's header ("สร้างใบงาน"/"สร้างการสอบ") — the rich due-date/submission/attachment form, kept out of the quick add above. */
+function AssignmentPostSheet({
+  kind,
+  assignmentId,
+  onClose,
+}: {
+  kind: ScoreItemKind | null;
+  assignmentId: string;
+  onClose: () => void;
+}) {
+  const toast = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const create = useCreateScoreItem();
+  const addAttachment = useAddAssignmentAttachment();
+  const [label, setLabel] = useState("");
+  const [maxScore, setMaxScore] = useState("");
+  const [description, setDescription] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [scheduled, setScheduled] = useState(false);
+  const [publishAt, setPublishAt] = useState("");
+  const [requiresSubmission, setRequiresSubmission] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  function reset() {
+    setLabel("");
+    setMaxScore("");
+    setDescription("");
+    setDueDate("");
+    setScheduled(false);
+    setPublishAt("");
+    setRequiresSubmission(false);
+    setFiles([]);
+  }
+
+  function close() {
+    reset();
+    onClose();
+  }
+
+  async function submit() {
+    if (!kind) return;
+    const n = Number(maxScore);
+    if (!label.trim() || !n) return;
+    if (scheduled && !publishAt) {
+      toast("เลือกวันเวลาที่จะโพสต์", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const created = await create.mutateAsync({
+        teaching_assignment_id: assignmentId,
+        kind,
+        label: label.trim(),
+        max_score: n,
+        description: description.trim() || null,
+        due_date: dueDate || null,
+        publish_at: scheduled && publishAt ? new Date(publishAt).toISOString() : undefined,
+        requires_submission: requiresSubmission,
+      });
+      for (const file of files) await addAttachment.mutateAsync({ scoreItemId: created.id, file });
+      toast(kind === "collect" ? "สร้างใบงานสำเร็จ" : "สร้างการสอบสำเร็จ");
+      close();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Sheet
+      open={kind !== null}
+      onOpenChange={(o) => !o && close()}
+      title={kind === "exam" ? "สร้างการสอบ" : "สร้างใบงาน"}
+    >
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <div className="min-w-0 flex-1">
+            <Field label="ชื่อรายการ">
+              <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="เช่น ใบงานที่ 1" />
+            </Field>
+          </div>
+          <div className="w-16 shrink-0">
+            <Field label="เต็ม">
+              <Input type="number" min="1" value={maxScore} onChange={(e) => setMaxScore(e.target.value)} />
+            </Field>
+          </div>
+        </div>
+        <Field label="คำอธิบายงาน">
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="รายละเอียดงาน" />
+        </Field>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="กำหนดส่ง (ถ้ามี)">
+            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </Field>
+          <Field label="เวลาโพสต์">
+            <Select value={scheduled ? "scheduled" : "now"} onChange={(e) => setScheduled(e.target.value === "scheduled")}>
+              <option value="now">ทันที</option>
+              <option value="scheduled">ตั้งเวลา</option>
+            </Select>
+          </Field>
+        </div>
+        {scheduled && (
+          <Field label="วันเวลาที่จะโพสต์">
+            <Input type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
+          </Field>
+        )}
+        <Switch checked={requiresSubmission} onChange={setRequiresSubmission} label="ต้องให้นักเรียนส่งออนไลน์" />
+        <div>
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              const picked = [...(e.target.files ?? [])].slice(0, MAX_ATTACHMENTS);
+              if (picked.some((f) => f.size > MAX_ATTACHMENT_BYTES)) {
+                toast("ไฟล์ต้องมีขนาดไม่เกิน 10MB", "error");
+                return;
+              }
+              setFiles(picked);
+            }}
+          />
+          <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+            {files.length ? `เลือกแล้ว ${files.length} ไฟล์` : "แนบไฟล์ (สูงสุด 5 ไฟล์)"}
+          </Button>
+        </div>
+        <Button className="w-full" onClick={submit} disabled={!label.trim() || !maxScore || saving}>
+          {saving ? <Spinner className="h-3 w-3" /> : kind === "exam" ? "สร้างการสอบ" : "สร้างใบงาน"}
+        </Button>
+      </div>
+    </Sheet>
   );
 }
 
