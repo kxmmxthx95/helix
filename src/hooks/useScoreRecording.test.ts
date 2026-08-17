@@ -20,6 +20,11 @@ describe("sumItemScores", () => {
     kind,
     label: id,
     max_score: max,
+    description: null,
+    due_date: null,
+    publish_at: "",
+    requires_submission: false,
+    notified_at: null,
     created_at: "",
     updated_at: "",
   });
@@ -28,6 +33,7 @@ describe("sumItemScores", () => {
     score_item_id: itemId,
     student_id: studentId,
     score: value,
+    feedback: null,
     created_at: "",
     updated_at: "",
   });

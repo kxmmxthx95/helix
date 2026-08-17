@@ -6,6 +6,7 @@ import { useMyChildren } from "@/hooks/useAttendance";
 import { useLearningAreas } from "@/hooks/useCurriculum";
 import { useAllGradeLevels } from "@/hooks/useCurriculumStructure";
 import { avatarUrl, useUploadAvatar } from "@/hooks/useAvatar";
+import { LINE_LINK_CODE_TTL_MINUTES, useGenerateLinkCode } from "@/hooks/useLineLink";
 import { useDepartments, useUpdateMyProfile, type MyProfileEdit } from "@/hooks/useProfiles";
 import { profileFullName } from "@/lib/database.types";
 import { PREFIXES, roleLabels, STUDENT_PREFIXES } from "@/lib/roles";
@@ -117,6 +118,8 @@ export function Profile() {
         </Button>
       </Card>
 
+      <LineLinkCard />
+
       {isStudent && myStudent && (
         <Card className="space-y-2">
           <p className="text-sm font-semibold">ข้อมูลนักเรียน</p>
@@ -154,6 +157,52 @@ export function Profile() {
         </Card>
       )}
     </div>
+  );
+}
+
+/**
+ * ผูกบัญชี LINE — the school's OA already has a Messaging API channel, so
+ * linking happens by sending a one-time code as a chat message (see
+ * supabase/functions/line-webhook) rather than an OAuth redirect. Status is
+ * just profiles.line_user_id; "ตรวจสอบอีกครั้ง" re-pulls the profile since
+ * the actual link only happens once the LINE message round-trips.
+ */
+function LineLinkCard() {
+  const { profile, refreshProfile } = useAuth();
+  const generate = useGenerateLinkCode();
+  const [code, setCode] = useState<string | null>(null);
+
+  if (!profile) return null;
+  const linked = !!profile.line_user_id;
+
+  return (
+    <Card className="space-y-2">
+      <p className="text-sm font-semibold">บัญชี LINE</p>
+      {linked ? (
+        <p className="text-sm text-success">ผูกบัญชีแล้ว</p>
+      ) : code ? (
+        <div className="space-y-2 text-sm">
+          <p>
+            ส่งข้อความ <span className="font-mono text-base font-semibold">{code}</span> ไปยัง LINE
+            ทางการของโรงเรียน ภายใน {LINE_LINK_CODE_TTL_MINUTES} นาที
+          </p>
+          <Button variant="outline" size="sm" onClick={() => void refreshProfile()}>
+            ตรวจสอบอีกครั้ง
+          </Button>
+        </div>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">ยังไม่ได้ผูกบัญชี — จะได้รับแจ้งเตือนงาน/คะแนนทาง LINE</p>
+          <Button
+            size="sm"
+            disabled={generate.isPending}
+            onClick={() => generate.mutate(profile.id, { onSuccess: setCode })}
+          >
+            {generate.isPending ? <Spinner className="h-3 w-3" /> : "สร้างรหัสผูกบัญชี"}
+          </Button>
+        </>
+      )}
+    </Card>
   );
 }
 

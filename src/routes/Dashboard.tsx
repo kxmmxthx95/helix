@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { Button, Field, Input, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
+import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions } from "@/hooks/useAssignments";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
 import { STARTING_SCORE, summarizeBehaviorScore, useBehaviorRecords } from "@/hooks/useBehaviorRecords";
 import { useClockIn, useClockOut, useMyTimeClock } from "@/hooks/useTimeClock";
@@ -81,6 +82,10 @@ export function Dashboard() {
         (child) => profile && <StudentLeaveSection key={child.id} student={child} submittedBy={profile.id} />,
       )}
 
+      {myStudent && <AssignmentSummarySection student={myStudent} />}
+      {children.map((child) => (
+        <AssignmentSummarySection key={child.id} student={child} />
+      ))}
       {myStudent && <AttendanceSummarySection student={myStudent} />}
       {children.map((child) => (
         <AttendanceSummarySection key={child.id} student={child} />
@@ -170,6 +175,43 @@ function QuickClockSection({ profileId, departmentId }: { profileId: string; dep
           ดูทั้งหมด
         </button>
       </div>
+    </section>
+  );
+}
+
+/** role="student"/"parent" only — full to-do list + submit flow lives at /assignments. */
+function AssignmentSummarySection({ student }: { student: Student }) {
+  const navigate = useNavigate();
+  const { data: items = [], isLoading } = useMyAssignments(student.id);
+  const { data: scores } = useMyItemScores(student.id);
+  const { data: submissions } = useMySubmissions(student.id);
+
+  const counts = { missing: 0, submitted: 0, late: 0, graded: 0 };
+  for (const item of items) {
+    counts[assignmentStatus(item, submissions?.get(item.id) ?? null, scores?.has(item.id) ?? false)]++;
+  }
+
+  return (
+    <section>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          งานของ {student.first_name} {student.last_name}
+        </p>
+        <button type="button" className="tappable text-xs text-accent underline" onClick={() => navigate("/assignments")}>
+          ดูทั้งหมด
+        </button>
+      </div>
+      {isLoading ? (
+        <Spinner className="mt-1 h-4 w-4 text-muted-foreground" />
+      ) : items.length === 0 ? (
+        <p className="mt-1 text-sm text-muted-foreground">ยังไม่มีงาน</p>
+      ) : (
+        <p className="mt-1 text-sm">
+          <strong className="font-semibold">{counts.missing + counts.late}</strong> ยังไม่ส่ง ·{" "}
+          <strong className="font-semibold">{counts.submitted}</strong> ส่งแล้ว ·{" "}
+          <strong className="font-semibold">{counts.graded}</strong> ตรวจแล้ว
+        </p>
+      )}
     </section>
   );
 }

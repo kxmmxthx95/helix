@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  AssignmentAttachment,
   GradeStatusCode,
   ScoreItem,
   ScoreItemKind,
@@ -31,6 +32,12 @@ export function useScoreItems(teachingAssignmentId: string | null) {
   });
 }
 
+/**
+ * Same insert either way — a draft with `description` set is a posted
+ * Google Classroom–style assignment (see migration 0039); the plain
+ * label+max_score draft the quick "เพิ่มรายการ" flow has always used still
+ * works unchanged, just leaving those columns null.
+ */
 export function useCreateScoreItem() {
   const qc = useQueryClient();
   return useMutation({
@@ -39,9 +46,14 @@ export function useCreateScoreItem() {
       kind: ScoreItemKind;
       label: string;
       max_score: number;
+      description?: string | null;
+      due_date?: string | null;
+      publish_at?: string;
+      requires_submission?: boolean;
     }) => {
-      const { error } = await supabase.from("score_items").insert(draft);
+      const { data, error } = await supabase.from("score_items").insert(draft).select("id").single();
       if (error) throw error;
+      return data;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["score_items"] }),
   });
@@ -50,12 +62,79 @@ export function useCreateScoreItem() {
 export function useUpdateScoreItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...draft }: { id: string; label: string; max_score: number }) => {
+    mutationFn: async ({
+      id,
+      ...draft
+    }: {
+      id: string;
+      label: string;
+      max_score: number;
+      description?: string | null;
+      due_date?: string | null;
+      publish_at?: string;
+      requires_submission?: boolean;
+    }) => {
       const { error } = await supabase.from("score_items").update(draft).eq("id", id);
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["score_items"] }),
   });
+}
+
+// -------------------------------------------------------------- assignment_attachments
+
+export function useAssignmentAttachments(scoreItemId: string | null) {
+  return useQuery({
+    queryKey: ["assignment_attachments", scoreItemId],
+    enabled: !!scoreItemId,
+    queryFn: async (): Promise<AssignmentAttachment[]> => {
+      const { data, error } = await supabase
+        .from("assignment_attachments")
+        .select("*")
+        .eq("score_item_id", scoreItemId!)
+        .order("uploaded_at");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+const ASSIGNMENT_ATTACHMENTS_BUCKET = "assignment-attachments";
+
+export function useAddAssignmentAttachment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ scoreItemId, file }: { scoreItemId: string; file: File }) => {
+      const ext = file.name.includes(".") ? file.name.split(".").pop() : undefined;
+      const path = `${scoreItemId}/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
+      const { error: upErr } = await supabase.storage.from(ASSIGNMENT_ATTACHMENTS_BUCKET).upload(path, file);
+      if (upErr) throw upErr;
+      const { error } = await supabase
+        .from("assignment_attachments")
+        .insert({ score_item_id: scoreItemId, storage_path: path, file_name: file.name });
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["assignment_attachments"] }),
+  });
+}
+
+export function useDeleteAssignmentAttachment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (attachment: AssignmentAttachment) => {
+      await supabase.storage.from(ASSIGNMENT_ATTACHMENTS_BUCKET).remove([attachment.storage_path]);
+      const { error } = await supabase.from("assignment_attachments").delete().eq("id", attachment.id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["assignment_attachments"] }),
+  });
+}
+
+/** Private bucket — no public URL, sign one on demand (same pattern as Leave.tsx's openAttachment). */
+export async function signedAssignmentAttachmentUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(ASSIGNMENT_ATTACHMENTS_BUCKET).createSignedUrl(path, 60);
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 export function useDeleteScoreItem() {
@@ -95,7 +174,12 @@ export function useStudentItemScores(teachingAssignmentId: string | null) {
 export function useSaveStudentItemScore() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (draft: { score_item_id: string; student_id: string; score: number }) => {
+    mutationFn: async (draft: {
+      score_item_id: string;
+      student_id: string;
+      score: number;
+      feedback?: string | null;
+    }) => {
       const { error } = await supabase
         .from("student_item_scores")
         .upsert(draft, { onConflict: "score_item_id,student_id" });
@@ -173,7 +257,12 @@ export function usePassFailScores(teachingAssignmentId: string | null) {
 export function useSetPassFailScore() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (draft: { teaching_assignment_id: string; student_id: string; passed: boolean }) => {
+    mutationFn: async (draft: {
+      teaching_assignment_id: string;
+      student_id: string;
+      passed: boolean;
+      feedback?: string | null;
+    }) => {
       const { error } = await supabase
         .from("student_pass_fail_scores")
         .upsert(draft, { onConflict: "teaching_assignment_id,student_id" });

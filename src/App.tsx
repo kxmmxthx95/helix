@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ToastProvider } from "@/components/Toast";
 import { Spinner } from "@/components/ui";
+import { Assignments } from "@/routes/Assignments";
 import { Attendance } from "@/routes/Attendance";
 import { BehaviorScore } from "@/routes/BehaviorScore";
 import { ScoreRecording } from "@/routes/ScoreRecording";
@@ -51,6 +52,7 @@ function Gate() {
         <Route path="users" element={<Users />} />
         <Route path="roster" element={<Roster />} />
         <Route path="score-recording" element={<ScoreRecording />} />
+        <Route path="assignments" element={<Assignments />} />
         <Route path="attendance" element={<Attendance />} />
         <Route path="behavior" element={<BehaviorScore />} />
         <Route path="subjects" element={<Subjects />} />

@@ -441,15 +441,58 @@ export type TeachingAssignment = {
 
 export type ScoreItemKind = "collect" | "exam";
 
-/** A teacher's own line item (e.g. "ใบงาน 1") for one assignment. max_score is informational, not enforced against the assignment's pct target. */
+/**
+ * A teacher's own line item (e.g. "ใบงาน 1") for one assignment. max_score is
+ * informational, not enforced against the assignment's pct target. A row
+ * with `description` set doubles as a Google Classroom–style posted
+ * assignment (see migration 0039) — `description`/`due_date` left null means
+ * it's still just a quick คะแนนเก็บ/คะแนนสอบ line item, unchanged from 0030.
+ */
 export type ScoreItem = {
   id: string;
   teaching_assignment_id: string;
   kind: ScoreItemKind;
   label: string;
   max_score: number;
+  description: string | null;
+  due_date: string | null;
+  /** Defaults to creation time; a future value schedules the post + its LINE notification. */
+  publish_at: string;
+  /** True = student must submit online (assignment_submissions); false = teacher grades directly (paper/in-class work). */
+  requires_submission: boolean;
+  /** Set once the "new assignment" LINE notification has been enqueued — see migration 0040. */
+  notified_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/** Teacher-posted material for one assignment (score_item). See migration 0039. */
+export type AssignmentAttachment = {
+  id: string;
+  score_item_id: string;
+  storage_path: string;
+  file_name: string;
+  uploaded_at: string;
+};
+
+/** A student's turn-in for one assignment. Blocked from editing again once graded unless `reopened`. See migration 0039. */
+export type AssignmentSubmission = {
+  id: string;
+  score_item_id: string;
+  student_id: string;
+  content: string | null;
+  submitted_at: string;
+  reopened: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SubmissionAttachment = {
+  id: string;
+  submission_id: string;
+  storage_path: string;
+  file_name: string;
+  uploaded_at: string;
 };
 
 export type StudentItemScore = {
@@ -457,6 +500,8 @@ export type StudentItemScore = {
   score_item_id: string;
   student_id: string;
   score: number;
+  /** Written feedback from the teacher, separate from the numeric score. See migration 0039. */
+  feedback: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -477,8 +522,19 @@ export type StudentPassFailScore = {
   teaching_assignment_id: string;
   student_id: string;
   passed: boolean;
+  /** Written feedback from the teacher. See migration 0039. */
+  feedback: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/** One-time code a profile generates to link their LINE account by messaging it to the school's OA. See migration 0040. */
+export type LineLinkCode = {
+  code: string;
+  profile_id: string;
+  expires_at: string;
+  used_at: string | null;
+  created_at: string;
 };
 
 // ------------------------------------------------------------------ timetable
@@ -770,10 +826,20 @@ export type Database = {
           "term" | "group_id" | "score_collect_pct" | "score_exam_pct" | "split_exam_items"
         >
       >;
-      score_items: Table<ScoreItem, InsertOf<ScoreItem, never>>;
-      student_item_scores: Table<StudentItemScore, InsertOf<StudentItemScore, never>>;
+      score_items: Table<
+        ScoreItem,
+        InsertOf<ScoreItem, "description" | "due_date" | "publish_at" | "requires_submission" | "notified_at">
+      >;
+      assignment_attachments: Table<AssignmentAttachment, InsertOf<AssignmentAttachment, "uploaded_at">>;
+      assignment_submissions: Table<
+        AssignmentSubmission,
+        InsertOf<AssignmentSubmission, "content" | "submitted_at" | "reopened">
+      >;
+      submission_attachments: Table<SubmissionAttachment, InsertOf<SubmissionAttachment, "uploaded_at">>;
+      student_item_scores: Table<StudentItemScore, InsertOf<StudentItemScore, "feedback">>;
       student_grade_status: Table<StudentGradeStatus, InsertOf<StudentGradeStatus, never>>;
-      student_pass_fail_scores: Table<StudentPassFailScore, InsertOf<StudentPassFailScore, never>>;
+      student_pass_fail_scores: Table<StudentPassFailScore, InsertOf<StudentPassFailScore, "feedback">>;
+      line_link_codes: Table<LineLinkCode, InsertOf<LineLinkCode, "used_at">>;
       teaching_plan_units: Table<
         TeachingPlanUnit,
         InsertOf<TeachingPlanUnit, "description" | "completed_at" | "completed_on_plan" | "note">

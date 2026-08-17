@@ -1,10 +1,17 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Select, Spinner, Switch } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
+import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS,
+  signedSubmissionAttachmentUrl,
+  useAssignmentSubmissions,
+  useReopenSubmission,
+} from "@/hooks/useAssignments";
 import { useClassroomRoster } from "@/hooks/useAttendance";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
@@ -12,9 +19,13 @@ import { useDepartments } from "@/hooks/useProfiles";
 import {
   resolveScorePct,
   scoreToGrade,
+  signedAssignmentAttachmentUrl,
   sumItemScores,
+  useAddAssignmentAttachment,
+  useAssignmentAttachments,
   useClearGradeStatus,
   useCreateScoreItem,
+  useDeleteAssignmentAttachment,
   useDeleteScoreItem,
   useGradeStatuses,
   usePassFailScores,
@@ -29,10 +40,12 @@ import { useDepartmentSettings } from "@/hooks/useSettings";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import { useDepartmentTeachingAssignments } from "@/hooks/useTeachingLoad";
 import type {
+  AssignmentSubmission,
   GradeStatusCode,
   ScoreItem,
   ScoreItemKind,
   Student,
+  SubmissionAttachment,
   Subject,
   TeachingAssignment,
 } from "@/lib/database.types";
@@ -393,6 +406,7 @@ function GradedPanel({
         assignment={assignment}
         items={items}
         pct={pct}
+        roster={roster}
       />
       <StudentScoreSheet
         student={openStudent}
@@ -414,20 +428,24 @@ function ItemManagerSheet({
   assignment,
   items,
   pct,
+  roster,
 }: {
   open: boolean;
   onClose: () => void;
   assignment: TeachingAssignment;
   items: ScoreItem[];
   pct: { collectPct: number; examPct: number } | null;
+  roster: Student[];
 }) {
   const toast = useToast();
   const create = useCreateScoreItem();
   const del = useDeleteScoreItem();
+  const addAttachment = useAddAssignmentAttachment();
   const savePct = useSaveAssignmentScorePct();
   const [collectCustom, setCollectCustom] = useState(String(assignment.score_collect_pct ?? ""));
   const [examCustom, setExamCustom] = useState(String(assignment.score_exam_pct ?? ""));
   const [splitExam, setSplitExam] = useState(assignment.split_exam_items);
+  const [gradingItem, setGradingItem] = useState<ScoreItem | null>(null);
 
   function savePctSettings() {
     const c = collectCustom.trim() === "" ? null : Number(collectCustom);
@@ -440,6 +458,22 @@ function ItemManagerSheet({
       { id: assignment.id, score_collect_pct: c, score_exam_pct: e, split_exam_items: splitExam },
       { onSuccess: () => toast("บันทึกสำเร็จ"), onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error") },
     );
+  }
+
+  async function createItem(draft: {
+    teaching_assignment_id: string;
+    kind: ScoreItemKind;
+    label: string;
+    max_score: number;
+    description?: string | null;
+    due_date?: string | null;
+    publish_at?: string;
+    requires_submission?: boolean;
+    files: File[];
+  }) {
+    const { files, ...rest } = draft;
+    const created = await create.mutateAsync(rest);
+    for (const file of files) await addAttachment.mutateAsync({ scoreItemId: created.id, file });
   }
 
   return (
@@ -468,8 +502,9 @@ function ItemManagerSheet({
           targetMax={pct?.collectPct ?? null}
           allowMultiple
           assignmentId={assignment.id}
-          onCreate={(draft) => create.mutate(draft)}
+          onCreate={createItem}
           onDelete={(id) => del.mutate(id)}
+          onGrade={setGradingItem}
         />
         <ItemKindSection
           title="คะแนนสอบ"
@@ -478,10 +513,13 @@ function ItemManagerSheet({
           targetMax={pct?.examPct ?? null}
           allowMultiple={splitExam}
           assignmentId={assignment.id}
-          onCreate={(draft) => create.mutate(draft)}
+          onCreate={createItem}
           onDelete={(id) => del.mutate(id)}
+          onGrade={setGradingItem}
         />
       </div>
+
+      <SubmissionsSheet item={gradingItem} roster={roster} onClose={() => setGradingItem(null)} />
     </Sheet>
   );
 }
@@ -495,6 +533,7 @@ function ItemKindSection({
   assignmentId,
   onCreate,
   onDelete,
+  onGrade,
 }: {
   title: string;
   kind: ScoreItemKind;
@@ -502,20 +541,73 @@ function ItemKindSection({
   targetMax: number | null;
   allowMultiple: boolean;
   assignmentId: string;
-  onCreate: (draft: { teaching_assignment_id: string; kind: ScoreItemKind; label: string; max_score: number }) => void;
+  onCreate: (draft: {
+    teaching_assignment_id: string;
+    kind: ScoreItemKind;
+    label: string;
+    max_score: number;
+    description?: string | null;
+    due_date?: string | null;
+    publish_at?: string;
+    requires_submission?: boolean;
+    files: File[];
+  }) => void;
   onDelete: (id: string) => void;
+  onGrade: (item: ScoreItem) => void;
 }) {
+  const toast = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [label, setLabel] = useState("");
   const [maxScore, setMaxScore] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const [description, setDescription] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [scheduled, setScheduled] = useState(false);
+  const [publishAt, setPublishAt] = useState("");
+  const [requiresSubmission, setRequiresSubmission] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const [saving, setSaving] = useState(false);
   const sum = items.reduce((s, i) => s + i.max_score, 0);
   const canAdd = allowMultiple || items.length === 0;
 
-  function add() {
-    const n = Number(maxScore);
-    if (!label.trim() || !n) return;
-    onCreate({ teaching_assignment_id: assignmentId, kind, label: label.trim(), max_score: n });
+  function reset() {
     setLabel("");
     setMaxScore("");
+    setExpanded(false);
+    setDescription("");
+    setDueDate("");
+    setScheduled(false);
+    setPublishAt("");
+    setRequiresSubmission(false);
+    setFiles([]);
+  }
+
+  async function add() {
+    const n = Number(maxScore);
+    if (!label.trim() || !n) return;
+    if (scheduled && !publishAt) {
+      toast("เลือกวันเวลาที่จะโพสต์", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onCreate({
+        teaching_assignment_id: assignmentId,
+        kind,
+        label: label.trim(),
+        max_score: n,
+        description: expanded && description.trim() ? description.trim() : null,
+        due_date: expanded && dueDate ? dueDate : null,
+        publish_at: expanded && scheduled && publishAt ? new Date(publishAt).toISOString() : undefined,
+        requires_submission: expanded ? requiresSubmission : false,
+        files,
+      });
+      reset();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -530,34 +622,316 @@ function ItemKindSection({
       </div>
       <ul className="divide-y divide-border rounded-lg border border-border text-xs">
         {items.map((i) => (
-          <li key={i.id} className="flex items-center justify-between gap-2 px-2 py-1.5">
-            <span>
-              {i.label} <span className="text-muted-foreground">(เต็ม {i.max_score})</span>
-            </span>
-            <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => onDelete(i.id)}>
-              ลบ
-            </Button>
-          </li>
+          <ItemRow key={i.id} item={i} onDelete={() => onDelete(i.id)} onGrade={() => onGrade(i)} />
         ))}
         {items.length === 0 && <li className="px-2 py-3 text-center text-muted-foreground">ยังไม่มีรายการ</li>}
       </ul>
       {canAdd && (
-        <div className="flex gap-2">
-          <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="ชื่อรายการ" className="min-w-0 flex-1" />
-          <Input
-            type="number"
-            min="1"
-            value={maxScore}
-            onChange={(e) => setMaxScore(e.target.value)}
-            placeholder="เต็ม"
-            className="w-16 shrink-0"
-          />
-          <Button size="icon" className="shrink-0" onClick={add} disabled={!label.trim() || !maxScore} aria-label="เพิ่มรายการ">
-            <Plus className="h-3 w-3" />
-          </Button>
+        <div className="space-y-2 rounded-lg border border-dashed border-border p-2">
+          <div className="flex gap-2">
+            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="ชื่อรายการ" className="min-w-0 flex-1" />
+            <Input
+              type="number"
+              min="1"
+              value={maxScore}
+              onChange={(e) => setMaxScore(e.target.value)}
+              placeholder="เต็ม"
+              className="w-16 shrink-0"
+            />
+            {!expanded && (
+              <Button size="icon" className="shrink-0" onClick={add} disabled={!label.trim() || !maxScore || saving} aria-label="เพิ่มรายการ">
+                {saving ? <Spinner className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+              </Button>
+            )}
+          </div>
+          <button
+            type="button"
+            className="text-[10px] text-muted-foreground underline underline-offset-2"
+            onClick={() => setExpanded((v) => !v)}
+          >
+            {expanded ? "ซ่อนตัวเลือกโพสต์งาน" : "โพสต์เป็นงาน (กำหนดส่ง/ไฟล์แนบ)"}
+          </button>
+          {expanded && (
+            <div className="space-y-2">
+              <Field label="คำอธิบายงาน">
+                <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="รายละเอียดงาน" />
+              </Field>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="กำหนดส่ง (ถ้ามี)">
+                  <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                </Field>
+                <Field label="เวลาโพสต์">
+                  <Select
+                    value={scheduled ? "scheduled" : "now"}
+                    onChange={(e) => setScheduled(e.target.value === "scheduled")}
+                  >
+                    <option value="now">ทันที</option>
+                    <option value="scheduled">ตั้งเวลา</option>
+                  </Select>
+                </Field>
+              </div>
+              {scheduled && (
+                <Field label="วันเวลาที่จะโพสต์">
+                  <Input type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
+                </Field>
+              )}
+              <Switch checked={requiresSubmission} onChange={setRequiresSubmission} label="ต้องให้นักเรียนส่งออนไลน์" />
+              <div>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const picked = [...(e.target.files ?? [])].slice(0, MAX_ATTACHMENTS);
+                    if (picked.some((f) => f.size > MAX_ATTACHMENT_BYTES)) {
+                      toast("ไฟล์ต้องมีขนาดไม่เกิน 10MB", "error");
+                      return;
+                    }
+                    setFiles(picked);
+                  }}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                  {files.length ? `เลือกแล้ว ${files.length} ไฟล์` : "แนบไฟล์ (สูงสุด 5 ไฟล์)"}
+                </Button>
+              </div>
+              <Button size="sm" className="w-full" onClick={add} disabled={!label.trim() || !maxScore || saving}>
+                {saving ? <Spinner className="h-3 w-3" /> : "โพสต์งาน"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function ItemRow({ item, onDelete, onGrade }: { item: ScoreItem; onDelete: () => void; onGrade: () => void }) {
+  const { data: attachments = [] } = useAssignmentAttachments(item.description ? item.id : null);
+  const deleteAttachment = useDeleteAssignmentAttachment();
+
+  async function openAttachment(path: string) {
+    try {
+      window.open(await signedAssignmentAttachmentUrl(path), "_blank");
+    } catch {
+      /* best-effort — ignore */
+    }
+  }
+
+  return (
+    <li className="flex items-center justify-between gap-2 px-2 py-1.5">
+      <div className="min-w-0">
+        <span>
+          {item.label} <span className="text-muted-foreground">(เต็ม {item.max_score})</span>
+        </span>
+        {item.description && (
+          <p className="text-[10px] text-muted-foreground">
+            งานที่โพสต์{item.due_date ? ` · กำหนดส่ง ${item.due_date}` : ""}
+            {item.requires_submission ? " · ต้องส่งออนไลน์" : ""}
+          </p>
+        )}
+        {attachments.length > 0 && (
+          <ul className="mt-0.5 space-y-0.5">
+            {attachments.map((a) => (
+              <li key={a.id} className="flex items-center gap-1">
+                <button type="button" className="text-primary underline" onClick={() => openAttachment(a.storage_path)}>
+                  {a.file_name}
+                </button>
+                <button
+                  type="button"
+                  className="text-muted-foreground"
+                  aria-label="ลบไฟล์แนบ"
+                  onClick={() => deleteAttachment.mutate(a)}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        {item.requires_submission && (
+          <Button variant="outline" size="sm" onClick={onGrade}>
+            งานที่ส่ง
+          </Button>
+        )}
+        <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onDelete}>
+          ลบ
+        </Button>
+      </div>
+    </li>
+  );
+}
+
+// ------------------------------------------------------------ grading submissions
+
+function SubmissionsSheet({
+  item,
+  roster,
+  onClose,
+}: {
+  item: ScoreItem | null;
+  roster: Student[];
+  onClose: () => void;
+}) {
+  const { data: submissions = [] } = useAssignmentSubmissions(item?.id ?? null);
+  const [openStudent, setOpenStudent] = useState<Student | null>(null);
+  const byStudent = new Map(submissions.map((s) => [s.student_id, s]));
+
+  return (
+    <Sheet open={item !== null} onOpenChange={(o) => !o && onClose()} title="งานที่ส่ง" description={item?.label}>
+      {item && (
+        <>
+          <ul className="divide-y divide-border rounded-lg border border-border text-xs">
+            {roster.map((s) => {
+              const submission = byStudent.get(s.id) ?? null;
+              return (
+                <li key={s.id} className="flex items-center justify-between gap-2 px-2 py-1.5">
+                  <span>
+                    {s.first_name} {s.last_name}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge submission={submission} dueDate={item.due_date} />
+                    <Button variant="outline" size="sm" onClick={() => setOpenStudent(s)}>
+                      ตรวจ
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+            {roster.length === 0 && <li className="px-2 py-3 text-center text-muted-foreground">ไม่มีนักเรียน</li>}
+          </ul>
+          <GradeSubmissionSheet item={item} student={openStudent} onClose={() => setOpenStudent(null)} />
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+function StatusBadge({ submission, dueDate }: { submission: AssignmentSubmission | null; dueDate: string | null }) {
+  const late = !!submission && !!dueDate && submission.submitted_at.slice(0, 10) > dueDate;
+  if (!submission) return <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">ยังไม่ส่ง</span>;
+  return (
+    <span className={cn("rounded-full px-2 py-0.5 text-[10px]", late ? "bg-warning/15 text-warning" : "bg-success/15 text-success")}>
+      {late ? "ส่งช้า" : "ส่งแล้ว"}
+    </span>
+  );
+}
+
+function GradeSubmissionSheet({
+  item,
+  student,
+  onClose,
+}: {
+  item: ScoreItem;
+  student: Student | null;
+  onClose: () => void;
+}) {
+  const toast = useToast();
+  const { data: submissions = [] } = useAssignmentSubmissions(item.id);
+  const submission = student ? (submissions.find((s) => s.student_id === student.id) ?? null) : null;
+  const { data: itemScores = [] } = useStudentItemScores(item.teaching_assignment_id);
+  const saveScore = useSaveStudentItemScore();
+  const reopen = useReopenSubmission();
+  const existing = student ? itemScores.find((s) => s.score_item_id === item.id && s.student_id === student.id) : undefined;
+  const scoreRef = useRef<HTMLInputElement>(null);
+  const feedbackRef = useRef<HTMLInputElement>(null);
+
+  async function openAttachment(path: string) {
+    try {
+      window.open(await signedSubmissionAttachmentUrl(path), "_blank");
+    } catch {
+      /* best-effort — ignore */
+    }
+  }
+
+  function save() {
+    if (!student) return;
+    const raw = scoreRef.current?.value ?? "";
+    const n = Number(raw);
+    if (raw.trim() === "" || Number.isNaN(n)) return;
+    const feedback = feedbackRef.current?.value.trim() || null;
+    saveScore.mutate(
+      { score_item_id: item.id, student_id: student.id, score: n, feedback },
+      {
+        onSuccess: () => {
+          toast("บันทึกคะแนนสำเร็จ");
+          onClose();
+        },
+        onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
+      },
+    );
+  }
+
+  return (
+    <Sheet
+      open={student !== null}
+      onOpenChange={(o) => !o && onClose()}
+      title="ตรวจงาน"
+      description={student ? `${student.first_name} ${student.last_name}` : undefined}
+    >
+      {student && (
+        <div className="space-y-4">
+          <div className="space-y-2 rounded-lg border border-border p-3 text-sm">
+            <p className="text-xs font-medium text-muted-foreground">งานที่ส่ง</p>
+            {submission ? (
+              <>
+                {submission.content && <p className="whitespace-pre-wrap">{submission.content}</p>}
+                {submission.attachments.length > 0 && (
+                  <ul className="space-y-1">
+                    {submission.attachments.map((a: SubmissionAttachment) => (
+                      <li key={a.id}>
+                        <button type="button" className="text-primary underline" onClick={() => openAttachment(a.storage_path)}>
+                          {a.file_name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!submission.content && submission.attachments.length === 0 && (
+                  <p className="text-muted-foreground">ส่งงานแล้ว (ไม่มีข้อความ/ไฟล์)</p>
+                )}
+              </>
+            ) : (
+              <p className="text-muted-foreground">ยังไม่ได้ส่งงาน</p>
+            )}
+          </div>
+
+          <Field label={`คะแนน (เต็ม ${item.max_score})`}>
+            <Input
+              key={`${student.id}-score`}
+              ref={scoreRef}
+              type="number"
+              min="0"
+              max={item.max_score}
+              defaultValue={existing?.score ?? ""}
+            />
+          </Field>
+          <Field label="ความเห็น/feedback">
+            <Input
+              key={`${student.id}-feedback`}
+              ref={feedbackRef}
+              defaultValue={existing?.feedback ?? ""}
+              placeholder="ให้ความเห็นกับงานชิ้นนี้"
+            />
+          </Field>
+          <Button className="w-full" onClick={save} disabled={saveScore.isPending}>
+            {saveScore.isPending ? <Spinner className="h-3 w-3" /> : "บันทึกคะแนน"}
+          </Button>
+
+          {submission && (
+            <Field label="เปิดให้ส่งใหม่">
+              <Switch
+                checked={submission.reopened}
+                onChange={(v) => reopen.mutate({ id: submission.id, reopened: v })}
+                label={submission.reopened ? "เปิดอยู่ — นักเรียนแก้ไขงานที่ส่งได้" : "ปิดอยู่"}
+              />
+            </Field>
+          )}
+        </div>
+      )}
+    </Sheet>
   );
 }
 

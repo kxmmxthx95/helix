@@ -10,6 +10,7 @@ import {
   ClipboardIcon,
   ChevronForward,
   CloudOff,
+  CheckboxOutlineIcon,
   DocumentTextIcon,
   GraduationCap,
   LayoutDashboard,
@@ -160,6 +161,17 @@ const TABS = [
     deptManagerOnly: false,
     academicManagerOnly: false,
     teacherOrManagerOnly: true,
+  },
+  {
+    to: "/assignments",
+    label: "งาน",
+    icon: CheckboxOutlineIcon,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    // Visible to everyone (like "/") — student/parent-only content, renders EmptyState for teacher/admin.
+    teacherOrManagerOnly: false,
   },
   {
     to: "/attendance",
