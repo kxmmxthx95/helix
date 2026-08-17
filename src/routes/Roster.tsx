@@ -315,56 +315,56 @@ export function Roster() {
                   }}
                   className={
                     mayEdit
-                      ? "rounded-lg border border-border p-3 active:bg-muted"
-                      : "rounded-lg border border-border p-3"
+                      ? "rounded-xl border border-border bg-card p-3.5 shadow-sm transition-colors active:bg-muted"
+                      : "rounded-xl border border-border bg-card p-3.5 shadow-sm"
                   }
                 >
                   <div className="flex items-start gap-3">
                     <Avatar
                       name={fullName}
                       src={row.profile ? avatarUrl(row.profile) : null}
-                      className="h-10 w-10 text-xs"
+                      className="h-11 w-11 text-sm"
                     />
-                    <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{fullName}</p>
-                        <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                          <span className="truncate">{row.student_code}</span>
-                          {gender && (
-                            <span
-                              className={
-                                gender === "ชาย"
-                                  ? "inline-flex shrink-0 items-center rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] text-blue-500"
-                                  : "inline-flex shrink-0 items-center rounded-full bg-pink-500/15 px-2 py-0.5 text-[10px] text-pink-500"
-                              }
-                            >
-                              {gender}
-                            </span>
-                          )}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                          {deptName.get(row.department_id) ?? "—"}
-                          {" · "}
-                          {row.grade_level_id ? (gradeLevelName.get(row.grade_level_id) ?? "—") : "—"}
-                        </p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="truncate text-sm font-semibold">{fullName}</p>
+                        <span className="mt-0.5 flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+                          <span
+                            className={
+                              row.status === "studying"
+                                ? "size-1.5 rounded-full bg-success"
+                                : "size-1.5 rounded-full bg-muted-foreground"
+                            }
+                          />
+                          {STATUS_LABEL[row.status]}
+                        </span>
                       </div>
-                      <span className="flex shrink-0 items-center gap-1.5 pt-0.5 text-xs">
-                        <span
-                          className={
-                            row.status === "studying"
-                              ? "size-2 rounded-full bg-success"
-                              : "size-2 rounded-full bg-muted-foreground"
-                          }
-                        />
-                        {STATUS_LABEL[row.status]}
-                      </span>
+                      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className="truncate text-xs text-muted-foreground">{row.student_code}</span>
+                        {gender && (
+                          <span
+                            className={
+                              gender === "ชาย"
+                                ? "inline-flex shrink-0 items-center rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-500"
+                                : "inline-flex shrink-0 items-center rounded-full bg-pink-500/15 px-2 py-0.5 text-[10px] font-medium text-pink-500"
+                            }
+                          >
+                            {gender}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">
+                        {deptName.get(row.department_id) ?? "—"}
+                        {" · "}
+                        {row.grade_level_id ? (gradeLevelName.get(row.grade_level_id) ?? "—") : "—"}
+                      </p>
                     </div>
                   </div>
                   {(mayManageUsers || mayEdit) && (
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="mt-3 flex items-center gap-2 border-t border-border pt-2.5">
                       {mayManageUsers &&
                         (row.profile_id ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] text-blue-500">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-1 text-[11px] font-medium text-success">
                             <CheckmarkCircleIcon className="size-3" />
                             มีบัญชีแล้ว
                           </span>
@@ -385,7 +385,7 @@ export function Roster() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="ml-auto"
+                          className="ml-auto text-muted-foreground hover:text-destructive"
                           aria-label="ลบนักเรียน"
                           onClick={(e) => {
                             e.stopPropagation();
