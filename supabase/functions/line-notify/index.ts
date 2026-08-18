@@ -18,13 +18,10 @@ Deno.serve(async (req) => {
   const accessToken = Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN")!;
   const admin = createClient(supabaseUrl, serviceRoleKey);
 
-  const { data: secretRow } = await admin
-    .schema("vault")
-    .from("decrypted_secrets")
-    .select("decrypted_secret")
-    .eq("name", "line_notify_cron_secret")
-    .maybeSingle();
-  const expected = secretRow?.decrypted_secret as string | undefined;
+  // vault.decrypted_secrets isn't reachable via PostgREST (only
+  // public/graphql_public are exposed) — read_vault_secret (migration
+  // 0046) is the RPC workaround, callable only by service_role.
+  const { data: expected } = await admin.rpc("read_vault_secret", { secret_name: "line_notify_cron_secret" });
   if (!expected || req.headers.get("x-cron-secret") !== expected) {
     return new Response("unauthorized", { status: 401 });
   }

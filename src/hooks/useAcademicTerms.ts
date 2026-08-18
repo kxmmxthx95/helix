@@ -173,6 +173,22 @@ export function useSaveAcademicEvent() {
   });
 }
 
+/** Org-wide only (enforced in the edge function) — pulls this + next year's Thai public holidays from iApp. See migration 0045. */
+export function useSyncHolidays() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const year = new Date().getFullYear();
+      const { data, error } = await supabase.functions.invoke("sync-holidays", {
+        body: { years: [year, year + 1] },
+      });
+      if (error) throw error;
+      return data as { upserted: number; errors: string[] };
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["academic_events"] }),
+  });
+}
+
 export function useDeleteAcademicEvent() {
   const qc = useQueryClient();
   return useMutation({

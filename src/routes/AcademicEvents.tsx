@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { ChevronBack, ChevronForward, Plus } from "@/components/icons";
+import { ChevronBack, ChevronForward, DownloadIcon, Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Field, Input, Select, Spinner } from "@/components/ui";
@@ -8,6 +8,7 @@ import {
   useAcademicEvents,
   useDeleteAcademicEvent,
   useSaveAcademicEvent,
+  useSyncHolidays,
   type AcademicEventDraft,
   type AcademicEventRow,
 } from "@/hooks/useAcademicTerms";
@@ -32,7 +33,7 @@ const EVENT_TYPE_DOT: Record<AcademicEventType, string> = {
   school_event: "bg-accent",
 };
 
-const WEEKDAY_LABEL = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"];
+const WEEKDAY_LABEL = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const toISODate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -46,9 +47,9 @@ const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
 const addMonths = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth() + n, 1);
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 
-/** 6 weeks × 7 days (Mon-start), enough to cover any month plus lead/trail days. */
+/** 6 weeks × 7 days (Sun-start), enough to cover any month plus lead/trail days. */
 function buildCalendarDays(monthStart: Date): Date[] {
-  const leadingEmpty = (monthStart.getDay() + 6) % 7; // Mon=0..Sun=6
+  const leadingEmpty = monthStart.getDay(); // Sun=0..Sat=6
   const gridStart = addDays(monthStart, -leadingEmpty);
   return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
 }
@@ -67,6 +68,8 @@ export function AcademicEvents() {
   const { profile: me } = useAuth();
   const { data: events = [], isLoading } = useAcademicEvents();
   const del = useDeleteAcademicEvent();
+  const syncHolidays = useSyncHolidays();
+  const toast = useToast();
   const orgWide = me ? isOrgWide(me.roles) : false;
   const mayEdit = me ? canManage(me.roles) : false;
 
@@ -116,6 +119,23 @@ export function AcademicEvents() {
           <Button variant="outline" size="icon" onClick={() => setCursor((c) => addMonths(c, 1))} aria-label="เดือนถัดไป">
             <ChevronForward className="h-4 w-4" />
           </Button>
+          {orgWide && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="ml-1"
+              disabled={syncHolidays.isPending}
+              aria-label="ดึงวันหยุดราชการ"
+              onClick={() =>
+                syncHolidays.mutate(undefined, {
+                  onSuccess: (data) => toast(`ดึงวันหยุดสำเร็จ ${data.upserted} รายการ`),
+                  onError: () => toast("ดึงวันหยุดไม่สำเร็จ"),
+                })
+              }
+            >
+              {syncHolidays.isPending ? <Spinner className="h-4 w-4" /> : <DownloadIcon className="h-4 w-4" />}
+            </Button>
+          )}
           {mayEdit && (
             <Button size="icon" variant="default" className="ml-1" onClick={() => setCreating("")} aria-label="เพิ่ม Event">
               <Plus className="h-4 w-4" />
