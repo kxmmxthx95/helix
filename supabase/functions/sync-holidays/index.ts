@@ -3,11 +3,11 @@
 // Pulls Thailand's public holiday calendar from Google Calendar (the
 // "en.th.official#holiday@group.v.calendar.google.com" public calendar — free,
 // no OAuth, just an API key) and upserts them into academic_events
-// (event_type='holiday', whole-school — no department link). Names come
-// through in English (e.g. "New Year's Day") since that's what the calendar
-// publishes; grill decision was to accept that rather than pay for a
-// Thai-language holiday API. Called two ways, same body: a manual button in
-// AcademicEvents.tsx (user JWT, org-wide only) and a yearly pg_cron job
+// (event_type='holiday', whole-school — no department link). The calendar
+// only publishes English names (e.g. "New Year's Day") — THAI_NAME below
+// translates the known set; anything new falls back to the English summary
+// rather than failing the sync. Called two ways, same body: a manual button
+// in AcademicEvents.tsx (user JWT, org-wide only) and a yearly pg_cron job
 // (x-cron-secret, see migration 0045) that has no logged-in user to check
 // roles against.
 //
@@ -25,6 +25,44 @@ function dayBefore(isoDate: string): string {
   const d = new Date(`${isoDate}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() - 1);
   return d.toISOString().slice(0, 10);
+}
+
+// Base holiday names as the calendar publishes them — "Day off for X" /
+// "X observed" variants are handled separately below (compensatory-holiday
+// wording), not listed here again.
+const THAI_NAME: Record<string, string> = {
+  "New Year's Day": "วันขึ้นปีใหม่",
+  "New Year's Eve": "วันสิ้นปี",
+  "New Year Special Holiday": "วันหยุดพิเศษ (ปีใหม่)",
+  "Makha Bucha": "วันมาฆบูชา",
+  "Chakri Day": "วันจักรี",
+  Songkran: "วันสงกรานต์",
+  "Songkran Holiday": "วันหยุดสงกรานต์",
+  "Labor Day": "วันแรงงานแห่งชาติ",
+  "Coronation Day": "วันฉัตรมงคล",
+  "Royal Ploughing Ceremony Day": "วันพืชมงคล",
+  "Visakha Bucha": "วันวิสาขบูชา",
+  "Queen Suthida's Birthday": "วันเฉลิมพระชนมพรรษาสมเด็จพระราชินี",
+  "Asalha Bucha": "วันอาสาฬหบูชา",
+  "King Vajiralongkorn's Birthday": "วันเฉลิมพระชนมพรรษาพระบาทสมเด็จพระเจ้าอยู่หัว",
+  "The Queen Mother's Birthday": "วันเฉลิมพระชนมพรรษาสมเด็จพระบรมราชชนนีพันปีหลวง (วันแม่แห่งชาติ)",
+  "Chulalongkorn Day": "วันปิยมหาราช",
+  "King Bhumibol's Birthday": "วันคล้ายวันเฉลิมพระชนมพรรษาพระบาทสมเด็จพระบรมชนกาธิเบศร (วันพ่อแห่งชาติ)",
+  "Constitution Day": "วันรัฐธรรมนูญ",
+  "Anniversary of the Death of King Bhumibol": "วันคล้ายวันสวรรคตพระบาทสมเด็จพระบรมชนกาธิเบศร",
+};
+
+/** Translates a Google Calendar holiday summary to Thai, keeping "Day off for X" / "X observed" (ชดเชยวันหยุด) wording consistent. Falls back to the English name for anything not yet mapped. */
+function toThaiName(summary: string): string {
+  if (THAI_NAME[summary]) return THAI_NAME[summary];
+
+  const dayOffMatch = summary.match(/^Day off for (.+)$/);
+  if (dayOffMatch && THAI_NAME[dayOffMatch[1]]) return `ชดเชย${THAI_NAME[dayOffMatch[1]]}`;
+
+  const observedMatch = summary.match(/^(.+) observed$/);
+  if (observedMatch && THAI_NAME[observedMatch[1]]) return `ชดเชย${THAI_NAME[observedMatch[1]]}`;
+
+  return summary;
 }
 
 const corsHeaders = {
@@ -116,7 +154,7 @@ Deno.serve(async (req) => {
         .upsert(
           {
             external_ref: `gcal:${startDate}`,
-            name: ev.summary,
+            name: toThaiName(ev.summary),
             event_type: "holiday",
             start_date: startDate,
             end_date: endDate,
