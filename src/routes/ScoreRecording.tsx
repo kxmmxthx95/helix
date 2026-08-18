@@ -1,10 +1,10 @@
 import { useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Plus } from "@/components/icons";
+import { ChevronBack, Plus, SettingsIcon } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Select, Spinner, Switch } from "@/components/ui";
-import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
+import { useActiveTerm } from "@/hooks/useAcademicTerms";
 import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS,
@@ -61,7 +61,6 @@ export function ScoreRecording() {
   const isTeacher = me ? (me.roles.includes("teacher") as boolean) : false;
 
   const [pickedDept, setPickedDept] = useState("");
-  const [term, setTerm] = useState<1 | 2>(1);
   // An id, not the object itself — so saves (e.g. score ratio) that
   // invalidate/refetch teaching_assignments show up immediately instead of
   // staying stuck on the stale object captured at click time.
@@ -71,8 +70,10 @@ export function ScoreRecording() {
   const department = departments.find((d) => d.id === departmentId);
   const splitsByTerm = department?.code === "SEC";
 
-  const { data: activeYear } = useActiveAcademicYear(departmentId || null);
-  const academicYear = activeYear ?? new Date().getFullYear() + 543;
+  // Always the department's current term — no manual toggle (grill decision).
+  const { data: activeTerm } = useActiveTerm(departmentId || null);
+  const academicYear = activeTerm?.academic_year ?? new Date().getFullYear() + 543;
+  const term: 1 | 2 = activeTerm?.term_type === "term2" ? 2 : 1;
   const { data: allAssignments = [], isLoading } = useDepartmentTeachingAssignments(
     departmentId || null,
     academicYear,
@@ -123,28 +124,6 @@ export function ScoreRecording() {
               </option>
             ))}
           </Select>
-        )}
-        {splitsByTerm && (
-          <div className="ml-auto inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
-            {[1, 2].map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => {
-                  setTerm(t as 1 | 2);
-                  setSelectedId(null);
-                }}
-                className={cn(
-                  "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                  term === t
-                    ? "bg-foreground/10 text-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                ภาคเรียน {t}
-              </button>
-            ))}
-          </div>
         )}
       </div>
 
@@ -232,12 +211,17 @@ function AssignmentPanel({
   onBack: () => void;
 }) {
   const { data: roster = [], isLoading } = useClassroomRoster(assignment.classroom_id, assignment.academic_year);
+  const graded = !isLoading && roster.length > 0 && subject?.grading_method !== "pass_fail";
+
+  const [itemsOpen, setItemsOpen] = useState(false);
+  const [tab, setTab] = useState<"score" | "collect" | "exam">("score");
+  const [creating, setCreating] = useState(false);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex shrink-0 items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          ← กลับ
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <Button variant="ghost" size="icon" onClick={onBack} aria-label="กลับ">
+          <ChevronBack className="h-4 w-4" />
         </Button>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">
@@ -245,6 +229,44 @@ function AssignmentPanel({
           </p>
           <p className="text-xs text-muted-foreground">{classroomLabel}</p>
         </div>
+        {graded && (
+          <>
+            {tab === "score" ? (
+              <Button
+                variant={itemsOpen ? "default" : "outline"}
+                size="icon"
+                className="shrink-0"
+                onClick={() => setItemsOpen(true)}
+                aria-label="ตั้งค่าสัดส่วนคะแนน"
+                title="ตั้งค่าสัดส่วนคะแนน"
+              >
+                <SettingsIcon className="h-3 w-3" />
+              </Button>
+            ) : (
+              <Button
+                size="icon"
+                onClick={() => setCreating(true)}
+                aria-label={`สร้าง${tab === "exam" ? "การสอบ" : "ใบงาน"}ใหม่`}
+                title={`สร้าง${tab === "exam" ? "การสอบ" : "ใบงาน"}ใหม่`}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
+            <Select
+              className="w-auto min-w-[8rem]"
+              value={tab}
+              onChange={(e) => {
+                setTab(e.target.value as "score" | "collect" | "exam");
+                setCreating(false);
+              }}
+              aria-label="มุมมอง"
+            >
+              <option value="score">คะแนน</option>
+              <option value="collect">ใบงาน</option>
+              <option value="exam">การสอบ</option>
+            </Select>
+          </>
+        )}
       </div>
 
       {isLoading ? (
@@ -258,7 +280,16 @@ function AssignmentPanel({
       ) : subject?.grading_method === "pass_fail" ? (
         <PassFailPanel assignment={assignment} roster={roster} />
       ) : (
-        <GradedPanel assignment={assignment} roster={roster} departmentId={departmentId} />
+        <GradedPanel
+          assignment={assignment}
+          roster={roster}
+          departmentId={departmentId}
+          tab={tab}
+          itemsOpen={itemsOpen}
+          onItemsOpenChange={setItemsOpen}
+          creating={creating}
+          onCreatingChange={setCreating}
+        />
       )}
     </div>
   );
@@ -330,93 +361,98 @@ function GradedPanel({
   assignment,
   roster,
   departmentId,
+  tab,
+  itemsOpen,
+  onItemsOpenChange,
+  creating,
+  onCreatingChange,
 }: {
   assignment: TeachingAssignment;
   roster: Student[];
   departmentId: string;
+  tab: "score" | "collect" | "exam";
+  itemsOpen: boolean;
+  onItemsOpenChange: (v: boolean) => void;
+  creating: boolean;
+  onCreatingChange: (v: boolean) => void;
 }) {
   const { data: deptSettings } = useDepartmentSettings(departmentId);
   const { data: items = [] } = useScoreItems(assignment.id);
   const { data: itemScores = [] } = useStudentItemScores(assignment.id);
   const { data: gradeStatuses = [] } = useGradeStatuses(assignment.id);
-  const [itemsOpen, setItemsOpen] = useState(false);
   const [openStudent, setOpenStudent] = useState<Student | null>(null);
-  const [listKind, setListKind] = useState<ScoreItemKind | null>(null);
 
   const pct = resolveScorePct(assignment, deptSettings);
   const statusByStudent = new Map(gradeStatuses.map((g) => [g.student_id, g.status]));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">
-          สัดส่วนคะแนนเก็บ:สอบ = {pct ? `${pct.collectPct}:${pct.examPct}` : "ยังไม่ได้ตั้งค่า"}
-        </p>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setListKind("collect")}>
-            สร้างใบงาน
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setListKind("exam")}>
-            สร้างการสอบ
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setItemsOpen(true)}>
-            จัดการรายการคะแนน
-          </Button>
-        </div>
-      </div>
-
-      <div className="table-panel flex-1">
-        <div className="table-panel-scroll">
-          <table className="w-full min-w-[36rem] text-xs">
-            <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
-                <th className="px-3 py-2 font-medium">รายชื่อ</th>
-                <th className="px-3 py-2 text-right font-medium">เก็บ</th>
-                <th className="px-3 py-2 text-right font-medium">สอบ</th>
-                <th className="px-3 py-2 text-right font-medium">รวม</th>
-                <th className="px-3 py-2 text-center font-medium">เกรด</th>
-                <th className="w-20 px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {roster.map((s) => {
-                const collect = sumItemScores(items, itemScores, s.id, "collect");
-                const exam = sumItemScores(items, itemScores, s.id, "exam");
-                const total = collect.score + exam.score;
-                const status = statusByStudent.get(s.id);
-                return (
-                  <tr key={s.id} className="border-t border-border">
-                    <td className="px-3 py-2">{s.student_code}</td>
-                    <td className="px-3 py-2 font-medium">
-                      {s.first_name} {s.last_name}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {collect.score}
-                      <span className="text-muted-foreground">/{collect.max}</span>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {exam.score}
-                      <span className="text-muted-foreground">/{exam.max}</span>
-                    </td>
-                    <td className="px-3 py-2 text-right font-semibold">{total}</td>
-                    <td className="px-3 py-2 text-center font-semibold">{status ?? scoreToGrade(total)}</td>
-                    <td className="px-3 py-2 text-right">
-                      <Button variant="outline" size="sm" onClick={() => setOpenStudent(s)}>
-                        กรอกคะแนน
-                      </Button>
-                    </td>
+      {tab === "score" ? (
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+          <div className="table-panel flex-1">
+            <div className="table-panel-scroll">
+              <table className="w-full min-w-[36rem] text-xs">
+                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
+                    <th className="px-3 py-2 font-medium">รายชื่อ</th>
+                    <th className="px-3 py-2 text-right font-medium">เก็บ</th>
+                    <th className="px-3 py-2 text-right font-medium">สอบ</th>
+                    <th className="px-3 py-2 text-right font-medium">รวม</th>
+                    <th className="px-3 py-2 text-center font-medium">เกรด</th>
+                    <th className="w-20 px-3 py-2" />
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {roster.map((s) => {
+                    const collect = sumItemScores(items, itemScores, s.id, "collect");
+                    const exam = sumItemScores(items, itemScores, s.id, "exam");
+                    const total = collect.score + exam.score;
+                    const status = statusByStudent.get(s.id);
+                    return (
+                      <tr key={s.id} className="border-t border-border">
+                        <td className="px-3 py-2">{s.student_code}</td>
+                        <td className="px-3 py-2 font-medium">
+                          {s.first_name} {s.last_name}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {collect.score}
+                          <span className="text-muted-foreground">/{collect.max}</span>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {exam.score}
+                          <span className="text-muted-foreground">/{exam.max}</span>
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold">{total}</td>
+                        <td className="px-3 py-2 text-center font-semibold">{status ?? scoreToGrade(total)}</td>
+                        <td className="px-3 py-2 text-right">
+                          <Button variant="outline" size="sm" onClick={() => setOpenStudent(s)}>
+                            กรอกคะแนน
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <AssignmentKindPanel
+          key={tab}
+          kind={tab}
+          assignmentId={assignment.id}
+          items={items}
+          roster={roster}
+          creating={creating}
+          onCreatingChange={onCreatingChange}
+        />
+      )}
 
       <ItemManagerSheet
         open={itemsOpen}
-        onClose={() => setItemsOpen(false)}
+        onClose={() => onItemsOpenChange(false)}
         assignment={assignment}
         items={items}
         pct={pct}
@@ -430,13 +466,49 @@ function GradedPanel({
         status={openStudent ? (statusByStudent.get(openStudent.id) ?? null) : null}
         onClose={() => setOpenStudent(null)}
       />
-      <AssignmentListSheet
-        kind={listKind}
-        assignmentId={assignment.id}
-        items={items}
-        roster={roster}
-        onClose={() => setListKind(null)}
-      />
+    </div>
+  );
+}
+
+/** Score-ratio form — top section of ItemManagerSheet, merged in so one gear button covers both. */
+function ScoreRatioFields({ assignment }: { assignment: TeachingAssignment }) {
+  const toast = useToast();
+  const savePct = useSaveAssignmentScorePct();
+  const [collectCustom, setCollectCustom] = useState(String(assignment.score_collect_pct ?? ""));
+  const [examCustom, setExamCustom] = useState(String(assignment.score_exam_pct ?? ""));
+  const [splitExam, setSplitExam] = useState(assignment.split_exam_items);
+
+  function save() {
+    const c = collectCustom.trim() === "" ? null : Number(collectCustom);
+    const e = examCustom.trim() === "" ? null : Number(examCustom);
+    if ((c === null) !== (e === null)) {
+      toast("ต้องตั้งทั้งคู่ หรือเว้นว่างทั้งคู่", "error");
+      return;
+    }
+    savePct.mutate(
+      { id: assignment.id, score_collect_pct: c, score_exam_pct: e, split_exam_items: splitExam },
+      {
+        onSuccess: () => toast("บันทึกสำเร็จ"),
+        onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
+      },
+    );
+  }
+
+  return (
+    <div className="space-y-2 rounded-lg border border-border p-3">
+      <p className="text-xs font-medium text-muted-foreground">สัดส่วนของวิชานี้ (เว้นว่าง = ใช้ค่าแผนก)</p>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="เก็บ (%)">
+          <Input type="number" value={collectCustom} onChange={(e) => setCollectCustom(e.target.value)} />
+        </Field>
+        <Field label="สอบ (%)">
+          <Input type="number" value={examCustom} onChange={(e) => setExamCustom(e.target.value)} />
+        </Field>
+      </div>
+      <Switch checked={splitExam} onChange={setSplitExam} label="แยกกลางภาค/ปลายภาค" />
+      <Button size="sm" className="w-full" onClick={save} disabled={savePct.isPending}>
+        {savePct.isPending ? <Spinner className="h-3 w-3" /> : "บันทึกสัดส่วน"}
+      </Button>
     </div>
   );
 }
@@ -458,47 +530,14 @@ function ItemManagerSheet({
   pct: { collectPct: number; examPct: number } | null;
   roster: Student[];
 }) {
-  const toast = useToast();
   const create = useCreateScoreItem();
   const del = useDeleteScoreItem();
-  const savePct = useSaveAssignmentScorePct();
-  const [collectCustom, setCollectCustom] = useState(String(assignment.score_collect_pct ?? ""));
-  const [examCustom, setExamCustom] = useState(String(assignment.score_exam_pct ?? ""));
-  const [splitExam, setSplitExam] = useState(assignment.split_exam_items);
   const [gradingItem, setGradingItem] = useState<ScoreItem | null>(null);
-
-  function savePctSettings() {
-    const c = collectCustom.trim() === "" ? null : Number(collectCustom);
-    const e = examCustom.trim() === "" ? null : Number(examCustom);
-    if ((c === null) !== (e === null)) {
-      toast("ต้องตั้งทั้งคู่ หรือเว้นว่างทั้งคู่", "error");
-      return;
-    }
-    savePct.mutate(
-      { id: assignment.id, score_collect_pct: c, score_exam_pct: e, split_exam_items: splitExam },
-      { onSuccess: () => toast("บันทึกสำเร็จ"), onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error") },
-    );
-  }
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()} title="จัดการรายการคะแนน" side="left">
       <div className="space-y-4">
-        <div className="space-y-2 rounded-lg border border-border p-3">
-          <p className="text-xs font-medium text-muted-foreground">สัดส่วนของวิชานี้ (เว้นว่าง = ใช้ค่าแผนก)</p>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="เก็บ (%)">
-              <Input type="number" value={collectCustom} onChange={(e) => setCollectCustom(e.target.value)} />
-            </Field>
-            <Field label="สอบ (%)">
-              <Input type="number" value={examCustom} onChange={(e) => setExamCustom(e.target.value)} />
-            </Field>
-          </div>
-          <Switch checked={splitExam} onChange={setSplitExam} label="แยกกลางภาค/ปลายภาค" />
-          <Button size="sm" className="w-full" onClick={savePctSettings} disabled={savePct.isPending}>
-            {savePct.isPending ? <Spinner className="h-3 w-3" /> : "บันทึกสัดส่วน"}
-          </Button>
-        </div>
-
+        <ScoreRatioFields assignment={assignment} />
         <ItemKindSection
           title="คะแนนเก็บ"
           kind="collect"
@@ -515,7 +554,7 @@ function ItemManagerSheet({
           kind="exam"
           items={items.filter((i) => i.kind === "exam")}
           targetMax={pct?.examPct ?? null}
-          allowMultiple={splitExam}
+          allowMultiple={assignment.split_exam_items}
           assignmentId={assignment.id}
           onCreate={(draft) => create.mutate(draft)}
           onDelete={(id) => del.mutate(id)}
@@ -600,66 +639,63 @@ function ItemKindSection({
 
 // ------------------------------------------------------------ assignment list
 
-/** Opened from GradedPanel's "สร้างใบงาน"/"สร้างการสอบ" — shows posted assignments of that kind first, "+ สร้างใหม่" opens AssignmentPostSheet on top. */
-function AssignmentListSheet({
+/** The ใบงาน/การสอบ tab body in GradedPanel — table of posted assignments of that kind. "+ สร้างใหม่" (in GradedPanel's header) opens AssignmentPostSheet on top. */
+function AssignmentKindPanel({
   kind,
   assignmentId,
   items,
   roster,
-  onClose,
+  creating,
+  onCreatingChange,
 }: {
-  kind: ScoreItemKind | null;
+  kind: ScoreItemKind;
   assignmentId: string;
   items: ScoreItem[];
   roster: Student[];
-  onClose: () => void;
+  creating: boolean;
+  onCreatingChange: (v: boolean) => void;
 }) {
   const del = useDeleteScoreItem();
-  const [creating, setCreating] = useState(false);
   const [gradingItem, setGradingItem] = useState<ScoreItem | null>(null);
   const title = kind === "exam" ? "การสอบ" : "ใบงาน";
   const posted = items.filter((i) => i.kind === kind && i.description);
 
   return (
-    <Sheet open={kind !== null} onOpenChange={(o) => !o && onClose()} title={title}>
-      <div className="space-y-3">
-        <Button size="sm" className="w-full" onClick={() => setCreating(true)}>
-          + สร้าง{title}ใหม่
-        </Button>
-
-        {posted.length === 0 ? (
-          <p className="py-6 text-center text-xs text-muted-foreground">ยังไม่มี{title}</p>
-        ) : (
-          <div className="table-panel">
-            <div className="table-panel-scroll">
-              <table className="w-full min-w-[26rem] text-xs">
-                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-                  <tr>
-                    <th className="px-2 py-1.5 font-medium">ชื่อ / รายละเอียด</th>
-                    <th className="px-2 py-1.5 font-medium">กำหนดส่ง</th>
-                    <th className="px-2 py-1.5 font-medium">ส่งออนไลน์</th>
-                    <th className="w-24 px-2 py-1.5" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {posted.map((i) => (
-                    <AssignmentTableRow
-                      key={i.id}
-                      item={i}
-                      onDelete={() => del.mutate(i.id)}
-                      onGrade={() => setGradingItem(i)}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      {posted.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title={`ยังไม่มี${title}`} description={`กด "+ สร้าง${title}ใหม่" เพื่อเริ่มโพสต์`} />
+        </div>
+      ) : (
+        <div className="table-panel flex-1">
+          <div className="table-panel-scroll">
+            <table className="w-full min-w-[26rem] text-xs">
+              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-1.5 font-medium">ชื่อ / รายละเอียด</th>
+                  <th className="px-2 py-1.5 font-medium">กำหนดส่ง</th>
+                  <th className="px-2 py-1.5 font-medium">ส่งออนไลน์</th>
+                  <th className="w-24 px-2 py-1.5" />
+                </tr>
+              </thead>
+              <tbody>
+                {posted.map((i) => (
+                  <AssignmentTableRow
+                    key={i.id}
+                    item={i}
+                    onDelete={() => del.mutate(i.id)}
+                    onGrade={() => setGradingItem(i)}
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <AssignmentPostSheet kind={creating ? kind : null} assignmentId={assignmentId} onClose={() => setCreating(false)} />
+      <AssignmentPostSheet kind={creating ? kind : null} assignmentId={assignmentId} onClose={() => onCreatingChange(false)} />
       <SubmissionsSheet item={gradingItem} roster={roster} onClose={() => setGradingItem(null)} />
-    </Sheet>
+    </div>
   );
 }
 
@@ -675,7 +711,7 @@ function AssignmentTableRow({ item, onDelete, onGrade }: { item: ScoreItem; onDe
   }
 
   return (
-    <tr className="border-t border-border align-top">
+    <tr onClick={onGrade} className="cursor-pointer border-t border-border align-top hover:bg-muted active:bg-muted">
       <td className="px-2 py-2">
         <p className="font-medium">
           {item.label} <span className="font-normal text-muted-foreground">(เต็ม {item.max_score})</span>
@@ -685,7 +721,14 @@ function AssignmentTableRow({ item, onDelete, onGrade }: { item: ScoreItem; onDe
           <ul className="mt-0.5 space-y-0.5">
             {attachments.map((a) => (
               <li key={a.id}>
-                <button type="button" className="text-primary underline" onClick={() => openAttachment(a.storage_path)}>
+                <button
+                  type="button"
+                  className="text-primary underline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openAttachment(a.storage_path);
+                  }}
+                >
                   {a.file_name}
                 </button>
               </li>
@@ -696,16 +739,17 @@ function AssignmentTableRow({ item, onDelete, onGrade }: { item: ScoreItem; onDe
       <td className="px-2 py-2 whitespace-nowrap">{item.due_date ?? "—"}</td>
       <td className="px-2 py-2">{item.requires_submission ? "ใช่" : "ไม่ใช่"}</td>
       <td className="px-2 py-2 text-right">
-        <div className="flex flex-col items-end gap-1">
-          {item.requires_submission && (
-            <Button variant="outline" size="sm" onClick={onGrade}>
-              งานที่ส่ง
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={onDelete}>
-            ลบ
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          ลบ
+        </Button>
       </td>
     </tr>
   );

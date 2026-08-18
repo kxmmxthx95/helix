@@ -46,6 +46,24 @@ export function useActiveAcademicYear(departmentId: string | null) {
   });
 }
 
+/** The department's one active term row (status='active'), or null while none is active yet. */
+export function useActiveTerm(departmentId: string | null) {
+  return useQuery({
+    queryKey: ["academic_terms", "active", departmentId],
+    enabled: !!departmentId,
+    queryFn: async (): Promise<AcademicTerm | null> => {
+      const { data, error } = await supabase
+        .from("academic_terms")
+        .select("*")
+        .eq("department_id", departmentId!)
+        .eq("status", "active")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export type AcademicTermDraft = Pick<
   AcademicTerm,
   "department_id" | "academic_year" | "term_type" | "start_date" | "end_date"
