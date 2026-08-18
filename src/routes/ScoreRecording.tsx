@@ -1,10 +1,11 @@
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronBack, Plus, SettingsIcon } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Select, Spinner, Switch } from "@/components/ui";
+import { Avatar, Button, Card, EmptyState, Field, Input, Select, Spinner, Switch } from "@/components/ui";
 import { useActiveTerm } from "@/hooks/useAcademicTerms";
+import { avatarUrl } from "@/hooks/useAvatar";
 import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS,
@@ -27,8 +28,8 @@ import {
   useCreateScoreItem,
   useDeleteAssignmentAttachment,
   useDeleteScoreItem,
-  useGradeStatuses,
   usePassFailScores,
+  useResolvedGradeStatuses,
   useSaveAssignmentScorePct,
   useSaveStudentItemScore,
   useScoreItems,
@@ -38,6 +39,7 @@ import {
 } from "@/hooks/useScoreRecording";
 import { useDepartmentSettings } from "@/hooks/useSettings";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
+import type { StudentListItem } from "@/hooks/useStudents";
 import { useDepartmentTeachingAssignments } from "@/hooks/useTeachingLoad";
 import type {
   AssignmentSubmission,
@@ -297,10 +299,11 @@ function AssignmentPanel({
 
 // ---------------------------------------------------------------- pass/fail
 
-function PassFailPanel({ assignment, roster }: { assignment: TeachingAssignment; roster: Student[] }) {
+function PassFailPanel({ assignment, roster }: { assignment: TeachingAssignment; roster: StudentListItem[] }) {
   const { data: scores = [] } = usePassFailScores(assignment.id);
   const setScore = useSetPassFailScore();
   const byStudent = new Map(scores.map((s) => [s.student_id, s.passed]));
+  const [avatarStudent, setAvatarStudent] = useState<StudentListItem | null>(null);
 
   return (
     <div className="table-panel flex-1">
@@ -320,7 +323,14 @@ function PassFailPanel({ assignment, roster }: { assignment: TeachingAssignment;
                 <tr key={s.id} className="border-t border-border">
                   <td className="px-3 py-2">{s.student_code}</td>
                   <td className="px-3 py-2 font-medium">
-                    {s.first_name} {s.last_name}
+                    <button
+                      type="button"
+                      onClick={() => setAvatarStudent(s)}
+                      className="tappable flex items-center gap-2"
+                    >
+                      <Avatar name={`${s.first_name} ${s.last_name}`} src={s.profile ? avatarUrl(s.profile) : null} className="h-7 w-7 text-[10px]" />
+                      {s.first_name} {s.last_name}
+                    </button>
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex justify-center gap-2">
@@ -351,6 +361,7 @@ function PassFailPanel({ assignment, roster }: { assignment: TeachingAssignment;
           </tbody>
         </table>
       </div>
+      <StudentAvatarSheet student={avatarStudent} onClose={() => setAvatarStudent(null)} />
     </div>
   );
 }
@@ -368,7 +379,7 @@ function GradedPanel({
   onCreatingChange,
 }: {
   assignment: TeachingAssignment;
-  roster: Student[];
+  roster: StudentListItem[];
   departmentId: string;
   tab: "score" | "collect" | "exam";
   itemsOpen: boolean;
@@ -379,11 +390,13 @@ function GradedPanel({
   const { data: deptSettings } = useDepartmentSettings(departmentId);
   const { data: items = [] } = useScoreItems(assignment.id);
   const { data: itemScores = [] } = useStudentItemScores(assignment.id);
-  const { data: gradeStatuses = [] } = useGradeStatuses(assignment.id);
-  const [openStudent, setOpenStudent] = useState<Student | null>(null);
+  const { data: resolvedStatuses = [] } = useResolvedGradeStatuses(assignment.id);
+  const [avatarStudent, setAvatarStudent] = useState<StudentListItem | null>(null);
+  const [statusStudent, setStatusStudent] = useState<StudentListItem | null>(null);
 
   const pct = resolveScorePct(assignment, deptSettings);
-  const statusByStudent = new Map(gradeStatuses.map((g) => [g.student_id, g.status]));
+  const statusByStudent = new Map(resolvedStatuses.map((g) => [g.student_id, g.status]));
+  const manualByStudent = new Set(resolvedStatuses.filter((g) => g.is_manual).map((g) => g.student_id));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -400,7 +413,6 @@ function GradedPanel({
                     <th className="px-3 py-2 text-right font-medium">สอบ</th>
                     <th className="px-3 py-2 text-right font-medium">รวม</th>
                     <th className="px-3 py-2 text-center font-medium">เกรด</th>
-                    <th className="w-20 px-3 py-2" />
                   </tr>
                 </thead>
                 <tbody>
@@ -413,7 +425,14 @@ function GradedPanel({
                       <tr key={s.id} className="border-t border-border">
                         <td className="px-3 py-2">{s.student_code}</td>
                         <td className="px-3 py-2 font-medium">
-                          {s.first_name} {s.last_name}
+                          <button
+                            type="button"
+                            onClick={() => setAvatarStudent(s)}
+                            className="tappable flex items-center gap-2"
+                          >
+                            <Avatar name={`${s.first_name} ${s.last_name}`} src={s.profile ? avatarUrl(s.profile) : null} className="h-7 w-7 text-[10px]" />
+                            {s.first_name} {s.last_name}
+                          </button>
                         </td>
                         <td className="px-3 py-2 text-right">
                           {collect.score}
@@ -424,11 +443,17 @@ function GradedPanel({
                           <span className="text-muted-foreground">/{exam.max}</span>
                         </td>
                         <td className="px-3 py-2 text-right font-semibold">{total}</td>
-                        <td className="px-3 py-2 text-center font-semibold">{status ?? scoreToGrade(total)}</td>
-                        <td className="px-3 py-2 text-right">
-                          <Button variant="outline" size="sm" onClick={() => setOpenStudent(s)}>
-                            กรอกคะแนน
-                          </Button>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setStatusStudent(s)}
+                            className={cn(
+                              "tappable rounded px-2 py-0.5 font-semibold hover:bg-muted",
+                              manualByStudent.has(s.id) && "underline decoration-dotted underline-offset-2",
+                            )}
+                          >
+                            {status ?? scoreToGrade(total)}
+                          </button>
                         </td>
                       </tr>
                     );
@@ -458,13 +483,13 @@ function GradedPanel({
         pct={pct}
         roster={roster}
       />
-      <StudentScoreSheet
-        student={openStudent}
-        assignment={assignment}
-        items={items}
-        itemScores={itemScores}
-        status={openStudent ? (statusByStudent.get(openStudent.id) ?? null) : null}
-        onClose={() => setOpenStudent(null)}
+      <StudentAvatarSheet student={avatarStudent} onClose={() => setAvatarStudent(null)} />
+      <GradeStatusPopup
+        student={statusStudent}
+        assignmentId={assignment.id}
+        computedStatus={statusStudent ? (statusByStudent.get(statusStudent.id) ?? null) : null}
+        isManual={statusStudent ? manualByStudent.has(statusStudent.id) : false}
+        onClose={() => setStatusStudent(null)}
       />
     </div>
   );
@@ -1124,107 +1149,86 @@ function GradeSubmissionSheet({
 
 // ------------------------------------------------------------ per-student entry
 
-function StudentScoreSheet({
+function StudentAvatarSheet({ student, onClose }: { student: StudentListItem | null; onClose: () => void }) {
+  if (!student) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="glass-sidebar flex flex-col items-center gap-3 rounded-2xl bg-white/[0.85] p-6 dark:bg-white/[0.06]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Avatar
+          name={`${student.first_name} ${student.last_name}`}
+          src={student.profile ? avatarUrl(student.profile) : null}
+          className="h-40 w-40 text-4xl"
+        />
+        <div className="font-heading text-base font-semibold">
+          {student.first_name} {student.last_name}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** เกรด popup — shows the computed ร/มส (from attendance/submissions, migration 0042) with a manual override escape hatch. */
+function GradeStatusPopup({
   student,
-  assignment,
-  items,
-  itemScores,
-  status,
+  assignmentId,
+  computedStatus,
+  isManual,
   onClose,
 }: {
-  student: Student | null;
-  assignment: TeachingAssignment;
-  items: ScoreItem[];
-  itemScores: { score_item_id: string; student_id: string; score: number }[];
-  status: GradeStatusCode | null;
+  student: StudentListItem | null;
+  assignmentId: string;
+  computedStatus: GradeStatusCode | null;
+  isManual: boolean;
   onClose: () => void;
 }) {
-  const save = useSaveStudentItemScore();
   const setStatus = useSetGradeStatus();
   const clearStatus = useClearGradeStatus();
-
-  const scoreByItem = useMemo(
-    () => new Map(itemScores.filter((s) => s.student_id === student?.id).map((s) => [s.score_item_id, s.score])),
-    [itemScores, student],
-  );
-
-  function onScoreChange(itemId: string, raw: string) {
-    if (!student) return;
-    const n = Number(raw);
-    if (raw.trim() === "" || Number.isNaN(n)) return;
-    save.mutate({ score_item_id: itemId, student_id: student.id, score: n });
-  }
-
-  const total = items.reduce((s, i) => s + (scoreByItem.get(i.id) ?? 0), 0);
+  if (!student) return null;
 
   return (
-    <Sheet
-      open={student !== null}
-      onOpenChange={(o) => !o && onClose()}
-      title="กรอกคะแนน"
-      description={student ? `${student.first_name} ${student.last_name}` : undefined}
-    >
-      {student && (
-        <div className="space-y-4">
-          {(["collect", "exam"] as const).map((kind) => {
-            const kindItems = items.filter((i) => i.kind === kind);
-            if (kindItems.length === 0) return null;
-            return (
-              <div key={kind} className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">
-                  {kind === "collect" ? "คะแนนเก็บ" : "คะแนนสอบ"}
-                </p>
-                {kindItems.map((i) => (
-                  <Field key={i.id} label={`${i.label} (เต็ม ${i.max_score})`}>
-                    <Input
-                      type="number"
-                      min="0"
-                      max={i.max_score}
-                      defaultValue={scoreByItem.get(i.id) ?? ""}
-                      onBlur={(e) => onScoreChange(i.id, e.target.value)}
-                    />
-                  </Field>
-                ))}
-              </div>
-            );
-          })}
-
-          <div className="rounded-lg border border-border p-3 text-sm">
-            <p>
-              รวม: <span className="font-semibold">{total}</span> · เกรด:{" "}
-              <span className="font-semibold">{status ?? scoreToGrade(total)}</span>
-            </p>
-          </div>
-
-          <Field label="สถานะพิเศษ (ร/มส)">
-            <div className="flex gap-2">
-              {(["ร", "มส"] as const).map((code) => (
-                <Button
-                  key={code}
-                  variant={status === code ? "default" : "outline"}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() =>
-                    setStatus.mutate({ teaching_assignment_id: assignment.id, student_id: student.id, status: code })
-                  }
-                >
-                  {code}
-                </Button>
-              ))}
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={!status}
-                onClick={() =>
-                  clearStatus.mutate({ teachingAssignmentId: assignment.id, studentId: student.id })
-                }
-              >
-                ล้าง
-              </Button>
-            </div>
-          </Field>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="glass-sidebar flex w-full max-w-xs flex-col gap-3 rounded-2xl bg-white/[0.85] p-4 dark:bg-white/[0.06]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="font-heading text-sm font-semibold">
+          {student.first_name} {student.last_name}
         </div>
-      )}
-    </Sheet>
+        <p className="text-xs text-muted-foreground">
+          {computedStatus
+            ? `สถานะปัจจุบัน: ${computedStatus}${isManual ? " (ตั้งเอง)" : " (คำนวณอัตโนมัติ)"}`
+            : "สถานะปัจจุบัน: ปกติ"}
+        </p>
+        <Field label="ตั้งสถานะเอง (ทับค่าอัตโนมัติ)">
+          <div className="flex gap-2">
+            {(["ร", "มส"] as const).map((code) => (
+              <Button
+                key={code}
+                variant={isManual && computedStatus === code ? "default" : "outline"}
+                size="sm"
+                className="flex-1"
+                onClick={() => setStatus.mutate({ teaching_assignment_id: assignmentId, student_id: student.id, status: code })}
+              >
+                {code}
+              </Button>
+            ))}
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!isManual}
+              onClick={() => clearStatus.mutate({ teachingAssignmentId: assignmentId, studentId: student.id })}
+            >
+              ล้าง
+            </Button>
+          </div>
+        </Field>
+      </div>
+    </div>
   );
 }

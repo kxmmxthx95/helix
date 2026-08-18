@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AttendanceRecord, AttendanceStatus, Student } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
+import type { StudentListItem } from "@/hooks/useStudents";
 
 // ------------------------------------------------------------- roster
 // Current room + still studying — see migration 0026 grill decision: the
@@ -10,18 +11,18 @@ export function useClassroomRoster(classroomId: string | null, academicYear: num
   return useQuery({
     queryKey: ["attendance", "roster", classroomId, academicYear],
     enabled: !!classroomId,
-    queryFn: async (): Promise<Student[]> => {
+    queryFn: async (): Promise<StudentListItem[]> => {
       const { data, error } = await supabase
         .from("student_classroom_enrollments")
-        .select("student_id, created_at, student:students!inner(*)")
+        .select("student_id, created_at, student:students!inner(*, profile:profiles!profile_id(avatar_path, updated_at))")
         .eq("classroom_id", classroomId!)
         .eq("academic_year", academicYear)
         .eq("student.status", "studying")
         .order("created_at", { ascending: false });
       if (error) throw error;
       // Latest enrollment row per student wins, same rule as useCurrentClassroomEnrollments.
-      const latest = new Map<string, Student>();
-      for (const row of data as unknown as { student_id: string; student: Student }[]) {
+      const latest = new Map<string, StudentListItem>();
+      for (const row of data as unknown as { student_id: string; student: StudentListItem }[]) {
         if (!latest.has(row.student_id)) latest.set(row.student_id, row.student);
       }
       return [...latest.values()].sort((a, b) => a.student_code.localeCompare(b.student_code));

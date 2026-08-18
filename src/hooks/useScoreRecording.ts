@@ -221,6 +221,22 @@ export function useSetGradeStatus() {
   });
 }
 
+/** Manual override when set, else auto-computed from attendance/submissions (see migration 0042). */
+export function useResolvedGradeStatuses(teachingAssignmentId: string | null) {
+  return useQuery({
+    queryKey: ["resolved_grade_status", teachingAssignmentId],
+    enabled: !!teachingAssignmentId,
+    queryFn: async (): Promise<{ student_id: string; status: GradeStatusCode; is_manual: boolean }[]> => {
+      const { data, error } = await supabase
+        .from("resolved_grade_status")
+        .select("student_id, status, is_manual")
+        .eq("teaching_assignment_id", teachingAssignmentId!);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useClearGradeStatus() {
   const qc = useQueryClient();
   return useMutation({
