@@ -144,7 +144,7 @@ export function AcademicEvents() {
         </div>
       </div>
 
-      <div className="grid grid-cols-7 border-l border-t border-border overflow-hidden rounded-lg">
+      <div className="font-sarabun grid grid-cols-7 border-l border-t border-border overflow-hidden rounded-lg">
         {WEEKDAY_LABEL.map((w) => (
           <div
             key={w}
@@ -157,14 +157,17 @@ export function AcademicEvents() {
           const iso = toISODate(day);
           const dayEvents = eventsByDay.get(iso) ?? [];
           const inMonth = day.getMonth() === cursor.getMonth();
+          const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+          const canCreate = mayEdit && !isWeekend;
           return (
             <div
               key={iso}
-              onClick={() => mayEdit && setCreating(iso)}
+              onClick={() => canCreate && setCreating(iso)}
               className={cn(
                 "flex min-h-20 flex-col gap-0.5 border-b border-r border-border p-1 text-xs",
                 inMonth ? "bg-background/40" : "opacity-40",
-                mayEdit && "cursor-pointer hover:bg-muted/60",
+                isWeekend && "bg-muted/30",
+                canCreate && "cursor-pointer hover:bg-muted/60",
               )}
             >
               <span
@@ -184,7 +187,7 @@ export function AcademicEvents() {
                     if (canEditRow(ev)) setEditing(ev);
                   }}
                   className={cn(
-                    "flex items-center gap-1 truncate rounded px-1 py-0.5 text-left hover:bg-muted",
+                    "font-sarabun flex items-center gap-1 truncate rounded px-1 py-0.5 text-left hover:bg-muted",
                     canEditRow(ev) ? "cursor-pointer" : "cursor-default",
                   )}
                   title={ev.name}
