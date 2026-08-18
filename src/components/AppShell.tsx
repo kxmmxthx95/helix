@@ -405,7 +405,7 @@ function AppShellInner() {
 
   return (
     <div className="relative flex h-dvh overflow-hidden overscroll-none max-lg:flex-col max-lg:gap-0 max-lg:p-0 lg:flex-row lg:gap-2 lg:p-2">
-      <div className="absolute inset-0 z-0 bg-background" aria-hidden />
+      <div className="absolute inset-0 z-0 bg-muted dark:bg-background" aria-hidden />
 
       {/* Desktop sidebar */}
       <aside
