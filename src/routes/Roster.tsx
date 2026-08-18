@@ -410,7 +410,7 @@ export function Roster() {
             })}
           </ul>
 
-          <div className="hidden overflow-x-auto rounded-lg border border-border lg:block">
+          <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
             <table className="w-full text-xs">
               <thead className="bg-muted text-left text-xs text-muted-foreground">
                 <tr>

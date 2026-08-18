@@ -374,7 +374,7 @@ function TimetableGrid({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className="overflow-x-auto rounded-lg border border-border bg-card">
       <table className="w-full min-w-[40rem] table-fixed text-xs">
         <thead className="bg-muted text-left text-xs text-muted-foreground">
           <tr>

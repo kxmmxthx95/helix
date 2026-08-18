@@ -323,7 +323,7 @@ function EnrollAllSheet({
         {studyPlans.length > 0 && pendingStudents.length > 0 && (
           <div className="flex min-h-0 flex-1 flex-col gap-1">
             <span className="font-ui text-xs font-medium">แก้ไขเฉพาะราย (ถ้าไม่ตรงค่าเริ่มต้น)</span>
-            <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border">
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-card">
               <table className={wide ? "w-full min-w-[36rem] text-xs" : "w-full text-xs"}>
                 <thead className="sticky top-0 z-10 bg-muted text-left text-muted-foreground">
                   <tr>

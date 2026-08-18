@@ -144,7 +144,7 @@ export function AcademicEvents() {
         </div>
       </div>
 
-      <div className="font-sarabun grid grid-cols-7 border-l border-t border-border overflow-hidden rounded-lg">
+      <div className="font-sarabun grid grid-cols-7 border-l border-t border-border overflow-hidden rounded-lg bg-card">
         {WEEKDAY_LABEL.map((w) => (
           <div
             key={w}

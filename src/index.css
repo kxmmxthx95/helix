@@ -297,6 +297,7 @@
     overflow: hidden;
     border-radius: 0.5rem;
     border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--card));
   }
 
   .table-panel-scroll {

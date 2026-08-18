@@ -252,7 +252,7 @@ const SIDEBAR_KEY = "helix-sidebar-collapsed";
 
 const navDrawerLink = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "font-ui tappable flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors",
+    "font-ui tappable flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors",
     isActive ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
   );
 
@@ -451,7 +451,7 @@ function AppShellInner() {
               title={label}
               className={({ isActive }) =>
                 cn(
-                  "font-ui tappable flex items-center rounded-lg text-xs font-medium transition-colors",
+                  "font-ui tappable flex items-center rounded-lg text-xs font-semibold transition-colors",
                   collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2",
                   isActive
                     ? "bg-foreground/10 text-foreground"

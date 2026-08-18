@@ -160,7 +160,7 @@ function MyRequestsCard({ profileId }: { profileId: string }) {
           <p className="text-xs text-muted-foreground">ยังไม่มีคำขอลา</p>
         )}
         {requests.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border border-border">
+          <div className="overflow-x-auto rounded-lg border border-border bg-card">
             <table className="w-full min-w-[36rem] text-xs">
               <thead className="bg-muted text-left text-xs text-muted-foreground">
                 <tr>

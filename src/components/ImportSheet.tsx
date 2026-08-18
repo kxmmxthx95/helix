@@ -275,7 +275,7 @@ export function ImportSheet({
                 <p className="text-sm text-muted-foreground">
                   จะนำเข้า {ready.length} คน — ตัวอย่าง {preview.length} แถวแรก
                 </p>
-                <div className="overflow-x-auto rounded-lg border border-border">
+                <div className="overflow-x-auto rounded-lg border border-border bg-card">
                   <table className="w-full min-w-[28rem] text-xs">
                     <thead className="bg-muted text-left text-muted-foreground">
                       <tr>

@@ -258,7 +258,7 @@ function HistoryCard({ profileId, departmentId }: { profileId: string; departmen
         <p className="text-xs text-muted-foreground">ยังไม่มีประวัติ</p>
       )}
       {records.length > 0 && (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-lg bg-card">
           <table className="w-full text-xs">
             <thead className="text-left text-muted-foreground">
               <tr>
