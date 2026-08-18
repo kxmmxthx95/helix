@@ -218,7 +218,7 @@ function AssignmentPanel({
   const [creating, setCreating] = useState(false);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <Button variant="ghost" size="icon" onClick={onBack} aria-label="กลับ">
           <ChevronBack className="h-4 w-4" />
