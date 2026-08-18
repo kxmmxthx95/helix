@@ -25,6 +25,7 @@ import { TeachingPlanOverview } from "@/routes/TeachingPlanOverview";
 import { Timetable } from "@/routes/Timetable";
 import { TimeTracking } from "@/routes/TimeTracking";
 import { Leave } from "@/routes/Leave";
+import { PeriodAttendance } from "@/routes/PeriodAttendance";
 import { Users } from "@/routes/Users";
 
 function Gate() {
@@ -54,6 +55,7 @@ function Gate() {
         <Route path="score-recording" element={<ScoreRecording />} />
         <Route path="assignments" element={<Assignments />} />
         <Route path="attendance" element={<Attendance />} />
+        <Route path="period-attendance" element={<PeriodAttendance />} />
         <Route path="behavior" element={<BehaviorScore />} />
         <Route path="subjects" element={<Subjects />} />
         <Route path="curriculum" element={<Curriculum />} />
