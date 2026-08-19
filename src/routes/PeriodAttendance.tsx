@@ -2,8 +2,10 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button, Card, EmptyState, Input, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
-import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
+import { useActiveAcademicYear, useActiveTerm } from "@/hooks/useAcademicTerms";
 import { useClassroomRoster } from "@/hooks/useAttendance";
+import { useSubjects } from "@/hooks/useCurriculum";
+import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
 import {
   type PeriodAttendanceDraft,
@@ -12,8 +14,10 @@ import {
   usePeriodAttendanceTakenSet,
 } from "@/hooks/usePeriodAttendance";
 import { useTeacherSchedule, type ScheduleEntryRow } from "@/hooks/useSchedule";
+import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import { useApprovedLeaveOnDate } from "@/hooks/useStudentLeave";
 import type { AttendanceStatus } from "@/lib/database.types";
+import { gradeShortLabel } from "@/lib/gradeLevels";
 import { cn } from "@/lib/utils";
 
 // ----------------------------------------------------------- period check-in
@@ -41,7 +45,6 @@ const STATUS_STYLE: Record<AttendanceStatus, string> = {
   leave:
     "bg-slate-300 text-slate-800 ring-1 ring-slate-500 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600",
 };
-const TERM_LABEL: Record<number, string> = { 1: "ภาคเรียน 1", 2: "ภาคเรียน 2" };
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const currentAcademicYear = () => new Date().getFullYear() + 543;
@@ -78,7 +81,6 @@ function PeriodCheckInPanel({
   recorderId: string;
 }) {
   const [date, setDate] = useState(todayIso());
-  const [term, setTerm] = useState<1 | 2>(1);
   const [openEntryId, setOpenEntryId] = useState<string | null>(null);
 
   const { data: departments = [] } = useDepartments();
@@ -86,6 +88,8 @@ function PeriodCheckInPanel({
   const splitsByTerm = department?.code === "SEC";
   const { data: activeYear } = useActiveAcademicYear(departmentId || null);
   const academicYear = activeYear ?? currentAcademicYear();
+  const { data: activeTerm } = useActiveTerm(departmentId || null);
+  const term: 1 | 2 = activeTerm?.term_type === "term2" ? 2 : 1;
   const scheduleTerm = splitsByTerm ? term : null;
 
   const { data: allEntries = [], isLoading } = useTeacherSchedule(
@@ -101,10 +105,27 @@ function PeriodCheckInPanel({
   const scheduleEntryIds = useMemo(() => todaysEntries.map((e) => e.id), [todaysEntries]);
   const { data: takenSet = new Set<string>() } = usePeriodAttendanceTakenSet(scheduleEntryIds, date);
 
+  const { data: subjects = [] } = useSubjects({
+    search: "",
+    departmentId,
+    learningAreaId: "",
+    gradeLevelId: "",
+    term: "",
+    subjectType: "",
+    includeInactive: true,
+  });
+  const { data: classrooms = [] } = useClassroomsByDepartment(departmentId || null);
+  const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
+  const classroomOf = (id: string) => classrooms.find((x) => x.id === id);
+  const gradeLevelName = (classroomId: string) => {
+    const code = gradeLevels.find((g) => g.id === classroomOf(classroomId)?.grade_level_id)?.code;
+    return code ? gradeShortLabel(code) : "—";
+  };
+
   const openEntry = todaysEntries.find((e) => e.id === openEntryId) ?? null;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="flex shrink-0 items-center gap-2">
         <Input
           type="date"
@@ -116,25 +137,6 @@ function PeriodCheckInPanel({
           className="w-40"
           aria-label="วันที่"
         />
-        {splitsByTerm && (
-          <div className="inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
-            {[1, 2].map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTerm(t as 1 | 2)}
-                className={cn(
-                  "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                  term === t
-                    ? "bg-foreground/10 text-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                {TERM_LABEL[t]}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {isLoading ? (
@@ -155,27 +157,53 @@ function PeriodCheckInPanel({
           onBack={() => setOpenEntryId(null)}
         />
       ) : (
-        <ul className="divide-y divide-border text-sm">
-          {todaysEntries.map((e) => (
-            <li key={e.id}>
-              <button
-                type="button"
-                onClick={() => setOpenEntryId(e.id)}
-                className="tappable flex w-full items-center justify-between py-2"
-              >
-                <span>คาบ {e.period_no}</span>
-                <span
-                  className={cn(
-                    "shrink-0 rounded-full px-2 py-0.5 text-xs",
-                    takenSet.has(e.id) ? "bg-success/15 text-success" : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {takenSet.has(e.id) ? "เช็คแล้ว" : "ยังไม่เช็ค"}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="table-panel">
+          <div className="table-panel-scroll">
+            <table className="w-full min-w-[52rem] table-fixed text-xs">
+              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="w-14 px-3 py-2 font-medium">คาบ</th>
+                  <th className="w-24 px-3 py-2 font-medium">รหัสวิชา</th>
+                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
+                  <th className="w-28 px-3 py-2 font-medium">แผนก</th>
+                  <th className="w-24 px-3 py-2 font-medium">ระดับชั้น</th>
+                  <th className="w-24 px-3 py-2 font-medium">ห้องเรียน</th>
+                  <th className="w-28 px-3 py-2 text-center font-medium">สถานะ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {todaysEntries.map((e) => {
+                  const subject = subjects.find((s) => s.id === e.teaching_assignment.subject_id);
+                  const classroom = classroomOf(e.teaching_assignment.classroom_id);
+                  return (
+                    <tr
+                      key={e.id}
+                      onClick={() => setOpenEntryId(e.id)}
+                      className="cursor-pointer border-t border-border hover:bg-muted/50"
+                    >
+                      <td className="px-3 py-2 text-muted-foreground">{e.period_no}</td>
+                      <td className="truncate px-3 py-2">{subject?.code ?? "—"}</td>
+                      <td className="truncate px-3 py-2">{subject?.name_th ?? "—"}</td>
+                      <td className="truncate px-3 py-2">{department?.name ?? "—"}</td>
+                      <td className="truncate px-3 py-2">{gradeLevelName(e.teaching_assignment.classroom_id)}</td>
+                      <td className="truncate px-3 py-2">{classroom?.name ?? "—"}</td>
+                      <td className="px-3 py-2 text-center">
+                        <span
+                          className={cn(
+                            "inline-flex rounded-full px-2 py-0.5 text-xs",
+                            takenSet.has(e.id) ? "bg-success/15 text-success" : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {takenSet.has(e.id) ? "เช็คแล้ว" : "ยังไม่เช็ค"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </div>
   );
