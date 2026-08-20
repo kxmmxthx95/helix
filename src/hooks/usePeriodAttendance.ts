@@ -22,6 +22,24 @@ export function usePeriodAttendance(scheduleEntryId: string | null, date: string
   });
 }
 
+/** All marks for one schedule entry across a date range — feeds the monthly summary table. */
+export function usePeriodAttendanceRange(scheduleEntryId: string | null, startDate: string, endDate: string) {
+  return useQuery({
+    queryKey: ["period_attendance_records", "by_entry_range", scheduleEntryId, startDate, endDate],
+    enabled: !!scheduleEntryId,
+    queryFn: async (): Promise<PeriodAttendanceRecord[]> => {
+      const { data, error } = await supabase
+        .from("period_attendance_records")
+        .select("*")
+        .eq("schedule_entry_id", scheduleEntryId!)
+        .gte("date", startDate)
+        .lte("date", endDate);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 /** Which of `scheduleEntryIds` already have at least one mark on `date` — feeds the taken/not-taken badge in the periods list. */
 export function usePeriodAttendanceTakenSet(scheduleEntryIds: string[], date: string) {
   return useQuery({

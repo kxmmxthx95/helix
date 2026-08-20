@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
+import { ChevronBack } from "@/components/icons";
 import { Button, Card, EmptyState, Input, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { useActiveAcademicYear, useActiveTerm } from "@/hooks/useAcademicTerms";
-import { useClassroomRoster } from "@/hooks/useAttendance";
+import { useClassroomRoster, summarizeAttendance } from "@/hooks/useAttendance";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
@@ -11,12 +12,13 @@ import {
   type PeriodAttendanceDraft,
   useSavePeriodAttendance,
   usePeriodAttendance,
+  usePeriodAttendanceRange,
   usePeriodAttendanceTakenSet,
 } from "@/hooks/usePeriodAttendance";
 import { useTeacherSchedule, type ScheduleEntryRow } from "@/hooks/useSchedule";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import { useApprovedLeaveOnDate } from "@/hooks/useStudentLeave";
-import type { AttendanceStatus } from "@/lib/database.types";
+import type { AttendanceStatus, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +50,7 @@ const STATUS_STYLE: Record<AttendanceStatus, string> = {
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const currentAcademicYear = () => new Date().getFullYear() + 543;
+const daysInMonth = (ceYear: number, month: number) => new Date(ceYear, month, 0).getDate();
 
 export function PeriodAttendance() {
   const { profile: me } = useAuth();
@@ -151,6 +154,7 @@ function PeriodCheckInPanel({
         <PeriodCheckInGrid
           key={`${openEntry.id}-${date}`}
           entry={openEntry}
+          subject={subjects.find((s) => s.id === openEntry.teaching_assignment.subject_id) ?? null}
           date={date}
           academicYear={academicYear}
           recorderId={recorderId}
@@ -211,12 +215,14 @@ function PeriodCheckInPanel({
 
 function PeriodCheckInGrid({
   entry,
+  subject,
   date,
   academicYear,
   recorderId,
   onBack,
 }: {
   entry: ScheduleEntryRow;
+  subject: Subject | null;
   date: string;
   academicYear: number;
   recorderId: string;
@@ -231,6 +237,20 @@ function PeriodCheckInGrid({
   const studentIds = useMemo(() => roster.map((s) => s.id), [roster]);
   const { data: lockedSet = new Set<string>() } = useApprovedLeaveOnDate(studentIds, date);
   const save = useSavePeriodAttendance();
+
+  const monthStart = `${date.slice(0, 7)}-01`;
+  const monthEnd = `${date.slice(0, 7)}-${String(daysInMonth(Number(date.slice(0, 4)), Number(date.slice(5, 7)))).padStart(2, "0")}`;
+  const { data: monthRecords = [] } = usePeriodAttendanceRange(entry.id, monthStart, monthEnd);
+  const monthCountsByStudent = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof summarizeAttendance>>();
+    for (const s of roster) {
+      map.set(
+        s.id,
+        summarizeAttendance(monthRecords.filter((r) => r.student_id === s.id)),
+      );
+    }
+    return map;
+  }, [roster, monthRecords]);
 
   const existingByStudent = useMemo(() => new Map(existing.map((r) => [r.student_id, r])), [existing]);
   const [marks, setMarks] = useState<Map<string, { status: AttendanceStatus | null; note: string }>>(
@@ -264,6 +284,17 @@ function PeriodCheckInGrid({
     });
   }
 
+  function markAllPresent() {
+    setMarks((prev) => {
+      const next = new Map(prev);
+      for (const s of roster) {
+        if (lockedSet.has(s.id)) continue;
+        next.set(s.id, { status: "present", note: prev.get(s.id)?.note ?? "" });
+      }
+      return next;
+    });
+  }
+
   function submit() {
     const rows: PeriodAttendanceDraft[] = roster.map((s) => {
       const mark = marks.get(s.id)!;
@@ -285,10 +316,23 @@ function PeriodCheckInGrid({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex shrink-0 items-center gap-2">
-        <button type="button" onClick={onBack} className="tappable text-xs text-accent underline">
-          ← กลับ
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="กลับ"
+          title="กลับ"
+          className="tappable inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-accent hover:bg-muted"
+        >
+          <ChevronBack className="h-4 w-4" />
         </button>
-        <span className="text-xs text-muted-foreground">คาบ {entry.period_no}</span>
+        <span className="min-w-0 truncate text-xs text-muted-foreground">
+          คาบ {entry.period_no} · {subject?.code ?? "—"} {subject?.name_th ?? ""}
+        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={markAllPresent}>
+            มาทั้งหมด
+          </Button>
+        </div>
       </div>
       {rosterLoading || recordsLoading ? (
         <div className="flex flex-1 items-center justify-center">
@@ -302,7 +346,7 @@ function PeriodCheckInGrid({
         <>
           <div className="table-panel">
             <div className="table-panel-scroll">
-              <table className="w-full min-w-[36rem] table-fixed text-xs">
+              <table className="w-full min-w-[44rem] table-fixed text-xs">
                 <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
                   <tr>
                     <th className="w-24 px-3 py-2 font-medium">รหัสนักเรียน</th>
@@ -354,15 +398,20 @@ function PeriodCheckInGrid({
                           )}
                         </td>
                         <td className="px-3 py-2">
-                          <Input
-                            value={mark.note}
-                            onChange={(e) => setNote(s.id, e.target.value)}
-                            placeholder="หมายเหตุ (ถ้ามี)"
-                            disabled={!noteOpen}
-                            className={cn("h-7 text-[10px]", !noteOpen && "invisible")}
-                            aria-label={`หมายเหตุของ ${name}`}
-                            tabIndex={noteOpen ? undefined : -1}
-                          />
+                          <div className="flex items-center gap-2">
+                            <span className="shrink-0 whitespace-nowrap text-[10px] text-muted-foreground">
+                              {STATUS_ORDER.map((st) => `${STATUS_LABEL[st]} ${monthCountsByStudent.get(s.id)?.[st] ?? 0}`).join(" · ")}
+                            </span>
+                            <Input
+                              value={mark.note}
+                              onChange={(e) => setNote(s.id, e.target.value)}
+                              placeholder="หมายเหตุ (ถ้ามี)"
+                              disabled={!noteOpen}
+                              className={cn("h-7 text-[10px]", !noteOpen && "invisible")}
+                              aria-label={`หมายเหตุของ ${name}`}
+                              tabIndex={noteOpen ? undefined : -1}
+                            />
+                          </div>
                         </td>
                       </tr>
                     );
