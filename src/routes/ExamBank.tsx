@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Plus, X } from "@/components/icons";
+import { ChevronForward, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
@@ -11,13 +11,16 @@ import {
   useDeleteExamSet,
   useExamQuestions,
   useExamSets,
+  useGradeLevelsByIds,
   useSubjectsByIds,
   useUpdateExamQuestion,
   type ChoiceDraft,
   type ExamQuestionWithChoices,
 } from "@/hooks/useExamBank";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
-import type { ExamQuestionType } from "@/lib/database.types";
+import type { ExamQuestionType, Subject } from "@/lib/database.types";
+import { gradeShortLabel } from "@/lib/gradeLevels";
+import { cn } from "@/lib/utils";
 
 const TYPE_LABEL: Record<ExamQuestionType, string> = {
   multiple_choice: "ปรนัย (เลือกตอบ)",
@@ -31,6 +34,9 @@ export function ExamBank() {
   const { data: assignments = [] } = useMyTeachingAssignments(me?.id ?? null);
   const subjectIds = [...new Set(assignments.map((a) => a.subject_id))];
   const { data: subjects = [] } = useSubjectsByIds(subjectIds);
+  const gradeLevelIds = [...new Set(subjects.map((s) => s.suggested_grade_level_id).filter((id): id is string => !!id))];
+  const { data: gradeLevels = [] } = useGradeLevelsByIds(gradeLevelIds);
+  const gradeLevelById = new Map(gradeLevels.map((g) => [g.id, g]));
 
   const [subjectId, setSubjectId] = useState("");
   const [setId, setSetId] = useState("");
@@ -51,22 +57,15 @@ export function ExamBank() {
   return (
     <div className="page-fill">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <Select
-          className="w-auto min-w-[10rem]"
+        <SubjectPicker
+          subjects={subjects}
+          gradeLevelById={gradeLevelById}
           value={subjectId}
-          onChange={(e) => {
-            setSubjectId(e.target.value);
+          onChange={(id) => {
+            setSubjectId(id);
             setSetId("");
           }}
-          aria-label="วิชา"
-          placeholder="เลือกวิชา"
-        >
-          {subjects.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.code} {s.name_th}
-            </option>
-          ))}
-        </Select>
+        />
         {subjectId && (
           <>
             <Select
@@ -465,5 +464,86 @@ function ChoiceEditor({
         </Button>
       </div>
     </Field>
+  );
+}
+
+/**
+ * Native <details>/<summary> disclosure instead of Select — a plain <option>
+ * can't render a badge, and each row here needs one for the subject's
+ * suggested grade level. Browser handles outside-click/Escape/focus for
+ * free; the only JS is closing on selection.
+ */
+function SubjectPicker({
+  subjects,
+  gradeLevelById,
+  value,
+  onChange,
+}: {
+  subjects: Subject[];
+  gradeLevelById: Map<string, { code: string }>;
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = subjects.find((s) => s.id === value) ?? null;
+
+  return (
+    <details
+      className="relative w-auto min-w-[10rem]"
+      open={open}
+      onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
+    >
+      <summary
+        className={cn(
+          "tappable flex h-8 w-full cursor-pointer list-none items-center justify-between gap-2 rounded-lg border border-input bg-background px-2.5 text-xs outline-none marker:content-none focus-visible:border-ring [&::-webkit-details-marker]:hidden",
+        )}
+        aria-label="วิชา"
+      >
+        <span className={cn("flex min-w-0 items-center gap-1.5 truncate", !selected && "text-muted-foreground")}>
+          {selected ? (
+            <>
+              <span className="truncate">{selected.name_th}</span>
+              {selected.suggested_grade_level_id && gradeLevelById.get(selected.suggested_grade_level_id) && (
+                <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent">
+                  {gradeShortLabel(gradeLevelById.get(selected.suggested_grade_level_id)!.code)}
+                </span>
+              )}
+            </>
+          ) : (
+            "เลือกวิชา"
+          )}
+        </span>
+        <ChevronForward className={cn("h-3 w-3 shrink-0 rotate-90 text-muted-foreground transition-transform", open && "-rotate-90")} />
+      </summary>
+
+      <ul className="absolute z-20 mt-1 max-h-72 w-full min-w-[16rem] overflow-y-auto rounded-lg border border-border bg-card p-1 text-xs shadow-lg">
+        {subjects.length === 0 && <li className="px-2 py-2 text-muted-foreground">ไม่มีวิชา</li>}
+        {subjects.map((s) => {
+          const grade = s.suggested_grade_level_id ? gradeLevelById.get(s.suggested_grade_level_id) : null;
+          return (
+            <li key={s.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(s.id);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "tappable flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left hover:bg-muted",
+                  s.id === value && "bg-muted font-medium",
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate">{s.name_th}</span>
+                {grade && (
+                  <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent">
+                    {gradeShortLabel(grade.code)}
+                  </span>
+                )}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </details>
   );
 }

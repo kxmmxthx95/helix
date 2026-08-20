@@ -1,5 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Classroom, ExamQuestion, ExamQuestionChoice, ExamQuestionType, ExamSet, Subject } from "@/lib/database.types";
+import type {
+  Classroom,
+  ExamQuestion,
+  ExamQuestionChoice,
+  ExamQuestionType,
+  ExamSet,
+  GradeLevel,
+  Subject,
+} from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
 // คลังข้อสอบ — the bank, owned by subject_id (any teacher teaching that
@@ -12,6 +20,19 @@ export function useSubjectsByIds(subjectIds: string[]) {
     enabled: subjectIds.length > 0,
     queryFn: async (): Promise<Subject[]> => {
       const { data, error } = await supabase.from("subjects").select("*").in("id", subjectIds);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** Same shape as useSubjectsByIds — resolves subjects.suggested_grade_level_id for the subject picker's grade-level badge. */
+export function useGradeLevelsByIds(gradeLevelIds: string[]) {
+  return useQuery({
+    queryKey: ["grade_levels", "by_ids", gradeLevelIds],
+    enabled: gradeLevelIds.length > 0,
+    queryFn: async (): Promise<GradeLevel[]> => {
+      const { data, error } = await supabase.from("grade_levels").select("*").in("id", gradeLevelIds);
       if (error) throw error;
       return data;
     },
