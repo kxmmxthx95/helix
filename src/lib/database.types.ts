@@ -466,6 +466,131 @@ export type ScoreItem = {
   updated_at: string;
 };
 
+// ------------------------------------------------------------------------- exams
+// สร้างข้อสอบ + จัดสอบออนไลน์ — see migration 0047 for the full grill
+// rationale (bank owned by subject, sessions are a separate "opening").
+
+export type ExamQuestionType = "multiple_choice" | "true_false" | "short_answer";
+
+/** A bank question, owned by subject_id — any teacher teaching that subject can read/write it. See migration 0047. */
+export type ExamQuestion = {
+  id: string;
+  subject_id: string;
+  question_type: ExamQuestionType;
+  prompt: string;
+  /** short_answer grading key only; multiple_choice/true_false use ExamQuestionChoice.is_correct instead. */
+  correct_answer: string | null;
+  points: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Answer-safe projection of ExamQuestion — no correct_answer. Read through this while an attempt is in_progress; see exam_questions_for_attempt view, migration 0047. */
+export type ExamQuestionForAttempt = Omit<ExamQuestion, "correct_answer">;
+
+/** One option for a multiple_choice/true_false question. */
+export type ExamQuestionChoice = {
+  id: string;
+  question_id: string;
+  label: string;
+  is_correct: boolean;
+  position: number;
+};
+
+/** Answer-safe projection — no is_correct. See exam_question_choices_for_attempt view, migration 0047. */
+export type ExamQuestionChoiceForAttempt = Omit<ExamQuestionChoice, "is_correct">;
+
+/** An "opening" of hand-picked bank questions against the teacher's own classroom(s). See migration 0047. */
+export type ExamSession = {
+  id: string;
+  subject_id: string;
+  teacher_id: string;
+  title: string;
+  opens_at: string;
+  closes_at: string;
+  /** Per-attempt countdown from first open; null = only the opens_at/closes_at window applies. */
+  duration_minutes: number | null;
+  max_attempts: number;
+  shuffle_questions: boolean;
+  shuffle_choices: boolean;
+  /** Mirrors the graded total into score_items/student_item_scores — see gradebook_item_id. */
+  sync_to_gradebook: boolean;
+  gradebook_item_id: string | null;
+  /** Teacher-flipped — students only see the answer key/correct answers once true. */
+  review_released: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Which of the teacher's own teaching_assignments (classrooms) a session is open to. */
+export type ExamSessionTarget = {
+  session_id: string;
+  teaching_assignment_id: string;
+};
+
+/** Which bank questions a session uses, in order, with a per-session point override. */
+export type ExamSessionQuestion = {
+  session_id: string;
+  question_id: string;
+  position: number;
+  points: number;
+};
+
+export type ExamAttemptStatus = "in_progress" | "submitted";
+
+export type ExamAttempt = {
+  id: string;
+  session_id: string;
+  student_id: string;
+  attempt_no: number;
+  /** Server-stamped on first open — duration_minutes anchors to this, never a client clock. */
+  started_at: string;
+  submitted_at: string | null;
+  status: ExamAttemptStatus;
+  /** Per-attempt shuffle order (question ids), generated once at start and reused on resume. */
+  question_order: string[];
+  score: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** One row per question per attempt, upserted on every answer change (autosave). is_correct/points_awarded fill in at submit. */
+export type ExamAttemptAnswer = {
+  attempt_id: string;
+  question_id: string;
+  choice_id: string | null;
+  short_answer: string | null;
+  is_correct: boolean | null;
+  points_awarded: number | null;
+  answered_at: string;
+};
+
+export type ExamAttemptEventType = "blur" | "visibility_hidden";
+
+/** Tab-switch/blur log for the teacher to review — no client-side lockdown, just a timestamped trail. */
+export type ExamAttemptEvent = {
+  id: string;
+  attempt_id: string;
+  event_type: ExamAttemptEventType;
+  at: string;
+};
+
+/** ชุดข้อสอบ — a tag/folder within one subject's bank. A question can carry several via ExamQuestionSet. See migration 0048. */
+export type ExamSet = {
+  id: string;
+  subject_id: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExamQuestionSet = {
+  question_id: string;
+  set_id: string;
+};
+
 /** Teacher-posted material for one assignment (score_item). See migration 0039. */
 export type AssignmentAttachment = {
   id: string;
@@ -911,9 +1036,42 @@ export type Database = {
         changes: unknown;
         created_at: string;
       }>;
+      exam_questions: Table<ExamQuestion, InsertOf<ExamQuestion, "correct_answer" | "points">>;
+      exam_question_choices: Table<ExamQuestionChoice, InsertOf<ExamQuestionChoice, "is_correct" | "position">>;
+      exam_sessions: Table<
+        ExamSession,
+        InsertOf<
+          ExamSession,
+          | "duration_minutes"
+          | "max_attempts"
+          | "shuffle_questions"
+          | "shuffle_choices"
+          | "sync_to_gradebook"
+          | "gradebook_item_id"
+          | "review_released"
+        >
+      >;
+      exam_session_targets: Table<ExamSessionTarget, ExamSessionTarget>;
+      exam_session_questions: Table<ExamSessionQuestion, ExamSessionQuestion>;
+      exam_attempts: Table<
+        ExamAttempt,
+        InsertOf<ExamAttempt, "attempt_no" | "started_at" | "submitted_at" | "status" | "question_order" | "score">
+      >;
+      exam_attempt_answers: Table<
+        ExamAttemptAnswer,
+        InsertOf<ExamAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
+      >;
+      exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
+      exam_sets: Table<ExamSet, InsertOf<ExamSet, never>>;
+      exam_question_sets: Table<ExamQuestionSet, ExamQuestionSet>;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      submit_exam_attempt: {
+        Args: { p_attempt_id: string };
+        Returns: void;
+      };
+    };
     Enums: {
       app_role: Role;
       student_status: StudentStatus;
@@ -927,6 +1085,9 @@ export type Database = {
       academic_event_type: AcademicEventType;
       behavior_severity: BehaviorSeverity;
       score_item_kind: ScoreItemKind;
+      exam_question_type: ExamQuestionType;
+      exam_attempt_status: ExamAttemptStatus;
+      exam_attempt_event_type: ExamAttemptEventType;
     };
     CompositeTypes: Record<string, never>;
   };

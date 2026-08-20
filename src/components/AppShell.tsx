@@ -164,6 +164,27 @@ const TABS = [
     teacherOrManagerOnly: true,
   },
   {
+    to: "/exam-bank",
+    label: "คลังข้อสอบ",
+    icon: LibraryIcon,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: true,
+  },
+  {
+    to: "/exams",
+    label: "สอบออนไลน์",
+    icon: DocumentTextIcon,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: false,
+    teacherOrStudentOrParentOnly: true,
+  },
+  {
     to: "/assignments",
     label: "งาน",
     icon: CheckboxOutlineIcon,
@@ -329,6 +350,11 @@ function AppShellInner() {
         (profile && (profile.roles.includes("teacher") || canManage(profile.roles)))) &&
       (!t.studentOrParentOnly ||
         (profile && (profile.roles.includes("student") || profile.roles.includes("parent")))) &&
+      (!t.teacherOrStudentOrParentOnly ||
+        (profile &&
+          (profile.roles.includes("teacher") ||
+            profile.roles.includes("student") ||
+            profile.roles.includes("parent")))) &&
       // /time-tracking is further gated by the school-wide per-role toggle (migration 0032).
       (t.to !== "/time-tracking" ||
         (profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r)))),
