@@ -310,9 +310,10 @@ function QuestionForm({
           </Select>
         </Field>
       )}
-      <Field label="โจทย์">
+      <div className="space-y-1">
+        <span className="font-ui text-xs font-medium">โจทย์</span>
         <QuestionEditor value={prompt} onChange={setPrompt} questionId={question?.id ?? null} />
-      </Field>
+      </div>
       {type === "short_answer" ? (
         <Field label="เฉลย (ไม่สนตัวพิมพ์เล็ก/ใหญ่)">
           <Input value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)} />

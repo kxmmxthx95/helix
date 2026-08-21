@@ -1,6 +1,6 @@
 import { BoldPlugin, HighlightPlugin, UnderlinePlugin } from "@platejs/basic-nodes/react";
 import { ListPlugin } from "@platejs/list/react";
-import { EquationPlugin } from "@platejs/math/react";
+import { EquationPlugin, InlineEquationPlugin } from "@platejs/math/react";
 import { ImagePlugin } from "@platejs/media/react";
 import type { Value } from "platejs";
 import { ParagraphPlugin } from "platejs/react";
@@ -21,6 +21,7 @@ export function examQuestionPlugins(questionId: string | null) {
     HighlightPlugin.withComponent(HighlightLeaf),
     ListPlugin,
     EquationPlugin.withComponent(EquationElement),
+    InlineEquationPlugin.withComponent(EquationElement),
     ImagePlugin.configure({
       options: {
         uploadImage: async (dataUrl) => {
