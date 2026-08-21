@@ -56,67 +56,133 @@ export function ExamBank() {
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <SubjectPicker
-          subjects={subjects}
-          gradeLevelById={gradeLevelById}
-          value={subjectId}
-          onChange={(id) => {
-            setSubjectId(id);
-            setSetId("");
-          }}
-        />
-        {subjectId && (
-          <>
-            <Select
-              className="w-auto min-w-[9rem]"
-              value={setId}
-              onChange={(e) => setSetId(e.target.value)}
-              aria-label="ชุดข้อสอบ"
-              placeholder="ทุกชุด"
-            >
-              {sets.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </Select>
+      {subjectId && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setSubjectId("");
+              setSetId("");
+            }}
+          >
+            <ChevronForward className="h-3 w-3 rotate-180" /> {subjects.find((s) => s.id === subjectId)?.name_th ?? "เปลี่ยนวิชา"}
+          </Button>
+          <div className="ml-auto flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => setCreatingSet(true)}>
               <Plus className="h-3 w-3" /> เพิ่มชุดข้อสอบ
             </Button>
-            {setId && (
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label="ลบชุดข้อสอบ"
-                onClick={() => {
-                  const set = sets.find((s) => s.id === setId);
-                  if (!set || !confirm(`ลบชุด "${set.name}"? (ข้อสอบในชุดจะยังอยู่ในคลัง)`)) return;
-                  deleteSet.mutate(setId, {
-                    onSuccess: () => setSetId(""),
-                    onError: () => toast("ลบไม่สำเร็จ", "error"),
-                  });
-                }}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            )}
             <Button size="sm" onClick={() => setCreating(true)} disabled={sets.length === 0}>
               <Plus className="h-3 w-3" /> เพิ่มข้อสอบ
             </Button>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
 
-      {!subjectId ? (
+      {subjects.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="เลือกวิชา" description="เลือกวิชาด้านบนเพื่อดูคลังข้อสอบ" />
+          <EmptyState title="ไม่มีวิชา" description="ยังไม่มีวิชาที่คุณสอน" />
+        </div>
+      ) : !subjectId ? (
+        <div className="table-panel flex-1">
+          <div className="table-panel-scroll">
+            <table className="w-full min-w-[24rem] text-xs">
+              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">รหัสวิชา</th>
+                  <th className="px-3 py-2 font-medium">วิชา</th>
+                  <th className="px-3 py-2 font-medium">ระดับชั้น</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subjects.map((s) => {
+                  const grade = s.suggested_grade_level_id ? gradeLevelById.get(s.suggested_grade_level_id) : null;
+                  return (
+                    <tr
+                      key={s.id}
+                      onClick={() => {
+                        setSubjectId(s.id);
+                        setSetId("");
+                      }}
+                      className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
+                    >
+                      <td className="px-3 py-2 text-muted-foreground">{s.code}</td>
+                      <td className="max-w-xs truncate px-3 py-2">{s.name_th}</td>
+                      <td className="px-3 py-2">
+                        {grade && (
+                          <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent">
+                            {gradeShortLabel(grade.code)}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : sets.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="ยังไม่มีชุดข้อสอบ" description="กด “เพิ่มชุดข้อสอบ” เพื่อสร้างชุดก่อนเริ่มเพิ่มข้อสอบ" />
         </div>
-      ) : isLoading ? (
+      ) : (
+        <div className="table-panel shrink-0 max-h-40">
+          <div className="table-panel-scroll">
+            <table className="w-full min-w-[20rem] text-xs">
+              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">ชุดข้อสอบ</th>
+                  <th className="px-3 py-2 font-medium" />
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  onClick={() => setSetId("")}
+                  className={cn(
+                    "cursor-pointer border-t border-border hover:bg-muted active:bg-muted",
+                    setId === "" && "bg-muted font-medium",
+                  )}
+                >
+                  <td className="px-3 py-2 text-muted-foreground">ทุกชุด</td>
+                  <td className="px-3 py-2" />
+                </tr>
+                {sets.map((s) => (
+                  <tr
+                    key={s.id}
+                    onClick={() => setSetId(s.id)}
+                    className={cn(
+                      "cursor-pointer border-t border-border hover:bg-muted active:bg-muted",
+                      setId === s.id && "bg-muted font-medium",
+                    )}
+                  >
+                    <td className="max-w-xs truncate px-3 py-2">{s.name}</td>
+                    <td className="px-3 py-2 text-right">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label="ลบชุดข้อสอบ"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!confirm(`ลบชุด "${s.name}"? (ข้อสอบในชุดจะยังอยู่ในคลัง)`)) return;
+                          deleteSet.mutate(s.id, {
+                            onSuccess: () => setId === s.id && setSetId(""),
+                            onError: () => toast("ลบไม่สำเร็จ", "error"),
+                          });
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!subjectId || sets.length === 0 ? null : isLoading ? (
         <div className="flex flex-1 items-center justify-center">
           <Spinner className="h-5 w-5 text-muted-foreground" />
         </div>
