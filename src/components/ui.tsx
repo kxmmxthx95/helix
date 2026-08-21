@@ -38,7 +38,7 @@ Button.displayName = "Button";
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   ({ className, type, value, onClick, onKeyDown, inputMode, ...props }, ref) => {
-    const isDate = type === "date";
+    const isDate = type === "date" || type === "datetime-local";
     return (
       <input
         ref={ref}

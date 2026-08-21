@@ -473,7 +473,7 @@ function ChoiceEditor({
  * suggested grade level. Browser handles outside-click/Escape/focus for
  * free; the only JS is closing on selection.
  */
-function SubjectPicker({
+export function SubjectPicker({
   subjects,
   gradeLevelById,
   value,

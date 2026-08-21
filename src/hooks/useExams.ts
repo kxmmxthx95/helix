@@ -156,6 +156,30 @@ export function useUpdateExamSession() {
   });
 }
 
+/** Replaces a session's full question set (delete then re-insert) — used to add/edit questions after the session already exists. */
+export function useSetSessionQuestions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      questions,
+    }: {
+      sessionId: string;
+      questions: { question_id: string; points: number }[];
+    }) => {
+      const { error: deleteError } = await supabase.from("exam_session_questions").delete().eq("session_id", sessionId);
+      if (deleteError) throw deleteError;
+      if (questions.length > 0) {
+        const { error: insertError } = await supabase.from("exam_session_questions").insert(
+          questions.map((q, i) => ({ session_id: sessionId, question_id: q.question_id, position: i, points: q.points })),
+        );
+        if (insertError) throw insertError;
+      }
+    },
+    onSettled: (_data, _err, vars) => void qc.invalidateQueries({ queryKey: ["exam_session_questions", vars.sessionId] }),
+  });
+}
+
 export function useDeleteExamSession() {
   const qc = useQueryClient();
   return useMutation({

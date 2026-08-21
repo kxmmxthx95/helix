@@ -3,9 +3,9 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ChevronBack, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Select, Spinner, Switch } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Spinner, Switch } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
-import { useClassroomsByIds, useExamQuestions, useSubjectsByIds } from "@/hooks/useExamBank";
+import { useClassroomsByIds, useExamQuestions, useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
 import {
   useAttemptAnswers,
   useAttemptQuestions,
@@ -19,12 +19,15 @@ import {
   useMyExamSessions,
   useSaveAnswer,
   useSessionAttempts,
+  useSetSessionQuestions,
   useStartOrResumeAttempt,
   useSubmitAttempt,
   useUpdateExamSession,
   type AvailableExam,
+  type ExamSessionQuestionRow,
 } from "@/hooks/useExams";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
+import { SubjectPicker } from "@/routes/ExamBank";
 import type { ExamAttempt, ExamSession, Student } from "@/lib/database.types";
 import { cn } from "@/lib/utils";
 
@@ -139,9 +142,13 @@ function CreateSessionSheet({
   const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
   const subjectIds = [...new Set(assignments.map((a) => a.subject_id))];
   const { data: subjects = [] } = useSubjectsByIds(subjectIds);
+  const gradeLevelIds = [...new Set(subjects.map((s) => s.suggested_grade_level_id).filter((id): id is string => !!id))];
+  const { data: gradeLevels = [] } = useGradeLevelsByIds(gradeLevelIds);
+  const gradeLevelById = new Map(gradeLevels.map((g) => [g.id, g]));
 
   const [subjectId, setSubjectId] = useState("");
   const [title, setTitle] = useState("");
+  const [noSchedule, setNoSchedule] = useState(false);
   const [opensAt, setOpensAt] = useState("");
   const [closesAt, setClosesAt] = useState("");
   const [duration, setDuration] = useState("");
@@ -150,9 +157,7 @@ function CreateSessionSheet({
   const [shuffleChoices, setShuffleChoices] = useState(true);
   const [syncGradebook, setSyncGradebook] = useState(false);
   const [targetIds, setTargetIds] = useState<string[]>([]);
-  const [questionIds, setQuestionIds] = useState<string[]>([]);
 
-  const { data: questions = [] } = useExamQuestions(subjectId || null);
   const targets = assignments.filter((a) => a.subject_id === subjectId);
   const classroomIds = [...new Set(targets.map((a) => a.classroom_id))];
   const { data: classrooms = [] } = useClassroomsByIds(classroomIds);
@@ -164,44 +169,46 @@ function CreateSessionSheet({
   function reset() {
     setSubjectId("");
     setTitle("");
+    setNoSchedule(false);
     setOpensAt("");
     setClosesAt("");
     setDuration("");
     setMaxAttempts("1");
     setTargetIds([]);
-    setQuestionIds([]);
   }
 
-  const totalPoints = questions.filter((q) => questionIds.includes(q.id)).reduce((s, q) => s + q.points, 0);
   const canSave =
-    subjectId && title.trim() && opensAt && closesAt && new Date(closesAt) > new Date(opensAt) &&
-    targetIds.length > 0 && questionIds.length > 0;
+    subjectId && title.trim() &&
+    (noSchedule || (opensAt && closesAt && new Date(closesAt) > new Date(opensAt))) &&
+    targetIds.length > 0;
 
-  function save() {
+  function close() {
+    reset();
+    onOpenChange(false);
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
     if (!canSave) return;
     create.mutate(
       {
         subject_id: subjectId,
         teacher_id: teacherId,
         title: title.trim(),
-        opens_at: new Date(opensAt).toISOString(),
-        closes_at: new Date(closesAt).toISOString(),
+        opens_at: noSchedule ? new Date().toISOString() : new Date(opensAt).toISOString(),
+        closes_at: noSchedule
+          ? new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000).toISOString()
+          : new Date(closesAt).toISOString(),
         duration_minutes: duration ? Number(duration) : null,
         max_attempts: Number(maxAttempts) || 1,
         shuffle_questions: shuffleQuestions,
         shuffle_choices: shuffleChoices,
         sync_to_gradebook: syncGradebook,
         teaching_assignment_ids: targetIds,
-        questions: questionIds.map((question_id) => ({
-          question_id,
-          points: questions.find((q) => q.id === question_id)?.points ?? 1,
-        })),
+        questions: [],
       },
       {
-        onSuccess: () => {
-          onOpenChange(false);
-          reset();
-        },
+        onSuccess: () => close(),
         onError: () => toast("เปิดสอบไม่สำเร็จ", "error"),
       },
     );
@@ -210,52 +217,82 @@ function CreateSessionSheet({
   return (
     <Sheet
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(next) => !next && close()}
       title="เปิดสอบใหม่"
-      wide
       footer={
-        <Button className="w-full" onClick={save} disabled={!canSave || create.isPending}>
-          เปิดสอบ
-        </Button>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={close}>
+            ยกเลิก
+          </Button>
+          <Button type="submit" form="create-session" className="flex-1" disabled={!canSave || create.isPending}>
+            เปิดสอบ
+          </Button>
+        </div>
       }
     >
-      <div className="space-y-3">
+      <form id="create-session" onSubmit={submit} className="space-y-3">
         <Field label="วิชา" required>
-          <Select
+          <SubjectPicker
+            subjects={subjects}
+            gradeLevelById={gradeLevelById}
             value={subjectId}
-            onChange={(e) => {
-              setSubjectId(e.target.value);
+            onChange={(id) => {
+              setSubjectId(id);
               setTargetIds([]);
-              setQuestionIds([]);
             }}
-            placeholder="เลือกวิชา"
-          >
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} {s.name_th}
-              </option>
-            ))}
-          </Select>
+          />
         </Field>
         <Field label="ชื่อการสอบ" required>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น สอบกลางภาค" />
         </Field>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="เปิดสอบ" required>
-            <Input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} />
-          </Field>
-          <Field label="ปิดสอบ" required>
-            <Input type="datetime-local" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} />
-          </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="เวลาทำ (นาที, ไม่บังคับ)">
-            <Input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="ไม่จำกัด" />
-          </Field>
-          <Field label="จำนวนครั้งที่สอบได้">
-            <Input type="number" min="1" value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)} />
-          </Field>
-        </div>
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={noSchedule}
+            onChange={(e) => setNoSchedule(e.target.checked)}
+          />
+          ไม่กำหนดวันและเวลาเปิด-ปิดสอบ
+        </label>
+        {!noSchedule && (
+          <>
+            <Field label="เปิดสอบ" required>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="date"
+                  value={opensAt.slice(0, 10)}
+                  onChange={(e) => setOpensAt(e.target.value ? `${e.target.value}T${opensAt.slice(11) || "00:00"}` : "")}
+                />
+                <Input
+                  type="time"
+                  value={opensAt.slice(11)}
+                  onChange={(e) => setOpensAt(`${opensAt.slice(0, 10)}T${e.target.value}`)}
+                  disabled={!opensAt.slice(0, 10)}
+                />
+              </div>
+            </Field>
+            <Field label="ปิดสอบ" required>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="date"
+                  value={closesAt.slice(0, 10)}
+                  onChange={(e) => setClosesAt(e.target.value ? `${e.target.value}T${closesAt.slice(11) || "00:00"}` : "")}
+                />
+                <Input
+                  type="time"
+                  value={closesAt.slice(11)}
+                  onChange={(e) => setClosesAt(`${closesAt.slice(0, 10)}T${e.target.value}`)}
+                  disabled={!closesAt.slice(0, 10)}
+                />
+              </div>
+            </Field>
+          </>
+        )}
+        <Field label="เวลาทำ (นาที, ไม่บังคับ)">
+          <Input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="ไม่จำกัด" />
+        </Field>
+        <Field label="จำนวนครั้งที่สอบได้">
+          <Input type="number" min="1" value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)} />
+        </Field>
 
         <div className="space-y-2 rounded-lg border border-border p-2.5">
           <label className="flex items-center justify-between text-xs">
@@ -296,29 +333,8 @@ function CreateSessionSheet({
           </Field>
         )}
 
-        {subjectId && (
-          <Field label={`ข้อสอบ (เลือกแล้ว ${questionIds.length} ข้อ, รวม ${totalPoints} คะแนน)`} required>
-            <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-lg border border-border p-2">
-              {questions.length === 0 && <p className="text-xs text-muted-foreground">คลังข้อสอบวิชานี้ยังว่าง</p>}
-              {questions.map((q) => (
-                <label key={q.id} className="flex items-start gap-2 text-xs">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={questionIds.includes(q.id)}
-                    onChange={(e) =>
-                      setQuestionIds(e.target.checked ? [...questionIds, q.id] : questionIds.filter((id) => id !== q.id))
-                    }
-                  />
-                  <span>
-                    {q.prompt} <span className="text-muted-foreground">({q.points} คะแนน)</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </Field>
-        )}
-      </div>
+        <p className="text-xs text-muted-foreground">เลือกข้อสอบได้หลังสร้างห้องสอบ ในหน้ารายละเอียดห้องสอบ</p>
+      </form>
     </Sheet>
   );
 }
@@ -329,6 +345,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   const { data: sessionQuestions = [] } = useExamSessionQuestions(session.id);
   const update = useUpdateExamSession();
   const toast = useToast();
+  const [editingQuestions, setEditingQuestions] = useState(false);
 
   const maxPoints = sessionQuestions.reduce((s, q) => s + q.points, 0);
   const submitted = attempts.filter((a) => a.status === "submitted");
@@ -347,6 +364,15 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         </div>
       </div>
 
+      <button
+        type="button"
+        onClick={() => setEditingQuestions(true)}
+        className="flex shrink-0 items-center justify-between rounded-lg border border-border px-3 py-2 text-left text-xs hover:bg-muted"
+      >
+        จัดการข้อสอบ ({sessionQuestions.length} ข้อ)
+        <span className="text-muted-foreground">แก้ไข</span>
+      </button>
+
       <label className="flex shrink-0 items-center justify-between rounded-lg border border-border px-3 py-2 text-xs">
         เปิดเฉลยให้นักเรียนดู
         <Switch
@@ -356,6 +382,13 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
           }
         />
       </label>
+
+      <EditSessionQuestionsSheet
+        session={session}
+        sessionQuestions={sessionQuestions}
+        open={editingQuestions}
+        onOpenChange={setEditingQuestions}
+      />
 
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center">
@@ -397,6 +430,79 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         </div>
       )}
     </div>
+  );
+}
+
+function EditSessionQuestionsSheet({
+  session,
+  sessionQuestions,
+  open,
+  onOpenChange,
+}: {
+  session: ExamSession;
+  sessionQuestions: ExamSessionQuestionRow[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { data: questions = [] } = useExamQuestions(open ? session.subject_id : null);
+  const setQuestions = useSetSessionQuestions();
+  const toast = useToast();
+  const [questionIds, setQuestionIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (open) setQuestionIds(sessionQuestions.map((q) => q.question_id));
+  }, [open, sessionQuestions]);
+
+  const totalPoints = questions.filter((q) => questionIds.includes(q.id)).reduce((s, q) => s + q.points, 0);
+
+  function save() {
+    setQuestions.mutate(
+      {
+        sessionId: session.id,
+        questions: questionIds.map((question_id) => ({
+          question_id,
+          points: questions.find((q) => q.id === question_id)?.points ?? 1,
+        })),
+      },
+      {
+        onSuccess: () => onOpenChange(false),
+        onError: () => toast("บันทึกข้อสอบไม่สำเร็จ", "error"),
+      },
+    );
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="จัดการข้อสอบ"
+      footer={
+        <Button className="w-full" onClick={save} disabled={questionIds.length === 0 || setQuestions.isPending}>
+          บันทึก
+        </Button>
+      }
+    >
+      <Field label={`ข้อสอบ (เลือกแล้ว ${questionIds.length} ข้อ, รวม ${totalPoints} คะแนน)`} required>
+        <div className="max-h-96 space-y-1.5 overflow-y-auto rounded-lg border border-border p-2">
+          {questions.length === 0 && <p className="text-xs text-muted-foreground">คลังข้อสอบวิชานี้ยังว่าง</p>}
+          {questions.map((q) => (
+            <label key={q.id} className="flex items-start gap-2 text-xs">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={questionIds.includes(q.id)}
+                onChange={(e) =>
+                  setQuestionIds(e.target.checked ? [...questionIds, q.id] : questionIds.filter((id) => id !== q.id))
+                }
+              />
+              <span>
+                {q.prompt} <span className="text-muted-foreground">({q.points} คะแนน)</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </Field>
+    </Sheet>
   );
 }
 
