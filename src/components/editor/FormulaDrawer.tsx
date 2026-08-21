@@ -50,7 +50,7 @@ export function FormulaDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh]">
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => onOpenChange(false)} />
       <div className="glass-sidebar relative w-full max-w-md rounded-2xl bg-white/[0.85] p-4 dark:bg-white/[0.06]">
         <div className="mb-3 flex items-center justify-between">

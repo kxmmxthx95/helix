@@ -3,7 +3,9 @@ import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { EMPTY_PROMPT } from "@/components/editor/plateConfig";
 import { QuestionEditor } from "@/components/editor/QuestionEditor";
-import { ChevronForward, Plus, X } from "@/components/icons";
+import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
+import { ChevronForward, DocumentTextIcon, Plus, X } from "@/components/icons";
+import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
 import {
@@ -52,6 +54,7 @@ export function ExamBank() {
   const [subjectId, setSubjectId] = useState("");
   const [editing, setEditing] = useState<ExamQuestionWithChoices | null>(null);
   const [formExpanded, setFormExpanded] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const { data: questions = [], isLoading } = useExamQuestions(subjectId || null);
   const deleteQuestion = useDeleteExamQuestion();
@@ -67,6 +70,16 @@ export function ExamBank() {
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Button size="sm" variant="ghost" onClick={() => setSubjectId("")}>
             <ChevronForward className="h-3 w-3 rotate-180" /> {subjects.find((s) => s.id === subjectId)?.name_th ?? "เปลี่ยนวิชา"}
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="ml-auto"
+            aria-label="ดูข้อสอบทั้งหมด"
+            disabled={questions.length === 0}
+            onClick={() => setPreviewOpen(true)}
+          >
+            <DocumentTextIcon className="h-3.5 w-3.5" />
           </Button>
         </div>
       )}
@@ -185,6 +198,30 @@ export function ExamBank() {
           </div>
         </div>
       )}
+
+      <Sheet open={previewOpen} onOpenChange={setPreviewOpen} title="ข้อสอบทั้งหมด" wide>
+        <div className="space-y-4">
+          {questions.map((q, i) => (
+            <div key={q.id} className="space-y-2 border-b border-border pb-4 last:border-0">
+              <div className="flex gap-1.5 text-sm font-medium">
+                <span>{i + 1}.</span>
+                <QuestionPromptView value={q.prompt_json} />
+              </div>
+              {q.question_type === "short_answer" ? (
+                <p className="pl-4 text-xs text-muted-foreground">เฉลย: {q.correct_answer}</p>
+              ) : (
+                <ul className="space-y-1 pl-4 text-xs">
+                  {q.choices.map((c) => (
+                    <li key={c.id} className={cn("flex items-center gap-1.5", c.is_correct && "font-medium text-success")}>
+                      {c.is_correct ? "✓" : "○"} {c.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      </Sheet>
     </div>
   );
 }
