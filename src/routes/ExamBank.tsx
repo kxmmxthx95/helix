@@ -6,11 +6,8 @@ import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
 import {
   useCreateExamQuestion,
-  useCreateExamSet,
   useDeleteExamQuestion,
-  useDeleteExamSet,
   useExamQuestions,
-  useExamSets,
   useGradeLevelsByIds,
   useSubjectsByIds,
   useUpdateExamQuestion,
@@ -39,15 +36,11 @@ export function ExamBank() {
   const gradeLevelById = new Map(gradeLevels.map((g) => [g.id, g]));
 
   const [subjectId, setSubjectId] = useState("");
-  const [setId, setSetId] = useState("");
-  const [creatingSet, setCreatingSet] = useState(false);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ExamQuestionWithChoices | null>(null);
 
-  const { data: sets = [] } = useExamSets(subjectId || null);
-  const { data: questions = [], isLoading } = useExamQuestions(subjectId || null, setId || null);
+  const { data: questions = [], isLoading } = useExamQuestions(subjectId || null);
   const deleteQuestion = useDeleteExamQuestion();
-  const deleteSet = useDeleteExamSet();
   const toast = useToast();
 
   if (!me?.roles.includes("teacher")) {
@@ -58,24 +51,12 @@ export function ExamBank() {
     <div className="page-fill">
       {subjectId && (
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setSubjectId("");
-              setSetId("");
-            }}
-          >
+          <Button size="sm" variant="ghost" onClick={() => setSubjectId("")}>
             <ChevronForward className="h-3 w-3 rotate-180" /> {subjects.find((s) => s.id === subjectId)?.name_th ?? "เปลี่ยนวิชา"}
           </Button>
-          <div className="ml-auto flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setCreatingSet(true)}>
-              <Plus className="h-3 w-3" /> เพิ่มชุดข้อสอบ
-            </Button>
-            <Button size="sm" onClick={() => setCreating(true)} disabled={sets.length === 0}>
-              <Plus className="h-3 w-3" /> เพิ่มข้อสอบ
-            </Button>
-          </div>
+          <Button size="sm" className="ml-auto" onClick={() => setCreating(true)}>
+            <Plus className="h-3 w-3" /> เพิ่มข้อสอบ
+          </Button>
         </div>
       )}
 
@@ -100,10 +81,7 @@ export function ExamBank() {
                   return (
                     <tr
                       key={s.id}
-                      onClick={() => {
-                        setSubjectId(s.id);
-                        setSetId("");
-                      }}
+                      onClick={() => setSubjectId(s.id)}
                       className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
                     >
                       <td className="px-3 py-2 text-muted-foreground">{s.code}</td>
@@ -122,67 +100,7 @@ export function ExamBank() {
             </table>
           </div>
         </div>
-      ) : sets.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ยังไม่มีชุดข้อสอบ" description="กด “เพิ่มชุดข้อสอบ” เพื่อสร้างชุดก่อนเริ่มเพิ่มข้อสอบ" />
-        </div>
-      ) : (
-        <div className="table-panel shrink-0 max-h-40">
-          <div className="table-panel-scroll">
-            <table className="w-full min-w-[20rem] text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">ชุดข้อสอบ</th>
-                  <th className="px-3 py-2 font-medium" />
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  onClick={() => setSetId("")}
-                  className={cn(
-                    "cursor-pointer border-t border-border hover:bg-muted active:bg-muted",
-                    setId === "" && "bg-muted font-medium",
-                  )}
-                >
-                  <td className="px-3 py-2 text-muted-foreground">ทุกชุด</td>
-                  <td className="px-3 py-2" />
-                </tr>
-                {sets.map((s) => (
-                  <tr
-                    key={s.id}
-                    onClick={() => setSetId(s.id)}
-                    className={cn(
-                      "cursor-pointer border-t border-border hover:bg-muted active:bg-muted",
-                      setId === s.id && "bg-muted font-medium",
-                    )}
-                  >
-                    <td className="max-w-xs truncate px-3 py-2">{s.name}</td>
-                    <td className="px-3 py-2 text-right">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label="ลบชุดข้อสอบ"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!confirm(`ลบชุด "${s.name}"? (ข้อสอบในชุดจะยังอยู่ในคลัง)`)) return;
-                          deleteSet.mutate(s.id, {
-                            onSuccess: () => setId === s.id && setSetId(""),
-                            onError: () => toast("ลบไม่สำเร็จ", "error"),
-                          });
-                        }}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {!subjectId || sets.length === 0 ? null : isLoading ? (
+      ) : isLoading ? (
         <div className="flex flex-1 items-center justify-center">
           <Spinner className="h-5 w-5 text-muted-foreground" />
         </div>
@@ -236,73 +154,15 @@ export function ExamBank() {
         </div>
       )}
 
-      <CreateSetSheet open={creatingSet} onOpenChange={setCreatingSet} subjectId={subjectId} teacherId={me.id} />
-      <QuestionSheet
-        open={creating}
-        onOpenChange={setCreating}
-        subjectId={subjectId}
-        teacherId={me.id}
-        sets={sets}
-        defaultSetId={setId || sets[0]?.id || ""}
-        question={null}
-      />
+      <QuestionSheet open={creating} onOpenChange={setCreating} subjectId={subjectId} teacherId={me.id} question={null} />
       <QuestionSheet
         open={!!editing}
         onOpenChange={(v) => !v && setEditing(null)}
         subjectId={subjectId}
         teacherId={me.id}
-        sets={sets}
-        defaultSetId=""
         question={editing}
       />
     </div>
-  );
-}
-
-function CreateSetSheet({
-  open,
-  onOpenChange,
-  subjectId,
-  teacherId,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  subjectId: string;
-  teacherId: string;
-}) {
-  const [name, setName] = useState("");
-  const create = useCreateExamSet();
-  const toast = useToast();
-
-  function save() {
-    if (!name.trim()) return;
-    create.mutate(
-      { subject_id: subjectId, name: name.trim(), created_by: teacherId },
-      {
-        onSuccess: () => {
-          onOpenChange(false);
-          setName("");
-        },
-        onError: () => toast("สร้างไม่สำเร็จ", "error"),
-      },
-    );
-  }
-
-  return (
-    <Sheet
-      open={open}
-      onOpenChange={onOpenChange}
-      title="เพิ่มชุดข้อสอบ"
-      footer={
-        <Button className="w-full" onClick={save} disabled={!name.trim() || create.isPending}>
-          บันทึก
-        </Button>
-      }
-    >
-      <Field label="ชื่อชุดข้อสอบ">
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น บทที่ 1, กลางภาค 2569" />
-      </Field>
-    </Sheet>
   );
 }
 
@@ -311,16 +171,12 @@ function QuestionSheet({
   onOpenChange,
   subjectId,
   teacherId,
-  sets,
-  defaultSetId,
   question,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   subjectId: string;
   teacherId: string;
-  sets: { id: string; name: string }[];
-  defaultSetId: string;
   question: ExamQuestionWithChoices | null;
 }) {
   const isEdit = !!question;
@@ -338,7 +194,6 @@ function QuestionSheet({
       { label: "", is_correct: false },
     ],
   );
-  const [setIds, setSetIds] = useState<string[]>(question?.set_ids ?? (defaultSetId ? [defaultSetId] : []));
 
   function reset() {
     setType("multiple_choice");
@@ -349,7 +204,6 @@ function QuestionSheet({
       { label: "", is_correct: true },
       { label: "", is_correct: false },
     ]);
-    setSetIds(defaultSetId ? [defaultSetId] : []);
   }
 
   const pointsNum = Number(points);
@@ -371,7 +225,6 @@ function QuestionSheet({
           points: pointsNum,
           correct_answer: type === "short_answer" ? correctAnswer.trim() : null,
           choices: type === "short_answer" ? undefined : finalChoices,
-          set_ids: setIds,
         },
         {
           onSuccess: () => onOpenChange(false),
@@ -388,7 +241,6 @@ function QuestionSheet({
           correct_answer: type === "short_answer" ? correctAnswer.trim() : null,
           created_by: teacherId,
           choices: finalChoices,
-          set_ids: setIds,
         },
         {
           onSuccess: () => {
@@ -442,25 +294,6 @@ function QuestionSheet({
           </Field>
         ) : (
           <ChoiceEditor type={type} choices={choices} onChange={setChoices} />
-        )}
-
-        {sets.length > 0 && (
-          <Field label="ชุดข้อสอบ (เลือกได้หลายชุด)">
-            <div className="space-y-1.5 rounded-lg border border-border p-2">
-              {sets.map((s) => (
-                <label key={s.id} className="flex items-center gap-2 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={setIds.includes(s.id)}
-                    onChange={(e) =>
-                      setSetIds(e.target.checked ? [...setIds, s.id] : setIds.filter((id) => id !== s.id))
-                    }
-                  />
-                  {s.name}
-                </label>
-              ))}
-            </div>
-          </Field>
         )}
       </div>
     </Sheet>

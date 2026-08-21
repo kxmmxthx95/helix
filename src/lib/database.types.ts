@@ -576,21 +576,6 @@ export type ExamAttemptEvent = {
   at: string;
 };
 
-/** ชุดข้อสอบ — a tag/folder within one subject's bank. A question can carry several via ExamQuestionSet. See migration 0048. */
-export type ExamSet = {
-  id: string;
-  subject_id: string;
-  name: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-};
-
-export type ExamQuestionSet = {
-  question_id: string;
-  set_id: string;
-};
-
 /** Teacher-posted material for one assignment (score_item). See migration 0039. */
 export type AssignmentAttachment = {
   id: string;
@@ -1062,8 +1047,6 @@ export type Database = {
         InsertOf<ExamAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
       >;
       exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
-      exam_sets: Table<ExamSet, InsertOf<ExamSet, never>>;
-      exam_question_sets: Table<ExamQuestionSet, ExamQuestionSet>;
     };
     Views: Record<string, never>;
     Functions: {
