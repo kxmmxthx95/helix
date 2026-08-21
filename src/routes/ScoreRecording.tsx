@@ -163,7 +163,8 @@ export function ScoreRecording() {
             <table className="w-full min-w-[32rem] text-xs">
               <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">วิชา</th>
+                  <th className="px-3 py-2 font-medium">รหัสวิชา</th>
+                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
                   <th className="px-3 py-2 font-medium">ห้อง</th>
                   {manager && <th className="px-3 py-2 font-medium">ครูผู้สอน</th>}
                 </tr>
@@ -179,10 +180,8 @@ export function ScoreRecording() {
                       onClick={() => setSelectedId(a.id)}
                       className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
                     >
-                      <td className="px-3 py-2">
-                        <span className="block font-medium">{subject?.code ?? "—"}</span>
-                        <span className="block text-muted-foreground">{subject?.name_th ?? "—"}</span>
-                      </td>
+                      <td className="px-3 py-2 font-medium">{subject?.code ?? "—"}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{subject?.name_th ?? "—"}</td>
                       <td className="px-3 py-2">{c ? `${g ? gradeShortLabel(g.code) : "—"}/${c.name}` : "—"}</td>
                       {manager && <td className="px-3 py-2">{a.teacher_id === me.id ? "ตัวเอง" : "—"}</td>}
                     </tr>
