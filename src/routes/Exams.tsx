@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
+import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { ChevronBack, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -729,9 +730,9 @@ function AttemptRunner({
         const answer = answers?.get(q.id);
         return (
           <Card key={q.id} className="space-y-2 text-sm">
-            <p className="font-medium">
-              {i + 1}. {q.prompt}
-            </p>
+            <div className="font-medium">
+              {i + 1}. <QuestionPromptView value={q.prompt_json} />
+            </div>
             {q.question_type === "short_answer" ? (
               <Input
                 value={answer?.short_answer ?? ""}
@@ -805,9 +806,9 @@ function AttemptResult({
           const choices = reviewData.choicesByQuestion.get(q.id) ?? [];
           return (
             <Card key={q.id} className={cn("space-y-1 text-sm", answer?.is_correct ? "border-success/40" : "border-destructive/40")}>
-              <p className="font-medium">
-                {i + 1}. {q.prompt}
-              </p>
+              <div className="font-medium">
+                {i + 1}. <QuestionPromptView value={q.prompt_json} />
+              </div>
               {q.question_type === "short_answer" ? (
                 <p className="text-xs">คำตอบของคุณ: {answer?.short_answer || "—"}</p>
               ) : (

@@ -1,3 +1,4 @@
+import type { Value as PlateValue } from "platejs";
 import type { Role } from "@/lib/roles";
 
 export type StudentStatus = "studying" | "transferred" | "graduated" | "dropped";
@@ -477,7 +478,10 @@ export type ExamQuestion = {
   id: string;
   subject_id: string;
   question_type: ExamQuestionType;
+  /** App-derived plaintext copy of prompt_json — index/preview use only (exam-bank table row, session-builder picker). */
   prompt: string;
+  /** Plate.js rich-content doc — the actual authored/rendered question body. */
+  prompt_json: PlateValue;
   /** short_answer grading key only; multiple_choice/true_false use ExamQuestionChoice.is_correct instead. */
   correct_answer: string | null;
   points: number;

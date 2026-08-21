@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Value as PlateValue } from "platejs";
 import type {
   Classroom,
   ExamQuestion,
@@ -85,6 +86,7 @@ export function useCreateExamQuestion() {
       subject_id: string;
       question_type: ExamQuestionType;
       prompt: string;
+      prompt_json: PlateValue;
       points: number;
       correct_answer: string | null;
       created_by: string;
@@ -116,6 +118,7 @@ export function useUpdateExamQuestion() {
     }: {
       id: string;
       prompt?: string;
+      prompt_json?: PlateValue;
       points?: number;
       correct_answer?: string | null;
       choices?: ChoiceDraft[];
@@ -135,6 +138,22 @@ export function useUpdateExamQuestion() {
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["exam_questions"] }),
   });
+}
+
+// Public bucket — question images render live during a timed exam, a
+// per-image signed-URL round trip is bad UX there, and the question itself
+// is already RLS-gated via can_read_exam_question. See migration 0050.
+const EXAM_IMAGES_BUCKET = "exam-question-images";
+
+/** Plate's image upload hook hands us a base64 dataUrl, not a File — see @platejs/media's ImagePlugin uploadImage option. */
+export async function uploadExamQuestionImage(dataUrl: string, questionId: string): Promise<string> {
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  const ext = blob.type.split("/")[1] ?? "png";
+  const path = `${questionId}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from(EXAM_IMAGES_BUCKET).upload(path, blob);
+  if (error) throw error;
+  return supabase.storage.from(EXAM_IMAGES_BUCKET).getPublicUrl(path).data.publicUrl;
 }
 
 export function useDeleteExamQuestion() {

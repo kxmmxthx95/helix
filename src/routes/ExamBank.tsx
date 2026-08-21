@@ -1,7 +1,9 @@
+import { NodeApi, type Value } from "platejs";
 import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
+import { EMPTY_PROMPT } from "@/components/editor/plateConfig";
+import { QuestionEditor } from "@/components/editor/QuestionEditor";
 import { ChevronForward, Plus, X } from "@/components/icons";
-import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
 import {
@@ -18,6 +20,18 @@ import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import type { ExamQuestionType, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { cn } from "@/lib/utils";
+
+/** Plaintext fallback for the table-preview/session-picker read sites — [สูตร]/[รูปภาพ] placeholders for nodes NodeApi.string can't stringify (equation/image have no .text). */
+function promptToPlainText(value: Value): string {
+  return value
+    .map((node) =>
+      NodeApi.string(node) ||
+      (node.type === "equation" || node.type === "inline_equation" ? "[สูตร]" : node.type === "img" ? "[รูปภาพ]" : ""),
+    )
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+}
 
 const TYPE_LABEL: Record<ExamQuestionType, string> = {
   multiple_choice: "ปรนัย (เลือกตอบ)",
@@ -36,8 +50,8 @@ export function ExamBank() {
   const gradeLevelById = new Map(gradeLevels.map((g) => [g.id, g]));
 
   const [subjectId, setSubjectId] = useState("");
-  const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ExamQuestionWithChoices | null>(null);
+  const [formExpanded, setFormExpanded] = useState(false);
 
   const { data: questions = [], isLoading } = useExamQuestions(subjectId || null);
   const deleteQuestion = useDeleteExamQuestion();
@@ -53,9 +67,6 @@ export function ExamBank() {
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Button size="sm" variant="ghost" onClick={() => setSubjectId("")}>
             <ChevronForward className="h-3 w-3 rotate-180" /> {subjects.find((s) => s.id === subjectId)?.name_th ?? "เปลี่ยนวิชา"}
-          </Button>
-          <Button size="sm" className="ml-auto" onClick={() => setCreating(true)}>
-            <Plus className="h-3 w-3" /> เพิ่มข้อสอบ
           </Button>
         </div>
       )}
@@ -84,9 +95,9 @@ export function ExamBank() {
                       onClick={() => setSubjectId(s.id)}
                       className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
                     >
-                      <td className="px-3 py-2 text-muted-foreground">{s.code}</td>
-                      <td className="max-w-xs truncate px-3 py-2">{s.name_th}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-3 text-muted-foreground">{s.code}</td>
+                      <td className="max-w-xs truncate px-3 py-3">{s.name_th}</td>
+                      <td className="px-3 py-3">
                         {grade && (
                           <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent">
                             {gradeShortLabel(grade.code)}
@@ -100,84 +111,100 @@ export function ExamBank() {
             </table>
           </div>
         </div>
-      ) : isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
-        </div>
-      ) : questions.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ยังไม่มีข้อสอบ" description="กด “เพิ่มข้อสอบ” เพื่อเริ่มสร้างคลังข้อสอบของวิชานี้" />
-        </div>
       ) : (
-        <div className="table-panel flex-1">
-          <div className="table-panel-scroll">
-            <table className="w-full min-w-[32rem] text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">โจทย์</th>
-                  <th className="px-3 py-2 font-medium">ประเภท</th>
-                  <th className="px-3 py-2 font-medium">คะแนน</th>
-                  <th className="px-3 py-2 font-medium" />
-                </tr>
-              </thead>
-              <tbody>
-                {questions.map((q) => (
-                  <tr
-                    key={q.id}
-                    onClick={() => setEditing(q)}
-                    className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
-                  >
-                    <td className="max-w-xs truncate px-3 py-2">{q.prompt}</td>
-                    <td className="px-3 py-2">{TYPE_LABEL[q.question_type]}</td>
-                    <td className="px-3 py-2">{q.points}</td>
-                    <td className="px-3 py-2 text-right">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label="ลบ"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!confirm("ลบข้อสอบนี้?")) return;
-                          deleteQuestion.mutate(q.id, {
-                            onError: () => toast("ลบไม่สำเร็จ", "error"),
-                          });
-                        }}
+        <div className="flex flex-1 gap-3 overflow-hidden">
+          <div className={cn("shrink-0 overflow-y-auto rounded-lg border border-border p-3", formExpanded ? "w-[36rem]" : "w-80")}>
+            <QuestionForm
+              key={editing?.id ?? "new"}
+              subjectId={subjectId}
+              teacherId={me.id}
+              question={editing}
+              expanded={formExpanded}
+              onToggleExpanded={() => setFormExpanded((v) => !v)}
+              onSaved={() => setEditing(null)}
+              onCancelEdit={() => setEditing(null)}
+            />
+          </div>
+
+          <div className="table-panel flex-1">
+            <div className="table-panel-scroll">
+              {isLoading ? (
+                <div className="flex h-full items-center justify-center">
+                  <Spinner className="h-5 w-5 text-muted-foreground" />
+                </div>
+              ) : questions.length === 0 ? (
+                <div className="flex h-full items-center justify-center">
+                  <EmptyState title="ยังไม่มีข้อสอบ" description="พิมพ์โจทย์ทางซ้ายแล้วกดบันทึกเพื่อเริ่มสร้างคลังข้อสอบ" />
+                </div>
+              ) : (
+                <table className="w-full min-w-[24rem] text-xs">
+                  <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">โจทย์</th>
+                      <th className="px-3 py-2 font-medium">ประเภท</th>
+                      <th className="px-3 py-2 font-medium">คะแนน</th>
+                      <th className="px-3 py-2 font-medium" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {questions.map((q) => (
+                      <tr
+                        key={q.id}
+                        onClick={() => setEditing(q)}
+                        className={cn(
+                          "cursor-pointer border-t border-border hover:bg-muted active:bg-muted",
+                          editing?.id === q.id && "bg-muted font-medium",
+                        )}
                       >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        <td className="max-w-xs truncate px-3 py-3">{q.prompt}</td>
+                        <td className="px-3 py-3">{TYPE_LABEL[q.question_type]}</td>
+                        <td className="px-3 py-3">{q.points}</td>
+                        <td className="px-3 py-3 text-right">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label="ลบ"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!confirm("ลบข้อสอบนี้?")) return;
+                              deleteQuestion.mutate(q.id, {
+                                onSuccess: () => editing?.id === q.id && setEditing(null),
+                                onError: () => toast("ลบไม่สำเร็จ", "error"),
+                              });
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </div>
       )}
-
-      <QuestionSheet open={creating} onOpenChange={setCreating} subjectId={subjectId} teacherId={me.id} question={null} />
-      <QuestionSheet
-        open={!!editing}
-        onOpenChange={(v) => !v && setEditing(null)}
-        subjectId={subjectId}
-        teacherId={me.id}
-        question={editing}
-      />
     </div>
   );
 }
 
-function QuestionSheet({
-  open,
-  onOpenChange,
+function QuestionForm({
   subjectId,
   teacherId,
   question,
+  expanded,
+  onToggleExpanded,
+  onSaved,
+  onCancelEdit,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   subjectId: string;
   teacherId: string;
   question: ExamQuestionWithChoices | null;
+  expanded: boolean;
+  onToggleExpanded: () => void;
+  onSaved: () => void;
+  onCancelEdit: () => void;
 }) {
   const isEdit = !!question;
   const create = useCreateExamQuestion();
@@ -185,8 +212,7 @@ function QuestionSheet({
   const toast = useToast();
 
   const [type, setType] = useState<ExamQuestionType>(question?.question_type ?? "multiple_choice");
-  const [prompt, setPrompt] = useState(question?.prompt ?? "");
-  const [points, setPoints] = useState(String(question?.points ?? 1));
+  const [prompt, setPrompt] = useState<Value>(question?.prompt_json ?? EMPTY_PROMPT);
   const [correctAnswer, setCorrectAnswer] = useState(question?.correct_answer ?? "");
   const [choices, setChoices] = useState<ChoiceDraft[]>(
     question?.choices.map((c) => ({ label: c.label, is_correct: c.is_correct })) ?? [
@@ -197,8 +223,7 @@ function QuestionSheet({
 
   function reset() {
     setType("multiple_choice");
-    setPrompt("");
-    setPoints("1");
+    setPrompt(EMPTY_PROMPT);
     setCorrectAnswer("");
     setChoices([
       { label: "", is_correct: true },
@@ -206,10 +231,9 @@ function QuestionSheet({
     ]);
   }
 
-  const pointsNum = Number(points);
+  const promptText = promptToPlainText(prompt);
   const canSave =
-    prompt.trim() &&
-    pointsNum > 0 &&
+    promptText &&
     (type === "short_answer"
       ? correctAnswer.trim()
       : choices.filter((c) => c.label.trim()).length >= 2 && choices.some((c) => c.is_correct));
@@ -221,13 +245,13 @@ function QuestionSheet({
       update.mutate(
         {
           id: question.id,
-          prompt: prompt.trim(),
-          points: pointsNum,
+          prompt: promptText,
+          prompt_json: prompt,
           correct_answer: type === "short_answer" ? correctAnswer.trim() : null,
           choices: type === "short_answer" ? undefined : finalChoices,
         },
         {
-          onSuccess: () => onOpenChange(false),
+          onSuccess: onSaved,
           onError: () => toast("บันทึกไม่สำเร็จ", "error"),
         },
       );
@@ -236,16 +260,17 @@ function QuestionSheet({
         {
           subject_id: subjectId,
           question_type: type,
-          prompt: prompt.trim(),
-          points: pointsNum,
+          prompt: promptText,
+          prompt_json: prompt,
+          points: 1,
           correct_answer: type === "short_answer" ? correctAnswer.trim() : null,
           created_by: teacherId,
           choices: finalChoices,
         },
         {
           onSuccess: () => {
-            onOpenChange(false);
             reset();
+            onSaved();
           },
           onError: () => toast("สร้างไม่สำเร็จ", "error"),
         },
@@ -254,49 +279,52 @@ function QuestionSheet({
   }
 
   return (
-    <Sheet
-      open={open}
-      onOpenChange={onOpenChange}
-      title={isEdit ? "แก้ไขข้อสอบ" : "เพิ่มข้อสอบ"}
-      footer={
-        <Button className="w-full" onClick={save} disabled={!canSave || create.isPending || update.isPending}>
-          บันทึก
-        </Button>
-      }
-    >
-      <div className="space-y-3">
-        {!isEdit && (
-          <Field label="ประเภทคำถาม">
-            <Select value={type} onChange={(e) => setType(e.target.value as ExamQuestionType)}>
-              {Object.entries(TYPE_LABEL).map(([v, label]) => (
-                <option key={v} value={v}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        )}
-        <Field label="โจทย์">
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            rows={3}
-            className="flex w-full rounded-lg border border-input bg-background px-2.5 py-2 text-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring"
-          />
-        </Field>
-        <Field label="คะแนน">
-          <Input type="number" min="0.01" step="0.01" value={points} onChange={(e) => setPoints(e.target.value)} className="w-24" />
-        </Field>
-
-        {type === "short_answer" ? (
-          <Field label="เฉลย (ไม่สนตัวพิมพ์เล็ก/ใหญ่)">
-            <Input value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)} />
-          </Field>
-        ) : (
-          <ChoiceEditor type={type} choices={choices} onChange={setChoices} />
-        )}
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-medium">{isEdit ? "แก้ไขข้อสอบ" : "เพิ่มข้อสอบ"}</h2>
+        <div className="flex items-center gap-1">
+          {isEdit && (
+            <Button size="sm" variant="ghost" onClick={onCancelEdit}>
+              <Plus className="h-3 w-3 rotate-45" /> ข้อใหม่
+            </Button>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={expanded ? "ย่อ panel" : "ขยาย panel"}
+            onClick={onToggleExpanded}
+          >
+            <ChevronForward className={cn("h-3 w-3 transition-transform", expanded ? "rotate-180" : "")} />
+          </Button>
+        </div>
       </div>
-    </Sheet>
+
+      {!isEdit && (
+        <Field label="ประเภทคำถาม">
+          <Select value={type} onChange={(e) => setType(e.target.value as ExamQuestionType)}>
+            {Object.entries(TYPE_LABEL).map(([v, label]) => (
+              <option key={v} value={v}>
+                {label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
+      <Field label="โจทย์">
+        <QuestionEditor value={prompt} onChange={setPrompt} questionId={question?.id ?? null} />
+      </Field>
+      {type === "short_answer" ? (
+        <Field label="เฉลย (ไม่สนตัวพิมพ์เล็ก/ใหญ่)">
+          <Input value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)} />
+        </Field>
+      ) : (
+        <ChoiceEditor type={type} choices={choices} onChange={setChoices} />
+      )}
+
+      <Button className="w-full" onClick={save} disabled={!canSave || create.isPending || update.isPending}>
+        บันทึก
+      </Button>
+    </div>
   );
 }
 

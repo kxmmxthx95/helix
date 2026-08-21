@@ -39,6 +39,10 @@ import School from "react-ionicons/lib/School";
 import IonSettings from "react-ionicons/lib/Settings";
 import Sunny from "react-ionicons/lib/Sunny";
 import AirplaneOutline from "react-ionicons/lib/AirplaneOutline";
+import CalculatorOutline from "react-ionicons/lib/CalculatorOutline";
+import ColorWandOutline from "react-ionicons/lib/ColorWandOutline";
+import ImageOutline from "react-ionicons/lib/ImageOutline";
+import ListOutline from "react-ionicons/lib/ListOutline";
 import IonTime from "react-ionicons/lib/Time";
 import Warning from "react-ionicons/lib/Warning";
 import WatchOutline from "react-ionicons/lib/WatchOutline";
@@ -113,3 +117,26 @@ export const TimetableIcon = wrap(GridOutline);
 export const RibbonIcon = wrap(RibbonOutline);
 export const DocumentTextIcon = wrap(DocumentTextOutline);
 export const X = wrap(Close);
+export const ListIcon = wrap(ListOutline);
+export const ImageIcon = wrap(ImageOutline);
+export const FormulaIcon = wrap(CalculatorOutline);
+export const HighlightIcon = wrap(ColorWandOutline);
+
+/** No ionicons bold/underline glyph exists — plain monoline SVGs matching the wrap()'d icons' size contract instead. */
+export function BoldIcon({ className, size }: IconProps) {
+  const px = size ?? sizeFromClass(className);
+  return (
+    <svg width={px} height={px} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M6 4h8a4 4 0 0 1 0 8H6zM6 12h9a4 4 0 0 1 0 8H6z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function UnderlineIcon({ className, size }: IconProps) {
+  const px = size ?? sizeFromClass(className);
+  return (
+    <svg width={px} height={px} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M6 4v7a6 6 0 0 0 12 0V4M4 20h16" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
