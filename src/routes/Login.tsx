@@ -84,7 +84,7 @@ export function Login() {
           className="w-full max-w-sm"
         >
           <div className="mb-8 text-center">
-            <h1 className="text-4xl font-bold tracking-tight text-white">Helix</h1>
+            <img src="/logo.webp" alt="Helix" className="mx-auto h-28 w-auto invert" />
             <p className="mt-2 text-sm text-white/65">Academic Enterprise Resource Planning</p>
           </div>
 

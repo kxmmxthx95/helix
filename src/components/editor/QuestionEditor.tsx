@@ -25,7 +25,7 @@ export function QuestionEditor({
     <Plate editor={editor} onChange={({ value: next }) => onChange(next)}>
       <Toolbar questionId={questionId} />
       <PlateContent
-        className="min-h-24 rounded-lg border border-input bg-background px-2.5 py-2 text-xs outline-none transition-colors focus-visible:border-ring"
+        className="min-h-48 rounded-lg border border-input bg-background px-2.5 py-2 text-xs outline-none transition-colors focus-visible:border-ring"
         placeholder="พิมพ์โจทย์…"
       />
     </Plate>

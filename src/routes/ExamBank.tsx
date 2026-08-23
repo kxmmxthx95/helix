@@ -4,7 +4,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { EMPTY_PROMPT } from "@/components/editor/plateConfig";
 import { QuestionEditor } from "@/components/editor/QuestionEditor";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
-import { ChevronForward, DocumentTextIcon, Plus, X } from "@/components/icons";
+import { ChevronForward, DocumentTextIcon, PencilIcon, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
@@ -53,8 +53,7 @@ export function ExamBank() {
 
   const [subjectId, setSubjectId] = useState("");
   const [editing, setEditing] = useState<ExamQuestionWithChoices | null>(null);
-  const [formExpanded, setFormExpanded] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
 
   const { data: questions = [], isLoading } = useExamQuestions(subjectId || null);
   const deleteQuestion = useDeleteExamQuestion();
@@ -71,16 +70,24 @@ export function ExamBank() {
           <Button size="sm" variant="ghost" onClick={() => setSubjectId("")}>
             <ChevronForward className="h-3 w-3 rotate-180" /> {subjects.find((s) => s.id === subjectId)?.name_th ?? "เปลี่ยนวิชา"}
           </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="ml-auto"
-            aria-label="ดูข้อสอบทั้งหมด"
-            disabled={questions.length === 0}
-            onClick={() => setPreviewOpen(true)}
-          >
-            <DocumentTextIcon className="h-3.5 w-3.5" />
-          </Button>
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              size="icon"
+              variant={previewing ? "accent" : "ghost"}
+              aria-label={previewing ? "กลับไปพิมพ์ข้อสอบ" : "ดูข้อสอบทั้งหมด"}
+              aria-pressed={previewing}
+              disabled={questions.length === 0}
+              onClick={() => setPreviewing((v) => !v)}
+            >
+              <DocumentTextIcon className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {subjectId && !previewing && (
+        <div className="shrink-0 rounded-lg border border-border bg-card p-3">
+          <QuestionForm key="new" subjectId={subjectId} teacherId={me.id} question={null} onSaved={() => {}} />
         </div>
       )}
 
@@ -88,7 +95,7 @@ export function ExamBank() {
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="ไม่มีวิชา" description="ยังไม่มีวิชาที่คุณสอน" />
         </div>
-      ) : !subjectId ? (
+      ) : subjectId && !previewing ? null : !subjectId ? (
         <div className="table-panel flex-1">
           <div className="table-panel-scroll">
             <table className="w-full min-w-[24rem] text-xs">
@@ -124,124 +131,77 @@ export function ExamBank() {
             </table>
           </div>
         </div>
-      ) : (
-        <div className="flex flex-1 gap-3 overflow-hidden">
-          <div className={cn("shrink-0 overflow-y-auto rounded-lg border border-border p-3", formExpanded ? "w-[36rem]" : "w-80")}>
-            <QuestionForm
-              key={editing?.id ?? "new"}
-              subjectId={subjectId}
-              teacherId={me.id}
-              question={editing}
-              expanded={formExpanded}
-              onToggleExpanded={() => setFormExpanded((v) => !v)}
-              onSaved={() => setEditing(null)}
-              onCancelEdit={() => setEditing(null)}
-            />
-          </div>
-
-          <div className="table-panel flex-1">
-            <div className="table-panel-scroll">
-              {isLoading ? (
-                <div className="flex h-full items-center justify-center">
-                  <Spinner className="h-5 w-5 text-muted-foreground" />
+      ) : isLoading ? (
+        <div className="flex flex-1 items-center justify-center">
+          <Spinner className="h-5 w-5 text-muted-foreground" />
+        </div>
+      ) : questions.length === 0 ? null : !previewing ? null : (
+        <div className="table-panel flex-1">
+          <div className="table-panel-scroll space-y-4 p-3">
+            {questions.map((q, i) => (
+              <div key={q.id} className="space-y-2 border-b border-border pb-4 last:border-0">
+                <div className="flex items-start justify-between gap-1.5">
+                  <div className="flex gap-1.5 text-sm font-medium">
+                    <span>{i + 1}.</span>
+                    <QuestionPromptView value={q.prompt_json} />
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button size="icon" variant="ghost" aria-label="แก้ไข" onClick={() => setEditing(q)}>
+                      <PencilIcon className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="ลบ"
+                      onClick={() => {
+                        if (!confirm("ลบข้อสอบนี้?")) return;
+                        deleteQuestion.mutate(q.id, {
+                          onError: () => toast("ลบไม่สำเร็จ", "error"),
+                        });
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
-              ) : questions.length === 0 ? (
-                <div className="flex h-full items-center justify-center">
-                  <EmptyState title="ยังไม่มีข้อสอบ" description="พิมพ์โจทย์ทางซ้ายแล้วกดบันทึกเพื่อเริ่มสร้างคลังข้อสอบ" />
-                </div>
-              ) : (
-                <table className="w-full min-w-[24rem] text-xs">
-                  <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-2 font-medium">โจทย์</th>
-                      <th className="px-3 py-2 font-medium">ประเภท</th>
-                      <th className="px-3 py-2 font-medium">คะแนน</th>
-                      <th className="px-3 py-2 font-medium" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {questions.map((q) => (
-                      <tr
-                        key={q.id}
-                        onClick={() => setEditing(q)}
-                        className={cn(
-                          "cursor-pointer border-t border-border hover:bg-muted active:bg-muted",
-                          editing?.id === q.id && "bg-muted font-medium",
-                        )}
-                      >
-                        <td className="max-w-xs truncate px-3 py-3">{q.prompt}</td>
-                        <td className="px-3 py-3">{TYPE_LABEL[q.question_type]}</td>
-                        <td className="px-3 py-3">{q.points}</td>
-                        <td className="px-3 py-3 text-right">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            aria-label="ลบ"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!confirm("ลบข้อสอบนี้?")) return;
-                              deleteQuestion.mutate(q.id, {
-                                onSuccess: () => editing?.id === q.id && setEditing(null),
-                                onError: () => toast("ลบไม่สำเร็จ", "error"),
-                              });
-                            }}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </td>
-                      </tr>
+                {q.question_type === "short_answer" ? (
+                  <p className="pl-4 text-xs text-muted-foreground">เฉลย: {q.correct_answer}</p>
+                ) : (
+                  <ul className="space-y-1 pl-4 text-xs">
+                    {q.choices.map((c) => (
+                      <li key={c.id} className={cn("flex items-center gap-1.5", c.is_correct && "font-medium text-success")}>
+                        {c.is_correct ? "✓" : "○"} {c.label}
+                      </li>
                     ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                  </ul>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      <Sheet open={previewOpen} onOpenChange={setPreviewOpen} title="ข้อสอบทั้งหมด" wide>
-        <div className="space-y-4">
-          {questions.map((q, i) => (
-            <div key={q.id} className="space-y-2 border-b border-border pb-4 last:border-0">
-              <div className="flex gap-1.5 text-sm font-medium">
-                <span>{i + 1}.</span>
-                <QuestionPromptView value={q.prompt_json} />
-              </div>
-              {q.question_type === "short_answer" ? (
-                <p className="pl-4 text-xs text-muted-foreground">เฉลย: {q.correct_answer}</p>
-              ) : (
-                <ul className="space-y-1 pl-4 text-xs">
-                  {q.choices.map((c) => (
-                    <li key={c.id} className={cn("flex items-center gap-1.5", c.is_correct && "font-medium text-success")}>
-                      {c.is_correct ? "✓" : "○"} {c.label}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
-      </Sheet>
+      <QuestionSheet
+        open={!!editing}
+        onOpenChange={(v) => !v && setEditing(null)}
+        subjectId={subjectId}
+        teacherId={me.id}
+        question={editing}
+      />
     </div>
   );
 }
 
-function QuestionForm({
+function useQuestionForm({
   subjectId,
   teacherId,
   question,
-  expanded,
-  onToggleExpanded,
   onSaved,
-  onCancelEdit,
 }: {
   subjectId: string;
   teacherId: string;
   question: ExamQuestionWithChoices | null;
-  expanded: boolean;
-  onToggleExpanded: () => void;
   onSaved: () => void;
-  onCancelEdit: () => void;
 }) {
   const isEdit = !!question;
   const create = useCreateExamQuestion();
@@ -315,30 +275,15 @@ function QuestionForm({
     }
   }
 
+  return { isEdit, type, setType, prompt, setPrompt, correctAnswer, setCorrectAnswer, choices, setChoices, canSave, save, pending: create.isPending || update.isPending };
+}
+
+function QuestionFormFields(form: ReturnType<typeof useQuestionForm>, questionId: string | null) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium">{isEdit ? "แก้ไขข้อสอบ" : "เพิ่มข้อสอบ"}</h2>
-        <div className="flex items-center gap-1">
-          {isEdit && (
-            <Button size="sm" variant="ghost" onClick={onCancelEdit}>
-              <Plus className="h-3 w-3 rotate-45" /> ข้อใหม่
-            </Button>
-          )}
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label={expanded ? "ย่อ panel" : "ขยาย panel"}
-            onClick={onToggleExpanded}
-          >
-            <ChevronForward className={cn("h-3 w-3 transition-transform", expanded ? "rotate-180" : "")} />
-          </Button>
-        </div>
-      </div>
-
-      {!isEdit && (
+      {!form.isEdit && (
         <Field label="ประเภทคำถาม">
-          <Select value={type} onChange={(e) => setType(e.target.value as ExamQuestionType)}>
+          <Select value={form.type} onChange={(e) => form.setType(e.target.value as ExamQuestionType)}>
             {Object.entries(TYPE_LABEL).map(([v, label]) => (
               <option key={v} value={v}>
                 {label}
@@ -349,20 +294,71 @@ function QuestionForm({
       )}
       <div className="space-y-1">
         <span className="font-ui text-xs font-medium">โจทย์</span>
-        <QuestionEditor value={prompt} onChange={setPrompt} questionId={question?.id ?? null} />
+        <QuestionEditor value={form.prompt} onChange={form.setPrompt} questionId={questionId} />
       </div>
-      {type === "short_answer" ? (
+      {form.type === "short_answer" ? (
         <Field label="เฉลย (ไม่สนตัวพิมพ์เล็ก/ใหญ่)">
-          <Input value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)} />
+          <Input value={form.correctAnswer} onChange={(e) => form.setCorrectAnswer(e.target.value)} />
         </Field>
       ) : (
-        <ChoiceEditor type={type} choices={choices} onChange={setChoices} />
+        <ChoiceEditor type={form.type} choices={form.choices} onChange={form.setChoices} />
       )}
+    </div>
+  );
+}
 
-      <Button className="w-full" onClick={save} disabled={!canSave || create.isPending || update.isPending}>
+/** Always-visible "new question" form above the table — no add button, matches ChoiceEditor's inline style. */
+function QuestionForm({
+  subjectId,
+  teacherId,
+  question,
+  onSaved,
+}: {
+  subjectId: string;
+  teacherId: string;
+  question: ExamQuestionWithChoices | null;
+  onSaved: () => void;
+}) {
+  const form = useQuestionForm({ subjectId, teacherId, question, onSaved });
+  return (
+    <div className="space-y-3">
+      {QuestionFormFields(form, question?.id ?? null)}
+      <Button className="w-full" onClick={form.save} disabled={!form.canSave || form.pending}>
         บันทึก
       </Button>
     </div>
+  );
+}
+
+function QuestionSheet({
+  open,
+  onOpenChange,
+  subjectId,
+  teacherId,
+  question,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  subjectId: string;
+  teacherId: string;
+  question: ExamQuestionWithChoices | null;
+}) {
+  const form = useQuestionForm({ subjectId, teacherId, question, onSaved: () => onOpenChange(false) });
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title={form.isEdit ? "แก้ไขข้อสอบ" : "เพิ่มข้อสอบ"}
+      wide
+      footer={
+        <Button className="w-full" onClick={form.save} disabled={!form.canSave || form.pending}>
+          บันทึก
+        </Button>
+      }
+    >
+      {QuestionFormFields(form, question?.id ?? null)}
+    </Sheet>
   );
 }
 

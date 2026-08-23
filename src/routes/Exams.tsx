@@ -64,8 +64,7 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 items-center justify-between">
-        <p className="font-heading text-sm font-semibold">สอบออนไลน์</p>
+      <div className="flex shrink-0 items-center justify-end">
         <Button size="sm" onClick={() => setCreating(true)} disabled={assignments.length === 0}>
           <Plus className="h-3 w-3" /> เปิดสอบใหม่
         </Button>
