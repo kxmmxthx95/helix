@@ -91,7 +91,7 @@ function TeacherPractice({ teacherId }: { teacherId: string }) {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาชื่อชุดหรือวิชา"
+            placeholder="ค้นหาแบบฝึกหัดหรือวิชา"
             className="pl-9"
             type="search"
           />
@@ -118,7 +118,7 @@ function TeacherPractice({ teacherId }: { teacherId: string }) {
             <table className="w-full min-w-[44rem] text-xs">
               <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">ชื่อชุด</th>
+                  <th className="px-3 py-2 font-medium">แบบฝึกหัด</th>
                   <th className="px-3 py-2 font-medium">รหัสวิชา</th>
                   <th className="px-3 py-2 font-medium">วิชา</th>
                   <th className="px-3 py-2 font-medium">ระดับชั้น</th>
@@ -235,7 +235,7 @@ function CreateSetSheet({
         <Field label="วิชา" required>
           <SubjectPicker subjects={subjects} gradeLevelById={gradeLevelById} value={subjectId} onChange={setSubjectId} />
         </Field>
-        <Field label="ชื่อชุดฝึกหัด" required>
+        <Field label="แบบฝึกหัด" required>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น ฝึกก่อนสอบบทที่ 3" />
         </Field>
 
