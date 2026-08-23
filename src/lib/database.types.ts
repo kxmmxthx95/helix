@@ -17,6 +17,13 @@ export type PositionTitle = {
   created_at: string;
 };
 
+export type CharacterOptions = {
+  skin: "light" | "amber" | "brown";
+  hair: "messy" | "parted_side_bangs" | "swoop_side";
+  outfitColor: "blue" | "red" | "green";
+  hat: "hairtie" | "thick" | null;
+};
+
 export type Profile = {
   id: string;
   department_id: string | null;
@@ -35,6 +42,8 @@ export type Profile = {
   must_change_password: boolean;
   /** Object path in the avatars storage bucket — always the profile's own id, see migration 0024. */
   avatar_path: string | null;
+  /** Character-builder picks, so the sheet can reopen pre-filled. See migration 0055. */
+  character_options: CharacterOptions | null;
   created_at: string;
   updated_at: string;
 };
@@ -909,6 +918,7 @@ export type Database = {
           | "learning_area_id"
           | "must_change_password"
           | "avatar_path"
+          | "character_options"
         > &
           Partial<
             Pick<
@@ -925,6 +935,7 @@ export type Database = {
               | "learning_area_id"
               | "must_change_password"
               | "avatar_path"
+              | "character_options"
             >
           >
       >;

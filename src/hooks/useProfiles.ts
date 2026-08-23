@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Department, PositionTitle, Profile } from "@/lib/database.types";
+import type { CharacterOptions, Department, PositionTitle, Profile } from "@/lib/database.types";
 import type { Role } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 
@@ -185,6 +185,16 @@ export function useUpdateMyProfile() {
   return useMutation({
     mutationFn: async ({ id, ...patch }: MyProfileEdit & { id: string }) => {
       const { error } = await supabase.from("profiles").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+  });
+}
+
+/** Same self-service RLS as useUpdateMyProfile, split out since character_options isn't part of the profile-edit form. */
+export function useUpdateCharacterOptions() {
+  return useMutation({
+    mutationFn: async ({ id, options }: { id: string; options: CharacterOptions }) => {
+      const { error } = await supabase.from("profiles").update({ character_options: options }).eq("id", id);
       if (error) throw error;
     },
   });

@@ -247,6 +247,7 @@ function AvatarUpload() {
         open={builderOpen}
         onOpenChange={setBuilderOpen}
         profileId={profile.id}
+        initialOptions={profile.character_options}
         onSaved={() => void refreshProfile()}
       />
     </div>

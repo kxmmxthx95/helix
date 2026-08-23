@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
+import { AvatarBuilder } from "@/components/AvatarBuilder";
+import { CharacterSprite } from "@/components/CharacterSprite";
 import { Sheet } from "@/components/Sheet";
-import { Button, Field, Input, Spinner } from "@/components/ui";
+import { Button, Card, Field, Input, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions } from "@/hooks/useAssignments";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
 import { STARTING_SCORE, summarizeBehaviorScore, useBehaviorRecords } from "@/hooks/useBehaviorRecords";
+import { DEFAULT_CHARACTER_OPTIONS } from "@/lib/characterSprite";
 import { useClockIn, useClockOut, useMyTimeClock } from "@/hooks/useTimeClock";
 import {
   useCancelStudentLeaveRequest,
@@ -14,7 +17,13 @@ import {
   useStudentLeaveRequests,
 } from "@/hooks/useStudentLeave";
 import { useSchoolSettings } from "@/hooks/useSettings";
-import { profileFullName, type AttendanceStatus, type StudentLeaveStatus, type Student } from "@/lib/database.types";
+import {
+  profileFullName,
+  type AttendanceStatus,
+  type ProfileWithRoles,
+  type StudentLeaveStatus,
+  type Student,
+} from "@/lib/database.types";
 import { roleLabels } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
@@ -65,7 +74,7 @@ export function Dashboard() {
   const showClockWidget =
     !!profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r));
 
-  if (isStudent) return null;
+  if (isStudent) return profile && <StudentCharacterCard profile={profile} />;
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
@@ -97,6 +106,36 @@ export function Dashboard() {
       {children.map((child) => (
         <BehaviorScoreSection key={child.id} student={child} />
       ))}
+    </div>
+  );
+}
+
+function StudentCharacterCard({ profile }: { profile: ProfileWithRoles }) {
+  const { refreshProfile } = useAuth();
+  const [builderOpen, setBuilderOpen] = useState(false);
+
+  return (
+    <div className="mx-auto max-w-xl">
+      <Card className="flex items-center gap-4">
+        <CharacterSprite options={profile.character_options ?? DEFAULT_CHARACTER_OPTIONS} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-heading text-lg font-semibold">{profileFullName(profile)}</p>
+          <button
+            type="button"
+            onClick={() => setBuilderOpen(true)}
+            className="tappable text-xs font-medium text-accent underline"
+          >
+            แก้ไขตัวละคร
+          </button>
+        </div>
+      </Card>
+      <AvatarBuilder
+        open={builderOpen}
+        onOpenChange={setBuilderOpen}
+        profileId={profile.id}
+        initialOptions={profile.character_options}
+        onSaved={() => void refreshProfile()}
+      />
     </div>
   );
 }
