@@ -4,26 +4,35 @@ import { insertImageFromFiles } from "@platejs/media";
 import type { Value } from "platejs";
 import { Plate, PlateContent, useEditorRef, usePlateEditor } from "platejs/react";
 import { useRef, useState } from "react";
-import { BoldIcon, FormulaIcon, HighlightIcon, ImageIcon, ListIcon, UnderlineIcon } from "@/components/icons";
+import { BoldIcon, FormulaIcon, HighlightIcon, ImageIcon, ItalicIcon, ListIcon, UnderlineIcon } from "@/components/icons";
+import { useToast } from "@/components/Toast";
 import { Button } from "@/components/ui";
 import { examQuestionPlugins } from "./plateConfig";
 import { FormulaDrawer } from "./FormulaDrawer";
 
-/** Controlled Plate.js editor for the โจทย์ field — bold/underline/highlight/bullet-list/KaTeX formula/image. Image upload needs a saved question id, see the toolbar's disabled state below. */
+/**
+ * Controlled Plate.js editor for the โจทย์ field —
+ * bold/italic/underline/highlight/bullet-list/KaTeX formula/image.
+ *
+ * ensureQuestionId resolves (creating a draft row on first call if needed)
+ * the question id an uploaded image's storage path attaches to — see
+ * examQuestionPlugins in plateConfig for why this can't just be a plain id.
+ */
 export function QuestionEditor({
   value,
   onChange,
-  questionId,
+  ensureQuestionId,
 }: {
   value: Value;
   onChange: (value: Value) => void;
-  questionId: string | null;
+  ensureQuestionId: () => Promise<string>;
 }) {
-  const editor = usePlateEditor({ plugins: examQuestionPlugins(questionId), value });
+  const toast = useToast();
+  const editor = usePlateEditor({ plugins: examQuestionPlugins(ensureQuestionId, (message) => toast(message, "error")), value });
 
   return (
     <Plate editor={editor} onChange={({ value: next }) => onChange(next)}>
-      <Toolbar questionId={questionId} />
+      <Toolbar />
       <PlateContent
         className="min-h-48 rounded-lg border border-input bg-background px-2.5 py-2 text-xs outline-none transition-colors focus-visible:border-ring"
         placeholder="พิมพ์โจทย์…"
@@ -33,7 +42,7 @@ export function QuestionEditor({
 }
 
 /** useListToolbarButtonState/useEditorRef need the Plate store from context — must render as a child of <Plate>, not alongside it. */
-function Toolbar({ questionId }: { questionId: string | null }) {
+function Toolbar() {
   const editor = useEditorRef();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formulaOpen, setFormulaOpen] = useState(false);
@@ -44,6 +53,9 @@ function Toolbar({ questionId }: { questionId: string | null }) {
     <div className="mb-1.5 flex flex-wrap items-center gap-0.5 p-1">
       <Button size="icon" variant="ghost" aria-label="ตัวหนา" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.tf.toggleMark("bold")}>
         <BoldIcon className="h-3 w-3" />
+      </Button>
+      <Button size="icon" variant="ghost" aria-label="ตัวเอียง" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.tf.toggleMark("italic")}>
+        <ItalicIcon className="h-3 w-3" />
       </Button>
       <Button size="icon" variant="ghost" aria-label="ขีดเส้นใต้" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.tf.toggleMark("underline")}>
         <UnderlineIcon className="h-3 w-3" />
@@ -79,8 +91,6 @@ function Toolbar({ questionId }: { questionId: string | null }) {
         size="icon"
         variant="ghost"
         aria-label="แทรกรูปภาพ"
-        disabled={!questionId}
-        title={questionId ? undefined : "บันทึกข้อสอบก่อนจึงจะแทรกรูปได้"}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => fileInputRef.current?.click()}
       >

@@ -139,3 +139,13 @@ export function UnderlineIcon({ className, size }: IconProps) {
     </svg>
   );
 }
+
+/** No ionicons italic glyph exists — plain monoline SVG matching the wrap()'d icons' size contract instead. */
+export function ItalicIcon({ className, size }: IconProps) {
+  const px = size ?? sizeFromClass(className);
+  return (
+    <svg width={px} height={px} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M10 4h8M6 20h8M14 4 10 20" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

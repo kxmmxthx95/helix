@@ -8,6 +8,10 @@ export function UnderlineLeaf(props: PlateLeafProps) {
   return <PlateLeaf {...props} as="u" />;
 }
 
+export function ItalicLeaf(props: PlateLeafProps) {
+  return <PlateLeaf {...props} as="em" />;
+}
+
 export function HighlightLeaf(props: PlateLeafProps) {
   return (
     <PlateLeaf {...props} as="mark" className="bg-accent/20">

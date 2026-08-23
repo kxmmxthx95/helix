@@ -1,5 +1,5 @@
 import { NodeApi, type Value } from "platejs";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { EMPTY_PROMPT } from "@/components/editor/plateConfig";
 import { QuestionEditor } from "@/components/editor/QuestionEditor";
@@ -239,6 +239,12 @@ function useQuestionForm({
   const update = useUpdateExamQuestion();
   const toast = useToast();
 
+  // Starts null for a brand-new question, then gets filled in either by an
+  // explicit save() or by ensureQuestionId() the moment the user tries to
+  // insert an image before saving — an image upload needs a real row to
+  // attach its storage path to (see plateConfig's uploadImage/RLS policy).
+  const [questionId, setQuestionId] = useState<string | null>(question?.id ?? null);
+
   const [type, setType] = useState<ExamQuestionType>(question?.question_type ?? "multiple_choice");
   const [prompt, setPrompt] = useState<Value>(question?.prompt_json ?? EMPTY_PROMPT);
   const [correctAnswer, setCorrectAnswer] = useState(question?.correct_answer ?? "");
@@ -277,10 +283,13 @@ function useQuestionForm({
   function save() {
     if (!canSave) return;
     const finalChoices = type === "short_answer" ? [] : choices.filter((c) => c.label.trim());
-    if (isEdit) {
+    // questionId is set for a real edit AND for a new question that already
+    // got a draft row from ensureQuestionId() (image inserted before save) —
+    // both cases update that existing row instead of inserting a second one.
+    if (questionId) {
       update.mutate(
         {
-          id: question.id,
+          id: questionId,
           prompt: promptText,
           prompt_json: prompt,
           correct_answer: type === "short_answer" ? correctAnswer.trim() : null,
@@ -289,7 +298,13 @@ function useQuestionForm({
           choices: type === "short_answer" ? undefined : finalChoices,
         },
         {
-          onSuccess: onSaved,
+          onSuccess: () => {
+            if (!isEdit) {
+              reset();
+              toast("เพิ่มข้อสอบแล้ว", "success");
+            }
+            onSaved();
+          },
           onError: () => toast("บันทึกไม่สำเร็จ", "error"),
         },
       );
@@ -311,6 +326,7 @@ function useQuestionForm({
           onSuccess: () => {
             reset();
             onSaved();
+            toast("เพิ่มข้อสอบแล้ว", "success");
           },
           onError: () => toast("สร้างไม่สำเร็จ", "error"),
         },
@@ -318,8 +334,44 @@ function useQuestionForm({
     }
   }
 
+  // Caches the in-flight draft-row insert so pasting/selecting multiple
+  // images at once (each calls ensureQuestionId independently, see
+  // plateConfig) shares one row instead of racing to create several.
+  const draftInsert = useRef<Promise<string> | null>(null);
+
+  /** Lazily creates a minimal draft row the first time an image needs to be inserted before the user has saved — a storage upload's RLS policy requires an existing exam_questions row to attach its path to. Reused as the update target if the user later fills in the rest and saves. */
+  function ensureQuestionId(): Promise<string> {
+    if (questionId) return Promise.resolve(questionId);
+    if (!draftInsert.current) {
+      draftInsert.current = create
+        .mutateAsync({
+          subject_id: subjectId,
+          question_type: type,
+          prompt: "",
+          prompt_json: EMPTY_PROMPT,
+          points: 1,
+          correct_answer: type === "short_answer" ? "" : null,
+          difficulty,
+          topic: null,
+          created_by: teacherId,
+          choices: [],
+        })
+        .then((inserted) => {
+          setQuestionId(inserted.id);
+          return inserted.id;
+        })
+        .catch((err) => {
+          draftInsert.current = null;
+          throw err;
+        });
+    }
+    return draftInsert.current;
+  }
+
   return {
     isEdit,
+    questionId,
+    ensureQuestionId,
     type,
     setType,
     prompt,
@@ -338,7 +390,7 @@ function useQuestionForm({
   };
 }
 
-function QuestionFormFields(form: ReturnType<typeof useQuestionForm>, questionId: string | null) {
+function QuestionFormFields(form: ReturnType<typeof useQuestionForm>) {
   return (
     <div className="space-y-3">
       {!form.isEdit && (
@@ -354,7 +406,7 @@ function QuestionFormFields(form: ReturnType<typeof useQuestionForm>, questionId
       )}
       <div className="space-y-1">
         <span className="font-ui text-xs font-medium">โจทย์</span>
-        <QuestionEditor value={form.prompt} onChange={form.setPrompt} questionId={questionId} />
+        <QuestionEditor value={form.prompt} onChange={form.setPrompt} ensureQuestionId={form.ensureQuestionId} />
       </div>
       <div className="flex gap-3">
         <div className="w-32 shrink-0">
@@ -400,7 +452,7 @@ function QuestionForm({
   const form = useQuestionForm({ subjectId, teacherId, question, onSaved });
   return (
     <div className="space-y-3">
-      {QuestionFormFields(form, question?.id ?? null)}
+      {QuestionFormFields(form)}
       <Button className="w-full" onClick={form.save} disabled={!form.canSave || form.pending}>
         บันทึก
       </Button>
@@ -435,7 +487,7 @@ function QuestionSheet({
         </Button>
       }
     >
-      {QuestionFormFields(form, question?.id ?? null)}
+      {QuestionFormFields(form)}
     </Sheet>
   );
 }
