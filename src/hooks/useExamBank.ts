@@ -4,6 +4,7 @@ import type {
   Classroom,
   ExamQuestion,
   ExamQuestionChoice,
+  ExamQuestionDifficulty,
   ExamQuestionType,
   GradeLevel,
   Subject,
@@ -89,6 +90,8 @@ export function useCreateExamQuestion() {
       prompt_json: PlateValue;
       points: number;
       correct_answer: string | null;
+      difficulty: ExamQuestionDifficulty;
+      topic: string | null;
       created_by: string;
       choices: ChoiceDraft[];
     }) => {
@@ -121,6 +124,8 @@ export function useUpdateExamQuestion() {
       prompt_json?: PlateValue;
       points?: number;
       correct_answer?: string | null;
+      difficulty?: ExamQuestionDifficulty;
+      topic?: string | null;
       choices?: ChoiceDraft[];
     }) => {
       if (Object.keys(patch).length > 0) {

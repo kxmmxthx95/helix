@@ -19,7 +19,7 @@ import {
   type ExamQuestionWithChoices,
 } from "@/hooks/useExamBank";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
-import type { ExamQuestionType, Subject } from "@/lib/database.types";
+import type { ExamQuestionDifficulty, ExamQuestionType, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +39,18 @@ const TYPE_LABEL: Record<ExamQuestionType, string> = {
   multiple_choice: "ปรนัย (เลือกตอบ)",
   true_false: "ถูก/ผิด",
   short_answer: "เติมคำ",
+};
+
+const DIFFICULTY_LABEL: Record<ExamQuestionDifficulty, string> = {
+  easy: "ง่าย",
+  medium: "ปานกลาง",
+  hard: "ยาก",
+};
+
+const DIFFICULTY_BADGE_CLASS: Record<ExamQuestionDifficulty, string> = {
+  easy: "bg-success/15 text-success",
+  medium: "bg-accent/15 text-accent",
+  hard: "bg-destructive/15 text-destructive",
 };
 
 /** role="teacher" only — ครูสร้าง/จัดการคลังข้อสอบของวิชาที่ตัวเองสอน. See migration 0047. */
@@ -141,9 +153,22 @@ export function ExamBank() {
             {questions.map((q, i) => (
               <div key={q.id} className="space-y-2 border-b border-border pb-4 last:border-0">
                 <div className="flex items-start justify-between gap-1.5">
-                  <div className="flex gap-1.5 text-sm font-medium">
+                  <div className="flex flex-1 items-start gap-1.5 text-sm font-medium">
                     <span>{i + 1}.</span>
                     <QuestionPromptView value={q.prompt_json} />
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-normal",
+                        DIFFICULTY_BADGE_CLASS[q.difficulty],
+                      )}
+                    >
+                      {DIFFICULTY_LABEL[q.difficulty]}
+                    </span>
+                    {q.topic && (
+                      <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+                        {q.topic}
+                      </span>
+                    )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <Button size="icon" variant="ghost" aria-label="แก้ไข" onClick={() => setEditing(q)}>
@@ -156,7 +181,13 @@ export function ExamBank() {
                       onClick={() => {
                         if (!confirm("ลบข้อสอบนี้?")) return;
                         deleteQuestion.mutate(q.id, {
-                          onError: () => toast("ลบไม่สำเร็จ", "error"),
+                          onError: (err) =>
+                            toast(
+                              (err as { code?: string }).code === "23503"
+                                ? "ลบไม่ได้ ข้อสอบนี้ถูกใช้ในห้องสอบแล้ว"
+                                : "ลบไม่สำเร็จ",
+                              "error",
+                            ),
                         });
                       }}
                     >
@@ -211,9 +242,13 @@ function useQuestionForm({
   const [type, setType] = useState<ExamQuestionType>(question?.question_type ?? "multiple_choice");
   const [prompt, setPrompt] = useState<Value>(question?.prompt_json ?? EMPTY_PROMPT);
   const [correctAnswer, setCorrectAnswer] = useState(question?.correct_answer ?? "");
+  const [difficulty, setDifficulty] = useState<ExamQuestionDifficulty>(question?.difficulty ?? "medium");
+  const [topic, setTopic] = useState(question?.topic ?? "");
   const [choices, setChoices] = useState<ChoiceDraft[]>(
     question?.choices.map((c) => ({ label: c.label, is_correct: c.is_correct })) ?? [
       { label: "", is_correct: true },
+      { label: "", is_correct: false },
+      { label: "", is_correct: false },
       { label: "", is_correct: false },
     ],
   );
@@ -222,8 +257,12 @@ function useQuestionForm({
     setType("multiple_choice");
     setPrompt(EMPTY_PROMPT);
     setCorrectAnswer("");
+    setDifficulty("medium");
+    setTopic("");
     setChoices([
       { label: "", is_correct: true },
+      { label: "", is_correct: false },
+      { label: "", is_correct: false },
       { label: "", is_correct: false },
     ]);
   }
@@ -245,6 +284,8 @@ function useQuestionForm({
           prompt: promptText,
           prompt_json: prompt,
           correct_answer: type === "short_answer" ? correctAnswer.trim() : null,
+          difficulty,
+          topic: topic.trim() || null,
           choices: type === "short_answer" ? undefined : finalChoices,
         },
         {
@@ -261,6 +302,8 @@ function useQuestionForm({
           prompt_json: prompt,
           points: 1,
           correct_answer: type === "short_answer" ? correctAnswer.trim() : null,
+          difficulty,
+          topic: topic.trim() || null,
           created_by: teacherId,
           choices: finalChoices,
         },
@@ -275,7 +318,24 @@ function useQuestionForm({
     }
   }
 
-  return { isEdit, type, setType, prompt, setPrompt, correctAnswer, setCorrectAnswer, choices, setChoices, canSave, save, pending: create.isPending || update.isPending };
+  return {
+    isEdit,
+    type,
+    setType,
+    prompt,
+    setPrompt,
+    correctAnswer,
+    setCorrectAnswer,
+    difficulty,
+    setDifficulty,
+    topic,
+    setTopic,
+    choices,
+    setChoices,
+    canSave,
+    save,
+    pending: create.isPending || update.isPending,
+  };
 }
 
 function QuestionFormFields(form: ReturnType<typeof useQuestionForm>, questionId: string | null) {
@@ -295,6 +355,24 @@ function QuestionFormFields(form: ReturnType<typeof useQuestionForm>, questionId
       <div className="space-y-1">
         <span className="font-ui text-xs font-medium">โจทย์</span>
         <QuestionEditor value={form.prompt} onChange={form.setPrompt} questionId={questionId} />
+      </div>
+      <div className="flex gap-3">
+        <div className="w-32 shrink-0">
+          <Field label="ความยาก">
+            <Select value={form.difficulty} onChange={(e) => form.setDifficulty(e.target.value as ExamQuestionDifficulty)}>
+              {Object.entries(DIFFICULTY_LABEL).map(([v, label]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+        <div className="min-w-0 flex-1">
+          <Field label="ชื่อเนื้อหา">
+            <Input value={form.topic} onChange={(e) => form.setTopic(e.target.value)} placeholder="เช่น สมการเชิงเส้น" />
+          </Field>
+        </div>
       </div>
       {form.type === "short_answer" ? (
         <Field label="เฉลย (ไม่สนตัวพิมพ์เล็ก/ใหญ่)">

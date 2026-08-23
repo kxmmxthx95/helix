@@ -473,6 +473,8 @@ export type ScoreItem = {
 
 export type ExamQuestionType = "multiple_choice" | "true_false" | "short_answer";
 
+export type ExamQuestionDifficulty = "easy" | "medium" | "hard";
+
 /** A bank question, owned by subject_id — any teacher teaching that subject can read/write it. See migration 0047. */
 export type ExamQuestion = {
   id: string;
@@ -484,6 +486,10 @@ export type ExamQuestion = {
   prompt_json: PlateValue;
   /** short_answer grading key only; multiple_choice/true_false use ExamQuestionChoice.is_correct instead. */
   correct_answer: string | null;
+  /** Bank-only tag for the teacher's own browsing/filtering — not exposed to students. See migration 0051. */
+  difficulty: ExamQuestionDifficulty;
+  /** Free-text bank tag (e.g. หน่วยการเรียนรู้) — same scope as difficulty. See migration 0052. */
+  topic: string | null;
   points: number;
   created_by: string;
   created_at: string;
@@ -1025,7 +1031,7 @@ export type Database = {
         changes: unknown;
         created_at: string;
       }>;
-      exam_questions: Table<ExamQuestion, InsertOf<ExamQuestion, "correct_answer" | "points">>;
+      exam_questions: Table<ExamQuestion, InsertOf<ExamQuestion, "correct_answer" | "points" | "difficulty" | "topic">>;
       exam_question_choices: Table<ExamQuestionChoice, InsertOf<ExamQuestionChoice, "is_correct" | "position">>;
       exam_sessions: Table<
         ExamSession,
@@ -1073,6 +1079,7 @@ export type Database = {
       behavior_severity: BehaviorSeverity;
       score_item_kind: ScoreItemKind;
       exam_question_type: ExamQuestionType;
+      exam_question_difficulty: ExamQuestionDifficulty;
       exam_attempt_status: ExamAttemptStatus;
       exam_attempt_event_type: ExamAttemptEventType;
     };

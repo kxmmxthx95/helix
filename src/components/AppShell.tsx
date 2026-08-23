@@ -10,7 +10,6 @@ import {
   ClipboardIcon,
   ChevronForward,
   CloudOff,
-  CheckboxIcon,
   CheckboxOutlineIcon,
   DocumentTextIcon,
   GraduationCap,
@@ -208,7 +207,7 @@ const TABS = [
   {
     to: "/period-attendance",
     label: "บันทึกการเข้าเรียน",
-    icon: CheckboxIcon,
+    icon: CheckboxOutlineIcon,
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -446,7 +445,7 @@ function AppShellInner() {
             collapsed ? "justify-center px-1" : "justify-between gap-2 px-3",
           )}
         >
-          {!collapsed && <p className="font-heading truncate text-sm font-bold tracking-tight">Helix</p>}
+          {!collapsed && <img src="/logo.webp" alt="Helix" className="h-6 w-auto" />}
           <Button
             variant="ghost"
             size="icon"

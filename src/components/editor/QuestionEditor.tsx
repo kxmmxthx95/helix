@@ -41,7 +41,7 @@ function Toolbar({ questionId }: { questionId: string | null }) {
   const listButton = useListToolbarButton(listState);
 
   return (
-    <div className="mb-1.5 flex flex-wrap items-center gap-0.5 rounded-lg border border-border p-1">
+    <div className="mb-1.5 flex flex-wrap items-center gap-0.5 p-1">
       <Button size="icon" variant="ghost" aria-label="ตัวหนา" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.tf.toggleMark("bold")}>
         <BoldIcon className="h-3 w-3" />
       </Button>
