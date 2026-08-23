@@ -6,6 +6,8 @@ export type StudentFilters = {
   search: string;
   departmentId: string;
   status: StudentStatus | "";
+  gradeLevelId?: string;
+  classroomId?: string;
 };
 
 /** Roster list row — linked login avatar when the student has an account. */
@@ -40,6 +42,30 @@ export type StudentDraft = Pick<
   | "food_allergy"
 >;
 
+/** Students whose most recent student_classroom_enrollments row (across all years) points at this room — "current room" is just the latest placement, whichever year it was made in. */
+async function studentIdsCurrentlyInClassroom(classroomId: string): Promise<string[]> {
+  const { data: everInRoom, error: eirError } = await supabase
+    .from("student_classroom_enrollments")
+    .select("student_id")
+    .eq("classroom_id", classroomId);
+  if (eirError) throw eirError;
+  const candidateIds = [...new Set(everInRoom.map((r) => r.student_id))];
+  if (candidateIds.length === 0) return [];
+
+  const { data: history, error: historyError } = await supabase
+    .from("student_classroom_enrollments")
+    .select("student_id, classroom_id, created_at")
+    .in("student_id", candidateIds)
+    .order("created_at", { ascending: false });
+  if (historyError) throw historyError;
+
+  const latestByStudent = new Map<string, string>();
+  for (const row of history) {
+    if (!latestByStudent.has(row.student_id)) latestByStudent.set(row.student_id, row.classroom_id);
+  }
+  return candidateIds.filter((id) => latestByStudent.get(id) === classroomId);
+}
+
 export function useStudents(filters: StudentFilters) {
   return useQuery({
     queryKey: ["students", filters],
@@ -51,11 +77,17 @@ export function useStudents(filters: StudentFilters) {
 
       if (filters.departmentId) q = q.eq("department_id", filters.departmentId);
       if (filters.status) q = q.eq("status", filters.status);
+      if (filters.gradeLevelId) q = q.eq("grade_level_id", filters.gradeLevelId);
       if (filters.search.trim()) {
         const term = `%${filters.search.trim()}%`;
         q = q.or(
           `first_name.ilike.${term},last_name.ilike.${term},student_code.ilike.${term}`,
         );
+      }
+      if (filters.classroomId) {
+        const studentIds = await studentIdsCurrentlyInClassroom(filters.classroomId);
+        if (studentIds.length === 0) return [];
+        q = q.in("id", studentIds);
       }
 
       const { data, error } = await q;

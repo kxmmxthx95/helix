@@ -8,6 +8,7 @@ import { Button, Avatar, Card, EmptyState, Field, Input, Pagination, Select, Spi
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
+import { useClassrooms } from "@/hooks/useStatusManagement";
 import { useDepartments, useInviteUsers, type InviteOutcome, type UserInvite } from "@/hooks/useProfiles";
 import { passwordFromNationalId } from "@/lib/password";
 import {
@@ -37,7 +38,7 @@ import type {
 import { canManage, canManageUsers, isOrgWide, STUDENT_PREFIXES } from "@/lib/roles";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 
-const EMPTY: StudentFilters = { search: "", departmentId: "", status: "studying" };
+const EMPTY: StudentFilters = { search: "", departmentId: "", status: "studying", gradeLevelId: "", classroomId: "" };
 
 const STATUS_LABEL: Record<StudentStatus, string> = {
   studying: "กำลังศึกษา",
@@ -234,7 +235,14 @@ export function Roster() {
   const deleteStudent = useDeleteStudent();
   const { page, setPage, pageCount, pageRows } = usePagination(rows ?? [], [filters]);
 
-  const activeFilterCount = [filters.departmentId, filters.status].filter(Boolean).length;
+  const activeFilterCount = [filters.departmentId, filters.status, filters.gradeLevelId, filters.classroomId].filter(
+    Boolean,
+  ).length;
+
+  const filterGradeLevels = filters.departmentId
+    ? allGradeLevels.filter((g) => g.department_id === filters.departmentId)
+    : allGradeLevels;
+  const { data: filterClassrooms = [] } = useClassrooms(filters.gradeLevelId || null);
 
   return (
     <div className="page-fill">
@@ -541,7 +549,9 @@ export function Roster() {
             <Field label="แผนก">
               <Select
                 value={filters.departmentId}
-                onChange={(e) => setFilters({ ...filters, departmentId: e.target.value })}
+                onChange={(e) =>
+                  setFilters({ ...filters, departmentId: e.target.value, gradeLevelId: "", classroomId: "" })
+                }
               >
                 <option value="">ทุกแผนก</option>
                 {departments.map((d) => (
@@ -564,6 +574,35 @@ export function Roster() {
               {(Object.keys(STATUS_LABEL) as StudentStatus[]).map((s) => (
                 <option key={s} value={s}>
                   {STATUS_LABEL[s]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="ระดับชั้น">
+            <Select
+              value={filters.gradeLevelId}
+              onChange={(e) => setFilters({ ...filters, gradeLevelId: e.target.value, classroomId: "" })}
+            >
+              <option value="">ทุกระดับชั้น</option>
+              {filterGradeLevels.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {gradeShortLabel(g.code)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="ห้อง">
+            <Select
+              value={filters.classroomId}
+              onChange={(e) => setFilters({ ...filters, classroomId: e.target.value })}
+              disabled={!filters.gradeLevelId}
+            >
+              <option value="">ทุกห้อง</option>
+              {filterClassrooms.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </Select>
