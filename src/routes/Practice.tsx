@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
-import { ChevronBack, Plus, Search, X } from "@/components/icons";
+import { BookIcon, ChevronBack, Plus, Search, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
@@ -34,6 +34,24 @@ import type { ExamQuestionDifficulty, PracticeAttempt, PracticeSet, Student } fr
 import { cn } from "@/lib/utils";
 
 const DIFFICULTY_LABEL: Record<ExamQuestionDifficulty, string> = { easy: "ง่าย", medium: "ปานกลาง", hard: "ยาก" };
+
+/** Deterministic cover color per subject (no color/icon field on `subjects` — see grill note in Practice.tsx). Cycles through a fixed palette by id hash so the same subject always lands on the same color. */
+const SUBJECT_COVER_PALETTE = [
+  "bg-blue-500",
+  "bg-violet-500",
+  "bg-emerald-500",
+  "bg-amber-500",
+  "bg-rose-500",
+  "bg-cyan-500",
+  "bg-orange-500",
+  "bg-teal-500",
+];
+
+function subjectCoverColor(subjectId: string) {
+  let hash = 0;
+  for (let i = 0; i < subjectId.length; i++) hash = (hash * 31 + subjectId.charCodeAt(i)) >>> 0;
+  return SUBJECT_COVER_PALETTE[hash % SUBJECT_COVER_PALETTE.length];
+}
 
 /** Both teacher (curate sets) and student/parent (practice) render from here — role-branched, same shape as Exams.tsx. See migration 0053. */
 export function Practice() {
@@ -440,8 +458,13 @@ function PracticeHome({ student, onOpen }: { student: Student; onOpen: (s: Pract
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
 
   const [rolling, setRolling] = useState(false);
+  const [openSubjectId, setOpenSubjectId] = useState<string | null>(null);
   const selfServe = useCreateSelfServePracticeSet();
   const toast = useToast();
+
+  const setsBySubject = new Map<string, PracticeSet[]>();
+  for (const s of sets) setsBySubject.set(s.subject_id, [...(setsBySubject.get(s.subject_id) ?? []), s]);
+  const subjectsWithSets = subjects.filter((s) => (setsBySubject.get(s.id)?.length ?? 0) > 0);
 
   if (isLoading) {
     return (
@@ -451,28 +474,62 @@ function PracticeHome({ student, onOpen }: { student: Student; onOpen: (s: Pract
     );
   }
 
+  const openSubject = openSubjectId ? subjectById.get(openSubjectId) : null;
+
   return (
     <div className="space-y-4">
       <Button variant="outline" className="w-full" onClick={() => setRolling(true)} disabled={subjectIds.length === 0}>
         สุ่มโจทย์มาฝึกเอง
       </Button>
 
-      {sets.length === 0 ? (
+      {openSubject ? (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setOpenSubjectId(null)}
+            className="tappable flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <ChevronBack className="h-3.5 w-3.5" /> {openSubject.name_th}
+          </button>
+          <ul className="space-y-2">
+            {(setsBySubject.get(openSubject.id) ?? []).map((s) => (
+              <Card key={s.id} className="flex items-center justify-between gap-2 text-xs">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">{s.title}</p>
+                  <p className="text-muted-foreground">{openSubject.name_th}</p>
+                </div>
+                <Button size="sm" onClick={() => onOpen(s)}>
+                  ฝึกเลย
+                </Button>
+              </Card>
+            ))}
+          </ul>
+        </div>
+      ) : subjectsWithSets.length === 0 ? (
         <EmptyState title="ยังไม่มีชุดฝึกหัด" description="รอครูสร้างชุดฝึกหัด หรือลองสุ่มโจทย์มาฝึกเองด้านบน" />
       ) : (
-        <ul className="space-y-2">
-          {sets.map((s) => (
-            <Card key={s.id} className="flex items-center justify-between gap-2 text-xs">
-              <div className="min-w-0 flex-1">
-                <p className="font-medium">{s.title}</p>
-                <p className="text-muted-foreground">{subjectById.get(s.subject_id)?.name_th ?? "—"}</p>
-              </div>
-              <Button size="sm" onClick={() => onOpen(s)}>
-                ฝึกเลย
-              </Button>
-            </Card>
-          ))}
-        </ul>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {subjectsWithSets.map((s) => {
+            const count = setsBySubject.get(s.id)?.length ?? 0;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setOpenSubjectId(s.id)}
+                className={cn(
+                  "tappable flex aspect-[3/4] flex-col justify-between rounded-xl p-3 text-left text-white shadow-sm transition-transform active:scale-[0.97]",
+                  subjectCoverColor(s.id),
+                )}
+              >
+                <BookIcon className="h-6 w-6 opacity-90" />
+                <div>
+                  <p className="text-xs font-semibold leading-snug">{s.name_th}</p>
+                  <p className="mt-0.5 text-[10px] opacity-80">{count} ชุด</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       )}
 
       <SelfServeSheet
