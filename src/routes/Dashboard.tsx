@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { AvatarBuilder } from "@/components/AvatarBuilder";
 import { CharacterSprite } from "@/components/CharacterSprite";
+import { ClassroomScene } from "@/components/ClassroomScene";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, Field, Input, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
@@ -113,11 +114,12 @@ export function Dashboard() {
 function StudentCharacterCard({ profile }: { profile: ProfileWithRoles }) {
   const { refreshProfile } = useAuth();
   const [builderOpen, setBuilderOpen] = useState(false);
+  const options = profile.character_options ?? DEFAULT_CHARACTER_OPTIONS;
 
   return (
-    <div className="mx-auto max-w-xl">
+    <div className="mx-auto max-w-xl space-y-3">
       <Card className="flex items-center gap-4">
-        <CharacterSprite options={profile.character_options ?? DEFAULT_CHARACTER_OPTIONS} />
+        <CharacterSprite options={options} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-heading text-lg font-semibold">{profileFullName(profile)}</p>
           <button
@@ -129,6 +131,7 @@ function StudentCharacterCard({ profile }: { profile: ProfileWithRoles }) {
           </button>
         </div>
       </Card>
+      <ClassroomScene options={options} />
       <AvatarBuilder
         open={builderOpen}
         onOpenChange={setBuilderOpen}
