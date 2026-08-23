@@ -9,6 +9,7 @@ import { Attendance } from "@/routes/Attendance";
 import { BehaviorScore } from "@/routes/BehaviorScore";
 import { ExamBank } from "@/routes/ExamBank";
 import { Exams } from "@/routes/Exams";
+import { Practice } from "@/routes/Practice";
 import { ScoreRecording } from "@/routes/ScoreRecording";
 import { Profile } from "@/routes/Profile";
 import { Dashboard } from "@/routes/Dashboard";
@@ -58,6 +59,7 @@ function Gate() {
         <Route path="assignments" element={<Assignments />} />
         <Route path="exam-bank" element={<ExamBank />} />
         <Route path="exams" element={<Exams />} />
+        <Route path="practice" element={<Practice />} />
         <Route path="attendance" element={<Attendance />} />
         <Route path="period-attendance" element={<PeriodAttendance />} />
         <Route path="behavior" element={<BehaviorScore />} />

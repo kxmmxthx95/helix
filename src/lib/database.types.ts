@@ -586,6 +586,54 @@ export type ExamAttemptEvent = {
   at: string;
 };
 
+// แบบฝึกหัด — ungraded, retry-anytime practice, separate from ข้อสอบ above.
+// Reuses the exam_questions bank as its question source. See migration 0053.
+
+/** A set of bank questions to practice — either curated by a teacher (visible to every classroom currently studying the subject) or a student's own self-serve random pull. Every PracticeAttempt points at one of these either way. */
+export type PracticeSet = {
+  id: string;
+  subject_id: string;
+  created_by: string;
+  is_teacher_curated: boolean;
+  title: string | null;
+  /** Self-serve filters this pull was drawn from — null on teacher-curated sets. */
+  topic: string | null;
+  difficulty: ExamQuestionDifficulty | null;
+  created_at: string;
+};
+
+export type PracticeSetQuestion = {
+  set_id: string;
+  question_id: string;
+  position: number;
+};
+
+export type PracticeAttemptStatus = "in_progress" | "submitted";
+
+export type PracticeAttempt = {
+  id: string;
+  set_id: string;
+  student_id: string;
+  started_at: string;
+  submitted_at: string | null;
+  status: PracticeAttemptStatus;
+  question_order: string[];
+  score: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Graded immediately on save (not just at submit) — the whole point of practice is instant per-question feedback. */
+export type PracticeAttemptAnswer = {
+  attempt_id: string;
+  question_id: string;
+  choice_id: string | null;
+  short_answer: string | null;
+  is_correct: boolean | null;
+  points_awarded: number | null;
+  answered_at: string;
+};
+
 /** Teacher-posted material for one assignment (score_item). See migration 0039. */
 export type AssignmentAttachment = {
   id: string;
@@ -1057,10 +1105,28 @@ export type Database = {
         InsertOf<ExamAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
       >;
       exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
+      practice_sets: Table<PracticeSet, InsertOf<PracticeSet, "title" | "topic" | "difficulty">>;
+      practice_set_questions: Table<PracticeSetQuestion, PracticeSetQuestion>;
+      practice_attempts: Table<
+        PracticeAttempt,
+        InsertOf<PracticeAttempt, "started_at" | "submitted_at" | "status" | "question_order" | "score">
+      >;
+      practice_attempt_answers: Table<
+        PracticeAttemptAnswer,
+        InsertOf<PracticeAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
+      >;
     };
     Views: Record<string, never>;
     Functions: {
       submit_exam_attempt: {
+        Args: { p_attempt_id: string };
+        Returns: void;
+      };
+      save_practice_answer: {
+        Args: { p_attempt_id: string; p_question_id: string; p_choice_id: string | null; p_short_answer: string | null };
+        Returns: PracticeAttemptAnswer;
+      };
+      submit_practice_attempt: {
         Args: { p_attempt_id: string };
         Returns: void;
       };
@@ -1082,6 +1148,7 @@ export type Database = {
       exam_question_difficulty: ExamQuestionDifficulty;
       exam_attempt_status: ExamAttemptStatus;
       exam_attempt_event_type: ExamAttemptEventType;
+      practice_attempt_status: PracticeAttemptStatus;
     };
     CompositeTypes: Record<string, never>;
   };

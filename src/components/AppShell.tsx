@@ -184,6 +184,17 @@ const TABS = [
     teacherOrStudentOrParentOnly: true,
   },
   {
+    to: "/practice",
+    label: "แบบฝึกหัด",
+    icon: BookIcon,
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: false,
+    teacherOrStudentOrParentOnly: true,
+  },
+  {
     to: "/assignments",
     label: "งาน",
     icon: CheckboxOutlineIcon,
