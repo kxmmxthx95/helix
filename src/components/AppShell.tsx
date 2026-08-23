@@ -445,7 +445,7 @@ function AppShellInner() {
             collapsed ? "justify-center px-1" : "justify-between gap-2 px-3",
           )}
         >
-          {!collapsed && <img src="/logo.webp" alt="Helix" className="h-6 w-auto" />}
+          {!collapsed && <img src="/logo.webp" alt="Helix" className="h-6 w-auto dark:invert" />}
           <Button
             variant="ghost"
             size="icon"

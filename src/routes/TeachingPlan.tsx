@@ -160,23 +160,35 @@ function PlanBoard({
         </p>
       )}
 
-      <ul className="divide-y divide-border text-sm">
-        {units.map((u) => {
-          const s = planUnitStatus(u);
-          return (
-            <PlanUnitRow
-              key={u.id}
-              unit={u}
-              status={s}
-              onDelete={() => del.mutate(u.id)}
-              onReopen={u.completed_at ? () => reopen.mutate(u.id) : undefined}
-            />
-          );
-        })}
-        {!isLoading && units.length === 0 && (
-          <p className="py-2 text-sm text-muted-foreground">ยังไม่มีการแบ่งหน่วยการสอน</p>
-        )}
-      </ul>
+      {units.length > 0 ? (
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full min-w-[28rem] text-sm">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">หน่วย</th>
+                <th className="px-3 py-2 font-medium">สถานะ</th>
+                <th className="px-3 py-2 font-medium">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {units.map((u) => {
+                const s = planUnitStatus(u);
+                return (
+                  <PlanUnitRow
+                    key={u.id}
+                    unit={u}
+                    status={s}
+                    onDelete={() => del.mutate(u.id)}
+                    onReopen={u.completed_at ? () => reopen.mutate(u.id) : undefined}
+                  />
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        !isLoading && <p className="py-2 text-sm text-muted-foreground">ยังไม่มีการแบ่งหน่วยการสอน</p>
+      )}
 
       <NewPlanUnitForm teachingAssignmentId={assignment.id} nextUnitNo={(units.at(-1)?.unit_no ?? 0) + 1} />
     </Card>
@@ -201,52 +213,63 @@ function PlanUnitRow({
 
   if (editing) {
     return (
-      <li className="space-y-1.5 py-1.5">
-        <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="หัวข้อ" />
-        <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="รายละเอียด (ถ้ามี)" />
-        <div className="flex gap-1.5">
-          <Button
-            size="sm"
-            disabled={!title.trim() || update.isPending}
-            onClick={() =>
-              update.mutate(
-                { id: unit.id, title: title.trim(), description: description.trim() || null },
-                { onSuccess: () => setEditing(false) },
-              )
-            }
-          >
-            บันทึก
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
-            ยกเลิก
-          </Button>
-        </div>
-      </li>
+      <tr>
+        <td className="space-y-1.5 px-3 py-2">
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="หัวข้อ" />
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="รายละเอียด (ถ้ามี)" />
+        </td>
+        <td className="px-3 py-2 align-top">
+          <span className={cn("inline-block rounded-full px-2 py-0.5 text-xs", status.className)}>{status.text}</span>
+        </td>
+        <td className="px-3 py-2 align-top">
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              disabled={!title.trim() || update.isPending}
+              onClick={() =>
+                update.mutate(
+                  { id: unit.id, title: title.trim(), description: description.trim() || null },
+                  { onSuccess: () => setEditing(false) },
+                )
+              }
+            >
+              บันทึก
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
+              ยกเลิก
+            </Button>
+          </div>
+        </td>
+      </tr>
     );
   }
 
   return (
-    <li className="flex items-center justify-between gap-2 py-1.5">
-      <span className="min-w-0 flex-1">
+    <tr>
+      <td className="min-w-0 px-3 py-2">
         <span className="block truncate">หน่วยที่ {unit.unit_no} · {unit.title}</span>
-        {unit.description && <span className="text-xs text-muted-foreground">{unit.description}</span>}
+        {unit.description && <span className="block text-xs text-muted-foreground">{unit.description}</span>}
         {unit.note && <span className="block text-xs text-muted-foreground">บันทึก: {unit.note}</span>}
-      </span>
-      <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs", status.className)}>{status.text}</span>
-      <div className="flex shrink-0 items-center gap-1.5">
-        {onReopen && (
-          <Button variant="outline" size="sm" onClick={onReopen}>
-            เปิดใหม่
+      </td>
+      <td className="px-3 py-2 align-top">
+        <span className={cn("inline-block rounded-full px-2 py-0.5 text-xs", status.className)}>{status.text}</span>
+      </td>
+      <td className="px-3 py-2 align-top">
+        <div className="flex items-center gap-1.5">
+          {onReopen && (
+            <Button variant="outline" size="sm" onClick={onReopen}>
+              เปิดใหม่
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+            แก้ไข
           </Button>
-        )}
-        <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-          แก้ไข
-        </Button>
-        <Button variant="outline" size="sm" onClick={onDelete}>
-          ลบ
-        </Button>
-      </div>
-    </li>
+          <Button variant="outline" size="sm" onClick={onDelete}>
+            ลบ
+          </Button>
+        </div>
+      </td>
+    </tr>
   );
 }
 
