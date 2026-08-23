@@ -4,6 +4,7 @@ import { GraduationCap, Plus, Users, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { Card, EmptyState, Select, Spinner } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
+import { useMyClassroom } from "@/hooks/useAttendance";
 import { useDepartmentPeriods, usePeriodsForGrade } from "@/hooks/usePeriodDefinitions";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
@@ -18,7 +19,7 @@ import {
   type ScheduleEntryRow,
 } from "@/hooks/useSchedule";
 import { profileFullName, type Classroom, type GradeLevel, type PeriodDefinition, type TeachingAssignment } from "@/lib/database.types";
-import { canManage, isOrgWide } from "@/lib/roles";
+import { canManage, isOrgWide, isSelfScoped } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const DAY_LABEL: Record<number, string> = {
@@ -34,10 +35,11 @@ const TERM_LABEL: Record<number, string> = { 1: "ภาคเรียน 1", 2:
 type View = "classroom" | "teacher";
 
 export function Timetable() {
-  const { profile: me } = useAuth();
+  const { profile: me, myStudent } = useAuth();
   const { data: departments = [] } = useDepartments();
   const orgWide = me ? isOrgWide(me.roles) : false;
   const mayEdit = me ? canManage(me.roles) : false;
+  const isStudent = me ? isSelfScoped(me.roles) : false;
 
   const [pickedDept, setPickedDept] = useState("");
   const [term, setTerm] = useState<1 | 2>(1);
@@ -57,11 +59,53 @@ export function Timetable() {
   const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
   const { data: teachers = [] } = useProfiles({ search: "", departmentId, role: "teacher", active: "true" });
 
+  // student path: locked to their own classroom, no picker (mirrors Attendance.tsx).
+  const { data: myClassroom } = useMyClassroom(isStudent ? (myStudent?.id ?? null) : null, academicYear);
+
   useEffect(() => {
+    if (isStudent) return;
     if (!classroomId && classrooms.length > 0) setClassroomId(classrooms[0]!.id);
-  }, [classroomId, classrooms]);
+  }, [isStudent, classroomId, classrooms]);
 
   if (!me) return null;
+
+  if (isStudent) {
+    return myClassroom ? (
+      <div className="space-y-4">
+        {splitsByTerm && (
+          <div className="inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
+            {[1, 2].map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTerm(t as 1 | 2)}
+                className={cn(
+                  "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                  term === t
+                    ? "bg-foreground/10 text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                {TERM_LABEL[t]}
+              </button>
+            ))}
+          </div>
+        )}
+        <ClassroomTimetable
+          departmentId={departmentId}
+          classroomId={myClassroom.id}
+          academicYear={academicYear}
+          term={scheduleTerm}
+          mayEdit={false}
+          classrooms={classrooms}
+          gradeLevels={gradeLevels}
+          teachers={teachers}
+        />
+      </div>
+    ) : (
+      <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีห้องเรียนในปีการศึกษานี้" />
+    );
+  }
 
   return (
     <div className="space-y-4">
