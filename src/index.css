@@ -222,6 +222,21 @@
       inset 0 1px 0 rgb(255 255 255 / 0.14);
   }
 
+  /* Side drawer — floats off all edges, solid card fill (not glass) */
+  .drawer-float {
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow:
+      0 20px 50px rgb(0 0 0 / 0.18),
+      0 2px 8px rgb(0 0 0 / 0.08);
+  }
+
+  .dark .drawer-float {
+    box-shadow:
+      0 20px 50px rgb(0 0 0 / 0.55),
+      0 2px 8px rgb(0 0 0 / 0.3);
+  }
+
   /* Frosted panel — login / focal overlays (flat, no gradient) */
   .glass-panel {
     background-color: rgb(255 255 255 / 0.08);
