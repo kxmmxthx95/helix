@@ -426,9 +426,9 @@ function AppShellInner() {
 
   const userLabel = (
     <button type="button" onClick={() => navigate("/profile")} className="min-w-0 text-left tappable">
-      <p className="truncate text-sm font-semibold">{displayName}</p>
+      <p className="truncate text-xs font-semibold leading-tight">{displayName}</p>
       {profile && (
-        <p className="truncate text-xs text-muted-foreground">{roleLabels(profile.roles)}</p>
+        <p className="truncate text-[10px] leading-tight text-muted-foreground">{roleLabels(profile.roles)}</p>
       )}
     </button>
   );
@@ -504,14 +504,14 @@ function AppShellInner() {
         <div
           className={cn(
             "mt-auto border-t border-border/60",
-            collapsed ? "flex flex-col items-center gap-1 px-1.5 py-3" : "px-3 py-3",
+            collapsed ? "flex flex-col items-center gap-1 px-1.5 py-2" : "px-3 py-2",
           )}
         >
           {collapsed ? (
-            avatarButton("h-8 w-8 text-[10px]")
+            avatarButton("h-6 w-6 text-[9px]")
           ) : (
-            <div className="mb-2 flex items-center gap-3 px-1">
-              {avatarButton()}
+            <div className="mb-1.5 flex items-center gap-2 px-1">
+              {avatarButton("h-6 w-6 text-[9px]")}
               {userLabel}
             </div>
           )}

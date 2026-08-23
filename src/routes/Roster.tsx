@@ -226,6 +226,10 @@ export function Roster() {
     [allGradeLevels],
   );
   const mayEdit = me ? canManage(me.roles) : false;
+  // Teachers already have read RLS on students/student_contacts within their
+  // department (see migration 0015) — the sheet just never let them click
+  // through to see it. mayView opens the row read-only for them.
+  const mayView = mayEdit || (me?.roles.includes("teacher") ?? false);
   const mayManageUsers = me ? canManageUsers(me.roles) : false;
   const deleteStudent = useDeleteStudent();
   const { page, setPage, pageCount, pageRows } = usePagination(rows ?? [], [filters]);
@@ -303,18 +307,18 @@ export function Roster() {
               return (
               <li key={row.id}>
                 <div
-                  role={mayEdit ? "button" : undefined}
-                  tabIndex={mayEdit ? 0 : undefined}
-                  onClick={() => mayEdit && setEditing(row)}
+                  role={mayView ? "button" : undefined}
+                  tabIndex={mayView ? 0 : undefined}
+                  onClick={() => mayView && setEditing(row)}
                   onKeyDown={(e) => {
-                    if (!mayEdit) return;
+                    if (!mayView) return;
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       setEditing(row);
                     }
                   }}
                   className={
-                    mayEdit
+                    mayView
                       ? "rounded-xl border border-border bg-card p-3.5 shadow-sm transition-colors active:bg-muted"
                       : "rounded-xl border border-border bg-card p-3.5 shadow-sm"
                   }
@@ -428,9 +432,9 @@ export function Roster() {
                 {pageRows.map((row) => (
                   <tr
                     key={row.id}
-                    onClick={() => mayEdit && setEditing(row)}
+                    onClick={() => mayView && setEditing(row)}
                     className={
-                      mayEdit
+                      mayView
                         ? "h-[40px] cursor-pointer border-t border-border active:bg-muted"
                         : "h-[40px] border-t border-border"
                     }
@@ -630,6 +634,12 @@ function EditStudentSheet({
   const [section, setSection] = useState<Section>("basic");
 
   const isNew = target === "new";
+  // Teachers can open a row to view it (mayView in the parent) but can't
+  // write — RLS blocks it server-side regardless, this just keeps the form
+  // from looking editable. isNew is always opened by someone with mayEdit
+  // (the "add student" button is itself gated), so only an existing target
+  // can be read-only.
+  const readOnly = !isNew && !(me && canManage(me.roles));
   const base: StudentDraft | null =
     target === null
       ? null
@@ -675,16 +685,18 @@ function EditStudentSheet({
     <Sheet
       open={target !== null}
       onOpenChange={(open) => !open && close()}
-      title={isNew ? "เพิ่มนักเรียน" : "แก้ไขข้อมูลนักเรียน"}
+      title={isNew ? "เพิ่มนักเรียน" : readOnly ? "ข้อมูลนักเรียน" : "แก้ไขข้อมูลนักเรียน"}
       footer={
         current ? (
           <div className="flex gap-2">
             <Button type="button" variant="outline" className="flex-1" onClick={close}>
-              ยกเลิก
+              {readOnly ? "ปิด" : "ยกเลิก"}
             </Button>
-            <Button type="submit" form="edit-student" className="flex-1">
-              บันทึก
-            </Button>
+            {!readOnly && (
+              <Button type="submit" form="edit-student" className="flex-1">
+                บันทึก
+              </Button>
+            )}
           </div>
         ) : undefined
       }
@@ -709,6 +721,7 @@ function EditStudentSheet({
           </div>
 
           <form id="edit-student" onSubmit={submit} className="space-y-4">
+          <fieldset disabled={readOnly} className="space-y-4">
             {section === "basic" && (
               <>
                 <Field label="รหัสนักเรียน">
@@ -878,10 +891,11 @@ function EditStudentSheet({
                 </Field>
               </>
             )}
+          </fieldset>
           </form>
 
           {section === "guardian" && (
-            <div className="space-y-4">
+            <fieldset disabled={readOnly} className="space-y-4">
               <Field label="สถานภาพครอบครัว">
                 <Select
                   form="edit-student"
@@ -907,7 +921,7 @@ function EditStudentSheet({
                   studentAddress={pickAddress(current)}
                 />
               )}
-            </div>
+            </fieldset>
           )}
         </div>
       )}
