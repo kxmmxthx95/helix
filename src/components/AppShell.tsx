@@ -318,6 +318,8 @@ function AppShellInner() {
   const avatarSrc = profile ? avatarUrl(profile) : null;
   const maySeeSettings = !!profile && (isOrgWide(profile.roles) || profile.roles.includes("dept_head"));
   const { data: schoolSettings } = useSchoolSettings();
+  // Student homepage is deliberately blank (see Dashboard.tsx) — no title text, no header divider there.
+  const isStudentHome = !!profile && profile.roles.includes("student") && location.pathname === "/";
 
   const pickAvatar = () => avatarFileRef.current?.click();
   const onAvatarChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -545,13 +547,20 @@ function AppShellInner() {
 
       {/* Main pane: no frosted frame — work area is max-w-6xl column */}
       <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="glass sticky top-0 z-20 shrink-0 border-b border-border pt-safe lg:hidden">
+        <header
+          className={cn(
+            "glass sticky top-0 z-20 shrink-0 pt-safe lg:hidden",
+            !isStudentHome && "border-b border-border",
+          )}
+        >
           {/* Title stays leading (after menu) — never centered under the Dynamic Island */}
           <div className="flex h-12 items-center gap-2 px-shell">
             {menuButton}
-            <p className="font-heading min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
-              {pageTitle}
-            </p>
+            {!isStudentHome && (
+              <p className="font-heading min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+                {pageTitle}
+              </p>
+            )}
             {mobileHeaderEnd ? <div className="shrink-0">{mobileHeaderEnd}</div> : null}
           </div>
         </header>
@@ -608,9 +617,14 @@ function AppShellInner() {
           </nav>
         </Sheet>
 
-        <header className="sticky top-0 z-20 hidden h-12 shrink-0 border-b border-border/60 lg:block">
+        <header
+          className={cn(
+            "sticky top-0 z-20 hidden h-12 shrink-0 lg:block",
+            !isStudentHome && "border-b border-border/60",
+          )}
+        >
           <div className="mx-auto flex h-full w-full max-w-6xl items-center px-shell">
-            <p className="font-heading text-sm font-semibold text-foreground">{pageTitle}</p>
+            {!isStudentHome && <p className="font-heading text-sm font-semibold text-foreground">{pageTitle}</p>}
           </div>
         </header>
 
