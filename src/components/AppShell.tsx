@@ -269,7 +269,7 @@ const TABS = [
   },
   {
     to: "/leave",
-    label: "ลา",
+    label: "จัดการลา",
     icon: AirplaneIcon,
     managerOnly: false,
     orgWideOnly: false,
