@@ -2,10 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { AvatarBuilder } from "@/components/AvatarBuilder";
-import { CharacterSprite } from "@/components/CharacterSprite";
 import { ClassroomScene } from "@/components/ClassroomScene";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Spinner } from "@/components/ui";
+import { Button, Field, Input, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions } from "@/hooks/useAssignments";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
@@ -117,21 +116,16 @@ function StudentCharacterCard({ profile }: { profile: ProfileWithRoles }) {
   const options = profile.character_options ?? DEFAULT_CHARACTER_OPTIONS;
 
   return (
-    <div className="mx-auto max-w-xl space-y-3">
-      <Card className="flex items-center gap-4">
-        <CharacterSprite options={options} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-heading text-lg font-semibold">{profileFullName(profile)}</p>
-          <button
-            type="button"
-            onClick={() => setBuilderOpen(true)}
-            className="tappable text-xs font-medium text-accent underline"
-          >
-            แก้ไขตัวละคร
-          </button>
-        </div>
-      </Card>
+    <div className="relative -mx-3">
       <ClassroomScene options={options} />
+      <Button
+        size="sm"
+        variant="outline"
+        className="glass absolute right-3 top-3"
+        onClick={() => setBuilderOpen(true)}
+      >
+        แก้ไขตัวละคร
+      </Button>
       <AvatarBuilder
         open={builderOpen}
         onOpenChange={setBuilderOpen}
