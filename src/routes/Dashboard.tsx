@@ -59,10 +59,13 @@ function greeting() {
 export function Dashboard() {
   const { profile, myStudent } = useAuth();
   const isParent = profile?.roles.includes("parent") ?? false;
+  const isStudent = profile?.roles.includes("student") ?? false;
   const { data: children = [] } = useMyChildren(isParent ? (profile?.id ?? null) : null);
   const { data: schoolSettings } = useSchoolSettings();
   const showClockWidget =
     !!profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r));
+
+  if (isStudent) return null;
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
