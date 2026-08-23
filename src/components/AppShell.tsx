@@ -475,7 +475,7 @@ function AppShellInner() {
 
         <nav
           className={cn(
-            "flex flex-1 flex-col gap-1 overflow-y-auto py-2",
+            "scrollbar-hidden flex flex-1 flex-col gap-1 overflow-y-auto py-2",
             collapsed ? "px-1.5" : "px-3",
           )}
         >

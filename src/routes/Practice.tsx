@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
-import { ChevronBack, Plus, X } from "@/components/icons";
+import { ChevronBack, Plus, Search, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
@@ -20,12 +20,15 @@ import {
   usePracticeAttemptAnswers,
   usePracticeSetProgress,
   usePracticeSetQuestions,
+  useProfilesByIds,
   useSavePracticeAnswer,
+  useSetPracticeSetQuestions,
   useStartOrResumePracticeAttempt,
   useSubmitPracticeAttempt,
   type PracticeSetQuestionRow,
 } from "@/hooks/usePractice";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
+import { gradeShortLabel } from "@/lib/gradeLevels";
 import { SubjectPicker } from "@/routes/ExamBank";
 import type { ExamQuestionDifficulty, PracticeAttempt, PracticeSet, Student } from "@/lib/database.types";
 import { cn } from "@/lib/utils";
@@ -49,14 +52,32 @@ function TeacherPractice({ teacherId }: { teacherId: string }) {
   const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
   const subjectIds = [...new Set(assignments.map((a) => a.subject_id))];
   const { data: subjects = [] } = useSubjectsByIds(subjectIds);
+  const gradeLevelIds = [...new Set(subjects.map((s) => s.suggested_grade_level_id).filter((id): id is string => !!id))];
+  const { data: gradeLevels = [] } = useGradeLevelsByIds(gradeLevelIds);
+  const gradeLevelById = new Map(gradeLevels.map((g) => [g.id, g]));
 
   const { data: sets = [], isLoading } = useMyPracticeSets(subjectIds);
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<PracticeSet | null>(null);
+  const [search, setSearch] = useState("");
   const deleteSet = useDeletePracticeSet();
   const toast = useToast();
 
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
+  const creatorIds = [...new Set(sets.map((s) => s.created_by))];
+  const { data: creators = [] } = useProfilesByIds(creatorIds);
+  const creatorById = new Map(creators.map((p) => [p.id, p]));
+
+  const filteredSets = sets.filter((s) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    const subject = subjectById.get(s.subject_id);
+    return (
+      (s.title ?? "").toLowerCase().includes(q) ||
+      (subject?.name_th ?? "").toLowerCase().includes(q) ||
+      (subject?.code ?? "").toLowerCase().includes(q)
+    );
+  });
 
   if (selected) {
     return <SetDetail set={selected} onBack={() => setSelected(null)} />;
@@ -64,7 +85,17 @@ function TeacherPractice({ teacherId }: { teacherId: string }) {
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 items-center justify-end">
+      <div className="flex shrink-0 items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหาชื่อชุดหรือวิชา"
+            className="pl-9"
+            type="search"
+          />
+        </div>
         <Button size="sm" onClick={() => setCreating(true)} disabled={assignments.length === 0}>
           <Plus className="h-3 w-3" /> สร้างชุดฝึกหัด
         </Button>
@@ -74,30 +105,45 @@ function TeacherPractice({ teacherId }: { teacherId: string }) {
         <div className="flex flex-1 items-center justify-center">
           <Spinner className="h-5 w-5 text-muted-foreground" />
         </div>
-      ) : sets.length === 0 ? (
+      ) : filteredSets.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ยังไม่มีชุดฝึกหัด" description="กด “สร้างชุดฝึกหัด” เพื่อเลือกโจทย์จากคลังมาให้นักเรียนฝึก" />
+          <EmptyState
+            title={sets.length === 0 ? "ยังไม่มีชุดฝึกหัด" : "ไม่พบชุดฝึกหัดที่ค้นหา"}
+            description={sets.length === 0 ? "กด “สร้างชุดฝึกหัด” เพื่อเลือกโจทย์จากคลังมาให้นักเรียนฝึก" : ""}
+          />
         </div>
       ) : (
         <div className="table-panel flex-1">
           <div className="table-panel-scroll">
-            <table className="w-full min-w-[32rem] text-xs">
+            <table className="w-full min-w-[44rem] text-xs">
               <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">ชื่อชุด</th>
+                  <th className="px-3 py-2 font-medium">รหัสวิชา</th>
                   <th className="px-3 py-2 font-medium">วิชา</th>
+                  <th className="px-3 py-2 font-medium">ระดับชั้น</th>
+                  <th className="px-3 py-2 font-medium">ผู้สร้าง</th>
                   <th className="px-3 py-2 font-medium" />
                 </tr>
               </thead>
               <tbody>
-                {sets.map((s) => (
+                {filteredSets.map((s) => {
+                  const subject = subjectById.get(s.subject_id);
+                  const gradeLevel = subject?.suggested_grade_level_id
+                    ? gradeLevelById.get(subject.suggested_grade_level_id)
+                    : null;
+                  const creator = creatorById.get(s.created_by);
+                  return (
                   <tr
                     key={s.id}
                     onClick={() => setSelected(s)}
                     className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
                   >
                     <td className="px-3 py-2 font-medium">{s.title}</td>
-                    <td className="px-3 py-2">{subjectById.get(s.subject_id)?.name_th ?? "—"}</td>
+                    <td className="px-3 py-2">{subject?.code ?? "—"}</td>
+                    <td className="px-3 py-2">{subject?.name_th ?? "—"}</td>
+                    <td className="px-3 py-2">{gradeLevel ? gradeShortLabel(gradeLevel.code) : "—"}</td>
+                    <td className="px-3 py-2">{creator ? `${creator.first_name} ${creator.last_name}` : "—"}</td>
                     <td className="px-3 py-2 text-right">
                       <Button
                         size="icon"
@@ -113,7 +159,8 @@ function TeacherPractice({ teacherId }: { teacherId: string }) {
                       </Button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -143,8 +190,6 @@ function CreateSetSheet({
 
   const [subjectId, setSubjectId] = useState("");
   const [title, setTitle] = useState("");
-  const [questionIds, setQuestionIds] = useState<string[]>([]);
-  const { data: questions = [] } = useExamQuestions(subjectId || null);
 
   const create = useCreatePracticeSet();
   const toast = useToast();
@@ -152,10 +197,9 @@ function CreateSetSheet({
   function reset() {
     setSubjectId("");
     setTitle("");
-    setQuestionIds([]);
   }
 
-  const canSave = subjectId && title.trim() && questionIds.length > 0;
+  const canSave = subjectId && title.trim();
 
   function close() {
     reset();
@@ -166,7 +210,7 @@ function CreateSetSheet({
     e.preventDefault();
     if (!canSave) return;
     create.mutate(
-      { subject_id: subjectId, created_by: teacherId, title: title.trim(), question_ids: questionIds },
+      { subject_id: subjectId, created_by: teacherId, title: title.trim() },
       { onSuccess: () => close(), onError: () => toast("สร้างชุดฝึกหัดไม่สำเร็จ", "error") },
     );
   }
@@ -189,42 +233,13 @@ function CreateSetSheet({
     >
       <form id="create-practice-set" onSubmit={submit} className="space-y-3">
         <Field label="วิชา" required>
-          <SubjectPicker
-            subjects={subjects}
-            gradeLevelById={gradeLevelById}
-            value={subjectId}
-            onChange={(id) => {
-              setSubjectId(id);
-              setQuestionIds([]);
-            }}
-          />
+          <SubjectPicker subjects={subjects} gradeLevelById={gradeLevelById} value={subjectId} onChange={setSubjectId} />
         </Field>
         <Field label="ชื่อชุดฝึกหัด" required>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น ฝึกก่อนสอบบทที่ 3" />
         </Field>
 
-        {subjectId && (
-          <Field label={`โจทย์ (เลือกแล้ว ${questionIds.length} ข้อ)`} required>
-            <div className="max-h-96 space-y-1.5 overflow-y-auto rounded-lg border border-border p-2">
-              {questions.length === 0 && <p className="text-xs text-muted-foreground">คลังข้อสอบวิชานี้ยังว่าง</p>}
-              {questions.map((q) => (
-                <label key={q.id} className="flex items-start gap-2 text-xs">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={questionIds.includes(q.id)}
-                    onChange={(e) =>
-                      setQuestionIds(e.target.checked ? [...questionIds, q.id] : questionIds.filter((id) => id !== q.id))
-                    }
-                  />
-                  {q.prompt}
-                </label>
-              ))}
-            </div>
-          </Field>
-        )}
-
-        <p className="text-xs text-muted-foreground">เปิดให้ทุกห้องที่กำลังเรียนวิชานี้เห็นและฝึกได้ทันที</p>
+        <p className="text-xs text-muted-foreground">เลือกโจทย์ได้หลังสร้างชุด ในหน้ารายละเอียดชุดฝึกหัด</p>
       </form>
     </Sheet>
   );
@@ -238,6 +253,7 @@ function SetDetail({ set, onBack }: { set: PracticeSet; onBack: () => void }) {
   const submittedCount = progress?.attempts.length ?? 0;
   const avgScore =
     submittedCount > 0 ? (progress!.attempts.reduce((s, a) => s + (a.score ?? 0), 0) / submittedCount).toFixed(1) : null;
+  const [editingQuestions, setEditingQuestions] = useState(false);
 
   return (
     <div className="page-fill">
@@ -252,6 +268,22 @@ function SetDetail({ set, onBack }: { set: PracticeSet; onBack: () => void }) {
           </p>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setEditingQuestions(true)}
+        className="flex shrink-0 items-center justify-between rounded-lg border border-border px-3 py-2 text-left text-xs hover:bg-muted"
+      >
+        จัดการโจทย์ ({setQuestions.length} ข้อ)
+        <span className="text-muted-foreground">แก้ไข</span>
+      </button>
+
+      <EditPracticeSetQuestionsSheet
+        set={set}
+        setQuestions={setQuestions}
+        open={editingQuestions}
+        onOpenChange={setEditingQuestions}
+      />
 
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center">
@@ -289,6 +321,66 @@ function SetDetail({ set, onBack }: { set: PracticeSet; onBack: () => void }) {
         </div>
       )}
     </div>
+  );
+}
+
+function EditPracticeSetQuestionsSheet({
+  set,
+  setQuestions,
+  open,
+  onOpenChange,
+}: {
+  set: PracticeSet;
+  setQuestions: PracticeSetQuestionRow[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { data: questions = [] } = useExamQuestions(open ? set.subject_id : null);
+  const setSetQuestions = useSetPracticeSetQuestions();
+  const toast = useToast();
+  const [questionIds, setQuestionIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (open) setQuestionIds(setQuestions.map((q) => q.question_id));
+  }, [open, setQuestions]);
+
+  function save() {
+    setSetQuestions.mutate(
+      { setId: set.id, questionIds },
+      { onSuccess: () => onOpenChange(false), onError: () => toast("บันทึกโจทย์ไม่สำเร็จ", "error") },
+    );
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="จัดการโจทย์"
+      footer={
+        <Button className="w-full" onClick={save} disabled={questionIds.length === 0 || setSetQuestions.isPending}>
+          บันทึก
+        </Button>
+      }
+    >
+      <Field label={`โจทย์ (เลือกแล้ว ${questionIds.length} ข้อ)`} required>
+        <div className="max-h-96 space-y-1.5 overflow-y-auto rounded-lg border border-border p-2">
+          {questions.length === 0 && <p className="text-xs text-muted-foreground">คลังข้อสอบวิชานี้ยังว่าง</p>}
+          {questions.map((q) => (
+            <label key={q.id} className="flex items-start gap-2 text-xs">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={questionIds.includes(q.id)}
+                onChange={(e) =>
+                  setQuestionIds(e.target.checked ? [...questionIds, q.id] : questionIds.filter((id) => id !== q.id))
+                }
+              />
+              {q.prompt}
+            </label>
+          ))}
+        </div>
+      </Field>
+    </Sheet>
   );
 }
 

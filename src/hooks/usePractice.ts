@@ -12,6 +12,19 @@ import { supabase } from "@/lib/supabase";
 // แบบฝึกหัด — ungraded, retry-anytime practice against the exam_questions
 // bank. Separate from สอบออนไลน์ (useExams.ts). See migration 0053.
 
+/** Name-only lookup for practice_sets.created_by — the bank is shared across every teacher of a subject (see useMyPracticeSets), so the set list needs to show who authored each one. */
+export function useProfilesByIds(ids: string[]) {
+  return useQuery({
+    queryKey: ["profiles", "by_ids", ids],
+    enabled: ids.length > 0,
+    queryFn: async (): Promise<{ id: string; first_name: string; last_name: string }[]> => {
+      const { data, error } = await supabase.from("profiles").select("id, first_name, last_name").in("id", ids);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 /** Subjects the student is currently taught (via their current classroom's teaching_assignments) — same source the RLS policy reads, used to scope both the available-sets list and the self-serve subject picker. */
 export function useMySubjects(classroomId: string | null, academicYear: number | null) {
   return useQuery({
@@ -86,33 +99,38 @@ export function usePracticeSetQuestions(setId: string | null) {
   });
 }
 
-/** Creates a teacher-curated set plus its questions in one call. */
+/** Creates an empty teacher-curated set — questions get added afterward in the set's own detail view, same two-step flow as exam_sessions (useCreateExamSession creates the shell, useSetSessionQuestions fills it in). */
 export function useCreatePracticeSet() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (draft: {
-      subject_id: string;
-      created_by: string;
-      title: string;
-      question_ids: string[];
-    }) => {
-      const { question_ids, ...set } = draft;
+    mutationFn: async (draft: { subject_id: string; created_by: string; title: string }) => {
       const { data: inserted, error } = await supabase
         .from("practice_sets")
-        .insert({ ...set, is_teacher_curated: true })
+        .insert({ ...draft, is_teacher_curated: true })
         .select()
         .single();
       if (error) throw error;
-
-      if (question_ids.length > 0) {
-        const { error: qError } = await supabase.from("practice_set_questions").insert(
-          question_ids.map((question_id, i) => ({ set_id: inserted.id, question_id, position: i })),
-        );
-        if (qError) throw qError;
-      }
       return inserted as PracticeSet;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_sets"] }),
+  });
+}
+
+/** Replaces a set's full question list (delete then re-insert) — used to add/edit questions after the set already exists. */
+export function useSetPracticeSetQuestions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ setId, questionIds }: { setId: string; questionIds: string[] }) => {
+      const { error: delError } = await supabase.from("practice_set_questions").delete().eq("set_id", setId);
+      if (delError) throw delError;
+      if (questionIds.length > 0) {
+        const { error: insError } = await supabase.from("practice_set_questions").insert(
+          questionIds.map((question_id, i) => ({ set_id: setId, question_id, position: i })),
+        );
+        if (insError) throw insError;
+      }
+    },
+    onSettled: (_data, _err, vars) => void qc.invalidateQueries({ queryKey: ["practice_set_questions", vars.setId] }),
   });
 }
 
