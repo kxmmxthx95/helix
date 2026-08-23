@@ -74,6 +74,39 @@ export function useHomeroomClassrooms(teacherId: string | null, academicYear: nu
   });
 }
 
+// ----------------------------------------------------- student's own classroom
+// role="student" path — resolves their current room the same "latest
+// enrollment row wins" way useClassroomRoster does, scoped by student_id
+// instead of classroom_id since the room isn't known yet.
+
+export type MyClassroomOption = {
+  id: string;
+  label: string;
+};
+
+export function useMyClassroom(studentId: string | null, academicYear: number) {
+  return useQuery({
+    queryKey: ["student_classroom_enrollments", "by_student", studentId, academicYear],
+    enabled: !!studentId,
+    queryFn: async (): Promise<MyClassroomOption | null> => {
+      const { data, error } = await supabase
+        .from("student_classroom_enrollments")
+        .select("created_at, classroom:classrooms!inner(id, name, grade_level:grade_levels(name))")
+        .eq("student_id", studentId!)
+        .eq("academic_year", academicYear)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      const classroom = (
+        data as unknown as { classroom: { id: string; name: string; grade_level: { name: string } | null } }
+      ).classroom;
+      return { id: classroom.id, label: `${classroom.grade_level?.name ?? ""}/${classroom.name}` };
+    },
+  });
+}
+
 // --------------------------------------------------------- attendance_records
 
 export function useAttendanceForDate(classroomId: string | null, date: string) {

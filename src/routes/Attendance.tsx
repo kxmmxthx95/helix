@@ -12,6 +12,7 @@ import {
   useAttendanceRange,
   useClassroomRoster,
   useHomeroomClassrooms,
+  useMyClassroom,
   useSaveAttendance,
   summarizeAttendance,
 } from "@/hooks/useAttendance";
@@ -24,7 +25,7 @@ import {
   type PendingStudentLeaveRequest,
 } from "@/hooks/useStudentLeave";
 import type { AttendanceRecord, AttendanceStatus, Student } from "@/lib/database.types";
-import { canManage, isOrgWide } from "@/lib/roles";
+import { canManage, isOrgWide, isSelfScoped } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 export const STATUS_LABEL: Record<AttendanceStatus, string> = {
@@ -62,14 +63,18 @@ const VIEW_TAB_LABEL: Record<ViewTab, string> = {
 };
 
 export function Attendance() {
-  const { profile: me } = useAuth();
+  const { profile: me, myStudent } = useAuth();
   const manager = me ? canManage(me.roles) : false;
   const orgWide = me ? isOrgWide(me.roles) : false;
   const isTeacher = me ? (me.roles.includes("teacher") as boolean) : false;
+  const isStudent = me ? isSelfScoped(me.roles) : false;
   const academicYear = currentAcademicYear();
 
   const [view, setView] = useState<ViewTab>("checkin");
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // student path: read-only summary of their own classroom, no picker.
+  const { data: myClassroom } = useMyClassroom(isStudent ? (myStudent?.id ?? null) : null, academicYear);
 
   // manager path: department → grade level → classroom.
   const [pickedDept, setPickedDept] = useState(!orgWide && me?.department_id ? me.department_id : "");
@@ -89,7 +94,7 @@ export function Attendance() {
     if (homerooms.length === 1) setPickedHomeroomId(homerooms[0]!.id);
   }, [homerooms]);
 
-  const allowed = !!me && (manager || isTeacher);
+  const allowed = !!me && (manager || isTeacher || isStudent);
   const activeDeptRooms = deptClassrooms.filter((c) => c.is_active);
 
   const activeFilterCount = manager
@@ -98,7 +103,7 @@ export function Attendance() {
 
   const headerFilterButton = useMemo(
     () =>
-      allowed ? (
+      allowed && !isStudent ? (
         <Button
           variant="outline"
           size="icon"
@@ -114,13 +119,27 @@ export function Attendance() {
           )}
         </Button>
       ) : null,
-    [allowed, activeFilterCount],
+    [allowed, isStudent, activeFilterCount],
   );
 
   useMobileHeaderEnd(headerFilterButton);
 
   if (!allowed) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
+  }
+
+  if (isStudent) {
+    return (
+      <div className="page-fill">
+        {myClassroom ? (
+          <SummaryPanel classroomId={myClassroom.id} classroomLabel={myClassroom.label} academicYear={academicYear} />
+        ) : (
+          <div className="flex flex-1 items-center justify-center">
+            <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีห้องเรียนในปีการศึกษานี้" />
+          </div>
+        )}
+      </div>
+    );
   }
 
   const classroomId = manager ? pickedRoomId : pickedHomeroomId;
