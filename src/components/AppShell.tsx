@@ -81,6 +81,7 @@ const TABS = [
     deptManagerOnly: false,
     academicManagerOnly: false,
     teacherOrManagerOnly: false,
+    hideFromStudent: true,
   },
   {
     to: "/subjects",
@@ -141,6 +142,7 @@ const TABS = [
     deptManagerOnly: false,
     academicManagerOnly: false,
     teacherOrManagerOnly: false,
+    hideFromStudent: true,
   },
   {
     to: "/teaching-plan-overview",
@@ -365,6 +367,7 @@ function AppShellInner() {
           (profile.roles.includes("teacher") ||
             profile.roles.includes("student") ||
             profile.roles.includes("parent")))) &&
+      (!t.hideFromStudent || !profile || !profile.roles.includes("student")) &&
       // /time-tracking is further gated by the school-wide per-role toggle (migration 0032).
       (t.to !== "/time-tracking" ||
         (profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r)))),
