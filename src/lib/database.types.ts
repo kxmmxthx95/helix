@@ -34,12 +34,17 @@ export type GameMap = {
   updated_at: string;
 };
 
+/** sprite file lives at public/ninja/tiles/<sprite>.png — see migration 0058. */
+export const OBSTACLE_SPRITES = ["log_post", "barrel", "crate", "bookshelf"] as const;
+export type ObstacleSprite = (typeof OBSTACLE_SPRITES)[number];
+
 /** Always 1x1 — grid-toggle editor, see migration 0057. */
 export type GameMapObstacle = {
   id: string;
   map_id: string;
   x: number;
   y: number;
+  sprite: ObstacleSprite;
 };
 
 export type Profile = {
@@ -1169,7 +1174,7 @@ export type Database = {
         InsertOf<PracticeAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
       >;
       game_maps: Table<GameMap, InsertOf<GameMap, "ground_color" | "wall_color" | "is_active">>;
-      game_map_obstacles: Table<GameMapObstacle, InsertOf<GameMapObstacle, never>>;
+      game_map_obstacles: Table<GameMapObstacle, InsertOf<GameMapObstacle, "sprite">>;
     };
     Views: Record<string, never>;
     Functions: {

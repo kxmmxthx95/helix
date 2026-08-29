@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { GameMap, GameMapObstacle } from "@/lib/database.types";
+import type { GameMap, GameMapObstacle, ObstacleSprite } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
 export function useGameMaps() {
@@ -77,26 +77,40 @@ export function useDeleteGameMap() {
   });
 }
 
-/** Toggles one grid cell's obstacle on/off — the editor's whole write model (grill decision). */
-export function useToggleGameMapObstacle() {
+/**
+ * Editor's whole write model for a cell (grill decision): clicking with a
+ * prop selected places it; clicking a cell already holding that same prop
+ * clears it; clicking a cell holding a different prop swaps it.
+ */
+export function useSetGameMapObstacle() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
       mapId,
       x,
       y,
-      present,
+      existingSprite,
+      sprite,
     }: {
       mapId: string;
       x: number;
       y: number;
-      present: boolean;
+      existingSprite: ObstacleSprite | null;
+      sprite: ObstacleSprite;
     }) => {
-      if (present) {
+      if (existingSprite === sprite) {
         const { error } = await supabase.from("game_map_obstacles").delete().eq("map_id", mapId).eq("x", x).eq("y", y);
         if (error) throw error;
+      } else if (existingSprite) {
+        const { error } = await supabase
+          .from("game_map_obstacles")
+          .update({ sprite })
+          .eq("map_id", mapId)
+          .eq("x", x)
+          .eq("y", y);
+        if (error) throw error;
       } else {
-        const { error } = await supabase.from("game_map_obstacles").insert({ map_id: mapId, x, y });
+        const { error } = await supabase.from("game_map_obstacles").insert({ map_id: mapId, x, y, sprite });
         if (error) throw error;
       }
     },

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { CharacterOptions } from "@/lib/database.types";
+import { OBSTACLE_SPRITES, type CharacterOptions, type ObstacleSprite } from "@/lib/database.types";
 import { CELL, FRAMES_PER_DIRECTION, getWalkStrip, type WalkDirection } from "@/lib/characterSprite";
 import { buildWalkGrid, TILE } from "@/lib/trainingGroundScene";
 import { findPath, type GridPoint } from "@/lib/pathfind";
@@ -67,7 +67,7 @@ function TrainingGroundCanvas({
   const pathRef = useRef<GridPoint[]>([]); // remaining tiles to walk, path[0] is next step
   const directionRef = useRef<WalkDirection>("down");
   const frameRef = useRef(0);
-  const postImageRef = useRef<HTMLImageElement | null>(null);
+  const spriteImagesRef = useRef<Partial<Record<ObstacleSprite, HTMLImageElement>>>({});
   const stepStartRef = useRef(0);
   const fromRef = useRef<GridPoint>({ x: 1, y: 1 });
 
@@ -93,13 +93,11 @@ function TrainingGroundCanvas({
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    loadImage("/ninja/tiles/log_post.png").then((img) => {
-      if (!cancelled) postImageRef.current = img;
-    });
-    return () => {
-      cancelled = true;
-    };
+    for (const s of OBSTACLE_SPRITES) {
+      loadImage(`/ninja/tiles/${s}.png`).then((img) => {
+        spriteImagesRef.current[s] = img;
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -168,13 +166,13 @@ function TrainingGroundCanvas({
           ctx.fillRect(sx, sy, size, size);
         }
       }
-      const post = postImageRef.current;
       for (const o of obstacles) {
         const sx = (o.x * TILE - camX) * zoom;
         const sy = (o.y * TILE - camY) * zoom;
         const size = TILE * zoom;
-        if (post) {
-          ctx.drawImage(post, sx, sy, size, size);
+        const img = spriteImagesRef.current[o.sprite];
+        if (img) {
+          ctx.drawImage(img, sx, sy, size, size);
         } else {
           ctx.fillStyle = "#8a5a35";
           ctx.fillRect(sx, sy, size, size);

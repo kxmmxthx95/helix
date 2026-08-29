@@ -7,15 +7,22 @@ import {
   useDeleteGameMap,
   useGameMapObstacles,
   useGameMaps,
-  useToggleGameMapObstacle,
+  useSetGameMapObstacle,
   useUpdateGameMap,
 } from "@/hooks/useGameMaps";
-import type { GameMap } from "@/lib/database.types";
+import { OBSTACLE_SPRITES, type GameMap, type ObstacleSprite } from "@/lib/database.types";
 import { canManageUsers } from "@/lib/roles";
 
 const TILE_PX = 24;
 const DEFAULT_COLS = 14;
 const DEFAULT_ROWS = 10;
+
+const SPRITE_LABEL: Record<ObstacleSprite, string> = {
+  log_post: "เสาฝึก",
+  barrel: "ถัง",
+  crate: "หีบ",
+  bookshelf: "ชั้นหนังสือ",
+};
 
 export function GameEditor() {
   const { profile: me } = useAuth();
@@ -97,18 +104,19 @@ function MapEditor({ map }: { map: GameMap }) {
   const { data: obstacles } = useGameMapObstacles(map.id);
   const updateMap = useUpdateGameMap();
   const deleteMap = useDeleteGameMap();
-  const toggleObstacle = useToggleGameMapObstacle();
+  const setObstacle = useSetGameMapObstacle();
+  const [brush, setBrush] = useState<ObstacleSprite>("log_post");
 
-  const obstacleKeys = new Set((obstacles ?? []).map((o) => `${o.x},${o.y}`));
+  const obstacleAt = new Map((obstacles ?? []).map((o) => [`${o.x},${o.y}`, o.sprite]));
 
   function isEdge(x: number, y: number) {
     return x === 0 || y === 0 || x === map.cols - 1 || y === map.rows - 1;
   }
 
   function onCellClick(x: number, y: number) {
-    if (isEdge(x, y)) return; // outer ring is always wall — nothing to toggle
-    toggleObstacle.mutate(
-      { mapId: map.id, x, y, present: obstacleKeys.has(`${x},${y}`) },
+    if (isEdge(x, y)) return; // outer ring is always wall — nothing to place
+    setObstacle.mutate(
+      { mapId: map.id, x, y, existingSprite: obstacleAt.get(`${x},${y}`) ?? null, sprite: brush },
       { onError: (err) => toast(err instanceof Error ? err.message : "แก้ไขไม่สำเร็จ", "error") },
     );
   }
@@ -155,7 +163,17 @@ function MapEditor({ map }: { map: GameMap }) {
         </Button>
       </div>
 
-      <p className="text-xs text-muted-foreground">คลิกช่องในตารางเพื่อวาง/ลบเสาฝึก — ขอบนอกเป็นกำแพงเสมอ แก้ไม่ได้</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs text-muted-foreground">วางเป็น:</span>
+        {OBSTACLE_SPRITES.map((s) => (
+          <Button key={s} size="xs" variant={brush === s ? "accent" : "outline"} onClick={() => setBrush(s)}>
+            {SPRITE_LABEL[s]}
+          </Button>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        คลิกช่องว่างเพื่อวาง{SPRITE_LABEL[brush]} คลิกช่องที่มีของเดิมซ้ำเพื่อลบ หรือชนิดอื่นเพื่อเปลี่ยน — ขอบนอกเป็นกำแพงเสมอ แก้ไม่ได้
+      </p>
 
       <div
         className="inline-grid gap-px rounded border bg-border"
@@ -164,18 +182,21 @@ function MapEditor({ map }: { map: GameMap }) {
         {Array.from({ length: map.rows }, (_, y) =>
           Array.from({ length: map.cols }, (_, x) => {
             const edge = isEdge(x, y);
-            const hasObstacle = obstacleKeys.has(`${x},${y}`);
+            const sprite = obstacleAt.get(`${x},${y}`);
             return (
               <button
                 key={`${x},${y}`}
                 type="button"
                 onClick={() => onCellClick(x, y)}
                 disabled={edge}
-                title={edge ? "กำแพง" : hasObstacle ? "เสาฝึก (คลิกเพื่อลบ)" : "พื้นว่าง (คลิกเพื่อวางเสาฝึก)"}
+                title={edge ? "กำแพง" : sprite ? `${SPRITE_LABEL[sprite]} (คลิกเพื่อลบ/เปลี่ยน)` : `พื้นว่าง (คลิกเพื่อวาง${SPRITE_LABEL[brush]})`}
                 style={{
                   width: TILE_PX,
                   height: TILE_PX,
-                  backgroundColor: edge ? map.wall_color : hasObstacle ? "#8a5a35" : map.ground_color,
+                  backgroundColor: edge ? map.wall_color : map.ground_color,
+                  backgroundImage: sprite ? `url(/ninja/tiles/${sprite}.png)` : undefined,
+                  backgroundSize: "cover",
+                  imageRendering: "pixelated",
                 }}
                 className="tappable disabled:cursor-default"
               />
