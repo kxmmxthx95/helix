@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { AvatarBuilder } from "@/components/AvatarBuilder";
-import { ClassroomScene } from "@/components/ClassroomScene";
+import { TrainingGroundScene } from "@/components/TrainingGroundScene";
 import { Sheet } from "@/components/Sheet";
 import { Button, Field, Input, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
@@ -117,7 +117,7 @@ function StudentCharacterCard({ profile }: { profile: ProfileWithRoles }) {
 
   return (
     <div className="relative -mx-3">
-      <ClassroomScene options={options} />
+      <TrainingGroundScene options={options} />
       <Button
         size="sm"
         variant="outline"

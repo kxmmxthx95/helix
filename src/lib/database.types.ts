@@ -18,10 +18,28 @@ export type PositionTitle = {
 };
 
 export type CharacterOptions = {
-  skin: "light" | "amber" | "brown";
-  hair: "messy" | "parted_side_bangs" | "swoop_side";
-  outfitColor: "blue" | "red" | "green";
-  hat: "hairtie" | "thick" | null;
+  characterId: string;
+};
+
+/** Admin-authored walkable scene shown on the student dashboard. See migration 0057. */
+export type GameMap = {
+  id: string;
+  name: string;
+  cols: number;
+  rows: number;
+  ground_color: string;
+  wall_color: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Always 1x1 — grid-toggle editor, see migration 0057. */
+export type GameMapObstacle = {
+  id: string;
+  map_id: string;
+  x: number;
+  y: number;
 };
 
 export type Profile = {
@@ -1150,6 +1168,8 @@ export type Database = {
         PracticeAttemptAnswer,
         InsertOf<PracticeAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
       >;
+      game_maps: Table<GameMap, InsertOf<GameMap, "ground_color" | "wall_color" | "is_active">>;
+      game_map_obstacles: Table<GameMapObstacle, InsertOf<GameMapObstacle, never>>;
     };
     Views: Record<string, never>;
     Functions: {

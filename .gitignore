@@ -4,6 +4,9 @@ dist
 .env
 dev-dist
 
+# Raw asset-pack sources — only the curated files under public/ninja/ ship.
+assets-src/
+
 # Claude Code local only (settings, vendor skill dumps).
 # Helix policy lives in AGENTS.md / CLAUDE.md / .cursor/rules/.
 # Project skills live in .agents/skills/ (tracked).

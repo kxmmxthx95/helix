@@ -30,6 +30,7 @@ import { TimeTracking } from "@/routes/TimeTracking";
 import { Leave } from "@/routes/Leave";
 import { PeriodAttendance } from "@/routes/PeriodAttendance";
 import { Users } from "@/routes/Users";
+import { GameEditor } from "@/routes/GameEditor";
 
 function Gate() {
   const { session, profile, loading, onboardingStep, onboardingLoading } = useAuth();
@@ -54,6 +55,7 @@ function Gate() {
       <Route element={<AppShell />}>
         <Route index element={<Dashboard />} />
         <Route path="users" element={<Users />} />
+        <Route path="game-editor" element={<GameEditor />} />
         <Route path="roster" element={<Roster />} />
         <Route path="score-recording" element={<ScoreRecording />} />
         <Route path="assignments" element={<Assignments />} />

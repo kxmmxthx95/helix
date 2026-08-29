@@ -20,6 +20,7 @@ import DocumentTextOutline from "react-ionicons/lib/DocumentTextOutline";
 import Download from "react-ionicons/lib/Download";
 import EyeOffOutline from "react-ionicons/lib/EyeOffOutline";
 import EyeOutline from "react-ionicons/lib/EyeOutline";
+import GameControllerOutline from "react-ionicons/lib/GameControllerOutline";
 import GridOutline from "react-ionicons/lib/GridOutline";
 import HelpCircleOutline from "react-ionicons/lib/HelpCircleOutline";
 import Key from "react-ionicons/lib/Key";
@@ -76,6 +77,7 @@ function wrap(Ion: (props: Record<string, unknown>) => React.JSX.Element) {
 
 export const CloudOff = wrap(CloudOffline);
 export const LayoutDashboard = wrap(GridOutline);
+export const GameEditorIcon = wrap(GameControllerOutline);
 export const LogOut = wrap(IonLogOut);
 export const MenuIcon = wrap(MenuOutline);
 export const ProfileIcon = wrap(PersonCircleOutline);
