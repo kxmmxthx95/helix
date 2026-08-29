@@ -598,12 +598,34 @@ export type ExamAttemptEvent = {
 // แบบฝึกหัด — ungraded, retry-anytime practice, separate from ข้อสอบ above.
 // Reuses the exam_questions bank as its question source. See migration 0053.
 
+/** บทเรียนหลัก — top level of the practice catalog under a subject. See migration 0056. */
+export type PracticeLesson = {
+  id: string;
+  subject_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** เนื้อหาย่อย — one topic under a practice_lessons row; a teacher-curated PracticeSet always points at one of these. See migration 0056. */
+export type PracticeTopic = {
+  id: string;
+  lesson_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 /** A set of bank questions to practice — either curated by a teacher (visible to every classroom currently studying the subject) or a student's own self-serve random pull. Every PracticeAttempt points at one of these either way. */
 export type PracticeSet = {
   id: string;
   subject_id: string;
   created_by: string;
   is_teacher_curated: boolean;
+  /** Required iff is_teacher_curated — see migration 0056's SubjectPicker -> lesson -> topic flow. Null on self-serve sets. */
+  topic_id: string | null;
   title: string | null;
   /** Self-serve filters this pull was drawn from — null on teacher-curated sets. */
   topic: string | null;
@@ -1116,7 +1138,9 @@ export type Database = {
         InsertOf<ExamAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
       >;
       exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
-      practice_sets: Table<PracticeSet, InsertOf<PracticeSet, "title" | "topic" | "difficulty">>;
+      practice_lessons: Table<PracticeLesson, InsertOf<PracticeLesson, "sort_order" | "created_at" | "updated_at">>;
+      practice_topics: Table<PracticeTopic, InsertOf<PracticeTopic, "sort_order" | "created_at" | "updated_at">>;
+      practice_sets: Table<PracticeSet, InsertOf<PracticeSet, "title" | "topic_id" | "topic" | "difficulty">>;
       practice_set_questions: Table<PracticeSetQuestion, PracticeSetQuestion>;
       practice_attempts: Table<
         PracticeAttempt,

@@ -193,8 +193,12 @@ const TABS = [
     orgWideOnly: false,
     deptManagerOnly: false,
     academicManagerOnly: false,
+    // Own flag, not teacherOrStudentOrParentOnly (shared with /exams) —
+    // a manager (canManage) also curates practice sets org/department-wide,
+    // matching can_write_practice_subject's can_manage() grant (0053).
     teacherOrManagerOnly: false,
-    teacherOrStudentOrParentOnly: true,
+    teacherOrStudentOrParentOnly: false,
+    teacherOrManagerOrStudentOrParentOnly: true,
   },
   {
     to: "/assignments",
@@ -367,6 +371,12 @@ function AppShellInner() {
       (!t.teacherOrStudentOrParentOnly ||
         (profile &&
           (profile.roles.includes("teacher") ||
+            profile.roles.includes("student") ||
+            profile.roles.includes("parent")))) &&
+      (!t.teacherOrManagerOrStudentOrParentOnly ||
+        (profile &&
+          (profile.roles.includes("teacher") ||
+            canManage(profile.roles) ||
             profile.roles.includes("student") ||
             profile.roles.includes("parent")))) &&
       (!t.hideFromStudent || !profile || !profile.roles.includes("student")) &&

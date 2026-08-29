@@ -1,13 +1,16 @@
 import { NodeApi, type Value } from "platejs";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
+import { AiQuestionDrawer } from "@/components/AiQuestionDrawer";
 import { EMPTY_PROMPT } from "@/components/editor/plateConfig";
 import { QuestionEditor } from "@/components/editor/QuestionEditor";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
-import { ChevronForward, DocumentTextIcon, PencilIcon, Plus, X } from "@/components/icons";
+import { ChevronForward, DocumentTextIcon, HighlightIcon, PencilIcon, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
+import { useSubjects } from "@/hooks/useCurriculum";
+import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import {
   useCreateExamQuestion,
   useDeleteExamQuestion,
@@ -17,10 +20,13 @@ import {
   useUpdateExamQuestion,
   type ChoiceDraft,
   type ExamQuestionWithChoices,
+  type GeneratedQuestion,
 } from "@/hooks/useExamBank";
+import { useDepartments } from "@/hooks/useProfiles";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import type { ExamQuestionDifficulty, ExamQuestionType, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
+import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 /** Plaintext fallback for the table-preview/session-picker read sites — [สูตร]/[รูปภาพ] placeholders for nodes NodeApi.string can't stringify (equation/image have no .text). */
@@ -53,36 +59,88 @@ const DIFFICULTY_BADGE_CLASS: Record<ExamQuestionDifficulty, string> = {
   hard: "bg-destructive/15 text-destructive",
 };
 
-/** role="teacher" only — ครูสร้าง/จัดการคลังข้อสอบของวิชาที่ตัวเองสอน. See migration 0047. */
+/**
+ * role="teacher" sees the bank for subjects they teach; a manager
+ * (canManage — super_admin/director/staff/dept_head) sees every subject in
+ * their department (any department, org-wide), mirroring can_write_exam_subject's
+ * can_manage()+department grant in migration 0047 rather than the teacher's
+ * narrower teaching_assignments view.
+ */
 export function ExamBank() {
   const { profile: me } = useAuth();
-  const { data: assignments = [] } = useMyTeachingAssignments(me?.id ?? null);
-  const subjectIds = [...new Set(assignments.map((a) => a.subject_id))];
-  const { data: subjects = [] } = useSubjectsByIds(subjectIds);
+  const isManager = me ? canManage(me.roles) : false;
+  const orgWide = me ? isOrgWide(me.roles) : false;
+
+  const { data: assignments = [] } = useMyTeachingAssignments(!isManager ? me?.id ?? null : null);
+  const teacherSubjectIds = [...new Set(assignments.map((a) => a.subject_id))];
+  const { data: teacherSubjects = [] } = useSubjectsByIds(teacherSubjectIds);
+
+  const { data: departments = [] } = useDepartments();
+  const [pickedDept, setPickedDept] = useState("");
+  const managerDepartmentId = orgWide ? pickedDept : me?.department_id ?? "";
+  const { data: managerSubjects = [] } = useSubjects({
+    search: "",
+    departmentId: isManager ? managerDepartmentId : "",
+    learningAreaId: "",
+    gradeLevelId: "",
+    term: "",
+    subjectType: "",
+    includeInactive: false,
+  });
+
+  const subjects = isManager ? managerSubjects : teacherSubjects;
   const gradeLevelIds = [...new Set(subjects.map((s) => s.suggested_grade_level_id).filter((id): id is string => !!id))];
-  const { data: gradeLevels = [] } = useGradeLevelsByIds(gradeLevelIds);
-  const gradeLevelById = new Map(gradeLevels.map((g) => [g.id, g]));
+  const { data: teacherGradeLevels = [] } = useGradeLevelsByIds(!isManager ? gradeLevelIds : []);
+  const { data: managerGradeLevels = [] } = useGradeLevels(isManager ? managerDepartmentId || null : null);
+  const gradeLevelById = useMemo(
+    () => new Map((isManager ? managerGradeLevels : teacherGradeLevels).map((g) => [g.id, g])),
+    [isManager, managerGradeLevels, teacherGradeLevels],
+  );
 
   const [subjectId, setSubjectId] = useState("");
   const [editing, setEditing] = useState<ExamQuestionWithChoices | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   const { data: questions = [], isLoading } = useExamQuestions(subjectId || null);
   const deleteQuestion = useDeleteExamQuestion();
   const toast = useToast();
+  // Lifted out of QuestionForm so the header's AI drawer can fill the same
+  // always-visible "new question" form it's sitting next to.
+  const newQuestionForm = useQuestionForm({ subjectId, teacherId: me?.id ?? "", question: null, onSaved: () => {} });
 
-  if (!me?.roles.includes("teacher")) {
+  if (!me || (!me.roles.includes("teacher") && !isManager)) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
   }
 
   return (
     <div className="page-fill">
+      {isManager && orgWide && !subjectId && (
+        <div className="shrink-0">
+          <Field label="แผนก">
+            <Select value={pickedDept} onChange={(e) => setPickedDept(e.target.value)}>
+              <option value="">เลือกแผนก</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+      )}
+
       {subjectId && (
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Button size="sm" variant="ghost" onClick={() => setSubjectId("")}>
             <ChevronForward className="h-3 w-3 rotate-180" /> {subjects.find((s) => s.id === subjectId)?.name_th ?? "เปลี่ยนวิชา"}
           </Button>
           <div className="ml-auto flex items-center gap-1">
+            {!previewing && (
+              <Button size="icon" variant="ghost" aria-label="สร้างข้อสอบด้วย AI" onClick={() => setAiOpen(true)}>
+                <HighlightIcon className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <Button
               size="icon"
               variant={previewing ? "accent" : "ghost"}
@@ -99,13 +157,22 @@ export function ExamBank() {
 
       {subjectId && !previewing && (
         <div className="shrink-0 rounded-lg border border-border bg-card p-3">
-          <QuestionForm key="new" subjectId={subjectId} teacherId={me.id} question={null} onSaved={() => {}} />
+          <QuestionForm form={newQuestionForm} />
         </div>
       )}
 
-      {subjects.length === 0 ? (
+      <AiQuestionDrawer open={aiOpen} onOpenChange={setAiOpen} onGenerated={newQuestionForm.applyGenerated} />
+
+      {isManager && orgWide && !managerDepartmentId ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ไม่มีวิชา" description="ยังไม่มีวิชาที่คุณสอน" />
+          <EmptyState title="เลือกแผนก" description="เลือกแผนกเพื่อดูวิชาทั้งหมด" />
+        </div>
+      ) : subjects.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState
+            title="ไม่มีวิชา"
+            description={isManager ? "ยังไม่มีวิชาในแผนกนี้" : "ยังไม่มีวิชาที่คุณสอน"}
+          />
         </div>
       ) : subjectId && !previewing ? null : !subjectId ? (
         <div className="table-panel flex-1">
@@ -334,6 +401,16 @@ function useQuestionForm({
     }
   }
 
+  /** Fills every field from a finished AI chat draft — overwrites whatever's in the form, no confirm (nothing's saved to the DB until "บันทึก"). */
+  function applyGenerated(q: GeneratedQuestion) {
+    setType(q.type);
+    setDifficulty(q.difficulty);
+    setTopic(q.topic);
+    setPrompt([{ type: "p", children: [{ text: q.prompt }] }]);
+    setCorrectAnswer(q.correct_answer ?? "");
+    setChoices(q.choices);
+  }
+
   // Caches the in-flight draft-row insert so pasting/selecting multiple
   // images at once (each calls ensureQuestionId independently, see
   // plateConfig) shares one row instead of racing to create several.
@@ -386,6 +463,7 @@ function useQuestionForm({
     setChoices,
     canSave,
     save,
+    applyGenerated,
     pending: create.isPending || update.isPending,
   };
 }
@@ -437,19 +515,8 @@ function QuestionFormFields(form: ReturnType<typeof useQuestionForm>) {
   );
 }
 
-/** Always-visible "new question" form above the table — no add button, matches ChoiceEditor's inline style. */
-function QuestionForm({
-  subjectId,
-  teacherId,
-  question,
-  onSaved,
-}: {
-  subjectId: string;
-  teacherId: string;
-  question: ExamQuestionWithChoices | null;
-  onSaved: () => void;
-}) {
-  const form = useQuestionForm({ subjectId, teacherId, question, onSaved });
+/** Always-visible "new question" form above the table — no add button, matches ChoiceEditor's inline style. Takes `form` from the parent (rather than building its own) so the header's AI drawer can fill the same instance. */
+function QuestionForm({ form }: { form: ReturnType<typeof useQuestionForm> }) {
   return (
     <div className="space-y-3">
       {QuestionFormFields(form)}

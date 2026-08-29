@@ -5,12 +5,131 @@ import type {
   ExamQuestionDifficulty,
   PracticeAttempt,
   PracticeAttemptAnswer,
+  PracticeLesson,
   PracticeSet,
+  PracticeTopic,
 } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
 // แบบฝึกหัด — ungraded, retry-anytime practice against the exam_questions
 // bank. Separate from สอบออนไลน์ (useExams.ts). See migration 0053.
+
+// ------------------------------------------------------ lessons/topics catalog
+// วิชา -> บทเรียนหลัก -> เนื้อหาย่อย — the create-set flow's picker chain.
+// See migration 0056.
+
+export function usePracticeLessons(subjectId: string | null) {
+  return useQuery({
+    queryKey: ["practice_lessons", subjectId],
+    enabled: !!subjectId,
+    queryFn: async (): Promise<PracticeLesson[]> => {
+      const { data, error } = await supabase
+        .from("practice_lessons")
+        .select("*")
+        .eq("subject_id", subjectId!)
+        .order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useCreatePracticeLesson() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (draft: { subject_id: string; name: string; sort_order?: number }): Promise<PracticeLesson> => {
+      const { data, error } = await supabase.from("practice_lessons").insert(draft).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_lessons"] }),
+  });
+}
+
+export function useUpdatePracticeLesson() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: { id: string; name?: string; sort_order?: number }) => {
+      const { error } = await supabase.from("practice_lessons").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_lessons"] }),
+  });
+}
+
+export function useDeletePracticeLesson() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("practice_lessons").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_lessons"] }),
+  });
+}
+
+export function usePracticeTopics(lessonId: string | null) {
+  return useQuery({
+    queryKey: ["practice_topics", lessonId],
+    enabled: !!lessonId,
+    queryFn: async (): Promise<PracticeTopic[]> => {
+      const { data, error } = await supabase
+        .from("practice_topics")
+        .select("*")
+        .eq("lesson_id", lessonId!)
+        .order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** Topics by id — used to resolve a practice_set's displayed name (its topic's name) in the sets list/detail without a per-set query. */
+export function usePracticeTopicsByIds(topicIds: string[]) {
+  return useQuery({
+    queryKey: ["practice_topics", "by_ids", topicIds],
+    enabled: topicIds.length > 0,
+    queryFn: async (): Promise<PracticeTopic[]> => {
+      const { data, error } = await supabase.from("practice_topics").select("*").in("id", topicIds);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useCreatePracticeTopic() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (draft: { lesson_id: string; name: string; sort_order?: number }): Promise<PracticeTopic> => {
+      const { data, error } = await supabase.from("practice_topics").insert(draft).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_topics"] }),
+  });
+}
+
+export function useUpdatePracticeTopic() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: { id: string; name?: string; sort_order?: number }) => {
+      const { error } = await supabase.from("practice_topics").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_topics"] }),
+  });
+}
+
+export function useDeletePracticeTopic() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("practice_topics").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_topics"] }),
+  });
+}
 
 /** Name-only lookup for practice_sets.created_by — the bank is shared across every teacher of a subject (see useMyPracticeSets), so the set list needs to show who authored each one. */
 export function useProfilesByIds(ids: string[]) {
@@ -99,11 +218,11 @@ export function usePracticeSetQuestions(setId: string | null) {
   });
 }
 
-/** Creates an empty teacher-curated set — questions get added afterward in the set's own detail view, same two-step flow as exam_sessions (useCreateExamSession creates the shell, useSetSessionQuestions fills it in). */
+/** Creates an empty teacher-curated set against a topic (วิชา -> บทเรียนหลัก -> เนื้อหาย่อย, no title input — the set's displayed name is the topic's name) — questions get added afterward in the set's own detail view, same two-step flow as exam_sessions (useCreateExamSession creates the shell, useSetSessionQuestions fills it in). */
 export function useCreatePracticeSet() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (draft: { subject_id: string; created_by: string; title: string }) => {
+    mutationFn: async (draft: { subject_id: string; created_by: string; topic_id: string }) => {
       const { data: inserted, error } = await supabase
         .from("practice_sets")
         .insert({ ...draft, is_teacher_curated: true })
