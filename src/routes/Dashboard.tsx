@@ -1,15 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { AvatarBuilder } from "@/components/AvatarBuilder";
-import { TrainingGroundScene } from "@/components/TrainingGroundScene";
 import { Sheet } from "@/components/Sheet";
 import { Button, Field, Input, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions } from "@/hooks/useAssignments";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
 import { STARTING_SCORE, summarizeBehaviorScore, useBehaviorRecords } from "@/hooks/useBehaviorRecords";
-import { DEFAULT_CHARACTER_OPTIONS } from "@/lib/characterSprite";
 import { useClockIn, useClockOut, useMyTimeClock } from "@/hooks/useTimeClock";
 import {
   useCancelStudentLeaveRequest,
@@ -20,7 +17,6 @@ import { useSchoolSettings } from "@/hooks/useSettings";
 import {
   profileFullName,
   type AttendanceStatus,
-  type ProfileWithRoles,
   type StudentLeaveStatus,
   type Student,
 } from "@/lib/database.types";
@@ -74,7 +70,7 @@ export function Dashboard() {
   const showClockWidget =
     !!profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r));
 
-  if (isStudent) return profile && <StudentCharacterCard profile={profile} />;
+  if (isStudent) return profile && <StudentCharacterCard />;
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
@@ -110,28 +106,20 @@ export function Dashboard() {
   );
 }
 
-function StudentCharacterCard({ profile }: { profile: ProfileWithRoles }) {
-  const { refreshProfile } = useAuth();
-  const [builderOpen, setBuilderOpen] = useState(false);
-  const options = profile.character_options ?? DEFAULT_CHARACTER_OPTIONS;
-
+/**
+ * Godot HTML5 export (assets-src/GodotProject, see grill decision) — fixed
+ * GreenNinja player, no character picker. aspect-[320/176] matches the
+ * project's base viewport (project.godot window/size) so Godot's own
+ * stretch/aspect="keep" letterboxes correctly instead of us guessing a height.
+ */
+function StudentCharacterCard() {
   return (
-    <div className="relative -mx-3">
-      <TrainingGroundScene options={options} />
-      <Button
-        size="sm"
-        variant="outline"
-        className="glass absolute right-3 top-3"
-        onClick={() => setBuilderOpen(true)}
-      >
-        แก้ไขตัวละคร
-      </Button>
-      <AvatarBuilder
-        open={builderOpen}
-        onOpenChange={setBuilderOpen}
-        profileId={profile.id}
-        initialOptions={profile.character_options}
-        onSaved={() => void refreshProfile()}
+    <div className="-mx-3 aspect-[320/176] w-[calc(100%+1.5rem)]">
+      <iframe
+        src="/godot-game/index.html"
+        title="สนามฝึกนินจา"
+        className="h-full w-full border-0"
+        allow="autoplay"
       />
     </div>
   );
