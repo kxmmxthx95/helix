@@ -4,9 +4,9 @@ import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { BookIcon, ChevronBack, ChevronForward, PencilIcon, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
-import { useSubjects } from "@/hooks/useCurriculum";
+import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useExamQuestions, useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
 import { useMyCurrentClassroom } from "@/hooks/useExams";
@@ -38,6 +38,7 @@ import {
   type PracticeSetQuestionRow,
 } from "@/hooks/usePractice";
 import { useDepartments } from "@/hooks/useProfiles";
+import { usePagination } from "@/hooks/usePagination";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManage, isOrgWide } from "@/lib/roles";
@@ -97,21 +98,31 @@ function TeacherPractice({ me }: { me: NonNullable<ReturnType<typeof useAuth>["p
   const { data: departments = [] } = useDepartments();
   const [pickedDept, setPickedDept] = useState("");
   const managerDepartmentId = orgWide ? pickedDept : me.department_id ?? "";
+  const { data: learningAreas = [] } = useLearningAreas();
+  const [learningAreaId, setLearningAreaId] = useState("");
+  const [gradeLevelId, setGradeLevelId] = useState("");
   const { data: managerSubjects = [] } = useSubjects({
     search: "",
     departmentId: isManager ? managerDepartmentId : "",
-    learningAreaId: "",
-    gradeLevelId: "",
+    learningAreaId: isManager ? learningAreaId : "",
+    gradeLevelId: isManager ? gradeLevelId : "",
     term: "",
     subjectType: "",
     includeInactive: false,
   });
 
-  const subjects = isManager ? managerSubjects : teacherSubjects;
+  const teacherSubjectsFiltered = teacherSubjects.filter(
+    (s) =>
+      (!learningAreaId || s.learning_area_id === learningAreaId) &&
+      (!gradeLevelId || s.suggested_grade_level_id === gradeLevelId),
+  );
+  const subjects = isManager ? managerSubjects : teacherSubjectsFiltered;
   const gradeLevelIds = [...new Set(subjects.map((s) => s.suggested_grade_level_id).filter((id): id is string => !!id))];
   const { data: teacherGradeLevels = [] } = useGradeLevelsByIds(!isManager ? gradeLevelIds : []);
   const { data: managerGradeLevels = [] } = useGradeLevels(isManager ? managerDepartmentId || null : null);
   const gradeLevelById = new Map((isManager ? managerGradeLevels : teacherGradeLevels).map((g) => [g.id, g]));
+  const gradeLevelOptions = isManager ? managerGradeLevels : teacherGradeLevels;
+  const { page, setPage, pageCount, pageRows } = usePagination(subjects, [learningAreaId, gradeLevelId, managerDepartmentId]);
 
   // Drill-down: รายวิชา -> บทเรียน -> เนื้อหาย่อย (each level its own table).
   const [subjectId, setSubjectId] = useState("");
@@ -155,6 +166,33 @@ function TeacherPractice({ me }: { me: NonNullable<ReturnType<typeof useAuth>["p
         </div>
       )}
 
+      {(!isManager || !orgWide || managerDepartmentId) && (
+        <div className="flex shrink-0 gap-2">
+          <div className="flex-1">
+            <Field label="กลุ่มสาระ">
+              <Select value={learningAreaId} onChange={(e) => setLearningAreaId(e.target.value)} placeholder="ทั้งหมด">
+                {learningAreas.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          <div className="flex-1">
+            <Field label="ระดับชั้น">
+              <Select value={gradeLevelId} onChange={(e) => setGradeLevelId(e.target.value)} placeholder="ทั้งหมด">
+                {gradeLevelOptions.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {gradeShortLabel(g.code)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        </div>
+      )}
+
       {isManager && orgWide && !managerDepartmentId ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="เลือกแผนก" description="เลือกแผนกเพื่อดูรายวิชาทั้งหมด" />
@@ -175,7 +213,7 @@ function TeacherPractice({ me }: { me: NonNullable<ReturnType<typeof useAuth>["p
                 </tr>
               </thead>
               <tbody>
-                {subjects.map((s) => {
+                {pageRows.map((s) => {
                   const gradeLevel = s.suggested_grade_level_id ? gradeLevelById.get(s.suggested_grade_level_id) : null;
                   return (
                     <tr
@@ -198,6 +236,7 @@ function TeacherPractice({ me }: { me: NonNullable<ReturnType<typeof useAuth>["p
               </tbody>
             </table>
           </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </div>
       )}
     </div>
