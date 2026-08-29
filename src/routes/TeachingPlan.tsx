@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Plus } from "@/components/icons";
+import { ChevronForward, Plus } from "@/components/icons";
 import { Button, Card, Field, Input, Spinner } from "@/components/ui";
-import { useSubjects } from "@/hooks/useCurriculum";
+import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
+import { useDepartments } from "@/hooks/useProfiles";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import {
   currentPlanUnit,
@@ -18,8 +19,6 @@ import {
 } from "@/hooks/useTeachingPlan";
 import type { TeachingAssignment, TeachingPlanUnit } from "@/lib/database.types";
 import { cn } from "@/lib/utils";
-
-const TERM_LABEL: Record<number, string> = { 1: "เทอม 1", 2: "เทอม 2" };
 
 export function TeachingPlan() {
   const { profile: me } = useAuth();
@@ -36,73 +35,95 @@ export function TeachingPlan() {
   });
   const { data: classrooms = [] } = useClassroomsByDepartment(departmentId);
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
-  const [selectedId, setSelectedId] = useState("");
+  const { data: learningAreas = [] } = useLearningAreas();
+  const { data: departments = [] } = useDepartments();
+  const [expandedId, setExpandedId] = useState("");
 
   if (!me) return null;
 
   function label(a: TeachingAssignment) {
     const s = subjects.find((x) => x.id === a.subject_id);
     const c = classrooms.find((x) => x.id === a.classroom_id);
-    const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.name;
+    const g = gradeLevels.find((x) => x.id === c?.grade_level_id);
+    const la = learningAreas.find((x) => x.id === s?.learning_area_id);
+    const dept = departments.find((x) => x.id === s?.department_id);
     return {
-      title: s ? `${s.code} · ${s.name_th}` : "—",
-      subtitle: `${c ? `${g ?? "—"}/${c.name}` : "—"}${a.term ? ` · ${TERM_LABEL[a.term]}` : ""}`,
+      code: s?.code ?? "—",
+      learningArea: la?.name ?? "—",
+      name: s?.name_th ?? "—",
+      department: dept?.name ?? "—",
+      gradeLevel: g?.name ?? "—",
+      classroom: c?.name ?? "—",
     };
   }
 
-  const selected = assignments.find((a) => a.id === selectedId);
-
   return (
-    <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
-      <Card className="space-y-3 p-0">
-        <ul className="max-h-[32rem] divide-y divide-border overflow-y-auto text-sm">
-          {assignments.map((a) => {
-            const l = label(a);
-            return (
-              <li key={a.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(a.id)}
-                  className={cn(
-                    "flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left transition-colors",
-                    selectedId === a.id ? "bg-foreground/10" : "hover:bg-muted",
+    <Card className="space-y-3 p-0">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[48rem] text-xs">
+          <thead className="bg-muted text-left text-xs text-muted-foreground">
+            <tr>
+              <th className="w-8 px-3 py-2" />
+              <th className="px-3 py-2 font-medium">รหัสวิชา</th>
+              <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
+              <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
+              <th className="px-3 py-2 font-medium">แผนก</th>
+              <th className="px-3 py-2 font-medium">ระดับชั้น</th>
+              <th className="px-3 py-2 font-medium">ห้อง</th>
+            </tr>
+          </thead>
+          <tbody>
+            {assignments.map((a) => {
+              const l = label(a);
+              const open = expandedId === a.id;
+              return (
+                <Fragment key={a.id}>
+                  <tr
+                    onClick={() => setExpandedId(open ? "" : a.id)}
+                    className={cn(
+                      "h-[40px] cursor-pointer border-t border-border transition-colors",
+                      open ? "bg-foreground/10" : "hover:bg-muted",
+                    )}
+                  >
+                    <td className="px-3 py-0">
+                      <ChevronForward
+                        className={cn("h-3 w-3 shrink-0 rotate-90 text-muted-foreground transition-transform", open && "-rotate-90")}
+                      />
+                    </td>
+                    <td className="px-3 py-0 text-xs">{l.code}</td>
+                    <td className="px-3 py-0">{l.learningArea}</td>
+                    <td className="px-3 py-0 font-medium">{l.name}</td>
+                    <td className="px-3 py-0">{l.department}</td>
+                    <td className="px-3 py-0">{l.gradeLevel}</td>
+                    <td className="px-3 py-0">{l.classroom}</td>
+                  </tr>
+                  {open && (
+                    <tr className="border-t border-border">
+                      <td colSpan={7} className="bg-muted/20 p-3">
+                        <PlanBoard assignment={a} />
+                      </td>
+                    </tr>
                   )}
-                >
-                  <span className="truncate">{l.title}</span>
-                  <span className="text-xs text-muted-foreground">{l.subtitle}</span>
-                </button>
-              </li>
-            );
-          })}
-          {isLoading && (
-            <li className="flex justify-center py-8">
-              <Spinner className="h-5 w-5 text-muted-foreground" />
-            </li>
-          )}
-          {!isLoading && assignments.length === 0 && (
-            <li className="px-3 py-8 text-center text-sm text-muted-foreground">ยังไม่มีวิชาที่ได้รับมอบหมาย</li>
-          )}
-        </ul>
-      </Card>
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
-      {selected ? (
-        <PlanBoard assignment={selected} label={label(selected)} />
-      ) : (
-        <Card className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-          เลือกวิชาทางซ้ายเพื่อดู/แก้ไขแผนการสอน
-        </Card>
+      {isLoading && (
+        <div className="flex justify-center py-8">
+          <Spinner className="h-5 w-5 text-muted-foreground" />
+        </div>
       )}
-    </div>
+      {!isLoading && assignments.length === 0 && (
+        <p className="px-3 py-8 text-center text-sm text-muted-foreground">ยังไม่มีวิชาที่ได้รับมอบหมาย</p>
+      )}
+    </Card>
   );
 }
 
-function PlanBoard({
-  assignment,
-  label,
-}: {
-  assignment: TeachingAssignment;
-  label: { title: string; subtitle: string };
-}) {
+function PlanBoard({ assignment }: { assignment: TeachingAssignment }) {
   const { data: units = [], isLoading } = useTeachingPlanUnits(assignment.id);
   const current = currentPlanUnit(units);
   const mark = useMarkPlanUnitTaught();
@@ -111,12 +132,7 @@ function PlanBoard({
   const [note, setNote] = useState("");
 
   return (
-    <Card className="space-y-3">
-      <div>
-        <h3 className="text-sm font-semibold">{label.title}</h3>
-        <p className="text-xs text-muted-foreground">{label.subtitle}</p>
-      </div>
-
+    <div className="space-y-3">
       {isLoading && (
         <div className="flex justify-center py-6">
           <Spinner className="h-5 w-5 text-muted-foreground" />
@@ -124,7 +140,7 @@ function PlanBoard({
       )}
 
       {!isLoading && current && (
-        <div className="rounded-lg border border-border bg-muted/40 p-3">
+        <div className="rounded-lg border border-border bg-background p-3">
           <p className="text-xs text-muted-foreground">แผนวันนี้ — หน่วยที่ {current.unit_no}</p>
           <p className="text-sm font-medium">{current.title}</p>
           {current.description && <p className="text-xs text-muted-foreground">{current.description}</p>}
@@ -155,7 +171,7 @@ function PlanBoard({
       )}
 
       {!isLoading && !current && units.length > 0 && (
-        <p className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+        <p className="rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">
           สอนครบตามแผนแล้วทุกหน่วย
         </p>
       )}
@@ -170,7 +186,7 @@ function PlanBoard({
                 <th className="px-3 py-2 font-medium">จัดการ</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border bg-background">
               {units.map((u) => {
                 const s = planUnitStatus(u);
                 return (
@@ -191,7 +207,7 @@ function PlanBoard({
       )}
 
       <NewPlanUnitForm teachingAssignmentId={assignment.id} nextUnitNo={(units.at(-1)?.unit_no ?? 0) + 1} />
-    </Card>
+    </div>
   );
 }
 
@@ -322,4 +338,3 @@ function NewPlanUnitForm({
     </form>
   );
 }
-

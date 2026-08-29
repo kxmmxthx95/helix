@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
+import { ChevronForward } from "@/components/icons";
 import { Card, Select, Spinner } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
+import { useLearningAreas } from "@/hooks/useCurriculum";
 import { useDepartments, useProfiles } from "@/hooks/useProfiles";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import { useDepartmentTeachingAssignments } from "@/hooks/useTeachingLoad";
@@ -101,6 +103,8 @@ function OverviewBoard({
   });
   const { data: classrooms = [] } = useClassroomsByDepartment(departmentId);
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
+  const { data: learningAreas = [] } = useLearningAreas();
+  const { data: departments = [] } = useDepartments();
 
   const assignmentIds = useMemo(() => assignments.map((a) => a.id), [assignments]);
   const { data: units = [] } = useTeachingPlanUnitsForAssignments(assignmentIds);
@@ -111,10 +115,17 @@ function OverviewBoard({
     const t = teachers.find((x) => x.id === a.teacher_id);
     const s = subjects.find((x) => x.id === a.subject_id);
     const c = classrooms.find((x) => x.id === a.classroom_id);
-    const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.name;
+    const g = gradeLevels.find((x) => x.id === c?.grade_level_id);
+    const la = learningAreas.find((x) => x.id === s?.learning_area_id);
+    const dept = departments.find((x) => x.id === s?.department_id);
     return {
-      title: `${t ? profileFullName(t) : "—"} · ${s ? s.code : "—"}`,
-      subtitle: `${c ? `${g ?? "—"}/${c.name}` : "—"}${a.term ? ` · ${TERM_LABEL[a.term]}` : ""}`,
+      teacher: t ? profileFullName(t) : "—",
+      code: s?.code ?? "—",
+      learningArea: la?.name ?? "—",
+      name: s?.name_th ?? "—",
+      department: dept?.name ?? "—",
+      gradeLevel: g?.name ?? "—",
+      classroom: c?.name ?? "—",
     };
   }
 
@@ -132,92 +143,108 @@ function OverviewBoard({
     [assignments, units],
   );
 
-  const selected = rows.find((r) => r.assignment.id === selectedId);
-  const selectedUnits = units.filter((u) => u.teaching_assignment_id === selectedId);
-
   return (
-    <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
-      <Card className="space-y-3 p-0">
-        <ul className="max-h-[32rem] divide-y divide-border overflow-y-auto text-sm">
-          {rows.map((r) => {
-            const l = label(r.assignment);
-            return (
-              <li key={r.assignment.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(r.assignment.id)}
-                  className={cn(
-                    "flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors",
-                    selectedId === r.assignment.id ? "bg-foreground/10" : "hover:bg-muted",
-                  )}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate">{l.title}</span>
-                    <span className="text-xs text-muted-foreground">{l.subtitle}</span>
-                  </span>
-                  <span className="flex shrink-0 flex-col items-end gap-0.5">
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                      {r.completed}/{r.total} หน่วย
-                    </span>
-                    {r.offPlan > 0 && (
-                      <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs text-warning">
-                        ไม่ตามแผน {r.offPlan} ครั้ง
-                      </span>
+    <Card className="space-y-3 p-0">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[56rem] text-xs">
+          <thead className="bg-muted text-left text-xs text-muted-foreground">
+            <tr>
+              <th className="w-8 px-3 py-2" />
+              <th className="px-3 py-2 font-medium">ครูผู้สอน</th>
+              <th className="px-3 py-2 font-medium">รหัสวิชา</th>
+              <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
+              <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
+              <th className="px-3 py-2 font-medium">แผนก</th>
+              <th className="px-3 py-2 font-medium">ระดับชั้น</th>
+              <th className="px-3 py-2 font-medium">ห้อง</th>
+              <th className="px-3 py-2 font-medium">ความคืบหน้า</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const l = label(r.assignment);
+              const open = selectedId === r.assignment.id;
+              const rowUnits = units.filter((u) => u.teaching_assignment_id === r.assignment.id);
+              return (
+                <Fragment key={r.assignment.id}>
+                  <tr
+                    onClick={() => setSelectedId(open ? "" : r.assignment.id)}
+                    className={cn(
+                      "h-[40px] cursor-pointer border-t border-border transition-colors",
+                      open ? "bg-foreground/10" : "hover:bg-muted",
                     )}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-          {isLoading && (
-            <li className="flex justify-center py-8">
-              <Spinner className="h-5 w-5 text-muted-foreground" />
-            </li>
-          )}
-          {!isLoading && rows.length === 0 && (
-            <li className="px-3 py-8 text-center text-sm text-muted-foreground">ยังไม่มีภาระงานสอนในแผนกนี้</li>
-          )}
-        </ul>
-      </Card>
+                  >
+                    <td className="px-3 py-0">
+                      <ChevronForward
+                        className={cn("h-3 w-3 shrink-0 rotate-90 text-muted-foreground transition-transform", open && "-rotate-90")}
+                      />
+                    </td>
+                    <td className="px-3 py-0 font-medium">{l.teacher}</td>
+                    <td className="px-3 py-0 text-xs">{l.code}</td>
+                    <td className="px-3 py-0">{l.learningArea}</td>
+                    <td className="px-3 py-0">{l.name}</td>
+                    <td className="px-3 py-0">{l.department}</td>
+                    <td className="px-3 py-0">{l.gradeLevel}</td>
+                    <td className="px-3 py-0">{l.classroom}</td>
+                    <td className="px-3 py-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                          {r.completed}/{r.total} หน่วย
+                        </span>
+                        {r.offPlan > 0 && (
+                          <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs text-warning">
+                            ไม่ตามแผน {r.offPlan} ครั้ง
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                  {open && (
+                    <tr className="border-t border-border">
+                      <td colSpan={9} className="bg-muted/20 p-3">
+                        <PlanDetail units={rowUnits} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
-      {selected ? (
-        <PlanDetail label={label(selected.assignment)} units={selectedUnits} />
-      ) : (
-        <Card className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-          เลือกวิชาทางซ้ายเพื่อดูรายละเอียดแผนการสอน
-        </Card>
+      {isLoading && (
+        <div className="flex justify-center py-8">
+          <Spinner className="h-5 w-5 text-muted-foreground" />
+        </div>
       )}
-    </div>
+      {!isLoading && rows.length === 0 && (
+        <p className="px-3 py-8 text-center text-sm text-muted-foreground">ยังไม่มีภาระงานสอนในแผนกนี้</p>
+      )}
+    </Card>
   );
 }
 
 /** Read-only — oversight view, no edit/mark actions (grill decision). */
-function PlanDetail({ label, units }: { label: { title: string; subtitle: string }; units: TeachingPlanUnit[] }) {
+function PlanDetail({ units }: { units: TeachingPlanUnit[] }) {
   return (
-    <Card className="space-y-3">
-      <div>
-        <h3 className="text-sm font-semibold">{label.title}</h3>
-        <p className="text-xs text-muted-foreground">{label.subtitle}</p>
-      </div>
-
-      <ul className="divide-y divide-border text-sm">
-        {units.map((u) => {
-          const s = planUnitStatus(u);
-          return (
-            <li key={u.id} className="flex items-center justify-between gap-2 py-1.5">
-              <span className="min-w-0 flex-1">
-                <span className="block truncate">
-                  หน่วยที่ {u.unit_no} · {u.title}
-                </span>
-                {u.description && <span className="text-xs text-muted-foreground">{u.description}</span>}
-                {u.note && <span className="block text-xs text-muted-foreground">บันทึก: {u.note}</span>}
+    <ul className="divide-y divide-border rounded-lg border border-border bg-background text-sm">
+      {units.map((u) => {
+        const s = planUnitStatus(u);
+        return (
+          <li key={u.id} className="flex items-center justify-between gap-2 px-3 py-1.5">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate">
+                หน่วยที่ {u.unit_no} · {u.title}
               </span>
-              <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs", s.className)}>{s.text}</span>
-            </li>
-          );
-        })}
-        {units.length === 0 && <p className="py-2 text-sm text-muted-foreground">ยังไม่มีการแบ่งหน่วยการสอน</p>}
-      </ul>
-    </Card>
+              {u.description && <span className="text-xs text-muted-foreground">{u.description}</span>}
+              {u.note && <span className="block text-xs text-muted-foreground">บันทึก: {u.note}</span>}
+            </span>
+            <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs", s.className)}>{s.text}</span>
+          </li>
+        );
+      })}
+      {units.length === 0 && <li className="px-3 py-2 text-sm text-muted-foreground">ยังไม่มีการแบ่งหน่วยการสอน</li>}
+    </ul>
   );
 }
