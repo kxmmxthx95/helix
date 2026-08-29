@@ -41,6 +41,13 @@ export default defineConfig({
         // app still renders offline. Writes go through the outbox, not here.
         runtimeCaching: [
           {
+            // Identity/role lookups must never be served from a stale cache —
+            // otherwise a role change (e.g. promotion to super_admin) can render
+            // with the old role until the cache entry expires or is refreshed.
+            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/profile(s|_roles)(\?|$)/i,
+            handler: "NetworkOnly",
+          },
+          {
             urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
             handler: "NetworkFirst",
             options: {
