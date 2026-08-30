@@ -13,3 +13,6 @@ assets-src/
 .claude/
 
 *.tsbuildinfo
+
+# Supabase CLI local branch state
+supabase/.branches/

@@ -161,6 +161,30 @@ export async function uploadExamQuestionImage(dataUrl: string, questionId: strin
   return supabase.storage.from(EXAM_IMAGES_BUCKET).getPublicUrl(path).data.publicUrl;
 }
 
+export type AiChatMessage = { role: "user" | "assistant"; content: string };
+
+export type GeneratedQuestion = {
+  type: ExamQuestionType;
+  difficulty: ExamQuestionDifficulty;
+  topic: string;
+  prompt: string;
+  correct_answer: string | null;
+  choices: ChoiceDraft[];
+};
+
+export type AiChatTurn = { reply: string; done: boolean; question: GeneratedQuestion | null };
+
+/** One turn of the AI chat drawer — sends the whole conversation so far (edge function is stateless), gets back a chat reply and, once the model has enough info, a finished question. */
+export function useChatExamQuestion() {
+  return useMutation({
+    mutationFn: async (messages: AiChatMessage[]): Promise<AiChatTurn> => {
+      const { data, error } = await supabase.functions.invoke("generate-exam-question", { body: { messages } });
+      if (error) throw error;
+      return data as AiChatTurn;
+    },
+  });
+}
+
 export function useDeleteExamQuestion() {
   const qc = useQueryClient();
   return useMutation({
