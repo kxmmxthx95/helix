@@ -131,13 +131,18 @@ export function useDeletePracticeTopic() {
   });
 }
 
-/** Name-only lookup for practice_sets.created_by — the bank is shared across every teacher of a subject (see useMyPracticeSets), so the set list needs to show who authored each one. */
+/** Name + avatar lookup for practice_sets.created_by and the Classrooms homeroom teacher column — the practice bank is shared across every teacher of a subject (see useMyPracticeSets), so the set list needs to show who authored each one. */
 export function useProfilesByIds(ids: string[]) {
   return useQuery({
     queryKey: ["profiles", "by_ids", ids],
     enabled: ids.length > 0,
-    queryFn: async (): Promise<{ id: string; first_name: string; last_name: string }[]> => {
-      const { data, error } = await supabase.from("profiles").select("id, first_name, last_name").in("id", ids);
+    queryFn: async (): Promise<
+      { id: string; first_name: string; last_name: string; avatar_path: string | null; updated_at: string }[]
+    > => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, avatar_path, updated_at")
+        .in("id", ids);
       if (error) throw error;
       return data;
     },

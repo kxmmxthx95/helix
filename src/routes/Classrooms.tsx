@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { HomeIcon } from "@/components/icons";
-import { EmptyState, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { ChevronForward, HomeIcon } from "@/components/icons";
+import { Avatar, Button, EmptyState, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
+import { avatarUrl } from "@/hooks/useAvatar";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useProfilesByIds } from "@/hooks/usePractice";
+import { useStudents } from "@/hooks/useStudents";
 import {
   useClassroomsByDepartment,
   useCurrentClassroomEnrollmentsByDepartment,
@@ -15,6 +17,8 @@ import {
 } from "@/hooks/useStatusManagement";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { isOrgWide } from "@/lib/roles";
+import type { Classroom, Student } from "@/lib/database.types";
+import { EditStudentSheet } from "@/routes/Roster";
 
 /** อ่านอย่างเดียว — org-wide list ของทุกห้องเรียนในแผนก, ตรงข้ามกับ ClassroomPanel ใน StatusManagement.tsx ที่จัดการทีละระดับชั้นและมี CRUD. */
 export function Classrooms() {
@@ -41,7 +45,9 @@ export function Classrooms() {
 
   const teacherIds = [...new Set(homeroomTeachers.map((h) => h.teacher_id))];
   const { data: teacherProfiles = [] } = useProfilesByIds(teacherIds);
-  const teacherNameById = new Map(teacherProfiles.map((p) => [p.id, `${p.first_name} ${p.last_name}`]));
+  const teacherById = new Map(
+    teacherProfiles.map((p) => [p.id, { name: `${p.first_name} ${p.last_name}`, avatar: avatarUrl(p) }]),
+  );
   const teacherByClassroomId = new Map(homeroomTeachers.map((h) => [h.classroom_id, h.teacher_id]));
 
   const gradeLevelById = new Map(gradeLevels.map((g) => [g.id, g]));
@@ -73,6 +79,23 @@ export function Classrooms() {
   const { page, setPage, pageCount, pageRows } = usePagination(sorted, [departmentId, search]);
 
   const department = departments.find((d) => d.id === departmentId);
+
+  const [openClassroomId, setOpenClassroomId] = useState("");
+  const openClassroom = classrooms.find((c) => c.id === openClassroomId) ?? null;
+  if (openClassroom) {
+    const grade = gradeLevelById.get(openClassroom.grade_level_id);
+    const openClassroomTeacherId = teacherByClassroomId.get(openClassroom.id);
+    const openClassroomTeacher = openClassroomTeacherId ? teacherById.get(openClassroomTeacherId) : null;
+    return (
+      <ClassroomRoster
+        classroom={openClassroom}
+        departmentId={departmentId}
+        label={grade ? `${gradeShortLabel(grade.code)}/${openClassroom.name}` : openClassroom.name}
+        teacher={openClassroomTeacher ?? null}
+        onBack={() => setOpenClassroomId("")}
+      />
+    );
+  }
 
   return (
     <div className="page-fill">
@@ -146,10 +169,14 @@ export function Classrooms() {
                 {pageRows.map((c) => {
                   const grade = gradeLevelById.get(c.grade_level_id);
                   const teacherId = teacherByClassroomId.get(c.id);
-                  const teacherName = teacherId ? teacherNameById.get(teacherId) : null;
+                  const teacher = teacherId ? teacherById.get(teacherId) : null;
                   const studentCount = studentCountByClassroomId.get(c.id) ?? 0;
                   return (
-                    <tr key={c.id} className="border-t border-border">
+                    <tr
+                      key={c.id}
+                      onClick={() => setOpenClassroomId(c.id)}
+                      className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
+                    >
                       <td className="px-3 py-3">
                         {grade && (
                           <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent">
@@ -161,7 +188,16 @@ export function Classrooms() {
                         {grade ? `${gradeShortLabel(grade.code)}/${c.name}` : c.name}
                       </td>
                       <td className="px-3 py-3">{department?.name ?? "—"}</td>
-                      <td className="px-3 py-3">{teacherName ?? "—"}</td>
+                      <td className="px-3 py-3">
+                        {teacher ? (
+                          <div className="flex items-center gap-2">
+                            <Avatar name={teacher.name} src={teacher.avatar} className="h-6 w-6 text-[9px]" />
+                            {teacher.name}
+                          </div>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td className="px-3 py-3">{studentCount}</td>
                       <td className="px-3 py-3">
                         <span
@@ -183,6 +219,100 @@ export function Classrooms() {
           <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** อ่านอย่างเดียว — รายชื่อนักเรียนที่กำลังเรียนอยู่ในห้องนี้ตอนนี้ (ไม่กรอง academic_year เดียวกับตัวนับจำนวนด้านบน), reuse useStudents({ classroomId }) เดียวกับ Roster.tsx. */
+function ClassroomRoster({
+  classroom,
+  departmentId,
+  label,
+  teacher,
+  onBack,
+}: {
+  classroom: Classroom;
+  departmentId: string;
+  label: string;
+  teacher: { name: string; avatar: string | null } | null;
+  onBack: () => void;
+}) {
+  const { data: students = [], isLoading } = useStudents({
+    search: "",
+    departmentId,
+    status: "studying",
+    classroomId: classroom.id,
+  });
+  const { page, setPage, pageCount, pageRows } = usePagination(students, [classroom.id]);
+  const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
+
+  return (
+    <div className="page-fill">
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <Button size="sm" variant="ghost" onClick={onBack}>
+          <ChevronForward className="h-3 w-3 rotate-180" /> {label}
+        </Button>
+        {teacher && (
+          <div className="flex items-center gap-2">
+            <div className="text-right">
+              <p className="text-[10px] text-muted-foreground">ครูประจำชั้น</p>
+              <p className="text-xs font-medium">{teacher.name}</p>
+            </div>
+            <Avatar name={teacher.name} src={teacher.avatar} className="h-7 w-7 text-[9px]" />
+          </div>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex flex-1 items-center justify-center">
+          <Spinner className="h-5 w-5 text-muted-foreground" />
+        </div>
+      ) : students.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="ไม่มีนักเรียน" description="ห้องนี้ยังไม่มีนักเรียน" icon={HomeIcon} />
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+            <table className="w-full min-w-[20rem] text-xs">
+              <thead className="bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
+                  <th className="px-3 py-2 font-medium">คำนำหน้า</th>
+                  <th className="px-3 py-2 font-medium">ชื่อ-สกุล</th>
+                  <th className="px-3 py-2 font-medium">เบอร์โทรศัพท์</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((s) => (
+                  <tr
+                    key={s.id}
+                    onClick={() => setViewingStudent(s)}
+                    className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
+                  >
+                    <td className="px-3 py-3">{s.student_code}</td>
+                    <td className="px-3 py-3">{s.prefix ?? "—"}</td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <Avatar
+                          name={`${s.first_name} ${s.last_name}`}
+                          src={s.profile ? avatarUrl(s.profile) : null}
+                          className="h-6 w-6 text-[9px]"
+                        />
+                        {s.first_name} {s.last_name}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">{s.phone ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+        </div>
+      )}
+
+      <EditStudentSheet target={viewingStudent} onClose={() => setViewingStudent(null)} forceReadOnly />
     </div>
   );
 }

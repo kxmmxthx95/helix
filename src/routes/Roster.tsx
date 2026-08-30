@@ -658,12 +658,15 @@ const SECTIONS: { key: Section; label: string }[] = [
   { key: "guardian", label: "ผู้ปกครอง" },
 ];
 
-function EditStudentSheet({
+export function EditStudentSheet({
   target,
   onClose,
+  forceReadOnly = false,
 }: {
   target: Student | "new" | null;
   onClose: () => void;
+  /** Callers outside the roster's own manage flow (e.g. the read-only Classrooms page) force view-only regardless of the viewer's role. */
+  forceReadOnly?: boolean;
 }) {
   const { profile: me } = useAuth();
   const toast = useToast();
@@ -678,7 +681,7 @@ function EditStudentSheet({
   // from looking editable. isNew is always opened by someone with mayEdit
   // (the "add student" button is itself gated), so only an existing target
   // can be read-only.
-  const readOnly = !isNew && !(me && canManage(me.roles));
+  const readOnly = forceReadOnly || (!isNew && !(me && canManage(me.roles)));
   const base: StudentDraft | null =
     target === null
       ? null
