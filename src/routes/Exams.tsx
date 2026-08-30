@@ -752,7 +752,7 @@ function AttemptRunner({
                         saveAnswer.mutate({ attempt_id: attempt.id, question_id: q.id, choice_id: c.id, short_answer: null })
                       }
                     />
-                    {c.label}
+                    <QuestionPromptView value={c.label_json} />
                   </label>
                 ))}
               </div>
@@ -815,7 +815,7 @@ function AttemptResult({
                   {choices.map((c) => (
                     <li key={c.id} className={cn(answer?.choice_id === c.id && "font-medium")}>
                       {answer?.choice_id === c.id ? "● " : "○ "}
-                      {c.label}
+                      <QuestionPromptView value={c.label_json} />
                     </li>
                   ))}
                 </ul>

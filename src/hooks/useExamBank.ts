@@ -77,7 +77,7 @@ export function useExamQuestions(subjectId: string | null) {
   });
 }
 
-export type ChoiceDraft = { label: string; is_correct: boolean };
+export type ChoiceDraft = { label: string; label_json: PlateValue; is_correct: boolean };
 
 /** Creates one question + its choices (multiple_choice/true_false) in one call — short_answer skips the choices insert. */
 export function useCreateExamQuestion() {
@@ -100,7 +100,13 @@ export function useCreateExamQuestion() {
       if (error) throw error;
       if (choices.length > 0) {
         const { error: choicesError } = await supabase.from("exam_question_choices").insert(
-          choices.map((c, i) => ({ question_id: inserted.id, label: c.label, is_correct: c.is_correct, position: i })),
+          choices.map((c, i) => ({
+            question_id: inserted.id,
+            label: c.label,
+            label_json: c.label_json,
+            is_correct: c.is_correct,
+            position: i,
+          })),
         );
         if (choicesError) throw choicesError;
       }
@@ -136,7 +142,13 @@ export function useUpdateExamQuestion() {
         const { error: delError } = await supabase.from("exam_question_choices").delete().eq("question_id", id);
         if (delError) throw delError;
         const { error: insError } = await supabase.from("exam_question_choices").insert(
-          choices.map((c, i) => ({ question_id: id, label: c.label, is_correct: c.is_correct, position: i })),
+          choices.map((c, i) => ({
+            question_id: id,
+            label: c.label,
+            label_json: c.label_json,
+            is_correct: c.is_correct,
+            position: i,
+          })),
         );
         if (insError) throw insError;
       }
@@ -169,7 +181,8 @@ export type GeneratedQuestion = {
   topic: string;
   prompt: string;
   correct_answer: string | null;
-  choices: ChoiceDraft[];
+  /** Plain text only — the AI chat edge function doesn't produce Plate JSON. ExamBank's applyGenerated wraps each into a full ChoiceDraft. */
+  choices: { label: string; is_correct: boolean }[];
 };
 
 export type AiChatTurn = { reply: string; done: boolean; question: GeneratedQuestion | null };

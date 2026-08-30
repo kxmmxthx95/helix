@@ -1067,7 +1067,7 @@ function SetDetail({ set, onBack }: { set: PracticeSet; onBack: () => void }) {
               .map((q, i) => (
                 <div
                   key={q.id}
-                  className="space-y-2 rounded-lg border border-border bg-card p-3 text-xs"
+                  className="rounded-lg border border-border bg-card p-3 text-xs"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex flex-1 flex-wrap items-center gap-1.5 text-sm font-medium">
@@ -1117,15 +1117,15 @@ function SetDetail({ set, onBack }: { set: PracticeSet; onBack: () => void }) {
                       </Button>
                     </div>
                   </div>
-                  <div className="text-sm font-medium">
+                  <div className="mt-2 text-sm font-medium">
                     <QuestionPromptView value={q.prompt_json} />
                   </div>
                   {q.question_type === "short_answer" ? (
-                    <p className="text-muted-foreground">
+                    <p className="mt-3 text-muted-foreground">
                       เฉลย: {q.correct_answer}
                     </p>
                   ) : (
-                    <ul className="space-y-2">
+                    <ul className="mt-3 space-y-2">
                       {q.choices.map((c) => (
                         <li
                           key={c.id}
@@ -1134,7 +1134,7 @@ function SetDetail({ set, onBack }: { set: PracticeSet; onBack: () => void }) {
                             c.is_correct && "font-medium text-success",
                           )}
                         >
-                          {c.is_correct ? "✓" : "○"} {c.label}
+                          {c.is_correct ? "✓" : "○"} <QuestionPromptView value={c.label_json} />
                         </li>
                       ))}
                     </ul>
@@ -1591,7 +1591,7 @@ function PracticeRunner({
                         })
                       }
                     />
-                    {c.label}
+                    <QuestionPromptView value={c.label_json} />
                   </label>
                 ))}
               </div>

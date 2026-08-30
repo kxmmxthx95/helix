@@ -509,7 +509,10 @@ export type ExamQuestionForAttempt = Omit<ExamQuestion, "correct_answer">;
 export type ExamQuestionChoice = {
   id: string;
   question_id: string;
+  /** App-derived plaintext copy of label_json — index/preview use only. Same [สูตร]/[รูปภาพ] placeholder derivation as ExamQuestion.prompt. */
   label: string;
+  /** Plate.js rich-content doc — image/formula only (see ChoiceEditor's compact QuestionEditor). true_false's fixed ถูก/ผิด choices are never user-authored but still carry a plain-text label_json. */
+  label_json: PlateValue;
   is_correct: boolean;
   position: number;
 };

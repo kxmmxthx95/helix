@@ -273,7 +273,7 @@ export function ExamBank() {
                   <ul className="space-y-1 pl-4 text-xs">
                     {q.choices.map((c) => (
                       <li key={c.id} className={cn("flex items-center gap-1.5", c.is_correct && "font-medium text-success")}>
-                        {c.is_correct ? "✓" : "○"} {c.label}
+                        {c.is_correct ? "✓" : "○"} <QuestionPromptView value={c.label_json} />
                       </li>
                     ))}
                   </ul>
@@ -326,11 +326,11 @@ function useQuestionForm({
   const [difficulty, setDifficulty] = useState<ExamQuestionDifficulty>(question?.difficulty ?? "medium");
   const [topic, setTopic] = useState(question?.topic ?? defaultTopic);
   const [choices, setChoices] = useState<ChoiceDraft[]>(
-    question?.choices.map((c) => ({ label: c.label, is_correct: c.is_correct })) ?? [
-      { label: "", is_correct: true },
-      { label: "", is_correct: false },
-      { label: "", is_correct: false },
-      { label: "", is_correct: false },
+    question?.choices.map((c) => ({ label: c.label, label_json: c.label_json, is_correct: c.is_correct })) ?? [
+      { label: "", label_json: EMPTY_PROMPT, is_correct: true },
+      { label: "", label_json: EMPTY_PROMPT, is_correct: false },
+      { label: "", label_json: EMPTY_PROMPT, is_correct: false },
+      { label: "", label_json: EMPTY_PROMPT, is_correct: false },
     ],
   );
 
@@ -341,10 +341,10 @@ function useQuestionForm({
     setDifficulty("medium");
     setTopic(defaultTopic);
     setChoices([
-      { label: "", is_correct: true },
-      { label: "", is_correct: false },
-      { label: "", is_correct: false },
-      { label: "", is_correct: false },
+      { label: "", label_json: EMPTY_PROMPT, is_correct: true },
+      { label: "", label_json: EMPTY_PROMPT, is_correct: false },
+      { label: "", label_json: EMPTY_PROMPT, is_correct: false },
+      { label: "", label_json: EMPTY_PROMPT, is_correct: false },
     ]);
   }
 
@@ -416,7 +416,13 @@ function useQuestionForm({
     setTopic(q.topic);
     setPrompt([{ type: "p", children: [{ text: q.prompt }] }]);
     setCorrectAnswer(q.correct_answer ?? "");
-    setChoices(q.choices);
+    setChoices(
+      q.choices.map((c) => ({
+        label: c.label,
+        label_json: [{ type: "p", children: [{ text: c.label }] }],
+        is_correct: c.is_correct,
+      })),
+    );
   }
 
   // Caches the in-flight draft-row insert so pasting/selecting multiple
@@ -517,7 +523,12 @@ function QuestionFormFields(form: ReturnType<typeof useQuestionForm>) {
           <Input value={form.correctAnswer} onChange={(e) => form.setCorrectAnswer(e.target.value)} />
         </Field>
       ) : (
-        <ChoiceEditor type={form.type} choices={form.choices} onChange={form.setChoices} />
+        <ChoiceEditor
+          type={form.type}
+          choices={form.choices}
+          onChange={form.setChoices}
+          ensureQuestionId={form.ensureQuestionId}
+        />
       )}
     </div>
   );
@@ -585,14 +596,19 @@ export function QuestionSheet({
   );
 }
 
+const TRUE_LABEL_JSON: Value = [{ type: "p", children: [{ text: "ถูก" }] }];
+const FALSE_LABEL_JSON: Value = [{ type: "p", children: [{ text: "ผิด" }] }];
+
 function ChoiceEditor({
   type,
   choices,
   onChange,
+  ensureQuestionId,
 }: {
   type: ExamQuestionType;
   choices: ChoiceDraft[];
   onChange: (choices: ChoiceDraft[]) => void;
+  ensureQuestionId: () => Promise<string>;
 }) {
   if (type === "true_false") {
     const correctIdx = choices.findIndex((c) => c.is_correct);
@@ -602,8 +618,8 @@ function ChoiceEditor({
           value={String(correctIdx === 0 ? "true" : "false")}
           onChange={(e) =>
             onChange([
-              { label: "ถูก", is_correct: e.target.value === "true" },
-              { label: "ผิด", is_correct: e.target.value === "false" },
+              { label: "ถูก", label_json: TRUE_LABEL_JSON, is_correct: e.target.value === "true" },
+              { label: "ผิด", label_json: FALSE_LABEL_JSON, is_correct: e.target.value === "false" },
             ])
           }
         >
@@ -618,23 +634,34 @@ function ChoiceEditor({
     <Field label="ตัวเลือก (เลือกตัวที่ถูกไว้ 1 ข้อ)">
       <div className="space-y-2">
         {choices.map((c, i) => (
-          <div key={i} className="flex items-center gap-2">
+          <div key={i} className="flex items-start gap-2">
             <input
               type="radio"
+              className="mt-3"
               checked={c.is_correct}
               onChange={() => onChange(choices.map((ch, j) => ({ ...ch, is_correct: j === i })))}
               aria-label={`ตัวเลือกที่ถูก ${i + 1}`}
             />
-            <Input
-              value={c.label}
-              onChange={(e) => onChange(choices.map((ch, j) => (j === i ? { ...ch, label: e.target.value } : ch)))}
-              placeholder={`ตัวเลือกที่ ${i + 1}`}
-              className="min-w-0 flex-1"
-            />
+            <div className="min-w-0 flex-1">
+              <QuestionEditor
+                compact
+                value={c.label_json}
+                onChange={(next) =>
+                  onChange(
+                    choices.map((ch, j) =>
+                      j === i ? { ...ch, label_json: next, label: promptToPlainText(next) } : ch,
+                    ),
+                  )
+                }
+                ensureQuestionId={ensureQuestionId}
+                placeholder={`ตัวเลือกที่ ${i + 1}`}
+              />
+            </div>
             {choices.length > 2 && (
               <Button
                 size="icon"
                 variant="ghost"
+                className="mt-1"
                 aria-label="ลบตัวเลือก"
                 onClick={() => onChange(choices.filter((_, j) => j !== i))}
               >
@@ -643,7 +670,11 @@ function ChoiceEditor({
             )}
           </div>
         ))}
-        <Button size="sm" variant="outline" onClick={() => onChange([...choices, { label: "", is_correct: false }])}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => onChange([...choices, { label: "", label_json: EMPTY_PROMPT, is_correct: false }])}
+        >
           <Plus className="h-3 w-3" /> เพิ่มตัวเลือก
         </Button>
       </div>
