@@ -101,15 +101,23 @@ function TeacherPractice({ me }: { me: NonNullable<ReturnType<typeof useAuth>["p
   const { data: learningAreas = [] } = useLearningAreas();
   const [learningAreaId, setLearningAreaId] = useState("");
   const [gradeLevelId, setGradeLevelId] = useState("");
-  const { data: managerSubjects = [] } = useSubjects({
-    search: "",
-    departmentId: isManager ? managerDepartmentId : "",
-    learningAreaId: isManager ? learningAreaId : "",
-    gradeLevelId: isManager ? gradeLevelId : "",
-    term: "",
-    subjectType: "",
-    includeInactive: false,
-  });
+
+  useEffect(() => {
+    setGradeLevelId("");
+  }, [pickedDept]);
+
+  const { data: managerSubjects = [] } = useSubjects(
+    {
+      search: "",
+      departmentId: isManager ? managerDepartmentId : "",
+      learningAreaId: isManager ? learningAreaId : "",
+      gradeLevelId: isManager ? gradeLevelId : "",
+      term: "",
+      subjectType: "",
+      includeInactive: false,
+    },
+    { enabled: isManager && (!orgWide || !!managerDepartmentId) },
+  );
 
   const teacherSubjectsFiltered = teacherSubjects.filter(
     (s) =>
@@ -151,47 +159,57 @@ function TeacherPractice({ me }: { me: NonNullable<ReturnType<typeof useAuth>["p
 
   return (
     <div className="page-fill">
-      {isManager && orgWide && (
-        <div className="shrink-0">
-          <Field label="แผนก">
-            <Select value={pickedDept} onChange={(e) => setPickedDept(e.target.value)}>
-              <option value="">เลือกแผนก</option>
+      <div className="flex shrink-0 gap-2">
+        {isManager && orgWide && (
+          <div className="min-w-0 flex-1">
+            <Select
+              className="w-full"
+              value={pickedDept}
+              onChange={(e) => setPickedDept(e.target.value)}
+              aria-label="แผนก"
+              placeholder="เลือกแผนก"
+            >
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
               ))}
             </Select>
-          </Field>
-        </div>
-      )}
+          </div>
+        )}
 
-      {(!isManager || !orgWide || managerDepartmentId) && (
-        <div className="flex shrink-0 gap-2">
-          <div className="flex-1">
-            <Field label="กลุ่มสาระ">
-              <Select value={learningAreaId} onChange={(e) => setLearningAreaId(e.target.value)} placeholder="ทั้งหมด">
-                {learningAreas.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-          <div className="flex-1">
-            <Field label="ระดับชั้น">
-              <Select value={gradeLevelId} onChange={(e) => setGradeLevelId(e.target.value)} placeholder="ทั้งหมด">
-                {gradeLevelOptions.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {gradeShortLabel(g.code)}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
+        <div className="min-w-0 flex-1">
+          <Select
+            className="w-full"
+            value={learningAreaId}
+            onChange={(e) => setLearningAreaId(e.target.value)}
+            aria-label="กลุ่มสาระ"
+            placeholder="ทุกกลุ่มสาระ"
+          >
+            {learningAreas.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </Select>
         </div>
-      )}
+        <div className="min-w-0 flex-1">
+          <Select
+            className="w-full"
+            value={gradeLevelId}
+            onChange={(e) => setGradeLevelId(e.target.value)}
+            aria-label="ระดับชั้น"
+            placeholder="ทุกระดับชั้น"
+            disabled={isManager && orgWide && !pickedDept}
+          >
+            {gradeLevelOptions.map((g) => (
+              <option key={g.id} value={g.id}>
+                {gradeShortLabel(g.code)}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
 
       {isManager && orgWide && !managerDepartmentId ? (
         <div className="flex flex-1 items-center justify-center">

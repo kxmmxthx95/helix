@@ -39,13 +39,14 @@ export type SubjectFilters = {
   includeInactive: boolean;
 };
 
-export function useSubjects(filters: SubjectFilters) {
+export function useSubjects(filters: SubjectFilters, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["subjects", filters],
-    enabled: !!filters.departmentId,
+    enabled: options?.enabled ?? true,
     queryFn: async (): Promise<Subject[]> => {
-      let q = supabase.from("subjects").select("*").eq("department_id", filters.departmentId).order("code");
+      let q = supabase.from("subjects").select("*").order("code");
 
+      if (filters.departmentId) q = q.eq("department_id", filters.departmentId);
       if (!filters.includeInactive) q = q.eq("is_active", true);
       if (filters.learningAreaId) q = q.eq("learning_area_id", filters.learningAreaId);
       if (filters.gradeLevelId) q = q.eq("suggested_grade_level_id", filters.gradeLevelId);

@@ -78,15 +78,18 @@ export function ExamBank() {
   const { data: departments = [] } = useDepartments();
   const [pickedDept, setPickedDept] = useState("");
   const managerDepartmentId = orgWide ? pickedDept : me?.department_id ?? "";
-  const { data: managerSubjects = [] } = useSubjects({
-    search: "",
-    departmentId: isManager ? managerDepartmentId : "",
-    learningAreaId: "",
-    gradeLevelId: "",
-    term: "",
-    subjectType: "",
-    includeInactive: false,
-  });
+  const { data: managerSubjects = [] } = useSubjects(
+    {
+      search: "",
+      departmentId: isManager ? managerDepartmentId : "",
+      learningAreaId: "",
+      gradeLevelId: "",
+      term: "",
+      subjectType: "",
+      includeInactive: false,
+    },
+    { enabled: isManager && !!managerDepartmentId },
+  );
 
   const subjects = isManager ? managerSubjects : teacherSubjects;
   const gradeLevelIds = [...new Set(subjects.map((s) => s.suggested_grade_level_id).filter((id): id is string => !!id))];
@@ -117,16 +120,18 @@ export function ExamBank() {
     <div className="page-fill">
       {isManager && orgWide && !subjectId && (
         <div className="shrink-0">
-          <Field label="แผนก">
-            <Select value={pickedDept} onChange={(e) => setPickedDept(e.target.value)}>
-              <option value="">เลือกแผนก</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <Select
+            value={pickedDept}
+            onChange={(e) => setPickedDept(e.target.value)}
+            aria-label="แผนก"
+            placeholder="เลือกแผนก"
+          >
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
         </div>
       )}
 
