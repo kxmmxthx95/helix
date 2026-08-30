@@ -41,6 +41,11 @@ function promptToPlainText(value: Value): string {
     .trim();
 }
 
+/** A fresh empty Plate doc per call — unlike the shared EMPTY_PROMPT constant, this can't collide when several choice editors mount at once. Reusing one object's node identity across multiple simultaneous Plate editors corrupts Slate's internal node-path tracking ("Unable to find the path for Slate node"). */
+function emptyLabelJson(): Value {
+  return [{ type: "p", children: [{ text: "" }] }];
+}
+
 const TYPE_LABEL: Record<ExamQuestionType, string> = {
   multiple_choice: "ปรนัย (เลือกตอบ)",
   true_false: "ถูก/ผิด",
@@ -327,10 +332,10 @@ function useQuestionForm({
   const [topic, setTopic] = useState(question?.topic ?? defaultTopic);
   const [choices, setChoices] = useState<ChoiceDraft[]>(
     question?.choices.map((c) => ({ label: c.label, label_json: c.label_json, is_correct: c.is_correct })) ?? [
-      { label: "", label_json: EMPTY_PROMPT, is_correct: true },
-      { label: "", label_json: EMPTY_PROMPT, is_correct: false },
-      { label: "", label_json: EMPTY_PROMPT, is_correct: false },
-      { label: "", label_json: EMPTY_PROMPT, is_correct: false },
+      { label: "", label_json: emptyLabelJson(), is_correct: true },
+      { label: "", label_json: emptyLabelJson(), is_correct: false },
+      { label: "", label_json: emptyLabelJson(), is_correct: false },
+      { label: "", label_json: emptyLabelJson(), is_correct: false },
     ],
   );
 
@@ -341,10 +346,10 @@ function useQuestionForm({
     setDifficulty("medium");
     setTopic(defaultTopic);
     setChoices([
-      { label: "", label_json: EMPTY_PROMPT, is_correct: true },
-      { label: "", label_json: EMPTY_PROMPT, is_correct: false },
-      { label: "", label_json: EMPTY_PROMPT, is_correct: false },
-      { label: "", label_json: EMPTY_PROMPT, is_correct: false },
+      { label: "", label_json: emptyLabelJson(), is_correct: true },
+      { label: "", label_json: emptyLabelJson(), is_correct: false },
+      { label: "", label_json: emptyLabelJson(), is_correct: false },
+      { label: "", label_json: emptyLabelJson(), is_correct: false },
     ]);
   }
 
@@ -631,7 +636,13 @@ function ChoiceEditor({
   }
 
   return (
-    <Field label="ตัวเลือก (เลือกตัวที่ถูกไว้ 1 ข้อ)">
+    // Not <Field> (renders a <label>): a <label> wrapping several radios/editors
+    // makes Chrome forward any click on a non-form-control descendant (Plate's
+    // contenteditable is a <div>, not an <input>) to the label's first nested
+    // form control — every click into a choice's rich editor was jumping focus
+    // to choice 0's radio. Same classes as Field, plain <div> instead.
+    <div className="block space-y-1">
+      <span className="font-ui text-xs font-medium">ตัวเลือก (เลือกตัวที่ถูกไว้ 1 ข้อ)</span>
       <div className="space-y-2">
         {choices.map((c, i) => (
           <div key={i} className="flex items-start gap-2">
@@ -673,12 +684,12 @@ function ChoiceEditor({
         <Button
           size="sm"
           variant="outline"
-          onClick={() => onChange([...choices, { label: "", label_json: EMPTY_PROMPT, is_correct: false }])}
+          onClick={() => onChange([...choices, { label: "", label_json: emptyLabelJson(), is_correct: false }])}
         >
           <Plus className="h-3 w-3" /> เพิ่มตัวเลือก
         </Button>
       </div>
-    </Field>
+    </div>
   );
 }
 
