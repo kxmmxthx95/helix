@@ -15,6 +15,7 @@ import { Profile } from "@/routes/Profile";
 import { Dashboard } from "@/routes/Dashboard";
 import { Login } from "@/routes/Login";
 import { Onboarding } from "@/routes/Onboarding";
+import { Classrooms } from "@/routes/Classrooms";
 import { Curriculum } from "@/routes/Curriculum";
 import { Enrollment } from "@/routes/Enrollment";
 import { Roster } from "@/routes/Roster";
@@ -55,6 +56,7 @@ function Gate() {
         <Route index element={<Dashboard />} />
         <Route path="users" element={<Users />} />
         <Route path="roster" element={<Roster />} />
+        <Route path="classrooms" element={<Classrooms />} />
         <Route path="score-recording" element={<ScoreRecording />} />
         <Route path="assignments" element={<Assignments />} />
         <Route path="exam-bank" element={<ExamBank />} />

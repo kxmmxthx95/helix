@@ -88,6 +88,40 @@ export function useHomeroomTeachers(classroomId: string | null, academicYear: nu
   });
 }
 
+/** Every homeroom assignment across a department's rooms for one year — for list views that show all rooms at once rather than one room's teachers. */
+export function useHomeroomTeachersByDepartment(departmentId: string | null, academicYear: number) {
+  return useQuery({
+    queryKey: ["classroom_homeroom_teachers", "by_department", departmentId, academicYear],
+    enabled: !!departmentId,
+    queryFn: async (): Promise<ClassroomHomeroomTeacher[]> => {
+      const { data, error } = await supabase
+        .from("classroom_homeroom_teachers")
+        .select("*, classroom:classrooms!inner(grade_level:grade_levels!inner(department_id))")
+        .eq("academic_year", academicYear)
+        .eq("classroom.grade_level.department_id", departmentId!);
+      if (error) throw error;
+      return data as unknown as ClassroomHomeroomTeacher[];
+    },
+  });
+}
+
+/** Rooms one teacher currently heads as ครูประจำชั้น — scopes the classroom list page for a teacher who isn't a manager. */
+export function useHomeroomClassroomsByTeacher(teacherId: string | null, academicYear: number) {
+  return useQuery({
+    queryKey: ["classroom_homeroom_teachers", "by_teacher", teacherId, academicYear],
+    enabled: !!teacherId,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from("classroom_homeroom_teachers")
+        .select("classroom_id")
+        .eq("teacher_id", teacherId!)
+        .eq("academic_year", academicYear);
+      if (error) throw error;
+      return data.map((r) => r.classroom_id);
+    },
+  });
+}
+
 export type HomeroomTeacherDraft = Pick<
   ClassroomHomeroomTeacher,
   "classroom_id" | "teacher_id" | "academic_year"
@@ -132,6 +166,41 @@ export function useCurrentClassroomEnrollments(gradeLevelId: string | null, acad
         .order("created_at", { ascending: false });
       if (error) throw error;
       // Latest row per student wins — a reassignment leaves the old row in place.
+      const latest = new Map<string, StudentClassroomEnrollment>();
+      for (const row of data as unknown as StudentClassroomEnrollment[]) {
+        if (!latest.has(row.student_id)) latest.set(row.student_id, row);
+      }
+      return [...latest.values()];
+    },
+  });
+}
+
+/**
+ * Latest classroom_id per currently-studying student across a whole
+ * department — NOT filtered to one academic_year, unlike
+ * useCurrentClassroomEnrollments. Promotion (usePromoteStudents) only bumps
+ * students.grade_level_id; it doesn't insert a new enrollment row until an
+ * admin re-assigns the room in ClassroomPanel, so a student can go a whole
+ * new academic_year with their latest row still dated last year. A hard
+ * `.eq("academic_year", activeYear)` here would silently zero out every
+ * classroom nobody has re-assigned yet — this list is read-only headcounts,
+ * not a term-scoped roster, so "latest ever" is the right answer, not "latest
+ * this year". See grill note in the Classrooms feature discussion.
+ */
+export function useCurrentClassroomEnrollmentsByDepartment(departmentId: string | null) {
+  return useQuery({
+    queryKey: ["student_classroom_enrollments", "by_department", departmentId],
+    enabled: !!departmentId,
+    queryFn: async (): Promise<StudentClassroomEnrollment[]> => {
+      const { data, error } = await supabase
+        .from("student_classroom_enrollments")
+        .select(
+          "id, student_id, classroom_id, academic_year, created_at, classroom:classrooms!inner(grade_level:grade_levels!inner(department_id)), student:students!inner(status)",
+        )
+        .eq("classroom.grade_level.department_id", departmentId!)
+        .eq("student.status", "studying")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
       const latest = new Map<string, StudentClassroomEnrollment>();
       for (const row of data as unknown as StudentClassroomEnrollment[]) {
         if (!latest.has(row.student_id)) latest.set(row.student_id, row);
