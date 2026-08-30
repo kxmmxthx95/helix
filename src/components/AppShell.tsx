@@ -56,6 +56,7 @@ const TABS = [
     to: "/",
     label: "หน้าหลัก",
     icon: LayoutDashboard,
+    section: "ภาพรวม",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -66,6 +67,7 @@ const TABS = [
     to: "/users",
     label: "ผู้ใช้งาน",
     icon: Users,
+    section: "บริหารจัดการ",
     managerOnly: true,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -76,6 +78,7 @@ const TABS = [
     to: "/roster",
     label: "นักเรียน",
     icon: GraduationCap,
+    section: "บริหารจัดการ",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -84,9 +87,21 @@ const TABS = [
     hideFromStudent: true,
   },
   {
+    to: "/status",
+    label: "จัดการสถานภาพ",
+    icon: AppsIcon,
+    section: "บริหารจัดการ",
+    managerOnly: false,
+    orgWideOnly: true,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: false,
+  },
+  {
     to: "/subjects",
     label: "คลังรายวิชา",
     icon: BookIcon,
+    section: "งานวิชาการ",
     managerOnly: false,
     orgWideOnly: true,
     deptManagerOnly: false,
@@ -97,6 +112,7 @@ const TABS = [
     to: "/curriculum",
     label: "หลักสูตร",
     icon: LibraryIcon,
+    section: "งานวิชาการ",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: true,
@@ -107,6 +123,7 @@ const TABS = [
     to: "/enrollment",
     label: "ลงทะเบียน",
     icon: PersonAddIcon,
+    section: "งานวิชาการ",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: true,
@@ -117,6 +134,7 @@ const TABS = [
     to: "/teaching-load",
     label: "ภาระงานสอน",
     icon: TimeIcon,
+    section: "งานวิชาการ",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: true,
@@ -127,6 +145,18 @@ const TABS = [
     to: "/timetable",
     label: "ตารางสอน",
     icon: TimetableIcon,
+    section: "งานวิชาการ",
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: false,
+  },
+  {
+    to: "/academic-events",
+    label: "ปฏิทินกิจกรรม",
+    icon: CalendarIcon,
+    section: "งานวิชาการ",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -137,6 +167,7 @@ const TABS = [
     to: "/teaching-plan",
     label: "แผนการสอน",
     icon: ClipboardIcon,
+    section: "การสอนและห้องเรียน",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -148,6 +179,7 @@ const TABS = [
     to: "/teaching-plan-overview",
     label: "ภาพรวมแผนการสอน",
     icon: ClipboardIcon,
+    section: "การสอนและห้องเรียน",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -158,6 +190,40 @@ const TABS = [
     to: "/score-recording",
     label: "บันทึกคะแนน",
     icon: DocumentTextIcon,
+    section: "การสอนและห้องเรียน",
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: true,
+  },
+  {
+    to: "/attendance",
+    label: "เช็คชื่อ",
+    icon: CheckmarkCircleIcon,
+    section: "การสอนและห้องเรียน",
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: true,
+  },
+  {
+    to: "/period-attendance",
+    label: "บันทึกการเข้าเรียน",
+    icon: CheckboxOutlineIcon,
+    section: "การสอนและห้องเรียน",
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: true,
+  },
+  {
+    to: "/behavior",
+    label: "คะแนนพฤติกรรม",
+    icon: RibbonIcon,
+    section: "การสอนและห้องเรียน",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -168,6 +234,7 @@ const TABS = [
     to: "/exam-bank",
     label: "คลังข้อสอบ",
     icon: LibraryIcon,
+    section: "สอบและแบบฝึกหัด",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -178,6 +245,7 @@ const TABS = [
     to: "/exams",
     label: "สอบออนไลน์",
     icon: DocumentTextIcon,
+    section: "สอบและแบบฝึกหัด",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -189,6 +257,7 @@ const TABS = [
     to: "/practice",
     label: "แบบฝึกหัด",
     icon: BookIcon,
+    section: "สอบและแบบฝึกหัด",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -204,6 +273,7 @@ const TABS = [
     to: "/assignments",
     label: "งาน",
     icon: CheckboxOutlineIcon,
+    section: "สอบและแบบฝึกหัด",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -212,59 +282,10 @@ const TABS = [
     studentOrParentOnly: true,
   },
   {
-    to: "/attendance",
-    label: "เช็คชื่อ",
-    icon: CheckmarkCircleIcon,
-    managerOnly: false,
-    orgWideOnly: false,
-    deptManagerOnly: false,
-    academicManagerOnly: false,
-    teacherOrManagerOnly: true,
-  },
-  {
-    to: "/period-attendance",
-    label: "บันทึกการเข้าเรียน",
-    icon: CheckboxOutlineIcon,
-    managerOnly: false,
-    orgWideOnly: false,
-    deptManagerOnly: false,
-    academicManagerOnly: false,
-    teacherOrManagerOnly: true,
-  },
-  {
-    to: "/behavior",
-    label: "คะแนนพฤติกรรม",
-    icon: RibbonIcon,
-    managerOnly: false,
-    orgWideOnly: false,
-    deptManagerOnly: false,
-    academicManagerOnly: false,
-    teacherOrManagerOnly: true,
-  },
-  {
-    to: "/status",
-    label: "จัดการสถานภาพ",
-    icon: AppsIcon,
-    managerOnly: false,
-    orgWideOnly: true,
-    deptManagerOnly: false,
-    academicManagerOnly: false,
-    teacherOrManagerOnly: false,
-  },
-  {
-    to: "/academic-events",
-    label: "ปฏิทินกิจกรรม",
-    icon: CalendarIcon,
-    managerOnly: false,
-    orgWideOnly: false,
-    deptManagerOnly: false,
-    academicManagerOnly: false,
-    teacherOrManagerOnly: false,
-  },
-  {
     to: "/time-tracking",
     label: "เวลาทำงาน",
     icon: WatchIcon,
+    section: "บุคลากร",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -277,6 +298,7 @@ const TABS = [
     to: "/leave",
     label: "จัดการลา",
     icon: AirplaneIcon,
+    section: "บุคลากร",
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -384,6 +406,13 @@ function AppShellInner() {
       (t.to !== "/time-tracking" ||
         (profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r)))),
   );
+
+  const tabSections: { section: string; items: typeof tabs }[] = [];
+  for (const tab of tabs) {
+    const group = tabSections.find((g) => g.section === tab.section);
+    if (group) group.items.push(tab);
+    else tabSections.push({ section: tab.section, items: [tab] });
+  }
 
   const pageTitle =
     tabs.find((t) => t.to === location.pathname || (t.to === "/" && location.pathname === "/"))?.label ??
@@ -494,25 +523,30 @@ function AppShellInner() {
             collapsed ? "px-1.5" : "px-3",
           )}
         >
-          {tabs.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === "/"}
-              title={label}
-              className={({ isActive }) =>
-                cn(
-                  "font-ui tappable flex items-center rounded-lg text-xs font-semibold transition-colors",
-                  collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2",
-                  isActive
-                    ? "bg-foreground/10 text-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )
-              }
-            >
-              <Icon className="h-3 w-3 shrink-0" />
-              {!collapsed && <span className="truncate">{label}</span>}
-            </NavLink>
+          {tabSections.map(({ section, items }) => (
+            <div key={section}>
+              <div className="mx-2 my-1.5 border-t border-border/60 first:mt-0" />
+              {items.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={to === "/"}
+                  title={label}
+                  className={({ isActive }) =>
+                    cn(
+                      "font-ui tappable flex items-center rounded-lg text-xs font-semibold transition-colors",
+                      collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2",
+                      isActive
+                        ? "bg-foreground/10 text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )
+                  }
+                >
+                  <Icon className="h-3 w-3 shrink-0" />
+                  {!collapsed && <span className="truncate">{label}</span>}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
 
@@ -618,11 +652,22 @@ function AppShellInner() {
           }
         >
           <nav className="flex flex-col gap-0.5">
-            {tabs.map(({ to, label, icon: Icon }) => (
-              <NavLink key={to} to={to} end={to === "/"} onClick={() => setNavOpen(false)} className={navDrawerLink}>
-                <Icon className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">{label}</span>
-              </NavLink>
+            {tabSections.map(({ section, items }) => (
+              <div key={section}>
+                <div className="mx-1 my-1.5 border-t border-border/60 first:mt-0" />
+                {items.map(({ to, label, icon: Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end={to === "/"}
+                    onClick={() => setNavOpen(false)}
+                    className={navDrawerLink}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{label}</span>
+                  </NavLink>
+                ))}
+              </div>
             ))}
           </nav>
         </Sheet>
