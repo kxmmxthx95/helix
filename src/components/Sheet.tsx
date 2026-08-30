@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { Drawer } from "vaul";
+import { ContractIcon, ExpandIcon } from "@/components/icons";
+import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,6 +20,7 @@ export function Sheet({
   bodyClassName,
   wide = false,
   side = "right",
+  resizable = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,10 +34,15 @@ export function Sheet({
   className?: string;
   /** Extra classes on the scroll body (e.g. flex column fill for long inline lists). */
   bodyClassName?: string;
-  /** Wider drawer — for tables that need more horizontal space. */
-  wide?: boolean;
+  /** Wider drawer — for tables that need more horizontal space. `"full"` drops the max-width cap entirely (near full-screen). */
+  wide?: boolean | "full";
   side?: "left" | "right";
+  /** Adds a header button letting the user toggle between wide and full-screen. Only useful when `wide` is `true` or `"full"`. */
+  resizable?: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const effectiveWide = resizable ? (expanded ? "full" : true) : wide;
+
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange} direction={side}>
       <Drawer.Portal>
@@ -41,7 +50,7 @@ export function Sheet({
         <Drawer.Content
           className={cn(
             "drawer-float fixed inset-y-2 z-50 flex w-[calc(100%-1rem)] flex-col overflow-hidden rounded-2xl outline-none",
-            wide ? "max-w-2xl" : "max-w-sm",
+            effectiveWide === "full" ? "" : effectiveWide ? "max-w-2xl" : "max-w-sm",
             side === "left" ? "left-2" : "right-2",
             className,
           )}
@@ -49,6 +58,16 @@ export function Sheet({
           <div className="shrink-0 border-b border-border px-3 pb-3 pt-3">
             <div className="flex items-center gap-2">
               <Drawer.Title className="font-heading min-w-0 flex-1 truncate text-base font-semibold">{title}</Drawer.Title>
+              {resizable && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  aria-label={expanded ? "ย่อขนาด" : "ขยายขนาด"}
+                  onClick={() => setExpanded((v) => !v)}
+                >
+                  {expanded ? <ContractIcon className="h-3.5 w-3.5" /> : <ExpandIcon className="h-3.5 w-3.5" />}
+                </Button>
+              )}
               {headerEnd}
             </div>
             {description ? (

@@ -199,7 +199,13 @@ export function useMyPracticeSets(subjectIds: string[]) {
   });
 }
 
-export type PracticeSetQuestionRow = { question_id: string; position: number; points: number; prompt: string };
+export type PracticeSetQuestionRow = {
+  question_id: string;
+  position: number;
+  points: number;
+  prompt: string;
+  difficulty: ExamQuestionDifficulty;
+};
 
 export function usePracticeSetQuestions(setId: string | null) {
   return useQuery({
@@ -208,26 +214,48 @@ export function usePracticeSetQuestions(setId: string | null) {
     queryFn: async (): Promise<PracticeSetQuestionRow[]> => {
       const { data, error } = await supabase
         .from("practice_set_questions")
-        .select("question_id, position, question:exam_questions(prompt, points)")
+        .select("question_id, position, question:exam_questions(prompt, points, difficulty)")
         .eq("set_id", setId!)
         .order("position", { ascending: true });
       if (error) throw error;
-      type Row = { question_id: string; position: number; question: { prompt: string; points: number } | null };
+      type Row = {
+        question_id: string;
+        position: number;
+        question: { prompt: string; points: number; difficulty: ExamQuestionDifficulty } | null;
+      };
       return (data as unknown as Row[]).map((r) => ({
         question_id: r.question_id,
         position: r.position,
         prompt: r.question?.prompt ?? "—",
         points: r.question?.points ?? 0,
+        difficulty: r.question?.difficulty ?? "medium",
       }));
     },
   });
 }
 
-/** Creates an empty teacher-curated set against a topic (วิชา -> บทเรียนหลัก -> เนื้อหาย่อย, no title input — the set's displayed name is the topic's name) — questions get added afterward in the set's own detail view, same two-step flow as exam_sessions (useCreateExamSession creates the shell, useSetSessionQuestions fills it in). */
+/** Submitted-attempt count for one set — the sets table's "ทำแล้ว" column. Lighter than usePracticeSetProgress, which also joins per-question answers for the teacher progress drill-down. */
+export function usePracticeAttemptCount(setId: string | null) {
+  return useQuery({
+    queryKey: ["practice_attempts", "count", setId],
+    enabled: !!setId,
+    queryFn: async (): Promise<number> => {
+      const { count, error } = await supabase
+        .from("practice_attempts")
+        .select("*", { count: "exact", head: true })
+        .eq("set_id", setId!)
+        .eq("status", "submitted");
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+}
+
+/** Creates an empty teacher-curated set against a topic (วิชา -> บทเรียนหลัก -> เนื้อหาย่อย — an optional title distinguishes multiple sets under the same topic; falls back to the topic's name when blank) — questions get added afterward in the set's own detail view, same two-step flow as exam_sessions (useCreateExamSession creates the shell, useSetSessionQuestions fills it in). */
 export function useCreatePracticeSet() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (draft: { subject_id: string; created_by: string; topic_id: string }) => {
+    mutationFn: async (draft: { subject_id: string; created_by: string; topic_id: string; title?: string | null }) => {
       const { data: inserted, error } = await supabase
         .from("practice_sets")
         .insert({ ...draft, is_teacher_curated: true })

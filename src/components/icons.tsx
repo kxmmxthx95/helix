@@ -18,6 +18,8 @@ import Desktop from "react-ionicons/lib/Desktop";
 import DocumentAttach from "react-ionicons/lib/DocumentAttach";
 import DocumentTextOutline from "react-ionicons/lib/DocumentTextOutline";
 import Download from "react-ionicons/lib/Download";
+import ContractOutline from "react-ionicons/lib/ContractOutline";
+import ExpandOutline from "react-ionicons/lib/ExpandOutline";
 import EyeOffOutline from "react-ionicons/lib/EyeOffOutline";
 import EyeOutline from "react-ionicons/lib/EyeOutline";
 import GridOutline from "react-ionicons/lib/GridOutline";
@@ -122,6 +124,8 @@ export const ListIcon = wrap(ListOutline);
 export const ImageIcon = wrap(ImageOutline);
 export const FormulaIcon = wrap(CalculatorOutline);
 export const HighlightIcon = wrap(ColorWandOutline);
+export const ExpandIcon = wrap(ExpandOutline);
+export const ContractIcon = wrap(ContractOutline);
 
 /** No ionicons bold/underline glyph exists — plain monoline SVGs matching the wrap()'d icons' size contract instead. */
 export function BoldIcon({ className, size }: IconProps) {

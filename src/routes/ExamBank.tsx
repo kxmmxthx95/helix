@@ -300,11 +300,14 @@ function useQuestionForm({
   teacherId,
   question,
   onSaved,
+  defaultTopic = "",
 }: {
   subjectId: string;
   teacherId: string;
   question: ExamQuestionWithChoices | null;
-  onSaved: () => void;
+  onSaved: (id: string) => void;
+  /** Pre-fills "ชื่อเนื้อหา" for a brand-new question (e.g. the practice topic it's being added into) — ignored once a real question is loaded for edit. */
+  defaultTopic?: string;
 }) {
   const isEdit = !!question;
   const create = useCreateExamQuestion();
@@ -321,7 +324,7 @@ function useQuestionForm({
   const [prompt, setPrompt] = useState<Value>(question?.prompt_json ?? EMPTY_PROMPT);
   const [correctAnswer, setCorrectAnswer] = useState(question?.correct_answer ?? "");
   const [difficulty, setDifficulty] = useState<ExamQuestionDifficulty>(question?.difficulty ?? "medium");
-  const [topic, setTopic] = useState(question?.topic ?? "");
+  const [topic, setTopic] = useState(question?.topic ?? defaultTopic);
   const [choices, setChoices] = useState<ChoiceDraft[]>(
     question?.choices.map((c) => ({ label: c.label, is_correct: c.is_correct })) ?? [
       { label: "", is_correct: true },
@@ -336,7 +339,7 @@ function useQuestionForm({
     setPrompt(EMPTY_PROMPT);
     setCorrectAnswer("");
     setDifficulty("medium");
-    setTopic("");
+    setTopic(defaultTopic);
     setChoices([
       { label: "", is_correct: true },
       { label: "", is_correct: false },
@@ -375,7 +378,7 @@ function useQuestionForm({
               reset();
               toast("เพิ่มข้อสอบแล้ว", "success");
             }
-            onSaved();
+            onSaved(questionId);
           },
           onError: () => toast("บันทึกไม่สำเร็จ", "error"),
         },
@@ -395,9 +398,9 @@ function useQuestionForm({
           choices: finalChoices,
         },
         {
-          onSuccess: () => {
+          onSuccess: (inserted) => {
             reset();
-            onSaved();
+            onSaved(inserted.id);
             toast("เพิ่มข้อสอบแล้ว", "success");
           },
           onError: () => toast("สร้างไม่สำเร็จ", "error"),
@@ -532,27 +535,45 @@ function QuestionForm({ form }: { form: ReturnType<typeof useQuestionForm> }) {
   );
 }
 
-function QuestionSheet({
+export function QuestionSheet({
   open,
   onOpenChange,
   subjectId,
   teacherId,
   question,
+  onSaved,
+  full,
+  defaultTopic,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   subjectId: string;
   teacherId: string;
   question: ExamQuestionWithChoices | null;
+  onSaved?: (id: string) => void;
+  /** Near full-screen instead of the usual wide cap — for a page that wants the popup to dominate the viewport. */
+  full?: boolean;
+  /** Pre-fills "ชื่อเนื้อหา" for a brand-new question. */
+  defaultTopic?: string;
 }) {
-  const form = useQuestionForm({ subjectId, teacherId, question, onSaved: () => onOpenChange(false) });
+  const form = useQuestionForm({
+    subjectId,
+    teacherId,
+    question,
+    defaultTopic,
+    onSaved: (id) => {
+      onOpenChange(false);
+      onSaved?.(id);
+    },
+  });
 
   return (
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
       title={form.isEdit ? "แก้ไขข้อสอบ" : "เพิ่มข้อสอบ"}
-      wide
+      wide={full ? "full" : true}
+      resizable={full}
       footer={
         <Button className="w-full" onClick={form.save} disabled={!form.canSave || form.pending}>
           บันทึก
