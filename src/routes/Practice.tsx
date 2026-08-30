@@ -1,14 +1,35 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
-import { BookIcon, ChevronBack, ChevronForward, PencilIcon, Plus, X } from "@/components/icons";
+import {
+  BookIcon,
+  ChevronBack,
+  ChevronForward,
+  PencilIcon,
+  Plus,
+  Search,
+  X,
+} from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  Input,
+  Pagination,
+  Select,
+  Spinner,
+} from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
 import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
-import { useExamQuestions, useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
+import {
+  useExamQuestions,
+  useGradeLevelsByIds,
+  useSubjectsByIds,
+} from "@/hooks/useExamBank";
 import { useMyCurrentClassroom } from "@/hooks/useExams";
 import {
   useAvailablePracticeSets,
@@ -42,10 +63,40 @@ import { usePagination } from "@/hooks/usePagination";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManage, isOrgWide } from "@/lib/roles";
-import type { ExamQuestionDifficulty, PracticeAttempt, PracticeSet, Student, Subject } from "@/lib/database.types";
+import type {
+  ExamQuestionDifficulty,
+  PracticeAttempt,
+  PracticeSet,
+  Student,
+  Subject,
+  SubjectType,
+} from "@/lib/database.types";
 import { cn } from "@/lib/utils";
 
-const DIFFICULTY_LABEL: Record<ExamQuestionDifficulty, string> = { easy: "ง่าย", medium: "ปานกลาง", hard: "ยาก" };
+const DIFFICULTY_LABEL: Record<ExamQuestionDifficulty, string> = {
+  easy: "ง่าย",
+  medium: "ปานกลาง",
+  hard: "ยาก",
+};
+
+const SUBJECT_TYPE_LABEL: Record<SubjectType, string> = {
+  basic: "พื้นฐาน",
+  additional: "เพิ่มเติม",
+  activity: "กิจกรรม",
+};
+
+const SUBJECT_TYPE_DOT: Record<SubjectType, string> = {
+  basic: "bg-blue-500",
+  additional: "bg-orange-500",
+  activity: "bg-violet-500",
+};
+
+/** Pedagogical order: พื้นฐาน → เพิ่มเติม → กิจกรรม */
+const SUBJECT_TYPE_ORDER: Record<SubjectType, number> = {
+  basic: 0,
+  additional: 1,
+  activity: 2,
+};
 
 /** Deterministic cover color per subject (no color/icon field on `subjects` — see grill note in Practice.tsx). Cycles through a fixed palette by id hash so the same subject always lands on the same color. */
 const SUBJECT_COVER_PALETTE = [
@@ -61,8 +112,56 @@ const SUBJECT_COVER_PALETTE = [
 
 function subjectCoverColor(subjectId: string) {
   let hash = 0;
-  for (let i = 0; i < subjectId.length; i++) hash = (hash * 31 + subjectId.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < subjectId.length; i++)
+    hash = (hash * 31 + subjectId.charCodeAt(i)) >>> 0;
   return SUBJECT_COVER_PALETTE[hash % SUBJECT_COVER_PALETTE.length];
+}
+
+/** Spotlight-style floating search — centered overlay, Escape/backdrop to close. */
+function SearchOverlay({
+  open,
+  onOpenChange,
+  value,
+  onChange,
+  placeholder,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onOpenChange(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onOpenChange]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-center pt-[15vh]" onClick={() => onOpenChange(false)}>
+      <div
+        className="animate-fade-in relative h-fit w-[calc(100%-2rem)] max-w-lg rounded-lg border border-border bg-card shadow-md"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative flex items-center">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            autoFocus
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            type="search"
+            className="h-14 border-none pl-11 pr-4 text-base shadow-none"
+          />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -82,25 +181,39 @@ export function Practice() {
 
   if (isTeacher || isManager) return <TeacherPractice me={me!} />;
   if (myStudent || isParent) return <StudentPractice />;
-  return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
+  return (
+    <Card className="text-sm text-muted-foreground">
+      ไม่มีสิทธิ์เข้าถึงเมนูนี้
+    </Card>
+  );
 }
 
 // ============================================================== teacher side
 
-function TeacherPractice({ me }: { me: NonNullable<ReturnType<typeof useAuth>["profile"]> }) {
+function TeacherPractice({
+  me,
+}: {
+  me: NonNullable<ReturnType<typeof useAuth>["profile"]>;
+}) {
   const isManager = canManage(me.roles);
   const orgWide = isOrgWide(me.roles);
 
-  const { data: assignments = [] } = useMyTeachingAssignments(!isManager ? me.id : null);
+  const { data: assignments = [] } = useMyTeachingAssignments(
+    !isManager ? me.id : null,
+  );
   const teacherSubjectIds = [...new Set(assignments.map((a) => a.subject_id))];
   const { data: teacherSubjects = [] } = useSubjectsByIds(teacherSubjectIds);
 
   const { data: departments = [] } = useDepartments();
   const [pickedDept, setPickedDept] = useState("");
-  const managerDepartmentId = orgWide ? pickedDept : me.department_id ?? "";
+  const managerDepartmentId = orgWide ? pickedDept : (me.department_id ?? "");
   const { data: learningAreas = [] } = useLearningAreas();
   const [learningAreaId, setLearningAreaId] = useState("");
   const [gradeLevelId, setGradeLevelId] = useState("");
+  const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchTerm = search.trim().toLowerCase();
+  const searching = searchTerm.length >= 3;
 
   useEffect(() => {
     setGradeLevelId("");
@@ -116,7 +229,7 @@ function TeacherPractice({ me }: { me: NonNullable<ReturnType<typeof useAuth>["p
       subjectType: "",
       includeInactive: false,
     },
-    { enabled: isManager && (!orgWide || !!managerDepartmentId) },
+    { enabled: isManager && (!orgWide || !!managerDepartmentId || searching) },
   );
 
   const teacherSubjectsFiltered = teacherSubjects.filter(
@@ -124,13 +237,51 @@ function TeacherPractice({ me }: { me: NonNullable<ReturnType<typeof useAuth>["p
       (!learningAreaId || s.learning_area_id === learningAreaId) &&
       (!gradeLevelId || s.suggested_grade_level_id === gradeLevelId),
   );
-  const subjects = isManager ? managerSubjects : teacherSubjectsFiltered;
-  const gradeLevelIds = [...new Set(subjects.map((s) => s.suggested_grade_level_id).filter((id): id is string => !!id))];
-  const { data: teacherGradeLevels = [] } = useGradeLevelsByIds(!isManager ? gradeLevelIds : []);
-  const { data: managerGradeLevels = [] } = useGradeLevels(isManager ? managerDepartmentId || null : null);
-  const gradeLevelById = new Map((isManager ? managerGradeLevels : teacherGradeLevels).map((g) => [g.id, g]));
+  const subjectsScoped = isManager ? managerSubjects : teacherSubjectsFiltered;
+  const subjects = searching
+    ? subjectsScoped.filter(
+        (s) =>
+          s.code.toLowerCase().includes(searchTerm) ||
+          s.name_th.toLowerCase().includes(searchTerm),
+      )
+    : subjectsScoped;
+  const gradeLevelIds = [
+    ...new Set(
+      subjects
+        .map((s) => s.suggested_grade_level_id)
+        .filter((id): id is string => !!id),
+    ),
+  ];
+  const { data: teacherGradeLevels = [] } = useGradeLevelsByIds(
+    !isManager ? gradeLevelIds : [],
+  );
+  const { data: managerGradeLevels = [] } = useGradeLevels(
+    isManager ? managerDepartmentId || null : null,
+  );
+  const gradeLevelById = new Map(
+    (isManager ? managerGradeLevels : teacherGradeLevels).map((g) => [g.id, g]),
+  );
   const gradeLevelOptions = isManager ? managerGradeLevels : teacherGradeLevels;
-  const { page, setPage, pageCount, pageRows } = usePagination(subjects, [learningAreaId, gradeLevelId, managerDepartmentId]);
+  const sortedSubjects = [...subjects].sort((a, b) => {
+    const gradeA = a.suggested_grade_level_id
+      ? (gradeLevelById.get(a.suggested_grade_level_id)?.sort_order ?? Infinity)
+      : Infinity;
+    const gradeB = b.suggested_grade_level_id
+      ? (gradeLevelById.get(b.suggested_grade_level_id)?.sort_order ?? Infinity)
+      : Infinity;
+    if (gradeA !== gradeB) return gradeA - gradeB;
+    if (a.subject_type !== b.subject_type)
+      return (
+        SUBJECT_TYPE_ORDER[a.subject_type] - SUBJECT_TYPE_ORDER[b.subject_type]
+      );
+    return a.code.localeCompare(b.code);
+  });
+  const { page, setPage, pageCount, pageRows } = usePagination(sortedSubjects, [
+    learningAreaId,
+    gradeLevelId,
+    managerDepartmentId,
+    search,
+  ]);
 
   // Drill-down: รายวิชา -> บทเรียน -> เนื้อหาย่อย (each level its own table).
   const [subjectId, setSubjectId] = useState("");
@@ -154,93 +305,138 @@ function TeacherPractice({ me }: { me: NonNullable<ReturnType<typeof useAuth>["p
     );
   }
   if (subject) {
-    return <LessonTable subject={subject} onBack={() => setSubjectId("")} onOpenLesson={setLessonId} />;
+    return (
+      <LessonTable
+        subject={subject}
+        onBack={() => setSubjectId("")}
+        onOpenLesson={setLessonId}
+      />
+    );
   }
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 gap-2">
-        {isManager && orgWide && (
+      <SearchOverlay
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        value={search}
+        onChange={setSearch}
+        placeholder="ค้นหารหัสหรือชื่อวิชา"
+      />
+      <div className="shrink-0 space-y-1.5">
+        <div className="flex gap-2">
+          {isManager && orgWide && (
+            <div className="min-w-0 flex-1">
+              <Select
+                className="w-full"
+                value={pickedDept}
+                onChange={(e) => setPickedDept(e.target.value)}
+                aria-label="แผนก"
+                placeholder="เลือกแผนก"
+              >
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+
           <div className="min-w-0 flex-1">
             <Select
               className="w-full"
-              value={pickedDept}
-              onChange={(e) => setPickedDept(e.target.value)}
-              aria-label="แผนก"
-              placeholder="เลือกแผนก"
+              value={learningAreaId}
+              onChange={(e) => setLearningAreaId(e.target.value)}
+              aria-label="กลุ่มสาระ"
+              placeholder="ทุกกลุ่มสาระ"
             >
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
+              {learningAreas.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
                 </option>
               ))}
             </Select>
           </div>
-        )}
-
-        <div className="min-w-0 flex-1">
-          <Select
-            className="w-full"
-            value={learningAreaId}
-            onChange={(e) => setLearningAreaId(e.target.value)}
-            aria-label="กลุ่มสาระ"
-            placeholder="ทุกกลุ่มสาระ"
+          <div className="min-w-0 flex-1">
+            <Select
+              className="w-full"
+              value={gradeLevelId}
+              onChange={(e) => setGradeLevelId(e.target.value)}
+              aria-label="ระดับชั้น"
+              placeholder="ทุกระดับชั้น"
+              disabled={isManager && orgWide && !pickedDept}
+            >
+              {gradeLevelOptions.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {gradeShortLabel(g.code)}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <Button
+            size="icon"
+            variant="outline"
+            aria-label="ค้นหาวิชา"
+            onClick={() => setSearchOpen(true)}
+            className={cn("shrink-0", search && "border-ring text-foreground")}
           >
-            {learningAreas.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <div className="min-w-0 flex-1">
-          <Select
-            className="w-full"
-            value={gradeLevelId}
-            onChange={(e) => setGradeLevelId(e.target.value)}
-            aria-label="ระดับชั้น"
-            placeholder="ทุกระดับชั้น"
-            disabled={isManager && orgWide && !pickedDept}
-          >
-            {gradeLevelOptions.map((g) => (
-              <option key={g.id} value={g.id}>
-                {gradeShortLabel(g.code)}
-              </option>
-            ))}
-          </Select>
+            <Search className="h-3 w-3" />
+          </Button>
         </div>
       </div>
 
-      {isManager && orgWide && !managerDepartmentId ? (
+      {isManager && orgWide && !managerDepartmentId && !searching ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="เลือกแผนก" description="เลือกแผนกเพื่อดูรายวิชาทั้งหมด" />
+          <EmptyState
+            title="เลือกแผนก"
+            description="เลือกแผนกเพื่อดูรายวิชาทั้งหมด"
+          />
         </div>
       ) : subjects.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ไม่มีวิชา" description={isManager ? "ยังไม่มีวิชาในแผนกนี้" : "ยังไม่มีวิชาที่คุณสอน"} />
+          <EmptyState
+            title="ไม่มีวิชา"
+            description={
+              isManager ? "ยังไม่มีวิชาในแผนกนี้" : "ยังไม่มีวิชาที่คุณสอน"
+            }
+          />
         </div>
       ) : (
-        <div className="table-panel flex-1">
-          <div className="table-panel-scroll">
+        <div className="space-y-3">
+          <div className="overflow-x-auto rounded-lg border border-border bg-card">
             <table className="w-full min-w-[24rem] text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+              <thead className="bg-muted text-left text-xs text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">รหัสวิชา</th>
                   <th className="px-3 py-2 font-medium">วิชา</th>
+                  <th className="px-3 py-2 font-medium">ประเภทวิชา</th>
                   <th className="px-3 py-2 font-medium">ระดับชั้น</th>
                 </tr>
               </thead>
               <tbody>
                 {pageRows.map((s) => {
-                  const gradeLevel = s.suggested_grade_level_id ? gradeLevelById.get(s.suggested_grade_level_id) : null;
+                  const gradeLevel = s.suggested_grade_level_id
+                    ? gradeLevelById.get(s.suggested_grade_level_id)
+                    : null;
                   return (
                     <tr
                       key={s.id}
                       onClick={() => setSubjectId(s.id)}
                       className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
                     >
-                      <td className="px-3 py-3 text-muted-foreground">{s.code}</td>
-                      <td className="max-w-xs truncate px-3 py-3">{s.name_th}</td>
+                      <td className="px-3 py-3">{s.code}</td>
+                      <td className="max-w-xs truncate px-3 py-3">
+                        {s.name_th}
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span
+                            className={`size-2 rounded-full ${SUBJECT_TYPE_DOT[s.subject_type]}`}
+                          />
+                          {SUBJECT_TYPE_LABEL[s.subject_type]}
+                        </span>
+                      </td>
                       <td className="px-3 py-3">
                         {gradeLevel && (
                           <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent">
@@ -287,7 +483,10 @@ function LessonTable({
 
       {lessons.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ยังไม่มีบทเรียนหลัก" description="เพิ่มบทเรียนหลักด้านล่างเพื่อเริ่มจัดหมวดแบบฝึกหัด" />
+          <EmptyState
+            title="ยังไม่มีบทเรียนหลัก"
+            description="เพิ่มบทเรียนหลักด้านล่างเพื่อเริ่มจัดหมวดแบบฝึกหัด"
+          />
         </div>
       ) : (
         <div className="table-panel flex-1">
@@ -301,21 +500,41 @@ function LessonTable({
               </thead>
               <tbody>
                 {lessons.map((l) => (
-                  <tr key={l.id} className="border-t border-border hover:bg-muted">
-                    <td className="cursor-pointer px-3 py-3 font-medium" onClick={() => onOpenLesson(l.id)}>
+                  <tr
+                    key={l.id}
+                    className="border-t border-border hover:bg-muted"
+                  >
+                    <td
+                      className="cursor-pointer px-3 py-3 font-medium"
+                      onClick={() => onOpenLesson(l.id)}
+                    >
                       {l.name}
                     </td>
                     <td className="px-3 py-2 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <EditableName value={l.name} onSave={(name) => updateLesson.mutate({ id: l.id, name })} />
+                        <EditableName
+                          value={l.name}
+                          onSave={(name) =>
+                            updateLesson.mutate({ id: l.id, name })
+                          }
+                        />
                         <Button
                           size="icon"
                           variant="ghost"
                           aria-label="ลบบทเรียน"
                           onClick={() => {
-                            if (!confirm(`ลบบทเรียน "${l.name}"? เนื้อหาย่อยทั้งหมดในบทเรียนนี้จะถูกลบด้วย`)) return;
+                            if (
+                              !confirm(
+                                `ลบบทเรียน "${l.name}"? เนื้อหาย่อยทั้งหมดในบทเรียนนี้จะถูกลบด้วย`,
+                              )
+                            )
+                              return;
                             deleteLesson.mutate(l.id, {
-                              onError: () => toast("ลบไม่สำเร็จ อาจมีชุดฝึกหัดใช้เนื้อหาย่อยนี้อยู่", "error"),
+                              onError: () =>
+                                toast(
+                                  "ลบไม่สำเร็จ อาจมีชุดฝึกหัดใช้เนื้อหาย่อยนี้อยู่",
+                                  "error",
+                                ),
                             });
                           }}
                         >
@@ -373,13 +592,17 @@ function TopicTable({
     <div className="page-fill">
       <div className="flex shrink-0 items-center gap-2">
         <Button size="sm" variant="ghost" onClick={onBack}>
-          <ChevronForward className="h-3 w-3 rotate-180" /> {lesson?.name ?? "เนื้อหาย่อย"}
+          <ChevronForward className="h-3 w-3 rotate-180" />{" "}
+          {lesson?.name ?? "เนื้อหาย่อย"}
         </Button>
       </div>
 
       {topics.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ยังไม่มีเนื้อหาย่อย" description="เพิ่มเนื้อหาย่อยด้านล่างเพื่อเริ่มเพิ่มแบบฝึกหัด" />
+          <EmptyState
+            title="ยังไม่มีเนื้อหาย่อย"
+            description="เพิ่มเนื้อหาย่อยด้านล่างเพื่อเริ่มเพิ่มแบบฝึกหัด"
+          />
         </div>
       ) : (
         <div className="table-panel flex-1">
@@ -389,12 +612,18 @@ function TopicTable({
                 key={t.id}
                 topic={t}
                 expanded={expandedTopicId === t.id}
-                onToggle={() => setExpandedTopicId((cur) => (cur === t.id ? "" : t.id))}
+                onToggle={() =>
+                  setExpandedTopicId((cur) => (cur === t.id ? "" : t.id))
+                }
                 onRename={(name) => updateTopic.mutate({ id: t.id, name })}
                 onDelete={() => {
                   if (!confirm(`ลบเนื้อหาย่อย "${t.name}"?`)) return;
                   deleteTopic.mutate(t.id, {
-                    onError: () => toast("ลบไม่สำเร็จ อาจมีชุดฝึกหัดใช้เนื้อหาย่อยนี้อยู่", "error"),
+                    onError: () =>
+                      toast(
+                        "ลบไม่สำเร็จ อาจมีชุดฝึกหัดใช้เนื้อหาย่อยนี้อยู่",
+                        "error",
+                      ),
                   });
                 }}
                 subjectId={subject.id}
@@ -450,12 +679,26 @@ function TopicRow({
   return (
     <div className="rounded-lg border border-border">
       <div className="flex items-center gap-2 p-2">
-        <button type="button" onClick={onToggle} className="flex flex-1 items-center gap-1.5 text-left text-xs font-medium">
-          <ChevronForward className={cn("h-3 w-3 shrink-0 transition-transform", expanded && "rotate-90")} />
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex flex-1 items-center gap-1.5 text-left text-xs font-medium"
+        >
+          <ChevronForward
+            className={cn(
+              "h-3 w-3 shrink-0 transition-transform",
+              expanded && "rotate-90",
+            )}
+          />
           {topic.name}
         </button>
         <EditableName value={topic.name} onSave={onRename} />
-        <Button size="icon" variant="ghost" aria-label="ลบเนื้อหาย่อย" onClick={onDelete}>
+        <Button
+          size="icon"
+          variant="ghost"
+          aria-label="ลบเนื้อหาย่อย"
+          onClick={onDelete}
+        >
           <X className="h-3 w-3" />
         </Button>
       </div>
@@ -468,7 +711,9 @@ function TopicRow({
               onOpen={() => onOpenSet(s)}
               onDelete={() => {
                 if (!confirm("ลบชุดฝึกหัดนี้?")) return;
-                deleteSet.mutate(s.id, { onError: () => toast("ลบไม่สำเร็จ", "error") });
+                deleteSet.mutate(s.id, {
+                  onError: () => toast("ลบไม่สำเร็จ", "error"),
+                });
               }}
             />
           ))}
@@ -477,8 +722,15 @@ function TopicRow({
             variant="outline"
             onClick={() =>
               createSet.mutate(
-                { subject_id: subjectId, created_by: createdBy, topic_id: topic.id },
-                { onSuccess: (s) => onOpenSet(s), onError: () => toast("เพิ่มไม่สำเร็จ", "error") },
+                {
+                  subject_id: subjectId,
+                  created_by: createdBy,
+                  topic_id: topic.id,
+                },
+                {
+                  onSuccess: (s) => onOpenSet(s),
+                  onError: () => toast("เพิ่มไม่สำเร็จ", "error"),
+                },
               )
             }
             disabled={createSet.isPending}
@@ -492,7 +744,15 @@ function TopicRow({
 }
 
 /** One existing set under an expanded topic — label is its question count since sets no longer carry a title (the topic name already identifies it). */
-function PracticeSetRow({ set, onOpen, onDelete }: { set: PracticeSet; onOpen: () => void; onDelete: () => void }) {
+function PracticeSetRow({
+  set,
+  onOpen,
+  onDelete,
+}: {
+  set: PracticeSet;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
   const { data: questions = [] } = usePracticeSetQuestions(set.id);
   return (
     <div
@@ -516,7 +776,13 @@ function PracticeSetRow({ set, onOpen, onDelete }: { set: PracticeSet; onOpen: (
 }
 
 /** Small "+ ชื่อ..." inline add row shared by the lesson table and each topic table. */
-function NewNameInput({ placeholder, onAdd }: { placeholder: string; onAdd: (name: string) => void }) {
+function NewNameInput({
+  placeholder,
+  onAdd,
+}: {
+  placeholder: string;
+  onAdd: (name: string) => void;
+}) {
   const [value, setValue] = useState("");
   function submit() {
     const name = value.trim();
@@ -533,7 +799,12 @@ function NewNameInput({ placeholder, onAdd }: { placeholder: string; onAdd: (nam
         placeholder={placeholder}
         className="min-w-0 flex-1"
       />
-      <Button size="sm" variant="outline" onClick={submit} disabled={!value.trim()}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={submit}
+        disabled={!value.trim()}
+      >
         <Plus className="h-3 w-3" />
       </Button>
     </div>
@@ -541,7 +812,13 @@ function NewNameInput({ placeholder, onAdd }: { placeholder: string; onAdd: (nam
 }
 
 /** Click-to-edit name — swaps to an Input on click, saves on blur/Enter. Used for both lesson and topic rename. */
-function EditableName({ value, onSave }: { value: string; onSave: (name: string) => void }) {
+function EditableName({
+  value,
+  onSave,
+}: {
+  value: string;
+  onSave: (name: string) => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
@@ -586,21 +863,36 @@ function SetDetail({ set, onBack }: { set: PracticeSet; onBack: () => void }) {
   const questionById = new Map(setQuestions.map((q) => [q.question_id, q]));
   const submittedCount = progress?.attempts.length ?? 0;
   const avgScore =
-    submittedCount > 0 ? (progress!.attempts.reduce((s, a) => s + (a.score ?? 0), 0) / submittedCount).toFixed(1) : null;
+    submittedCount > 0
+      ? (
+          progress!.attempts.reduce((s, a) => s + (a.score ?? 0), 0) /
+          submittedCount
+        ).toFixed(1)
+      : null;
   const [editingQuestions, setEditingQuestions] = useState(false);
-  const { data: [topic] = [] } = usePracticeTopicsByIds(set.topic_id ? [set.topic_id] : []);
+  const { data: [topic] = [] } = usePracticeTopicsByIds(
+    set.topic_id ? [set.topic_id] : [],
+  );
   const displayName = topic?.name ?? set.title ?? "—";
 
   return (
     <div className="page-fill">
       <div className="flex shrink-0 items-center gap-2">
-        <Button size="icon" variant="ghost" onClick={onBack} aria-label="ย้อนกลับ">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={onBack}
+          aria-label="ย้อนกลับ"
+        >
           <ChevronBack className="h-4 w-4" />
         </Button>
         <div className="min-w-0 flex-1">
-          <p className="font-heading truncate text-sm font-semibold">{displayName}</p>
+          <p className="font-heading truncate text-sm font-semibold">
+            {displayName}
+          </p>
           <p className="text-xs text-muted-foreground">
-            {setQuestions.length} ข้อ · ทำแล้ว {submittedCount} ครั้ง{avgScore != null && ` · เฉลี่ย ${avgScore} คะแนน`}
+            {setQuestions.length} ข้อ · ทำแล้ว {submittedCount} ครั้ง
+            {avgScore != null && ` · เฉลี่ย ${avgScore} คะแนน`}
           </p>
         </div>
       </div>
@@ -644,10 +936,19 @@ function SetDetail({ set, onBack }: { set: PracticeSet; onBack: () => void }) {
                   .map((q: PracticeSetQuestionRow) => {
                     const stat = progress?.perQuestion.get(q.question_id);
                     return (
-                      <tr key={q.question_id} className="border-t border-border">
-                        <td className="max-w-xs truncate px-3 py-2">{q.prompt}</td>
-                        <td className="px-3 py-2 text-success">{stat?.correct ?? 0}</td>
-                        <td className="px-3 py-2 text-destructive">{stat?.incorrect ?? 0}</td>
+                      <tr
+                        key={q.question_id}
+                        className="border-t border-border"
+                      >
+                        <td className="max-w-xs truncate px-3 py-2">
+                          {q.prompt}
+                        </td>
+                        <td className="px-3 py-2 text-success">
+                          {stat?.correct ?? 0}
+                        </td>
+                        <td className="px-3 py-2 text-destructive">
+                          {stat?.incorrect ?? 0}
+                        </td>
                       </tr>
                     );
                   })}
@@ -671,7 +972,9 @@ function EditPracticeSetQuestionsSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { data: questions = [] } = useExamQuestions(open ? set.subject_id : null);
+  const { data: questions = [] } = useExamQuestions(
+    open ? set.subject_id : null,
+  );
   const setSetQuestions = useSetPracticeSetQuestions();
   const toast = useToast();
   const [questionIds, setQuestionIds] = useState<string[]>([]);
@@ -683,7 +986,10 @@ function EditPracticeSetQuestionsSheet({
   function save() {
     setSetQuestions.mutate(
       { setId: set.id, questionIds },
-      { onSuccess: () => onOpenChange(false), onError: () => toast("บันทึกโจทย์ไม่สำเร็จ", "error") },
+      {
+        onSuccess: () => onOpenChange(false),
+        onError: () => toast("บันทึกโจทย์ไม่สำเร็จ", "error"),
+      },
     );
   }
 
@@ -693,14 +999,22 @@ function EditPracticeSetQuestionsSheet({
       onOpenChange={onOpenChange}
       title="จัดการโจทย์"
       footer={
-        <Button className="w-full" onClick={save} disabled={questionIds.length === 0 || setSetQuestions.isPending}>
+        <Button
+          className="w-full"
+          onClick={save}
+          disabled={questionIds.length === 0 || setSetQuestions.isPending}
+        >
           บันทึก
         </Button>
       }
     >
       <Field label={`โจทย์ (เลือกแล้ว ${questionIds.length} ข้อ)`} required>
         <div className="max-h-96 space-y-1.5 overflow-y-auto rounded-lg border border-border p-2">
-          {questions.length === 0 && <p className="text-xs text-muted-foreground">คลังข้อสอบวิชานี้ยังว่าง</p>}
+          {questions.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              คลังข้อสอบวิชานี้ยังว่าง
+            </p>
+          )}
           {questions.map((q) => (
             <label key={q.id} className="flex items-start gap-2 text-xs">
               <input
@@ -708,7 +1022,11 @@ function EditPracticeSetQuestionsSheet({
                 className="mt-0.5"
                 checked={questionIds.includes(q.id)}
                 onChange={(e) =>
-                  setQuestionIds(e.target.checked ? [...questionIds, q.id] : questionIds.filter((id) => id !== q.id))
+                  setQuestionIds(
+                    e.target.checked
+                      ? [...questionIds, q.id]
+                      : questionIds.filter((id) => id !== q.id),
+                  )
                 }
               />
               {q.prompt}
@@ -726,22 +1044,34 @@ function EditPracticeSetQuestionsSheet({
 function StudentPractice() {
   const { profile, myStudent } = useAuth();
   const isParent = profile?.roles.includes("parent") ?? false;
-  const { data: children = [] } = useMyChildren(isParent ? (profile?.id ?? null) : null);
+  const { data: children = [] } = useMyChildren(
+    isParent ? (profile?.id ?? null) : null,
+  );
   const options = [...(myStudent ? [myStudent] : []), ...children];
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const current = options.find((s) => s.id === selectedId) ?? options[0] ?? null;
+  const current =
+    options.find((s) => s.id === selectedId) ?? options[0] ?? null;
   const [activeSet, setActiveSet] = useState<PracticeSet | null>(null);
 
   if (options.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <EmptyState title="ไม่มีข้อมูล" description="เมนูนี้สำหรับนักเรียนและผู้ปกครองเท่านั้น" />
+        <EmptyState
+          title="ไม่มีข้อมูล"
+          description="เมนูนี้สำหรับนักเรียนและผู้ปกครองเท่านั้น"
+        />
       </div>
     );
   }
 
   if (current && activeSet) {
-    return <TakePractice student={current} set={activeSet} onExit={() => setActiveSet(null)} />;
+    return (
+      <TakePractice
+        student={current}
+        set={activeSet}
+        onExit={() => setActiveSet(null)}
+      />
+    );
   }
 
   return (
@@ -755,7 +1085,9 @@ function StudentPractice() {
               onClick={() => setSelectedId(s.id)}
               className={cn(
                 "tappable rounded-full px-3 py-1.5 text-xs font-medium",
-                current?.id === s.id ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:bg-muted",
+                current?.id === s.id
+                  ? "bg-foreground/10 text-foreground"
+                  : "text-muted-foreground hover:bg-muted",
               )}
             >
               {s.first_name} {s.last_name}
@@ -768,16 +1100,28 @@ function StudentPractice() {
   );
 }
 
-function PracticeHome({ student, onOpen }: { student: Student; onOpen: (s: PracticeSet) => void }) {
+function PracticeHome({
+  student,
+  onOpen,
+}: {
+  student: Student;
+  onOpen: (s: PracticeSet) => void;
+}) {
   const { data: classroom } = useMyCurrentClassroom(student.id);
-  const { data: subjectIds = [] } = useMySubjects(classroom?.classroomId ?? null, classroom?.academicYear ?? null);
+  const { data: subjectIds = [] } = useMySubjects(
+    classroom?.classroomId ?? null,
+    classroom?.academicYear ?? null,
+  );
   const { data: subjects = [] } = useSubjectsByIds(subjectIds);
   const { data: sets = [], isLoading } = useAvailablePracticeSets(subjectIds);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
-  const topicIds = [...new Set(sets.map((s) => s.topic_id).filter((id): id is string => !!id))];
+  const topicIds = [
+    ...new Set(sets.map((s) => s.topic_id).filter((id): id is string => !!id)),
+  ];
   const { data: topics = [] } = usePracticeTopicsByIds(topicIds);
   const topicById = new Map(topics.map((t) => [t.id, t]));
-  const setName = (s: PracticeSet) => (s.topic_id ? topicById.get(s.topic_id)?.name ?? "—" : s.title ?? "—");
+  const setName = (s: PracticeSet) =>
+    s.topic_id ? (topicById.get(s.topic_id)?.name ?? "—") : (s.title ?? "—");
 
   const [rolling, setRolling] = useState(false);
   const [openSubjectId, setOpenSubjectId] = useState<string | null>(null);
@@ -785,8 +1129,14 @@ function PracticeHome({ student, onOpen }: { student: Student; onOpen: (s: Pract
   const toast = useToast();
 
   const setsBySubject = new Map<string, PracticeSet[]>();
-  for (const s of sets) setsBySubject.set(s.subject_id, [...(setsBySubject.get(s.subject_id) ?? []), s]);
-  const subjectsWithSets = subjects.filter((s) => (setsBySubject.get(s.id)?.length ?? 0) > 0);
+  for (const s of sets)
+    setsBySubject.set(s.subject_id, [
+      ...(setsBySubject.get(s.subject_id) ?? []),
+      s,
+    ]);
+  const subjectsWithSets = subjects.filter(
+    (s) => (setsBySubject.get(s.id)?.length ?? 0) > 0,
+  );
 
   if (isLoading) {
     return (
@@ -800,7 +1150,12 @@ function PracticeHome({ student, onOpen }: { student: Student; onOpen: (s: Pract
 
   return (
     <div className="space-y-4">
-      <Button variant="outline" className="w-full" onClick={() => setRolling(true)} disabled={subjectIds.length === 0}>
+      <Button
+        variant="outline"
+        className="w-full"
+        onClick={() => setRolling(true)}
+        disabled={subjectIds.length === 0}
+      >
         สุ่มโจทย์มาฝึกเอง
       </Button>
 
@@ -815,7 +1170,10 @@ function PracticeHome({ student, onOpen }: { student: Student; onOpen: (s: Pract
           </button>
           <ul className="space-y-2">
             {(setsBySubject.get(openSubject.id) ?? []).map((s) => (
-              <Card key={s.id} className="flex items-center justify-between gap-2 text-xs">
+              <Card
+                key={s.id}
+                className="flex items-center justify-between gap-2 text-xs"
+              >
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{setName(s)}</p>
                   <p className="text-muted-foreground">{openSubject.name_th}</p>
@@ -828,7 +1186,10 @@ function PracticeHome({ student, onOpen }: { student: Student; onOpen: (s: Pract
           </ul>
         </div>
       ) : subjectsWithSets.length === 0 ? (
-        <EmptyState title="ยังไม่มีชุดฝึกหัด" description="รอครูสร้างชุดฝึกหัด หรือลองสุ่มโจทย์มาฝึกเองด้านบน" />
+        <EmptyState
+          title="ยังไม่มีชุดฝึกหัด"
+          description="รอครูสร้างชุดฝึกหัด หรือลองสุ่มโจทย์มาฝึกเองด้านบน"
+        />
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {subjectsWithSets.map((s) => {
@@ -845,7 +1206,9 @@ function PracticeHome({ student, onOpen }: { student: Student; onOpen: (s: Pract
               >
                 <BookIcon className="h-6 w-6 opacity-90" />
                 <div>
-                  <p className="text-xs font-semibold leading-snug">{s.name_th}</p>
+                  <p className="text-xs font-semibold leading-snug">
+                    {s.name_th}
+                  </p>
                   <p className="mt-0.5 text-[10px] opacity-80">{count} ชุด</p>
                 </div>
               </button>
@@ -892,7 +1255,12 @@ function SelfServeSheet({
   onError: () => void;
   pending: boolean;
   create: (
-    draft: { subject_id: string; created_by: string; topic: string | null; difficulty: ExamQuestionDifficulty | null },
+    draft: {
+      subject_id: string;
+      created_by: string;
+      topic: string | null;
+      difficulty: ExamQuestionDifficulty | null;
+    },
     opts: { onSuccess: (set: PracticeSet) => void; onError: () => void },
   ) => void;
 }) {
@@ -909,7 +1277,12 @@ function SelfServeSheet({
   function roll() {
     if (!subjectId) return;
     create(
-      { subject_id: subjectId, created_by: studentId, topic: null, difficulty: difficulty || null },
+      {
+        subject_id: subjectId,
+        created_by: studentId,
+        topic: null,
+        difficulty: difficulty || null,
+      },
       { onSuccess: onCreated, onError },
     );
   }
@@ -920,14 +1293,21 @@ function SelfServeSheet({
       onOpenChange={onOpenChange}
       title="สุ่มโจทย์มาฝึกเอง"
       footer={
-        <Button className="w-full" onClick={roll} disabled={!subjectId || pending}>
+        <Button
+          className="w-full"
+          onClick={roll}
+          disabled={!subjectId || pending}
+        >
           สุ่ม 10 ข้อ
         </Button>
       }
     >
       <div className="space-y-3">
         <Field label="วิชา" required>
-          <Select value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
+          <Select
+            value={subjectId}
+            onChange={(e) => setSubjectId(e.target.value)}
+          >
             {subjects.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name_th}
@@ -936,7 +1316,13 @@ function SelfServeSheet({
           </Select>
         </Field>
         <Field label="ระดับความยาก">
-          <Select value={difficulty} onChange={(e) => setDifficulty(e.target.value as ExamQuestionDifficulty | "")} placeholder="ทุกระดับ">
+          <Select
+            value={difficulty}
+            onChange={(e) =>
+              setDifficulty(e.target.value as ExamQuestionDifficulty | "")
+            }
+            placeholder="ทุกระดับ"
+          >
             {Object.entries(DIFFICULTY_LABEL).map(([v, label]) => (
               <option key={v} value={v}>
                 {label}
@@ -949,7 +1335,15 @@ function SelfServeSheet({
   );
 }
 
-function TakePractice({ student, set, onExit }: { student: Student; set: PracticeSet; onExit: () => void }) {
+function TakePractice({
+  student,
+  set,
+  onExit,
+}: {
+  student: Student;
+  set: PracticeSet;
+  onExit: () => void;
+}) {
   const { data: setQuestions = [] } = usePracticeSetQuestions(set.id);
   const { data: pastAttempts = [] } = useMyPracticeAttempts(set.id, student.id);
   const startOrResume = useStartOrResumePracticeAttempt();
@@ -959,8 +1353,15 @@ function TakePractice({ student, set, onExit }: { student: Student; set: Practic
   useEffect(() => {
     if (attempt || setQuestions.length === 0) return;
     startOrResume.mutate(
-      { setId: set.id, studentId: student.id, questionIds: setQuestions.map((q) => q.question_id) },
-      { onSuccess: setAttempt, onError: () => toast("เริ่มฝึกไม่สำเร็จ", "error") },
+      {
+        setId: set.id,
+        studentId: student.id,
+        questionIds: setQuestions.map((q) => q.question_id),
+      },
+      {
+        onSuccess: setAttempt,
+        onError: () => toast("เริ่มฝึกไม่สำเร็จ", "error"),
+      },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setQuestions.length]);
@@ -985,7 +1386,13 @@ function TakePractice({ student, set, onExit }: { student: Student; set: Practic
     );
   }
 
-  return <PracticeRunner attempt={attempt} onSubmitted={setAttempt} onExit={onExit} />;
+  return (
+    <PracticeRunner
+      attempt={attempt}
+      onSubmitted={setAttempt}
+      onExit={onExit}
+    />
+  );
 }
 
 function PracticeRunner({
@@ -997,7 +1404,9 @@ function PracticeRunner({
   onSubmitted: (a: PracticeAttempt) => void;
   onExit: () => void;
 }) {
-  const { data: questions = [] } = useExamQuestionsByIds(attempt.question_order);
+  const { data: questions = [] } = useExamQuestionsByIds(
+    attempt.question_order,
+  );
   const { data: answers } = usePracticeAttemptAnswers(attempt.id);
   const saveAnswer = useSavePracticeAnswer();
   const submit = useSubmitPracticeAttempt();
@@ -1006,7 +1415,9 @@ function PracticeRunner({
   const orderedQuestions = attempt.question_order
     .map((id) => questions.find((q) => q.id === id))
     .filter((q): q is NonNullable<typeof q> => !!q);
-  const answeredCount = orderedQuestions.filter((q) => answers?.has(q.id)).length;
+  const answeredCount = orderedQuestions.filter((q) =>
+    answers?.has(q.id),
+  ).length;
 
   function doSubmit() {
     submit.mutate(attempt.id, {
@@ -1031,7 +1442,10 @@ function PracticeRunner({
             key={q.id}
             className={cn(
               "space-y-2 text-sm",
-              answered && (answer.is_correct ? "border-success/40" : "border-destructive/40"),
+              answered &&
+                (answer.is_correct
+                  ? "border-success/40"
+                  : "border-destructive/40"),
             )}
           >
             <div className="font-medium">
@@ -1041,7 +1455,12 @@ function PracticeRunner({
               <Input
                 value={answer?.short_answer ?? ""}
                 onChange={(e) =>
-                  saveAnswer.mutate({ attempt_id: attempt.id, question_id: q.id, choice_id: null, short_answer: e.target.value })
+                  saveAnswer.mutate({
+                    attempt_id: attempt.id,
+                    question_id: q.id,
+                    choice_id: null,
+                    short_answer: e.target.value,
+                  })
                 }
                 placeholder="พิมพ์คำตอบ"
               />
@@ -1054,7 +1473,12 @@ function PracticeRunner({
                       name={q.id}
                       checked={answer?.choice_id === c.id}
                       onChange={() =>
-                        saveAnswer.mutate({ attempt_id: attempt.id, question_id: q.id, choice_id: c.id, short_answer: null })
+                        saveAnswer.mutate({
+                          attempt_id: attempt.id,
+                          question_id: q.id,
+                          choice_id: c.id,
+                          short_answer: null,
+                        })
                       }
                     />
                     {c.label}
@@ -1063,9 +1487,16 @@ function PracticeRunner({
               </div>
             )}
             {answered && (
-              <p className={cn("text-xs", answer.is_correct ? "text-success" : "text-destructive")}>
+              <p
+                className={cn(
+                  "text-xs",
+                  answer.is_correct ? "text-success" : "text-destructive",
+                )}
+              >
                 {answer.is_correct ? "ถูกต้อง" : "ยังไม่ถูก ลองอีกครั้งได้"}
-                {q.question_type === "short_answer" && !answer.is_correct && ` — เฉลย: ${q.correct_answer}`}
+                {q.question_type === "short_answer" &&
+                  !answer.is_correct &&
+                  ` — เฉลย: ${q.correct_answer}`}
                 {q.question_type !== "short_answer" &&
                   !answer.is_correct &&
                   ` — เฉลย: ${q.choices.find((c) => c.is_correct)?.label ?? "—"}`}
@@ -1079,7 +1510,11 @@ function PracticeRunner({
         <Button variant="outline" className="flex-1" onClick={onExit}>
           ออกไปก่อน (ทำต่อได้ภายหลัง)
         </Button>
-        <Button className="flex-1" onClick={doSubmit} disabled={submit.isPending}>
+        <Button
+          className="flex-1"
+          onClick={doSubmit}
+          disabled={submit.isPending}
+        >
           เสร็จแล้ว
         </Button>
       </div>
@@ -1107,7 +1542,9 @@ function AttemptSummary({
         <p className="font-heading text-2xl font-bold">
           {attempt.score ?? "—"}/{maxPoints}
         </p>
-        <p className="text-xs text-muted-foreground">ฝึกไปแล้ว {triesSoFar} ครั้ง</p>
+        <p className="text-xs text-muted-foreground">
+          ฝึกไปแล้ว {triesSoFar} ครั้ง
+        </p>
       </Card>
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={onExit}>
