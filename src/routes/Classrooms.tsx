@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronForward, HomeIcon } from "@/components/icons";
-import { Avatar, Button, EmptyState, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { Avatar, Button, EmptyState, Input, Pagination, Select, Skeleton } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
@@ -134,8 +134,46 @@ export function Classrooms() {
           <EmptyState title="เลือกแผนก" description="เลือกแผนกเพื่อดูรายชื่อห้องเรียนทั้งหมด" icon={HomeIcon} />
         </div>
       ) : isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด" className="overflow-x-auto rounded-lg border border-border bg-card">
+          <table className="w-full min-w-[32rem] text-xs">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">ระดับชั้น</th>
+                <th className="px-3 py-2 font-medium">ห้องเรียน</th>
+                <th className="px-3 py-2 font-medium">แผนก</th>
+                <th className="px-3 py-2 font-medium">ครูประจำชั้น</th>
+                <th className="px-3 py-2 font-medium">จำนวนนักเรียน</th>
+                <th className="px-3 py-2 font-medium">สถานะ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <tr key={i} className="border-t border-border">
+                  <td className="px-3 py-3">
+                    <Skeleton className="h-4 w-10 rounded-full" />
+                  </td>
+                  <td className="px-3 py-3">
+                    <Skeleton className="h-3 w-16" />
+                  </td>
+                  <td className="px-3 py-3">
+                    <Skeleton className="h-3 w-20" />
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-6 w-6 shrink-0 rounded-full" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </td>
+                  <td className="px-3 py-3">
+                    <Skeleton className="h-3 w-6" />
+                  </td>
+                  <td className="px-3 py-3">
+                    <Skeleton className="h-4 w-14 rounded-full" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : sorted.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
@@ -264,8 +302,38 @@ function ClassroomRoster({
       </div>
 
       {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด" className="overflow-x-auto rounded-lg border border-border bg-card">
+          <table className="w-full min-w-[20rem] text-xs">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
+                <th className="px-3 py-2 font-medium">คำนำหน้า</th>
+                <th className="px-3 py-2 font-medium">ชื่อ-สกุล</th>
+                <th className="px-3 py-2 font-medium">เบอร์โทรศัพท์</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <tr key={i} className="border-t border-border">
+                  <td className="px-3 py-3">
+                    <Skeleton className="h-3 w-16" />
+                  </td>
+                  <td className="px-3 py-3">
+                    <Skeleton className="h-3 w-10" />
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-6 w-6 shrink-0 rounded-full" />
+                      <Skeleton className="h-3 w-28" />
+                    </div>
+                  </td>
+                  <td className="px-3 py-3">
+                    <Skeleton className="h-3 w-20" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : students.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">

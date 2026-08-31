@@ -4,7 +4,7 @@ import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { ChevronBack, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Spinner, Switch } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Skeleton, Switch } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
 import { useClassroomsByIds, useExamQuestions, useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
 import {
@@ -71,8 +71,27 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
       </div>
 
       {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div className="table-panel flex-1" role="status" aria-label="กำลังโหลด">
+          <table className="w-full min-w-[36rem] text-xs">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">ชื่อสอบ</th>
+                <th className="px-3 py-2 font-medium">วิชา</th>
+                <th className="px-3 py-2 font-medium">เปิด – ปิด</th>
+                <th className="px-3 py-2 font-medium" />
+              </tr>
+            </thead>
+            <tbody>
+              {[0, 1, 2, 3].map((i) => (
+                <tr key={i} className="border-t border-border">
+                  <td className="px-3 py-2"><Skeleton className="h-3 w-32" /></td>
+                  <td className="px-3 py-2"><Skeleton className="h-3 w-20" /></td>
+                  <td className="px-3 py-2"><Skeleton className="h-3 w-40" /></td>
+                  <td className="px-3 py-2" />
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : sessions.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
@@ -391,8 +410,27 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
       />
 
       {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div className="table-panel flex-1" role="status" aria-label="กำลังโหลด">
+          <table className="w-full min-w-[28rem] text-xs">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">นักเรียน</th>
+                <th className="px-3 py-2 font-medium">ครั้งที่</th>
+                <th className="px-3 py-2 font-medium">สถานะ</th>
+                <th className="px-3 py-2 font-medium">คะแนน</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[0, 1, 2].map((i) => (
+                <tr key={i} className="border-t border-border">
+                  <td className="px-3 py-2"><Skeleton className="h-3 w-24" /></td>
+                  <td className="px-3 py-2"><Skeleton className="h-3 w-6" /></td>
+                  <td className="px-3 py-2"><Skeleton className="h-3 w-14" /></td>
+                  <td className="px-3 py-2"><Skeleton className="h-3 w-8" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : attempts.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
@@ -564,9 +602,19 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-10">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
-      </div>
+      <ul className="space-y-2" role="status" aria-label="กำลังโหลด">
+        {[0, 1].map((i) => (
+          <li key={i}>
+            <Card className="flex items-center justify-between gap-2 text-xs">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-32" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+              <Skeleton className="h-8 w-16 shrink-0 rounded-md" />
+            </Card>
+          </li>
+        ))}
+      </ul>
     );
   }
   if (exams.length === 0) {
@@ -621,8 +669,17 @@ function TakeExam({ student, session, onExit }: { student: Student; session: Ava
 
   if (!attempt) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
+      <div className="mx-auto max-w-xl space-y-3 pb-4" role="status" aria-label="กำลังโหลด">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-4 w-12" />
+        </div>
+        {[0, 1, 2].map((i) => (
+          <Card key={i} className="space-y-2">
+            <Skeleton className="h-3.5 w-full" />
+            <Skeleton className="h-3 w-3/4" />
+          </Card>
+        ))}
       </div>
     );
   }
@@ -696,8 +753,17 @@ function AttemptRunner({
 
   if (!data) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
+      <div className="mx-auto max-w-xl space-y-3 pb-4" role="status" aria-label="กำลังโหลด">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-4 w-12" />
+        </div>
+        {[0, 1, 2].map((i) => (
+          <Card key={i} className="space-y-2">
+            <Skeleton className="h-3.5 w-full" />
+            <Skeleton className="h-3 w-3/4" />
+          </Card>
+        ))}
       </div>
     );
   }

@@ -3,7 +3,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { BriefcaseIcon, Plus, Search, Upload as UploadIcon, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Avatar, Button, BuddhistDateSelect, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { Avatar, Button, BuddhistDateSelect, Card, EmptyState, Field, Input, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { summarizeAttendance } from "@/hooks/useAttendance";
 import { useStaffAttendanceRange } from "@/hooks/useStaffAttendance";
@@ -116,8 +116,59 @@ export function Employees() {
       </div>
 
       {isLoading && (
-        <div className="flex justify-center py-12">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด" className="space-y-2">
+          <ul className="space-y-2 lg:hidden">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <li key={i} className="rounded-lg border border-border p-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Skeleton className="h-3.5 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                  <Skeleton className="h-4 w-14 shrink-0 rounded-full" />
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden overflow-hidden rounded-lg border border-border bg-card lg:block">
+            <table className="w-full text-xs">
+              <thead className="bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">ชื่อ</th>
+                  <th className="px-3 py-2 font-medium">ตำแหน่งงาน</th>
+                  <th className="px-3 py-2 font-medium">แผนก</th>
+                  <th className="px-3 py-2 font-medium">หัวหน้างาน</th>
+                  <th className="px-3 py-2 font-medium">สถานะ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2.5">
+                        <Skeleton className="h-7 w-7 shrink-0 rounded-full" />
+                        <Skeleton className="h-3 w-28" />
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-20" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-16" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-20" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-4 w-12 rounded-full" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -481,7 +532,19 @@ function StatusPanel({ row, mayManageHr, me }: { row: EmployeeRow; mayManageHr: 
 
       <div className="space-y-2">
         <p className="text-xs font-medium text-muted-foreground">ประวัติการเปลี่ยนสถานะ</p>
-        {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+        {isLoading && (
+          <ul className="space-y-2" role="status" aria-label="กำลังโหลด">
+            {[0, 1].map((i) => (
+              <li key={i} className="rounded-lg border border-border p-2.5">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+                <Skeleton className="mt-1.5 h-3 w-40" />
+              </li>
+            ))}
+          </ul>
+        )}
         {!isLoading && history.length === 0 && <p className="text-xs text-muted-foreground">ยังไม่มีประวัติ</p>}
         <ul className="space-y-2">
           {history.map((h) => (
@@ -538,7 +601,16 @@ function AttendancePanel({ row }: { row: EmployeeRow }) {
         </Select>
       </div>
 
-      {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+      {isLoading && (
+        <div className="grid grid-cols-4 gap-2" role="status" aria-label="กำลังโหลด">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="rounded-lg px-2 py-1.5 text-center">
+              <Skeleton className="mx-auto h-2.5 w-8" />
+              <Skeleton className="mx-auto mt-1 h-3.5 w-5" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {!isLoading && (
         <div className="grid grid-cols-4 gap-2">
@@ -671,7 +743,16 @@ function ContractsPanel({ row, mayManageHr, me }: { row: EmployeeRow; mayManageH
         </div>
       )}
 
-      {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+      {isLoading && (
+        <ul className="space-y-2" role="status" aria-label="กำลังโหลด">
+          {[0, 1].map((i) => (
+            <li key={i} className="rounded-lg border border-border p-2.5">
+              <Skeleton className="h-3 w-28" />
+              <Skeleton className="mt-1.5 h-3 w-36" />
+            </li>
+          ))}
+        </ul>
+      )}
       {!isLoading && contracts.length === 0 && <p className="text-xs text-muted-foreground">ยังไม่มีสัญญาจ้าง</p>}
       <ul className="space-y-2">
         {contracts.map((c) => (
@@ -762,7 +843,15 @@ function DocumentsPanel({ row, mayManageHr, me }: { row: EmployeeRow; mayManageH
         </div>
       )}
 
-      {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+      {isLoading && (
+        <ul className="space-y-2" role="status" aria-label="กำลังโหลด">
+          {[0, 1].map((i) => (
+            <li key={i} className="flex items-center justify-between gap-2 rounded-lg border border-border p-2.5">
+              <Skeleton className="h-3 w-32" />
+            </li>
+          ))}
+        </ul>
+      )}
       {!isLoading && documents.length === 0 && <p className="text-xs text-muted-foreground">ยังไม่มีเอกสาร</p>}
       <ul className="space-y-2">
         {documents.map((d) => (

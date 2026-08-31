@@ -3,7 +3,7 @@ import { SlidersHorizontal } from "@/components/icons";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { useMobileHeaderEnd } from "@/components/MobileHeaderSlot";
-import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { useAcademicEvents } from "@/hooks/useAcademicTerms";
 import {
@@ -365,9 +365,21 @@ function LeaveRequestsPanel({ approverId }: { approverId: string }) {
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
-      </div>
+      <Card className="space-y-2" role="status" aria-label="กำลังโหลด">
+        <Skeleton className="h-4 w-40" />
+        <ul className="divide-y divide-border text-sm">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="space-y-1.5 py-2">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-56" />
+              <div className="flex gap-2">
+                <Skeleton className="h-8 flex-1" />
+                <Skeleton className="h-8 flex-1" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Card>
     );
   }
 
@@ -477,8 +489,53 @@ function CheckInPanel({
           <EmptyState title="ไม่ต้องเช็คชื่อวันนี้" description={blockedEvent.name} />
         </div>
       ) : rosterLoading || recordsLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div className="flex min-h-0 flex-1 flex-col gap-2" role="status" aria-label="กำลังโหลด">
+          <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto lg:hidden">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <li key={i} className="rounded-lg border border-border p-3">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="mt-1.5 h-3 w-20" />
+                <div className="mt-2 grid grid-cols-4 gap-1">
+                  {[0, 1, 2, 3].map((j) => (
+                    <Skeleton key={j} className="h-7 rounded-full" />
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="table-panel hidden lg:flex">
+            <div className="table-panel-scroll">
+              <table className="w-full table-fixed text-xs">
+                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="w-24 px-3 py-2 font-medium">รหัสนักเรียน</th>
+                    <th className="w-48 px-3 py-2 font-medium">รายชื่อ</th>
+                    <th className="w-36 px-3 py-2 text-center font-medium">สถานะ</th>
+                    <th className="px-3 py-2 text-center font-medium">หมายเหตุ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <tr key={i} className="border-t border-border">
+                      <td className="px-3 py-2">
+                        <Skeleton className="h-3 w-16" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Skeleton className="h-3 w-28" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Skeleton className="mx-auto h-3 w-24" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Skeleton className="mx-auto h-3 w-24" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       ) : roster.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
@@ -740,8 +797,55 @@ function SummaryPanel({
       </div>
 
       {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div className="flex min-h-0 flex-1 flex-col gap-2" role="status" aria-label="กำลังโหลด">
+          <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto lg:hidden">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <li key={i} className="rounded-lg border border-border p-3">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="mt-1.5 h-3 w-20" />
+                <div className="mt-2 grid grid-cols-4 gap-1">
+                  {[0, 1, 2, 3].map((j) => (
+                    <Skeleton key={j} className="h-10 rounded-lg" />
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="table-panel hidden lg:flex">
+            <div className="table-panel-scroll">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
+                    <th className="px-3 py-2 font-medium">รายชื่อ</th>
+                    {STATUS_ORDER.map((st) => (
+                      <th key={st} className="px-3 py-2 text-right font-medium">
+                        {STATUS_LABEL[st]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <tr key={i} className="border-t border-border">
+                      <td className="px-3 py-2">
+                        <Skeleton className="h-3 w-16" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Skeleton className="h-3 w-28" />
+                      </td>
+                      {STATUS_ORDER.map((st) => (
+                        <td key={st} className="px-3 py-2 text-right">
+                          <Skeleton className="ml-auto h-3 w-6" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       ) : roster.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">

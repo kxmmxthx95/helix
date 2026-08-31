@@ -8,7 +8,7 @@ import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { ChevronForward, DocumentTextIcon, HighlightIcon, PencilIcon, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Select, Skeleton } from "@/components/ui";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import {
@@ -221,8 +221,27 @@ export function ExamBank() {
           </div>
         </div>
       ) : isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด" className="table-panel flex-1">
+          <div className="table-panel-scroll space-y-4 p-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="space-y-2 border-b border-border pb-4 last:border-0">
+                <div className="flex items-start justify-between gap-1.5">
+                  <div className="flex flex-1 items-center gap-1.5">
+                    <Skeleton className="h-3 w-full max-w-md" />
+                    <Skeleton className="h-4 w-12 shrink-0 rounded-full" />
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Skeleton className="h-6 w-6 rounded-md" />
+                    <Skeleton className="h-6 w-6 rounded-md" />
+                  </div>
+                </div>
+                <div className="space-y-1 pl-4">
+                  <Skeleton className="h-3 w-40" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ) : questions.length === 0 ? null : !previewing ? null : (
         <div className="table-panel flex-1">

@@ -3,7 +3,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ChevronBack, ChevronForward, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Pagination, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
 import { useSubjects } from "@/hooks/useCurriculum";
 import {
   useCohorts,
@@ -714,8 +714,21 @@ function StudentSubjectsSheet({
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()} title={title} description={description}>
       {loading ? (
-        <div className="flex justify-center py-12">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด" className="space-y-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="rounded-xl border border-border px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Skeleton className="h-2.5 w-16" />
+                  <Skeleton className="h-3.5 w-40" />
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <Skeleton className="h-4 w-14 rounded-full" />
+                  <Skeleton className="h-2.5 w-10" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : rows.length === 0 ? (
         <EmptyState title="ไม่พบวิชา" description="ยังไม่มีวิชาในโครงสร้างหลักสูตรของชั้น/แผนนี้" />

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Plus, Users, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useCurriculumSubjectsAtGrade, useGradeLevels } from "@/hooks/useCurriculumStructure";
@@ -256,9 +256,15 @@ function TeachingLoadBoard({
                 </tr>
               ))}
               {isLoading && (
-                <tr>
-                  <td colSpan={3} className="px-3 py-8 text-center">
-                    <Spinner className="mx-auto h-5 w-5 text-muted-foreground" />
+                <tr role="status" aria-label="กำลังโหลด">
+                  <td className="px-3 py-2">
+                    <Skeleton className="h-3 w-24" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Skeleton className="h-3 w-12" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Skeleton className="h-4 w-20 rounded-full" />
                   </td>
                 </tr>
               )}

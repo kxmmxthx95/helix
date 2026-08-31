@@ -3,7 +3,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ChevronBack, ChevronForward, DownloadIcon, Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import {
   useAcademicEvents,
   useDeleteAcademicEvent,
@@ -107,7 +107,11 @@ export function AcademicEvents() {
           <span className="text-sm font-medium">
             {cursor.toLocaleDateString("th-TH", { month: "long", year: "numeric" })}
           </span>
-          {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+          {isLoading && (
+            <span role="status" aria-label="กำลังโหลด">
+              <Skeleton className="h-4 w-4 rounded-full" />
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <Button variant="outline" size="icon" onClick={() => setCursor((c) => addMonths(c, -1))} aria-label="เดือนก่อนหน้า">

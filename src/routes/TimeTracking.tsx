@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { useProfiles } from "@/hooks/useProfiles";
 import { useDepartmentSettings } from "@/hooks/useSettings";
 import {
@@ -101,7 +101,16 @@ function MyClockCard({
     <Card className="space-y-3">
       <p className="text-sm font-medium">เวลาทำงานวันนี้</p>
       {isLoading ? (
-        <Spinner className="h-4 w-4 text-muted-foreground" />
+        <div className="flex items-center gap-3" role="status" aria-label="กำลังโหลด">
+          <div className="flex-1 space-y-1">
+            <Skeleton className="h-3 w-12" />
+            <Skeleton className="h-5 w-16" />
+          </div>
+          <div className="flex-1 space-y-1">
+            <Skeleton className="h-3 w-12" />
+            <Skeleton className="h-5 w-16" />
+          </div>
+        </div>
       ) : (
         <div className="flex items-center gap-3">
           <div className="flex-1">
@@ -173,7 +182,18 @@ function PremisesExitCard({ profileId, date }: { profileId: string; date: string
         </Button>
       </div>
 
-      {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+      {isLoading && (
+        <ul className="divide-y divide-border text-sm" role="status" aria-label="กำลังโหลด">
+          {[0, 1].map((i) => (
+            <li key={i} className="flex items-center justify-between gap-2 py-1.5">
+              <div className="min-w-0 flex-1 space-y-1">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-2.5 w-40" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
       {!isLoading && requests.length === 0 && (
         <p className="text-xs text-muted-foreground">ยังไม่มีคำขอวันนี้</p>
       )}
@@ -253,7 +273,34 @@ function HistoryCard({ profileId, departmentId }: { profileId: string; departmen
   return (
     <Card className="space-y-2">
       <p className="text-sm font-medium">ประวัติ 14 วันล่าสุด</p>
-      {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+      {isLoading && (
+        <div className="overflow-x-auto rounded-lg bg-card" role="status" aria-label="กำลังโหลด">
+          <table className="w-full text-xs">
+            <thead className="text-left text-muted-foreground">
+              <tr>
+                <th className="py-1 pr-2 font-medium">วันที่</th>
+                <th className="py-1 pr-2 font-medium">เข้างาน</th>
+                <th className="py-1 font-medium">ออกงาน</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <tr key={i} className="border-t border-border">
+                  <td className="py-1.5 pr-2">
+                    <Skeleton className="h-3 w-16" />
+                  </td>
+                  <td className="py-1.5 pr-2">
+                    <Skeleton className="h-3 w-12" />
+                  </td>
+                  <td className="py-1.5">
+                    <Skeleton className="h-3 w-12" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {!isLoading && records.length === 0 && (
         <p className="text-xs text-muted-foreground">ยังไม่มีประวัติ</p>
       )}
@@ -305,7 +352,20 @@ function ApprovalsCard({ approverId }: { approverId: string }) {
   return (
     <Card className="space-y-2">
       <p className="text-sm font-medium">รออนุมัติ ({pending.length})</p>
-      {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+      {isLoading && (
+        <ul className="divide-y divide-border text-sm" role="status" aria-label="กำลังโหลด">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="space-y-1.5 py-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-48" />
+              <div className="flex gap-2">
+                <Skeleton className="h-8 flex-1" />
+                <Skeleton className="h-8 flex-1" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
       <ul className="divide-y divide-border text-sm">
         {pending.map((r) => (
           <li key={r.id} className="space-y-1.5 py-2">

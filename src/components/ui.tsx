@@ -315,6 +315,19 @@ export function Spinner({ className }: { className?: string }) {
   );
 }
 
+/** Decorative loading placeholder block — compose per-page to mirror real content shape. Wrap the group in `role="status" aria-label="กำลังโหลด"`. */
+export function Skeleton({ className }: { className?: string }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        "rounded-md bg-muted bg-gradient-to-r from-muted via-muted-foreground/20 to-muted bg-[length:200%_100%] animate-shimmer motion-reduce:animate-none motion-reduce:bg-none",
+        className,
+      )}
+    />
+  );
+}
+
 /** Centered empty placeholder — icon tile + title + muted description. */
 export function EmptyState({
   title,

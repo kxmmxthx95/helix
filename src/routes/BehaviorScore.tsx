@@ -3,7 +3,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { BarChartIcon, Plus, SettingsIcon, SlidersHorizontal } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { useClassroomRoster } from "@/hooks/useAttendance";
 import {
   STARTING_SCORE,
@@ -303,8 +303,56 @@ function RosterPanel({
 
   if (rosterLoading || recordsLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
+      <div className="flex min-h-0 flex-1 flex-col gap-2" role="status" aria-label="กำลังโหลด">
+        <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto lg:hidden">
+          {[0, 1, 2, 3].map((i) => (
+            <li key={i} className="rounded-lg border border-border p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Skeleton className="h-3.5 w-32" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+                <Skeleton className="h-5 w-8 shrink-0" />
+              </div>
+              <div className="mt-2 flex justify-end">
+                <Skeleton className="h-8 w-16 rounded-lg" />
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <div className="table-panel hidden lg:flex">
+          <div className="table-panel-scroll">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
+                  <th className="px-3 py-2 font-medium">รายชื่อ</th>
+                  <th className="px-3 py-2 text-right font-medium">คะแนนพฤติกรรม</th>
+                  <th className="w-24 px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3].map((i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-10" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-28" />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Skeleton className="ml-auto h-3 w-6" />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Skeleton className="ml-auto h-8 w-16 rounded-lg" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     );
   }
@@ -427,8 +475,44 @@ function ReportPanel({
 
   if (rosterLoading || recordsLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
+      <div className="flex min-h-0 flex-1 flex-col gap-2" role="status" aria-label="กำลังโหลด">
+        <Skeleton className="h-3 w-40" />
+        <div className="table-panel flex-1">
+          <div className="table-panel-scroll">
+            <table className="w-full min-w-[36rem] text-xs">
+              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="w-24 px-3 py-2 font-medium">วันที่</th>
+                  <th className="w-24 px-3 py-2 font-medium">รหัสนักเรียน</th>
+                  <th className="px-3 py-2 font-medium">รายชื่อ</th>
+                  <th className="w-16 px-3 py-2 text-right font-medium">คะแนน</th>
+                  <th className="px-3 py-2 font-medium">เหตุผล</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-16" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-10" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-28" />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Skeleton className="ml-auto h-3 w-6" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-32" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     );
   }

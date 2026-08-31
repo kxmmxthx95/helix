@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { useProfiles } from "@/hooks/useProfiles";
 import {
   leaveAttachmentUrl,
@@ -160,7 +160,40 @@ function MyRequestsSection({ profileId }: { profileId: string }) {
         </Button>
       </div>
 
-      {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+      {isLoading && (
+        <div className="overflow-hidden rounded-lg border border-border bg-card" role="status" aria-label="กำลังโหลด">
+          <table className="w-full min-w-[36rem] text-xs">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-2 py-2 font-medium">ประเภท</th>
+                <th className="px-2 py-2 font-medium">วันที่</th>
+                <th className="px-2 py-2 font-medium">เหตุผล</th>
+                <th className="px-2 py-2 font-medium">สถานะ</th>
+                <th className="px-2 py-2 font-medium" />
+              </tr>
+            </thead>
+            <tbody>
+              {[0, 1, 2].map((i) => (
+                <tr key={i} className="border-t border-border">
+                  <td className="px-2 py-2">
+                    <Skeleton className="h-3 w-16" />
+                  </td>
+                  <td className="px-2 py-2">
+                    <Skeleton className="h-3 w-32" />
+                  </td>
+                  <td className="px-2 py-2">
+                    <Skeleton className="h-3 w-24" />
+                  </td>
+                  <td className="px-2 py-2">
+                    <Skeleton className="h-4 w-16 rounded-full" />
+                  </td>
+                  <td className="px-2 py-2" />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {!isLoading && requests.length === 0 && (
         <p className="text-xs text-muted-foreground">ยังไม่มีคำขอลา</p>
       )}
@@ -336,7 +369,46 @@ function ApprovalsSection({ approverId }: { approverId: string }) {
           ))}
         </Select>
       </div>
-      {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+      {isLoading && (
+        <div className="overflow-hidden rounded-lg border border-border" role="status" aria-label="กำลังโหลด">
+          <table className="w-full min-w-[48rem] text-xs">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-2 py-2 font-medium">ผู้ขอ</th>
+                <th className="px-2 py-2 font-medium">ประเภท</th>
+                <th className="px-2 py-2 font-medium">วันที่</th>
+                <th className="px-2 py-2 font-medium">เหตุผล</th>
+                <th className="px-2 py-2 font-medium">ไฟล์แนบ</th>
+                <th className="px-2 py-2 font-medium">สถานะ</th>
+                <th className="px-2 py-2 font-medium" />
+              </tr>
+            </thead>
+            <tbody>
+              {[0, 1, 2].map((i) => (
+                <tr key={i} className="border-t border-border">
+                  <td className="px-2 py-2">
+                    <Skeleton className="h-3 w-20" />
+                  </td>
+                  <td className="px-2 py-2">
+                    <Skeleton className="h-3 w-16" />
+                  </td>
+                  <td className="px-2 py-2">
+                    <Skeleton className="h-3 w-32" />
+                  </td>
+                  <td className="px-2 py-2">
+                    <Skeleton className="h-3 w-24" />
+                  </td>
+                  <td className="px-2 py-2" />
+                  <td className="px-2 py-2">
+                    <Skeleton className="h-4 w-16 rounded-full" />
+                  </td>
+                  <td className="px-2 py-2" />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {!isLoading && requests.length === 0 && (
         <p className="text-xs text-muted-foreground">ไม่มีคำขอ</p>
       )}

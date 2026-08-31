@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Skeleton, Spinner } from "@/components/ui";
 import {
   assignmentStatus,
   MAX_ATTACHMENT_BYTES,
@@ -81,9 +81,22 @@ function AssignmentList({ student }: { student: Student }) {
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center py-8">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
-      </div>
+      <ul className="space-y-2" role="status" aria-label="กำลังโหลด">
+        {[0, 1, 2].map((i) => (
+          <li key={i}>
+            <Card className="space-y-1">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Skeleton className="h-2.5 w-24" />
+                  <Skeleton className="h-3.5 w-40" />
+                </div>
+                <Skeleton className="h-4 w-14 shrink-0 rounded-full" />
+              </div>
+              <Skeleton className="h-3 w-28" />
+            </Card>
+          </li>
+        ))}
+      </ul>
     );
   }
 

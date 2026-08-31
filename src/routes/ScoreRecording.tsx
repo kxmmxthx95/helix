@@ -3,7 +3,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ChevronBack, Plus, SettingsIcon } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Avatar, Button, Card, EmptyState, Field, Input, Select, Spinner, Switch } from "@/components/ui";
+import { Avatar, Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner, Switch } from "@/components/ui";
 import { useActiveTerm } from "@/hooks/useAcademicTerms";
 import { avatarUrl } from "@/hooks/useAvatar";
 import {
@@ -147,8 +147,39 @@ export function ScoreRecording() {
           onBack={() => setSelectedId(null)}
         />
       ) : isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div className="table-panel flex-1" role="status" aria-label="กำลังโหลด">
+          <div className="table-panel-scroll">
+            <table className="w-full min-w-[32rem] text-xs">
+              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">รหัสวิชา</th>
+                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
+                  <th className="px-3 py-2 font-medium">ห้อง</th>
+                  {manager && <th className="px-3 py-2 font-medium">ครูผู้สอน</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2].map((i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-12" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-32" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-10" />
+                    </td>
+                    {manager && (
+                      <td className="px-3 py-2">
+                        <Skeleton className="h-3 w-20" />
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : assignments.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
@@ -271,8 +302,48 @@ function AssignmentPanel({
       </div>
 
       {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div className="table-panel flex-1" role="status" aria-label="กำลังโหลด">
+          <div className="table-panel-scroll">
+            <table className="w-full min-w-[36rem] text-xs">
+              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
+                  <th className="px-3 py-2 font-medium">รายชื่อ</th>
+                  <th className="px-3 py-2 text-right font-medium">เก็บ</th>
+                  <th className="px-3 py-2 text-right font-medium">สอบ</th>
+                  <th className="px-3 py-2 text-right font-medium">รวม</th>
+                  <th className="px-3 py-2 text-center font-medium">เกรด</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3].map((i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-10" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-7 w-7 shrink-0 rounded-full" />
+                        <Skeleton className="h-3 w-24" />
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Skeleton className="ml-auto h-3 w-8" />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Skeleton className="ml-auto h-3 w-8" />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <Skeleton className="ml-auto h-3 w-8" />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <Skeleton className="mx-auto h-4 w-6 rounded-full" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : roster.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">

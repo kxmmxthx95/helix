@@ -4,7 +4,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Avatar, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { Button, Avatar, Card, EmptyState, Field, Input, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
@@ -295,8 +295,53 @@ export function Roster() {
       </div>
 
       {isLoading && (
-        <div className="flex flex-1 items-center justify-center py-12">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div className="space-y-2" role="status" aria-label="กำลังโหลด">
+          <ul className="space-y-2 lg:hidden">
+            {[0, 1, 2].map((i) => (
+              <li key={i} className="rounded-xl border border-border bg-card p-3.5 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <Skeleton className="h-11 w-11 shrink-0 rounded-full" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Skeleton className="h-3.5 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
+            <table className="w-full text-xs">
+              <thead className="bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">รหัส</th>
+                  <th className="px-3 py-2 font-medium">คำนำหน้า</th>
+                  <th className="px-3 py-2 font-medium">ชื่อ-นามสกุล</th>
+                  <th className="px-3 py-2 font-medium">แผนก</th>
+                  <th className="px-3 py-2 font-medium">ชั้น</th>
+                  <th className="px-3 py-2 font-medium">สถานะ</th>
+                  {mayManageUsers && <th className="px-3 py-2 font-medium">บัญชี</th>}
+                  {mayEdit && <th className="px-3 py-2 font-medium" />}
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <tr key={i} className="h-[40px] border-t border-border">
+                    <td className="px-3 py-0"><Skeleton className="h-3 w-12" /></td>
+                    <td className="px-3 py-0"><Skeleton className="h-3 w-10" /></td>
+                    <td className="px-3 py-0"><Skeleton className="h-3 w-32" /></td>
+                    <td className="px-3 py-0"><Skeleton className="h-3 w-16" /></td>
+                    <td className="px-3 py-0"><Skeleton className="h-3 w-10" /></td>
+                    <td className="px-3 py-0"><Skeleton className="h-4 w-14 rounded-full" /></td>
+                    {mayManageUsers && (
+                      <td className="px-3 py-0"><Skeleton className="h-4 w-20 rounded-full" /></td>
+                    )}
+                    {mayEdit && <td className="px-3 py-0" />}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

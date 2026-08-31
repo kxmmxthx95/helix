@@ -15,6 +15,7 @@ import {
   Pagination,
   PasswordInput,
   Select,
+  Skeleton,
   Spinner,
   Switch,
 } from "@/components/ui";
@@ -116,8 +117,59 @@ export function Users() {
       </div>
 
       {isLoading && (
-        <div className="flex justify-center py-12">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด" className="space-y-2">
+          <ul className="space-y-2 lg:hidden">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <li key={i} className="rounded-lg border border-border p-3">
+                <div className="flex items-start gap-3">
+                  <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Skeleton className="h-3.5 w-32" />
+                    <Skeleton className="h-3 w-40" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
+            <table className="w-full text-xs">
+              <thead className="bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">ชื่อ</th>
+                  <th className="px-3 py-2 font-medium">สิทธิ์</th>
+                  <th className="px-3 py-2 font-medium">ตำแหน่ง</th>
+                  <th className="px-3 py-2 font-medium">แผนก</th>
+                  <th className="px-3 py-2 font-medium">สถานะ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2.5">
+                        <Skeleton className="h-7 w-7 shrink-0 rounded-full" />
+                        <Skeleton className="h-3 w-28" />
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-16" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-20" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-16" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-4 w-12 rounded-full" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

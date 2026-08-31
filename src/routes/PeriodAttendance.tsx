@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronBack } from "@/components/icons";
-import { Button, Card, EmptyState, Input, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Input, Skeleton, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { useActiveAcademicYear, useActiveTerm } from "@/hooks/useAcademicTerms";
 import { useClassroomRoster, summarizeAttendance } from "@/hooks/useAttendance";
@@ -143,8 +143,49 @@ function PeriodCheckInPanel({
       </div>
 
       {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด" className="table-panel">
+          <div className="table-panel-scroll">
+            <table className="w-full min-w-[52rem] table-fixed text-xs">
+              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="w-14 px-3 py-2 font-medium">คาบ</th>
+                  <th className="w-24 px-3 py-2 font-medium">รหัสวิชา</th>
+                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
+                  <th className="w-28 px-3 py-2 font-medium">แผนก</th>
+                  <th className="w-24 px-3 py-2 font-medium">ระดับชั้น</th>
+                  <th className="w-24 px-3 py-2 font-medium">ห้องเรียน</th>
+                  <th className="w-28 px-3 py-2 text-center font-medium">สถานะ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-4" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-14" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-32" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-16" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-12" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-12" />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <Skeleton className="mx-auto h-4 w-16 rounded-full" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : todaysEntries.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
@@ -335,8 +376,37 @@ function PeriodCheckInGrid({
         </div>
       </div>
       {rosterLoading || recordsLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด" className="table-panel">
+          <div className="table-panel-scroll">
+            <table className="w-full min-w-[44rem] table-fixed text-xs">
+              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="w-24 px-3 py-2 font-medium">รหัสนักเรียน</th>
+                  <th className="w-48 px-3 py-2 font-medium">รายชื่อ</th>
+                  <th className="w-36 px-3 py-2 text-center font-medium">สถานะ</th>
+                  <th className="px-3 py-2 text-center font-medium">หมายเหตุ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <tr key={i} className="border-t border-border">
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-16" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-32" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="mx-auto h-4 w-28 rounded-full" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="mx-auto h-3 w-24" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : roster.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">

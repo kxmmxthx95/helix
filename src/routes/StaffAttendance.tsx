@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Card, EmptyState, Input, Select, Spinner } from "@/components/ui";
+import { Card, EmptyState, Input, Select, Skeleton } from "@/components/ui";
 import { bangkokTime } from "@/routes/TimeTracking";
 import { STATUS_LABEL, STATUS_STYLE } from "@/routes/Attendance";
 import { summarizeAttendance } from "@/hooks/useAttendance";
@@ -32,7 +32,7 @@ export function StaffAttendance() {
   const orgWide = isOrgWide(profile.roles);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="page-fill">
       <div className="flex flex-wrap items-center gap-2">
         <Select className="w-40" value={view} onChange={(e) => setView(e.target.value as View)}>
           <option value="roster">รายวัน</option>
@@ -40,7 +40,7 @@ export function StaffAttendance() {
         </Select>
         {orgWide && (
           <Select
-            className="w-48"
+            className="ml-auto w-48"
             value={departmentId}
             onChange={(e) => setDepartmentId(e.target.value)}
             placeholder="ทุกแผนก"
@@ -75,7 +75,34 @@ function RosterView({ departmentId }: { departmentId: string }) {
     <div className="space-y-3">
       <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" aria-label="วันที่" />
 
-      {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+      {isLoading && (
+        <div className="overflow-hidden rounded-lg border border-border bg-card" role="status" aria-label="กำลังโหลด">
+          <table className="w-full text-xs">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">ชื่อ</th>
+                <th className="px-3 py-2 font-medium">เข้างาน</th>
+                <th className="px-3 py-2 font-medium">สถานะ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <tr key={i} className="border-t border-border">
+                  <td className="px-3 py-2">
+                    <Skeleton className="h-3 w-24" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Skeleton className="h-3 w-12" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Skeleton className="h-4 w-12 rounded-full" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {!isLoading && visible.length === 0 && (
         <EmptyState title="ไม่มีข้อมูล" description="อาจเป็นวันหยุด หรือไม่มีพนักงานที่ต้องบันทึกเวลาในวันนี้" />
       )}
@@ -84,19 +111,19 @@ function RosterView({ departmentId }: { departmentId: string }) {
           <table className="w-full text-xs">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
-                <th className="px-2 py-2 font-medium">ชื่อ</th>
-                <th className="px-2 py-2 font-medium">เข้างาน</th>
-                <th className="px-2 py-2 font-medium">สถานะ</th>
+                <th className="px-3 py-2 font-medium">ชื่อ</th>
+                <th className="px-3 py-2 font-medium">เข้างาน</th>
+                <th className="px-3 py-2 font-medium">สถานะ</th>
               </tr>
             </thead>
             <tbody>
               {visible.map((r) => (
                 <tr key={r.profile_id} className="border-t border-border">
-                  <td className="px-2 py-2 font-medium">{nameById.get(r.profile_id) ?? "—"}</td>
-                  <td className="px-2 py-2 text-muted-foreground tabular-nums">
+                  <td className="px-3 py-2 font-medium">{nameById.get(r.profile_id) ?? "—"}</td>
+                  <td className="px-3 py-2 text-muted-foreground tabular-nums">
                     {r.clock_in_time ? bangkokTime(r.clock_in_time) : "—"}
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2">
                     <span className={cn("rounded-full px-2 py-0.5 text-[10px]", STATUS_STYLE[r.status])}>
                       {STATUS_LABEL[r.status]}
                     </span>
@@ -153,7 +180,36 @@ function SummaryView({ departmentId }: { departmentId: string }) {
         </Select>
       </div>
 
-      {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+      {isLoading && (
+        <div className="overflow-hidden rounded-lg border border-border bg-card" role="status" aria-label="กำลังโหลด">
+          <table className="w-full text-xs">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">ชื่อ</th>
+                {STATUS_ORDER.map((st) => (
+                  <th key={st} className="px-3 py-2 text-right font-medium">
+                    {STATUS_LABEL[st]}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <tr key={i} className="border-t border-border">
+                  <td className="px-3 py-2">
+                    <Skeleton className="h-3 w-24" />
+                  </td>
+                  {STATUS_ORDER.map((st) => (
+                    <td key={st} className="px-3 py-2 text-right">
+                      <Skeleton className="ml-auto h-3 w-6" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       {!isLoading && byProfile.size === 0 && (
         <EmptyState title="ไม่มีข้อมูล" description="ไม่มีข้อมูลการมาทำงานในเดือนนี้" />
       )}
@@ -162,9 +218,9 @@ function SummaryView({ departmentId }: { departmentId: string }) {
           <table className="w-full text-xs">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
-                <th className="px-2 py-2 font-medium">ชื่อ</th>
+                <th className="px-3 py-2 font-medium">ชื่อ</th>
                 {STATUS_ORDER.map((st) => (
-                  <th key={st} className="px-2 py-2 text-right font-medium">
+                  <th key={st} className="px-3 py-2 text-right font-medium">
                     {STATUS_LABEL[st]}
                   </th>
                 ))}
@@ -175,9 +231,9 @@ function SummaryView({ departmentId }: { departmentId: string }) {
                 const counts = summarizeAttendance(records);
                 return (
                   <tr key={profileId} className="border-t border-border">
-                    <td className="px-2 py-2 font-medium">{nameById.get(profileId) ?? "—"}</td>
+                    <td className="px-3 py-2 font-medium">{nameById.get(profileId) ?? "—"}</td>
                     {STATUS_ORDER.map((st) => (
-                      <td key={st} className="px-2 py-2 text-right tabular-nums">
+                      <td key={st} className="px-3 py-2 text-right tabular-nums">
                         {counts[st]}
                       </td>
                     ))}

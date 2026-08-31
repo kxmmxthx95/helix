@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { GraduationCap, Plus, Users, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { Card, EmptyState, Select, Spinner } from "@/components/ui";
+import { EmptyState, Select, Skeleton } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useMyClassroom } from "@/hooks/useAttendance";
 import { useDepartmentPeriods, usePeriodsForGrade } from "@/hooks/usePeriodDefinitions";
@@ -401,10 +401,40 @@ function TimetableGrid({
   }
 
   if (isLoading) {
+    const skeletonDays = [1, 2, 3, 4, 5];
     return (
-      <Card className="flex justify-center py-12">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
-      </Card>
+      <div
+        className="overflow-x-auto rounded-lg border border-border bg-card"
+        role="status"
+        aria-label="กำลังโหลด"
+      >
+        <table className="w-full min-w-[40rem] table-fixed text-xs">
+          <thead className="bg-muted text-left text-xs text-muted-foreground">
+            <tr>
+              <th className="w-12 px-2 py-2 font-medium">คาบ</th>
+              {skeletonDays.map((d) => (
+                <th key={d} className="px-2 py-2 font-medium">
+                  {DAY_LABEL[d] ?? d}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[0, 1, 2, 3, 4, 5].map((periodNo) => (
+              <tr key={periodNo} className="border-t border-border align-top">
+                <td className="px-2 py-2 text-center">
+                  <Skeleton className="mx-auto h-3 w-4" />
+                </td>
+                {skeletonDays.map((d) => (
+                  <td key={d} className="px-1 py-1">
+                    <Skeleton className="h-6 rounded" />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   }
 

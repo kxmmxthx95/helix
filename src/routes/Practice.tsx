@@ -20,7 +20,7 @@ import {
   Input,
   Pagination,
   Select,
-  Spinner,
+  Skeleton,
 } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
 import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
@@ -1050,8 +1050,27 @@ function SetDetail({ set, onBack }: { set: PracticeSet; onBack: () => void }) {
       )}
 
       {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div className="table-panel-scroll space-y-3 py-1" role="status" aria-label="กำลังโหลด">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="rounded-lg border border-border bg-card p-3 text-xs">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-1 flex-wrap items-center gap-1.5">
+                  <Skeleton className="h-4 w-6" />
+                  <Skeleton className="h-4 w-16 rounded-full" />
+                  <Skeleton className="h-4 w-12 rounded-full" />
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Skeleton className="h-6 w-6 rounded-md" />
+                  <Skeleton className="h-6 w-6 rounded-md" />
+                </div>
+              </div>
+              <Skeleton className="mt-2 h-3.5 w-3/4" />
+              <div className="mt-3 space-y-2">
+                <Skeleton className="h-3 w-1/2" />
+                <Skeleton className="h-3 w-2/5" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : setQuestions.length === 0 ? (
         <EmptyState title="ชุดนี้ยังไม่มีโจทย์" description="" />
@@ -1250,8 +1269,23 @@ function PracticeHome({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-10">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
+      <div
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+        role="status"
+        aria-label="กำลังโหลด"
+      >
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <div
+            key={i}
+            className="flex aspect-[3/4] flex-col justify-between rounded-xl border border-border p-3"
+          >
+            <Skeleton className="h-6 w-6 rounded" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-3.5 w-4/5" />
+              <Skeleton className="h-2.5 w-10" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
@@ -1478,8 +1512,22 @@ function TakePractice({
 
   if (!attempt) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
+      <div
+        className="mx-auto max-w-xl space-y-3 pb-4"
+        role="status"
+        aria-label="กำลังโหลด"
+      >
+        <Skeleton className="h-3 w-24" />
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="space-y-2 rounded-lg border border-border bg-card p-3">
+            <Skeleton className="h-4 w-4/5" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-3 w-3/5" />
+              <Skeleton className="h-3 w-2/5" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }

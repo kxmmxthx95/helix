@@ -1,7 +1,7 @@
 import { Fragment, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronForward, Plus } from "@/components/icons";
-import { Button, Card, Field, Input, Spinner } from "@/components/ui";
+import { Button, Card, Field, Input, Skeleton, Spinner } from "@/components/ui";
 import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
@@ -112,8 +112,18 @@ export function TeachingPlan() {
       </div>
 
       {isLoading && (
-        <div className="flex justify-center py-8">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex h-[40px] items-center gap-3 border-t border-border px-3">
+              <Skeleton className="h-3 w-3 shrink-0" />
+              <Skeleton className="h-3 w-12" />
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-3 w-10" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+          ))}
         </div>
       )}
       {!isLoading && assignments.length === 0 && (
@@ -134,8 +144,41 @@ function PlanBoard({ assignment }: { assignment: TeachingAssignment }) {
   return (
     <div className="space-y-3">
       {isLoading && (
-        <div className="flex justify-center py-6">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด" className="space-y-3">
+          <div className="rounded-lg border border-border bg-background p-3">
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="mt-1.5 h-4 w-40" />
+            <div className="mt-2 flex gap-1.5">
+              <Skeleton className="h-8 w-24 rounded-lg" />
+              <Skeleton className="h-8 w-24 rounded-lg" />
+            </div>
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full min-w-[28rem] text-sm">
+              <thead className="bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">หน่วย</th>
+                  <th className="px-3 py-2 font-medium">สถานะ</th>
+                  <th className="px-3 py-2 font-medium">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-background">
+                {[0, 1, 2].map((i) => (
+                  <tr key={i}>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-32" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-4 w-16 rounded-full" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Skeleton className="h-3 w-20" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

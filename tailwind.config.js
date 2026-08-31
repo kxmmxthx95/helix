@@ -50,9 +50,11 @@ export default {
       },
       keyframes: {
         "fade-in": { from: { opacity: "0" }, to: { opacity: "1" } },
+        shimmer: { from: { backgroundPosition: "150% 0" }, to: { backgroundPosition: "-50% 0" } },
       },
       animation: {
         "fade-in": "fade-in 200ms ease-out",
+        shimmer: "shimmer 1.5s ease-in-out infinite",
       },
     },
   },

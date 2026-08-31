@@ -4,7 +4,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ImportSubjectsSheet } from "@/components/ImportSubjectsSheet";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
 import {
   useDeleteSubject,
   useLearningAreas,
@@ -275,8 +275,49 @@ export function Subjects() {
       </div>
 
       {isLoading && (
-        <div className="flex flex-1 items-center justify-center py-12">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div className="flex min-h-0 flex-1 flex-col gap-2" role="status" aria-label="กำลังโหลด">
+          <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto lg:hidden">
+            {[0, 1, 2].map((i) => (
+              <li key={i} className="rounded-lg border border-border p-3">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="mt-1.5 h-3.5 w-40" />
+                <Skeleton className="mt-1.5 h-3 w-48" />
+                <Skeleton className="mt-1.5 h-3 w-32" />
+              </li>
+            ))}
+          </ul>
+          <div className="table-panel hidden lg:flex">
+            <table className="w-full text-xs">
+              <thead className="bg-muted text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">รหัส</th>
+                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
+                  <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
+                  <th className="px-3 py-2 font-medium">ระดับชั้น</th>
+                  <th className="px-3 py-2 font-medium">ภาคเรียน</th>
+                  <th className="px-3 py-2 font-medium">หน่วยกิต</th>
+                  <th className="px-3 py-2 font-medium">จำนวนชั่วโมง</th>
+                  <th className="px-3 py-2 font-medium">ประเภท</th>
+                  {mayEdit && <th className="px-3 py-2" />}
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <tr key={i} className="h-[40px] border-t border-border">
+                    <td className="px-3 py-0"><Skeleton className="h-3 w-10" /></td>
+                    <td className="px-3 py-0"><Skeleton className="h-3 w-32" /></td>
+                    <td className="px-3 py-0"><Skeleton className="h-3 w-20" /></td>
+                    <td className="px-3 py-0"><Skeleton className="h-3 w-16" /></td>
+                    <td className="px-3 py-0"><Skeleton className="h-3 w-8" /></td>
+                    <td className="px-3 py-0"><Skeleton className="h-3 w-6" /></td>
+                    <td className="px-3 py-0"><Skeleton className="h-3 w-8" /></td>
+                    <td className="px-3 py-0"><Skeleton className="h-3 w-16" /></td>
+                    {mayEdit && <td className="px-3 py-0" />}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

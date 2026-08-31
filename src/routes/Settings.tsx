@@ -3,7 +3,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Select, Spinner, Switch } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner, Switch } from "@/components/ui";
 import {
   useAcademicTerms,
   useSaveAcademicTerm,
@@ -92,8 +92,16 @@ function SchoolSettingsCard() {
 
   if (isLoading || !form || !settings) {
     return (
-      <Card className="flex justify-center py-8">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
+      <Card className="space-y-4" role="status" aria-label="กำลังโหลด">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-16 w-16 shrink-0 rounded-lg" />
+          <Skeleton className="h-8 w-28" />
+        </div>
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-9 w-full" />
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-9 w-full" />
+        <Skeleton className="h-9 w-28" />
       </Card>
     );
   }
@@ -213,8 +221,16 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
 
   if (isLoading || !form) {
     return (
-      <Card className="flex justify-center py-8">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
+      <Card className="space-y-4" role="status" aria-label="กำลังโหลด">
+        <Skeleton className="h-3 w-32" />
+        <Skeleton className="h-9 w-full" />
+        <div className="grid grid-cols-2 gap-3">
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+        </div>
+        <Skeleton className="h-3 w-32" />
+        <Skeleton className="h-9 w-full" />
+        <Skeleton className="h-9 w-28" />
       </Card>
     );
   }
@@ -446,9 +462,19 @@ function AcademicTermsCard({
 
   if (isLoading) {
     return (
-      <Card className="flex justify-center py-8">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
-      </Card>
+      <div className="space-y-3" role="status" aria-label="กำลังโหลด">
+        {[0, 1, 2].map((i) => (
+          <Card key={i} className="space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-32" />
+                <Skeleton className="h-3 w-40" />
+              </div>
+              <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
+            </div>
+          </Card>
+        ))}
+      </div>
     );
   }
 
@@ -741,8 +767,16 @@ function PeriodDefinitionsCard({
 
   if (isLoading) {
     return (
-      <Card className="flex justify-center py-8">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
+      <Card className="space-y-3" role="status" aria-label="กำลังโหลด">
+        <div className="flex justify-end gap-2">
+          <Skeleton className="h-8 w-24" />
+          <Skeleton className="h-8 w-24" />
+        </div>
+        <div className="space-y-1.5">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </div>
       </Card>
     );
   }
@@ -1160,8 +1194,18 @@ function LeaveTypesCard() {
 
   if (isLoading) {
     return (
-      <Card className="flex justify-center py-8">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
+      <Card className="space-y-3" role="status" aria-label="กำลังโหลด">
+        <div className="flex justify-end">
+          <Skeleton className="h-8 w-24" />
+        </div>
+        <ul className="divide-y divide-border">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="space-y-1.5 py-1.5">
+              <Skeleton className="h-3.5 w-32" />
+              <Skeleton className="h-3 w-24" />
+            </li>
+          ))}
+        </ul>
       </Card>
     );
   }
@@ -1350,8 +1394,18 @@ function SalaryGradesCard() {
 
   if (isLoading) {
     return (
-      <Card className="flex justify-center py-8">
-        <Spinner className="h-5 w-5 text-muted-foreground" />
+      <Card className="space-y-3" role="status" aria-label="กำลังโหลด">
+        <div className="flex justify-end">
+          <Skeleton className="h-8 w-24" />
+        </div>
+        <ul className="divide-y divide-border">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="space-y-1.5 py-1.5">
+              <Skeleton className="h-3.5 w-32" />
+              <Skeleton className="h-3 w-24" />
+            </li>
+          ))}
+        </ul>
       </Card>
     );
   }

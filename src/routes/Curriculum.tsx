@@ -3,7 +3,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { CheckboxIcon, CheckboxOutlineIcon, ClipboardIcon, HelpCircleIcon, PencilIcon, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useFillPageSize } from "@/hooks/useFillPageSize";
 import { usePagination } from "@/hooks/usePagination";
@@ -710,8 +710,33 @@ function SubjectPanel({
       </Sheet>
 
       {isLoading && (
-        <div className="flex flex-1 items-center justify-center py-12">
-          <Spinner className="h-5 w-5 text-muted-foreground" />
+        <div className="table-panel" role="status" aria-label="กำลังโหลด">
+          <table className="w-full min-w-[40rem] text-xs">
+            <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">รหัส</th>
+                <th className="px-3 py-2 font-medium">วิชา</th>
+                <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
+                <th className="px-3 py-2 font-medium">ประเภทวิชา</th>
+                <th className="px-3 py-2 font-medium">แผนการเรียน</th>
+                <th className="px-3 py-2 font-medium">สัดส่วนคะแนน</th>
+                {mayEdit && <th className="px-3 py-2" />}
+              </tr>
+            </thead>
+            <tbody>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <tr key={i} className="h-[40px] border-t border-border">
+                  <td className="px-3 py-0"><Skeleton className="h-3 w-12" /></td>
+                  <td className="px-3 py-0"><Skeleton className="h-3 w-32" /></td>
+                  <td className="px-3 py-0"><Skeleton className="h-3 w-20" /></td>
+                  <td className="px-3 py-0"><Skeleton className="h-3 w-16" /></td>
+                  <td className="px-3 py-0"><Skeleton className="h-3 w-20" /></td>
+                  <td className="px-3 py-0"><Skeleton className="h-3 w-16" /></td>
+                  {mayEdit && <td className="px-3 py-0" />}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -1623,7 +1648,16 @@ function KgPanel({
           )}
         </div>
 
-        {unitsLoading && <Spinner className="h-3 w-3 text-muted-foreground" />}
+        {unitsLoading && (
+          <ul className="divide-y divide-border" role="status" aria-label="กำลังโหลด">
+            {[0, 1, 2].map((i) => (
+              <li key={i} className="flex items-center justify-between py-2 text-sm">
+                <Skeleton className="h-3 w-40" />
+                <Skeleton className="h-3 w-8" />
+              </li>
+            ))}
+          </ul>
+        )}
         {!unitsLoading && (units ?? []).length === 0 && (
           <p className="text-sm text-muted-foreground">ยังไม่มีหน่วยการเรียนรู้</p>
         )}
@@ -1647,7 +1681,12 @@ function KgPanel({
 
       <Card className="space-y-4">
         <h3 className="text-lg font-semibold">หัวข้อการประเมินพัฒนาการ</h3>
-        {topicsLoading && <Spinner className="h-3 w-3 text-muted-foreground" />}
+        {topicsLoading && (
+          <div className="space-y-2" role="status" aria-label="กำลังโหลด">
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+        )}
 
         {(Object.keys(DOMAIN_LABEL) as DevelopmentDomain[]).map((domain) => (
           <div key={domain} className="space-y-2">

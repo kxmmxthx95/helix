@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
-import { Button, Field, Input, Spinner } from "@/components/ui";
+import { Button, Field, Input, Skeleton, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions } from "@/hooks/useAssignments";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
@@ -159,7 +159,9 @@ function QuickClockSection({ profileId, departmentId }: { profileId: string; dep
   return (
     <section>
       {isLoading ? (
-        <Spinner className="h-4 w-4 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด">
+          <Skeleton className="h-4 w-56" />
+        </div>
       ) : (
         <p className="text-sm">
           เวลาทำงานวันนี้ —{" "}
@@ -229,7 +231,9 @@ function AssignmentSummarySection({ student }: { student: Student }) {
         </button>
       </div>
       {isLoading ? (
-        <Spinner className="mt-1 h-4 w-4 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด">
+          <Skeleton className="mt-1 h-4 w-48" />
+        </div>
       ) : items.length === 0 ? (
         <p className="mt-1 text-sm text-muted-foreground">ยังไม่มีงาน</p>
       ) : (
@@ -259,7 +263,9 @@ function AttendanceSummarySection({ student }: { student: Student }) {
         การมาเรียนของ {student.first_name} {student.last_name} · {MONTH_LABEL}
       </p>
       {isLoading ? (
-        <Spinner className="mt-1 h-4 w-4 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด">
+          <Skeleton className="mt-1 h-4 w-40" />
+        </div>
       ) : (
         <p className="mt-1 text-sm">
           {STATUS_ORDER.map((st, i) => (
@@ -291,7 +297,9 @@ function BehaviorScoreSection({ student }: { student: Student }) {
         คะแนนพฤติกรรมของ {student.first_name} {student.last_name}
       </p>
       {isLoading ? (
-        <Spinner className="mt-1 h-4 w-4 text-muted-foreground" />
+        <div role="status" aria-label="กำลังโหลด">
+          <Skeleton className="mt-1 h-4 w-32" />
+        </div>
       ) : (
         <p className={cn("mt-1 text-sm", score < STARTING_SCORE ? "text-destructive" : "text-success")}>
           <strong className="text-lg font-semibold">{score}</strong> จาก {STARTING_SCORE} คะแนน
@@ -345,7 +353,16 @@ function StudentLeaveSection({ student, submittedBy }: { student: Student; submi
         </Button>
       </div>
 
-      {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+      {isLoading && (
+        <ul className="divide-y divide-border" role="status" aria-label="กำลังโหลด">
+          {[0, 1].map((i) => (
+            <li key={i} className="flex items-center justify-between gap-2 py-2">
+              <Skeleton className="h-3 w-28" />
+              <Skeleton className="h-4 w-14 rounded-full" />
+            </li>
+          ))}
+        </ul>
+      )}
       {!isLoading && requests.length === 0 && (
         <p className="text-sm">ยังไม่มีคำขอลา</p>
       )}
