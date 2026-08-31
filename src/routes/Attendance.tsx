@@ -36,7 +36,7 @@ export const STATUS_LABEL: Record<AttendanceStatus, string> = {
 };
 const STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent", "leave"];
 /** Selected check-in buttons + summary badges — light: saturated fill; dark: deep fill + mint text. */
-const STATUS_STYLE: Record<AttendanceStatus, string> = {
+export const STATUS_STYLE: Record<AttendanceStatus, string> = {
   present:
     "bg-emerald-400 text-emerald-950 ring-1 ring-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 dark:ring-emerald-800",
   late:

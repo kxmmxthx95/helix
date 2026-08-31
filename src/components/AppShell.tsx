@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   AirplaneIcon,
   AppsIcon,
+  BarChartIcon,
   BookIcon,
   BriefcaseIcon,
   CalendarIcon,
@@ -329,6 +330,17 @@ const TABS = [
     deptManagerOnly: false,
     academicManagerOnly: false,
     teacherOrManagerOnly: true,
+  },
+  {
+    to: "/staff-attendance",
+    label: "รายงานการมาทำงาน",
+    icon: BarChartIcon,
+    section: "บุคลากร",
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: true,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: false,
   },
 ];
 

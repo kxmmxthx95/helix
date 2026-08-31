@@ -5,6 +5,10 @@ import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, BuddhistDateSelect, Card, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { avatarUrl } from "@/hooks/useAvatar";
+import { summarizeAttendance } from "@/hooks/useAttendance";
+import { useStaffAttendanceRange } from "@/hooks/useStaffAttendance";
+import { STATUS_LABEL, STATUS_STYLE } from "@/routes/Attendance";
+import { bangkokTime } from "@/routes/TimeTracking";
 import {
   employeeDocumentSignedUrl,
   useChangeEmployeeStatus,
@@ -29,24 +33,27 @@ import {
   DOCUMENT_CATEGORY_LABEL,
   EMPLOYEE_STATUS_LABEL,
   profileFullName,
+  type AttendanceStatus,
   type Contract,
   type ContractType,
   type DocumentCategory,
   type EmployeeStatus,
   type ProfileWithRoles,
 } from "@/lib/database.types";
-import { canManageHr } from "@/lib/roles";
+import { canManage, canManageHr } from "@/lib/roles";
 import { textareaClass } from "@/routes/Roster";
+import { cn } from "@/lib/utils";
 
 const EMPTY: EmployeeFilters = { search: "", departmentId: "", status: "" };
 
-type Tab = "position" | "compensation" | "status" | "contracts" | "documents";
+type Tab = "position" | "compensation" | "status" | "contracts" | "documents" | "attendance";
 const TABS: { key: Tab; label: string }[] = [
   { key: "position", label: "ตำแหน่งงาน" },
   { key: "compensation", label: "เงินเดือน" },
   { key: "status", label: "สถานะ" },
   { key: "contracts", label: "สัญญาจ้าง" },
   { key: "documents", label: "เอกสาร" },
+  { key: "attendance", label: "การมาทำงาน" },
 ];
 
 export function Employees() {
@@ -240,8 +247,14 @@ function EmployeeDetailSheet({
   const mayManageHr = canManageHr(me.roles);
   const isSelf = row?.id === me.id;
   const canSeeSensitive = isSelf || mayManageHr;
+  // Attendance is day-to-day ops data (same access level as time_clock_records
+  // itself — self or canManage()), not confidential HR data like
+  // salary/contract/status/document, so it uses a wider gate than those.
+  const canSeeAttendance = isSelf || canManage(me.roles);
 
-  const visibleTabs = TABS.filter((t) => t.key === "position" || canSeeSensitive);
+  const visibleTabs = TABS.filter((t) =>
+    t.key === "position" ? true : t.key === "attendance" ? canSeeAttendance : canSeeSensitive,
+  );
 
   return (
     <Sheet
@@ -270,6 +283,7 @@ function EmployeeDetailSheet({
           {tab === "status" && canSeeSensitive && <StatusPanel row={row} mayManageHr={mayManageHr} me={me} />}
           {tab === "contracts" && canSeeSensitive && <ContractsPanel row={row} mayManageHr={mayManageHr} me={me} />}
           {tab === "documents" && canSeeSensitive && <DocumentsPanel row={row} mayManageHr={mayManageHr} me={me} />}
+          {tab === "attendance" && canSeeAttendance && <AttendancePanel row={row} />}
         </div>
       )}
     </Sheet>
@@ -481,6 +495,80 @@ function StatusPanel({ row, mayManageHr, me }: { row: EmployeeRow; mayManageHr: 
           ))}
         </ul>
       </div>
+    </div>
+  );
+}
+
+const ATTENDANCE_MONTH_NAMES = Array.from({ length: 12 }, (_, i) =>
+  new Intl.DateTimeFormat("th-TH", { month: "long" }).format(new Date(2000, i, 1)),
+);
+const attendanceDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
+const ATTENDANCE_STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent", "leave"];
+
+/** Read-only — derived from staff_attendance_status() (migration 0062), nothing to edit here. */
+function AttendancePanel({ row }: { row: EmployeeRow }) {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear() + 543); // พ.ศ.
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const ceYear = year - 543;
+  const startDate = `${ceYear}-${String(month).padStart(2, "0")}-01`;
+  const endDate = `${ceYear}-${String(month).padStart(2, "0")}-${String(attendanceDaysInMonth(ceYear, month)).padStart(2, "0")}`;
+  const years = Array.from({ length: 4 }, (_, i) => now.getFullYear() + 543 - i);
+
+  const { data: allRows = [], isLoading } = useStaffAttendanceRange(startDate, endDate);
+  const rows = allRows.filter((r) => r.profile_id === row.id);
+  const counts = summarizeAttendance(rows);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Select className="w-32" value={String(month)} onChange={(e) => setMonth(Number(e.target.value))}>
+          {ATTENDANCE_MONTH_NAMES.map((name, i) => (
+            <option key={name} value={i + 1}>
+              {name}
+            </option>
+          ))}
+        </Select>
+        <Select className="w-24" value={String(year)} onChange={(e) => setYear(Number(e.target.value))}>
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </Select>
+      </div>
+
+      {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+
+      {!isLoading && (
+        <div className="grid grid-cols-4 gap-2">
+          {ATTENDANCE_STATUS_ORDER.map((st) => (
+            <div key={st} className={cn("rounded-lg px-2 py-1.5 text-center text-[10px] font-medium", STATUS_STYLE[st])}>
+              <p>{STATUS_LABEL[st]}</p>
+              <p className="mt-0.5 text-sm tabular-nums">{counts[st]}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!isLoading && rows.length === 0 && (
+        <p className="text-xs text-muted-foreground">ไม่มีข้อมูลการมาทำงานในเดือนนี้</p>
+      )}
+      {rows.length > 0 && (
+        <ul className="max-h-64 space-y-1.5 overflow-y-auto text-xs">
+          {rows.map((r) => (
+            <li key={r.date} className="flex items-center justify-between rounded-lg border border-border px-2.5 py-1.5">
+              <span className="tabular-nums">{r.date}</span>
+              <span className="text-muted-foreground tabular-nums">
+                {r.clock_in_time ? bangkokTime(r.clock_in_time) : "—"}
+              </span>
+              <span className={cn("rounded-full px-2 py-0.5 text-[10px]", STATUS_STYLE[r.status])}>
+                {STATUS_LABEL[r.status]}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

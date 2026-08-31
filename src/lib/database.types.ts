@@ -339,6 +339,22 @@ export type Contract = {
   updated_at: string;
 };
 
+/**
+ * One row per (employee, work day) — derived, not stored. Returned by the
+ * staff_attendance_status() function, which combines time_clock_records +
+ * leave_requests + academic_events into a single มา/สาย/ขาด/ลา status,
+ * scoped to whatever the caller could already see on those source tables.
+ * See migration 0062.
+ */
+export type StaffAttendanceStatusRow = {
+  profile_id: string;
+  department_id: string | null;
+  date: string;
+  status: AttendanceStatus;
+  clock_in_time: string | null;
+  clock_out_time: string | null;
+};
+
 // ------------------------------------------------------------- curriculum
 // See supabase/migrations/0004_curriculum.sql for the full grill rationale.
 
@@ -1278,6 +1294,10 @@ export type Database = {
       submit_practice_attempt: {
         Args: { p_attempt_id: string };
         Returns: void;
+      };
+      staff_attendance_status: {
+        Args: { p_start: string; p_end: string };
+        Returns: StaffAttendanceStatusRow[];
       };
     };
     Enums: {
