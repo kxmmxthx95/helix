@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Field, Input, Select, Spinner } from "@/components/ui";
 import { useProfiles } from "@/hooks/useProfiles";
 import {
   leaveAttachmentUrl,
@@ -39,21 +39,33 @@ const LEAVE_STATUS_STYLE: Record<LeaveStatus, string> = {
   cancelled: "bg-muted text-muted-foreground",
 };
 
+type LeaveView = "mine" | "approvals";
+
 export function Leave() {
   const { profile } = useAuth();
+  const [view, setView] = useState<LeaveView>("mine");
   if (!profile) return null;
   const mayApprove = canManage(profile.roles);
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <QuotaCard profileId={profile.id} />
-      <MyRequestsCard profileId={profile.id} />
-      {mayApprove && <ApprovalsCard approverId={profile.id} />}
+      <Select className="w-48" value={view} onChange={(e) => setView(e.target.value as LeaveView)}>
+        <option value="mine">คำขอลาของฉัน</option>
+        {mayApprove && <option value="approvals">คำขอลา</option>}
+      </Select>
+
+      {view === "mine" && (
+        <>
+          <QuotaSection profileId={profile.id} />
+          <MyRequestsSection profileId={profile.id} />
+        </>
+      )}
+      {view === "approvals" && mayApprove && <ApprovalsSection approverId={profile.id} />}
     </div>
   );
 }
 
-function QuotaCard({ profileId }: { profileId: string }) {
+function QuotaSection({ profileId }: { profileId: string }) {
   const { data: types = [] } = useLeaveTypes();
   const { data: requests = [] } = useMyLeaveRequests(profileId);
   const year = currentYear();
@@ -71,9 +83,9 @@ function QuotaCard({ profileId }: { profileId: string }) {
   if (types.length === 0) return null;
 
   return (
-    <Card className="space-y-2">
+    <div className="space-y-2">
       <p className="text-sm font-medium">โควตาลาปี {year}</p>
-      <ul className="divide-y divide-border text-sm">
+      <ul className="divide-y divide-border rounded-lg border border-border px-3 text-sm">
         {types.map((t) => {
           const used = usedByType.get(t.id) ?? 0;
           const over = t.max_days_per_year !== null && used > t.max_days_per_year;
@@ -87,18 +99,17 @@ function QuotaCard({ profileId }: { profileId: string }) {
           );
         })}
       </ul>
-    </Card>
+    </div>
   );
 }
 
-function MyRequestsCard({ profileId }: { profileId: string }) {
+function MyRequestsSection({ profileId }: { profileId: string }) {
   const toast = useToast();
   const { data: types = [] } = useLeaveTypes();
   const { data: requests = [], isLoading } = useMyLeaveRequests(profileId);
   const request = useRequestLeave();
   const cancel = useCancelLeaveRequest();
   const [open, setOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
 
   const [leaveTypeId, setLeaveTypeId] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -141,72 +152,65 @@ function MyRequestsCard({ profileId }: { profileId: string }) {
   const typeName = (id: string) => types.find((t) => t.id === id)?.name ?? "—";
 
   return (
-    <Card className="space-y-3">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">คำขอลาของฉัน</p>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setHistoryOpen(true)}>
-            ประวัติ ({requests.length})
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-            + ลาใหม่
-          </Button>
-        </div>
+        <p className="text-sm font-medium">ประวัติคำขอลา ({requests.length})</p>
+        <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+          + ลาใหม่
+        </Button>
       </div>
 
-      <Sheet open={historyOpen} onOpenChange={setHistoryOpen} title="ประวัติคำขอลาของฉัน">
-        {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
-        {!isLoading && requests.length === 0 && (
-          <p className="text-xs text-muted-foreground">ยังไม่มีคำขอลา</p>
-        )}
-        {requests.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
-            <table className="w-full min-w-[36rem] text-xs">
-              <thead className="bg-muted text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-2 py-2 font-medium">ประเภท</th>
-                  <th className="px-2 py-2 font-medium">วันที่</th>
-                  <th className="px-2 py-2 font-medium">เหตุผล</th>
-                  <th className="px-2 py-2 font-medium">สถานะ</th>
-                  <th className="px-2 py-2 font-medium" />
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map((r) => {
-                  const cancellable =
-                    (r.status === "pending" || r.status === "approved") && r.start_date > todayIso();
-                  return (
-                    <tr key={r.id} className="border-t border-border align-top">
-                      <td className="px-2 py-2 font-medium">{typeName(r.leave_type_id)}</td>
-                      <td className="px-2 py-2 text-muted-foreground">
-                        {r.start_date} – {r.end_date} ({r.days} วัน)
-                      </td>
-                      <td className="px-2 py-2 text-muted-foreground">{r.reason}</td>
-                      <td className="px-2 py-2">
-                        <span className={cn("rounded-full px-2 py-0.5 text-xs", LEAVE_STATUS_STYLE[r.status])}>
-                          {LEAVE_STATUS_LABEL[r.status]}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2">
-                        {cancellable && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => cancel.mutate(r.id)}
-                            disabled={cancel.isPending}
-                          >
-                            ยกเลิก
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Sheet>
+      {isLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
+      {!isLoading && requests.length === 0 && (
+        <p className="text-xs text-muted-foreground">ยังไม่มีคำขอลา</p>
+      )}
+      {requests.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <table className="w-full min-w-[36rem] text-xs">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-2 py-2 font-medium">ประเภท</th>
+                <th className="px-2 py-2 font-medium">วันที่</th>
+                <th className="px-2 py-2 font-medium">เหตุผล</th>
+                <th className="px-2 py-2 font-medium">สถานะ</th>
+                <th className="px-2 py-2 font-medium" />
+              </tr>
+            </thead>
+            <tbody>
+              {requests.map((r) => {
+                const cancellable =
+                  (r.status === "pending" || r.status === "approved") && r.start_date > todayIso();
+                return (
+                  <tr key={r.id} className="border-t border-border align-top">
+                    <td className="px-2 py-2 font-medium">{typeName(r.leave_type_id)}</td>
+                    <td className="px-2 py-2 text-muted-foreground">
+                      {r.start_date} – {r.end_date} ({r.days} วัน)
+                    </td>
+                    <td className="px-2 py-2 text-muted-foreground">{r.reason}</td>
+                    <td className="px-2 py-2">
+                      <span className={cn("rounded-full px-2 py-0.5 text-xs", LEAVE_STATUS_STYLE[r.status])}>
+                        {LEAVE_STATUS_LABEL[r.status]}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2">
+                      {cancellable && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => cancel.mutate(r.id)}
+                          disabled={cancel.isPending}
+                        >
+                          ยกเลิก
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <Sheet
         open={open}
@@ -293,11 +297,11 @@ function MyRequestsCard({ profileId }: { profileId: string }) {
           )}
         </form>
       </Sheet>
-    </Card>
+    </div>
   );
 }
 
-function ApprovalsCard({ approverId }: { approverId: string }) {
+function ApprovalsSection({ approverId }: { approverId: string }) {
   const [status, setStatusFilter] = useState<LeaveStatus | "">("pending");
   const { data: requests = [], isLoading } = useLeaveApprovals(status);
   const { data: types = [] } = useLeaveTypes();
@@ -316,7 +320,7 @@ function ApprovalsCard({ approverId }: { approverId: string }) {
   }
 
   return (
-    <Card className="space-y-2">
+    <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium">คำขอลา ({requests.length})</p>
         <Select
@@ -402,6 +406,6 @@ function ApprovalsCard({ approverId }: { approverId: string }) {
           </table>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
