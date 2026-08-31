@@ -500,34 +500,15 @@ function AppShellInner() {
     <div className="relative flex h-dvh overflow-hidden overscroll-none max-lg:flex-col max-lg:gap-0 max-lg:p-0 lg:flex-row lg:gap-2 lg:p-2">
       <div className="absolute inset-0 z-0 bg-muted dark:bg-background" aria-hidden />
 
-      {/* Desktop sidebar */}
+      {/* Desktop sidebar — fully hides (w-0) when collapsed; the toggle to bring it back lives in the main header, not in here, since this whole panel disappears. */}
       <aside
         className={cn(
-          "font-ui glass-sidebar relative z-10 hidden shrink-0 flex-col overflow-hidden rounded-2xl transition-[width] duration-200 lg:flex",
-          collapsed ? "w-14" : "w-56",
+          "font-ui bg-muted dark:bg-background relative z-10 hidden shrink-0 flex-col overflow-hidden transition-[width] duration-200 lg:flex",
+          collapsed ? "w-0" : "w-56",
         )}
       >
-        <div
-          className={cn(
-            "flex h-12 shrink-0 items-center",
-            collapsed ? "justify-center px-1" : "justify-between gap-2 px-3",
-          )}
-        >
-          {!collapsed && <img src="/logo.webp" alt="Helix" className="h-6 w-auto dark:invert" />}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCollapsed((v) => !v)}
-            aria-label={collapsed ? "ขยายแถบด้านข้าง" : "หุบแถบด้านข้าง"}
-            aria-expanded={!collapsed}
-            title={collapsed ? "ขยายแถบด้านข้าง" : "หุบแถบด้านข้าง"}
-          >
-            {collapsed ? (
-              <ChevronForward className="h-3 w-3" />
-            ) : (
-              <ChevronBack className="h-3 w-3" />
-            )}
-          </Button>
+        <div className="flex h-12 shrink-0 items-center px-3">
+          <img src="/logo.webp" alt="Helix" className="h-6 w-auto dark:invert" />
         </div>
 
         <nav
@@ -608,8 +589,8 @@ function AppShellInner() {
       </aside>
       {avatarInput}
 
-      {/* Main pane: no frosted frame — work area is max-w-6xl column */}
-      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
+      {/* Main pane */}
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl bg-background dark:bg-muted shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.08)]">
         <header
           className={cn(
             "glass sticky top-0 z-20 shrink-0 pt-safe lg:hidden",
@@ -695,11 +676,25 @@ function AppShellInner() {
 
         <header
           className={cn(
-            "sticky top-0 z-20 hidden h-12 shrink-0 lg:block",
+            "sticky top-0 z-20 hidden h-12 shrink-0 items-center gap-2 px-shell lg:flex",
             !isStudentHome && "border-b border-border/60",
           )}
         >
-          <div className="mx-auto flex h-full w-full max-w-6xl items-center px-shell">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? "ขยายแถบด้านข้าง" : "หุบแถบด้านข้าง"}
+            aria-expanded={!collapsed}
+            title={collapsed ? "ขยายแถบด้านข้าง" : "หุบแถบด้านข้าง"}
+          >
+            {collapsed ? (
+              <ChevronForward className="h-3 w-3" />
+            ) : (
+              <ChevronBack className="h-3 w-3" />
+            )}
+          </Button>
+          <div className="mx-auto flex h-full w-full max-w-6xl items-center">
             {!isStudentHome && <p className="font-heading text-sm font-semibold text-foreground">{pageTitle}</p>}
           </div>
         </header>

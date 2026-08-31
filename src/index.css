@@ -34,7 +34,7 @@
 
   .dark {
     /* Off-black shell (not pure #000) */
-    --background: 0 0% 4%;
+    --background: 0 0% 8%;
     --foreground: 0 0% 93%;
     --card: 0 0% 4%;
     --card-foreground: 0 0% 93%;
@@ -202,11 +202,9 @@
       inset 0 1px 0 rgb(255 255 255 / 0.12);
   }
 
-  /* Desktop sidebar — frosted, flat (no gradient) */
+  /* Frosted glass panel — used by FormulaDrawer and ScoreRecording's overlay cards (not the sidebar anymore, despite the name; those two set their own background color and keep this for isolation/blur/shadow). */
   .glass-sidebar {
     isolation: isolate;
-    background-color: rgb(255 255 255 / 0.22);
-    border: 1px solid rgb(255 255 255 / 0.45);
     box-shadow:
       0 2px 8px rgb(0 0 0 / 0.05),
       inset 0 1px 0 rgb(255 255 255 / 0.65);
@@ -215,8 +213,6 @@
   }
 
   .dark .glass-sidebar {
-    background-color: rgb(255 255 255 / 0.06);
-    border: 1px solid rgb(255 255 255 / 0.12);
     box-shadow:
       0 2px 8px rgb(0 0 0 / 0.2),
       inset 0 1px 0 rgb(255 255 255 / 0.14);
