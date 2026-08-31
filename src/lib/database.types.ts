@@ -355,6 +355,50 @@ export type StaffAttendanceStatusRow = {
   clock_out_time: string | null;
 };
 
+// --------------------------------------------------------------- duty roster
+// เวรประจำวัน — see migration 0063. School-wide duty points (เวรประตู, ...);
+// any number of staff per point per day.
+
+export type DutyPoint = {
+  id: string;
+  name: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DutyAssignment = {
+  id: string;
+  duty_point_id: string;
+  staff_id: string;
+  date: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** One-way hand-off, not a mutual swap — target accepts, then can_manage() confirms. */
+export type DutyTransferStatus =
+  | "pending_target"
+  | "pending_admin"
+  | "approved"
+  | "rejected_by_target"
+  | "rejected_by_admin"
+  | "cancelled";
+
+export type DutyTransferRequest = {
+  id: string;
+  assignment_id: string;
+  requester_id: string;
+  target_staff_id: string;
+  /** Copied from the assignment at insert time — see migration 0063. Lets the target (who can't read duty_assignments) see what duty this is for. */
+  duty_point_id: string;
+  date: string;
+  status: DutyTransferStatus;
+  created_at: string;
+  updated_at: string;
+};
+
 // ------------------------------------------------------------- curriculum
 // See supabase/migrations/0004_curriculum.sql for the full grill rationale.
 
@@ -1190,6 +1234,12 @@ export type Database = {
         StudentLeaveRequest,
         InsertOf<StudentLeaveRequest, "days" | "status" | "approved_by" | "approved_at">
       >;
+      duty_points: Table<DutyPoint, InsertOf<DutyPoint, "active">>;
+      duty_assignments: Table<DutyAssignment, InsertOf<DutyAssignment, never>>;
+      duty_transfer_requests: Table<
+        DutyTransferRequest,
+        InsertOf<DutyTransferRequest, "status" | "duty_point_id" | "date">
+      >;
       salary_grades: Table<SalaryGrade, InsertOf<SalaryGrade, "min_salary" | "max_salary">>;
       employee_positions: Table<
         EmployeePosition,
@@ -1321,6 +1371,7 @@ export type Database = {
       employee_status: EmployeeStatus;
       contract_type: ContractType;
       document_category: DocumentCategory;
+      duty_transfer_status: DutyTransferStatus;
     };
     CompositeTypes: Record<string, never>;
   };

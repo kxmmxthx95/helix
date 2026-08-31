@@ -25,6 +25,7 @@ import {
   PersonAddIcon,
   RibbonIcon,
   SettingsIcon,
+  ShieldIcon,
   Sun,
   TimeIcon,
   TimetableIcon,
@@ -341,6 +342,17 @@ const TABS = [
     deptManagerOnly: true,
     academicManagerOnly: false,
     teacherOrManagerOnly: false,
+  },
+  {
+    to: "/duty-roster",
+    label: "เวรประจำวัน",
+    icon: ShieldIcon,
+    section: "บุคลากร",
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: true,
   },
 ];
 

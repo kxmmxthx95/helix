@@ -40,6 +40,7 @@ import RibbonOutline from "react-ionicons/lib/RibbonOutline";
 import IonSearch from "react-ionicons/lib/Search";
 import SchoolOutline from "react-ionicons/lib/SchoolOutline";
 import IonSettings from "react-ionicons/lib/Settings";
+import ShieldOutline from "react-ionicons/lib/ShieldOutline";
 import Sunny from "react-ionicons/lib/Sunny";
 import AirplaneOutline from "react-ionicons/lib/AirplaneOutline";
 import CalculatorOutline from "react-ionicons/lib/CalculatorOutline";
@@ -128,6 +129,7 @@ export const HighlightIcon = wrap(ColorWandOutline);
 export const ExpandIcon = wrap(ExpandOutline);
 export const ContractIcon = wrap(ContractOutline);
 export const BriefcaseIcon = wrap(BriefcaseOutline);
+export const ShieldIcon = wrap(ShieldOutline);
 
 /** No ionicons bold/underline glyph exists — plain monoline SVGs matching the wrap()'d icons' size contract instead. */
 export function BoldIcon({ className, size }: IconProps) {
