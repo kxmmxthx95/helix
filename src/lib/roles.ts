@@ -39,6 +39,10 @@ export const STUDENT_PREFIXES = ["เด็กชาย", "เด็กหญิ
 
 const ORG_WIDE: readonly Role[] = ["super_admin", "director", "staff"];
 const MANAGERS: readonly Role[] = ["super_admin", "director", "staff", "dept_head"];
+/** Roles an "employee" HR record applies to — everyone with a job in the school except super_admin (a system account), students, and parents. See migration 0061. */
+export const EMPLOYEE_ROLES: readonly Role[] = ["staff", "teacher", "dept_head", "director"];
+/** May manage sensitive HR data (salary, contract, status, document) — narrower than ORG_WIDE, which also includes staff/ธุรการ. Mirrors can_manage_hr() in migration 0061. */
+const HR_MANAGERS: readonly Role[] = ["super_admin", "director"];
 /** Same as MANAGERS minus staff (ธุรการ) — lesson-plan content/oversight isn't roster admin work. See migration 0020. */
 const ACADEMIC_MANAGERS: readonly Role[] = ["super_admin", "director", "dept_head"];
 /** Roles whose actions land in audit_logs — students and parents are excluded. */
@@ -55,6 +59,12 @@ export const canManageAcademic = (roles: Role[]) => roles.some((r) => ACADEMIC_M
 
 /** May open the user-management screen and create/edit accounts — super_admin only (grill decision). */
 export const canManageUsers = (roles: Role[]) => roles.includes("super_admin");
+
+/** May manage salary/contract/status/document — director + super_admin only (grill decision, 2026-08-31). */
+export const canManageHr = (roles: Role[]) => roles.some((r) => HR_MANAGERS.includes(r));
+
+/** Has an HR record (position/status/etc.) — everyone employed except super_admin/student/parent. */
+export const isEmployeeRole = (roles: Role[]) => roles.some((r) => EMPLOYEE_ROLES.includes(r));
 
 /** May see the audit trail. */
 export const canViewAudit = canManage;

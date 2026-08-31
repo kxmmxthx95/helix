@@ -39,6 +39,7 @@ import { profileFullName } from "@/lib/database.types";
 import { blobToBase64, compressImage } from "@/lib/image";
 import { passwordFromDob } from "@/lib/password";
 import { canManageUsers, isOrgWide, PREFIXES, ROLE_LABEL, ROLES, STUDENT_PREFIXES, roleLabels, type Role } from "@/lib/roles";
+import { AddressInputs, pickAddress } from "@/routes/Roster";
 
 const EMPTY: ProfileFilters = { search: "", departmentId: "", role: "", active: "" };
 
@@ -855,6 +856,8 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
             />
           </Field>
 
+          <AddressInputs value={current} onChange={(patch) => setDraft({ ...current, ...patch })} />
+
           <RolePicker
             role={current.roles[0] ?? ""}
             positionTitleIds={current.positionTitleIds}
@@ -1229,6 +1232,7 @@ function pickEditable(p: ProfileRow): ProfileEdit {
     is_active: p.is_active,
     teacher_code: p.teacher_code,
     learning_area_id: p.learning_area_id,
+    ...pickAddress(p),
     roles: p.roles.filter((r) => r !== "dept_head"),
     positionTitleIds: p.positionTitleIds,
   };

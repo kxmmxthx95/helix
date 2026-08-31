@@ -38,8 +38,22 @@ import {
   useSaveLeaveType,
   type LeaveTypeDraft,
 } from "@/hooks/useLeave";
-import type { AcademicTerm, LeaveType, PeriodDefinition, PeriodType, TermStatus, TermType } from "@/lib/database.types";
-import { isOrgWide, ROLE_LABEL, ROLES, type Role } from "@/lib/roles";
+import {
+  useDeleteSalaryGrade,
+  useSalaryGrades,
+  useSaveSalaryGrade,
+  type SalaryGradeDraft,
+} from "@/hooks/useEmployees";
+import type {
+  AcademicTerm,
+  LeaveType,
+  PeriodDefinition,
+  PeriodType,
+  SalaryGrade,
+  TermStatus,
+  TermType,
+} from "@/lib/database.types";
+import { canManageHr, isOrgWide, ROLE_LABEL, ROLES, type Role } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const TERM_TYPE_LABEL: Record<TermType, string> = {
@@ -1322,7 +1336,185 @@ function LeaveTypeSheet({
   );
 }
 
-type SettingsTab = "school" | "department" | "terms" | "periods" | "leave_types";
+function SalaryGradesCard() {
+  const { data: grades = [], isLoading } = useSalaryGrades();
+  const [editing, setEditing] = useState<SalaryGrade | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const sheets = (
+    <>
+      <SalaryGradeSheet mode="edit" salaryGrade={editing} open={editing !== null} onClose={() => setEditing(null)} />
+      <SalaryGradeSheet mode="create" salaryGrade={null} open={creating} onClose={() => setCreating(false)} />
+    </>
+  );
+
+  if (isLoading) {
+    return (
+      <Card className="flex justify-center py-8">
+        <Spinner className="h-5 w-5 text-muted-foreground" />
+      </Card>
+    );
+  }
+
+  if (grades.length === 0) {
+    return (
+      <>
+        <EmptyState
+          title="ไม่พบข้อมูล"
+          description="ยังไม่มีระดับเงินเดือน"
+          action={
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              เพิ่มระดับ
+            </Button>
+          }
+        />
+        {sheets}
+      </>
+    );
+  }
+
+  return (
+    <Card className="space-y-3">
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setCreating(true)}>
+          <Plus className="h-3.5 w-3.5" />
+          เพิ่มระดับ
+        </Button>
+      </div>
+      <ul className="divide-y divide-border text-sm">
+        {grades.map((g) => (
+          <li
+            key={g.id}
+            onClick={() => setEditing(g)}
+            className="flex cursor-pointer items-center justify-between gap-2 py-1.5"
+          >
+            <span>
+              {g.name}
+              <span className="block text-xs text-muted-foreground">
+                {g.min_salary !== null || g.max_salary !== null
+                  ? `${g.min_salary ?? "?"} – ${g.max_salary ?? "?"} บาท`
+                  : "ไม่ระบุช่วงเงินเดือน"}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {sheets}
+    </Card>
+  );
+}
+
+function SalaryGradeSheet({
+  mode,
+  salaryGrade,
+  open,
+  onClose,
+}: {
+  mode: "create" | "edit";
+  salaryGrade: SalaryGrade | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const toast = useToast();
+  const save = useSaveSalaryGrade();
+  const del = useDeleteSalaryGrade();
+
+  const blank = (): SalaryGradeDraft => ({ code: "", name: "", min_salary: null, max_salary: null });
+
+  const [draft, setDraft] = useState<SalaryGradeDraft>(blank);
+
+  useEffect(() => {
+    if (!open) return;
+    setDraft(
+      salaryGrade
+        ? {
+            code: salaryGrade.code,
+            name: salaryGrade.name,
+            min_salary: salaryGrade.min_salary,
+            max_salary: salaryGrade.max_salary,
+          }
+        : blank(),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, salaryGrade]);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!draft.code.trim() || !draft.name.trim()) return;
+    save.mutate(
+      { id: salaryGrade?.id, ...draft },
+      {
+        onSuccess: () => {
+          toast("บันทึกสำเร็จ");
+          onClose();
+        },
+        onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
+      },
+    );
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      title={mode === "create" ? "เพิ่มระดับเงินเดือน" : "แก้ไขระดับเงินเดือน"}
+      footer={
+        salaryGrade ? (
+          <Button
+            variant="outline"
+            className="w-full text-destructive"
+            onClick={() => del.mutate(salaryGrade.id, { onSuccess: onClose })}
+          >
+            ลบระดับเงินเดือน
+          </Button>
+        ) : undefined
+      }
+    >
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="รหัส">
+          <Input
+            value={draft.code}
+            onChange={(e) => setDraft({ ...draft, code: e.target.value })}
+            placeholder="เช่น P1, P2"
+            required
+          />
+        </Field>
+        <Field label="ชื่อ">
+          <Input
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            placeholder="เช่น ระดับปฏิบัติการ"
+            required
+          />
+        </Field>
+        <Field label="เงินเดือนต่ำสุด (บาท)">
+          <Input
+            type="number"
+            min={0}
+            placeholder="ไม่ระบุ"
+            value={draft.min_salary ?? ""}
+            onChange={(e) => setDraft({ ...draft, min_salary: e.target.value === "" ? null : Number(e.target.value) })}
+          />
+        </Field>
+        <Field label="เงินเดือนสูงสุด (บาท)">
+          <Input
+            type="number"
+            min={0}
+            placeholder="ไม่ระบุ"
+            value={draft.max_salary ?? ""}
+            onChange={(e) => setDraft({ ...draft, max_salary: e.target.value === "" ? null : Number(e.target.value) })}
+          />
+        </Field>
+        <Button type="submit" className="w-full" disabled={!draft.code.trim() || !draft.name.trim() || save.isPending}>
+          {save.isPending ? <Spinner className="h-3 w-3" /> : mode === "create" ? "เพิ่ม" : "บันทึก"}
+        </Button>
+      </form>
+    </Sheet>
+  );
+}
+
+type SettingsTab = "school" | "department" | "terms" | "periods" | "leave_types" | "salary_grades";
 
 const lineTab = (active: boolean, grow = false) =>
   cn(
@@ -1348,6 +1540,8 @@ export function Settings() {
     if (orgWide && !pickedDept && departments.length > 0) setPickedDept(departments[0]!.id);
   }, [orgWide, departments, pickedDept]);
 
+  const mayManageHr = profile ? canManageHr(profile.roles) : false;
+
   const tabs: { id: SettingsTab; label: string }[] = [
     ...(orgWide
       ? [
@@ -1355,6 +1549,7 @@ export function Settings() {
           { id: "leave_types" as const, label: "ประเภทการลา" },
         ]
       : []),
+    ...(mayManageHr ? [{ id: "salary_grades" as const, label: "ระดับเงินเดือน" }] : []),
     ...(canDept
       ? [
           { id: "department" as const, label: "ตั้งค่าแผนก" },
@@ -1366,7 +1561,8 @@ export function Settings() {
 
   const deptName = (id: string) => departments.find((d) => d.id === id)?.name ?? "";
   const deptSettingsId = orgWide ? pickedDept : profile?.department_id ?? "";
-  const showDeptPicker = orgWide && tab !== "school" && tab !== "leave_types" && departments.length > 0;
+  const showDeptPicker =
+    orgWide && tab !== "school" && tab !== "leave_types" && tab !== "salary_grades" && departments.length > 0;
 
   if (!orgWide && !isDeptHead) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์ตั้งค่าระบบ</Card>;
@@ -1421,6 +1617,8 @@ export function Settings() {
       {tab === "school" && orgWide && <SchoolSettingsCard />}
 
       {tab === "leave_types" && orgWide && <LeaveTypesCard />}
+
+      {tab === "salary_grades" && mayManageHr && <SalaryGradesCard />}
 
       {tab === "department" && deptSettingsId && (
         <DepartmentSettingsCard

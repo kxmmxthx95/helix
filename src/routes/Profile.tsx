@@ -11,11 +11,12 @@ import { LINE_LINK_CODE_TTL_MINUTES, useGenerateLinkCode } from "@/hooks/useLine
 import { useDepartments, useUpdateMyProfile, type MyProfileEdit } from "@/hooks/useProfiles";
 import { profileFullName } from "@/lib/database.types";
 import { PREFIXES, roleLabels, STUDENT_PREFIXES } from "@/lib/roles";
+import { AddressInputs, pickAddress } from "@/routes/Roster";
 import { PrefixNameFields } from "@/routes/Users";
 
 function pickEditable(p: MyProfileEdit): MyProfileEdit {
   const { prefix, first_name, last_name, email, national_id, date_of_birth } = p;
-  return { prefix, first_name, last_name, email, national_id, date_of_birth };
+  return { prefix, first_name, last_name, email, national_id, date_of_birth, ...pickAddress(p) };
 }
 
 export function Profile() {
@@ -113,6 +114,8 @@ export function Profile() {
             <Input value={department.name} disabled readOnly />
           </Field>
         )}
+
+        <AddressInputs value={current} onChange={(patch) => setDraft({ ...current, ...patch })} />
 
         <Button className="w-full" onClick={save} disabled={!dirty || update.isPending}>
           {update.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}

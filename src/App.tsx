@@ -17,6 +17,7 @@ import { Login } from "@/routes/Login";
 import { Onboarding } from "@/routes/Onboarding";
 import { Classrooms } from "@/routes/Classrooms";
 import { Curriculum } from "@/routes/Curriculum";
+import { Employees } from "@/routes/Employees";
 import { Enrollment } from "@/routes/Enrollment";
 import { Roster } from "@/routes/Roster";
 import { Settings } from "@/routes/Settings";
@@ -75,6 +76,7 @@ function Gate() {
         <Route path="academic-events" element={<AcademicEvents />} />
         <Route path="time-tracking" element={<TimeTracking />} />
         <Route path="leave" element={<Leave />} />
+        <Route path="employees" element={<Employees />} />
         <Route path="status" element={<StatusManagement />} />
         <Route path="settings" element={<Settings />} />
         <Route path="profile" element={<Profile />} />

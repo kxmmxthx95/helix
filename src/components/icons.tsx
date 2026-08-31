@@ -4,6 +4,7 @@ import Add from "react-ionicons/lib/Add";
 import AppsOutline from "react-ionicons/lib/AppsOutline";
 import BarChartOutline from "react-ionicons/lib/BarChartOutline";
 import BookOutline from "react-ionicons/lib/BookOutline";
+import BriefcaseOutline from "react-ionicons/lib/BriefcaseOutline";
 import CalendarOutline from "react-ionicons/lib/CalendarOutline";
 import Checkbox from "react-ionicons/lib/Checkbox";
 import CheckmarkCircleOutline from "react-ionicons/lib/CheckmarkCircleOutline";
@@ -126,6 +127,7 @@ export const FormulaIcon = wrap(CalculatorOutline);
 export const HighlightIcon = wrap(ColorWandOutline);
 export const ExpandIcon = wrap(ExpandOutline);
 export const ContractIcon = wrap(ContractOutline);
+export const BriefcaseIcon = wrap(BriefcaseOutline);
 
 /** No ionicons bold/underline glyph exists — plain monoline SVGs matching the wrap()'d icons' size contract instead. */
 export function BoldIcon({ className, size }: IconProps) {

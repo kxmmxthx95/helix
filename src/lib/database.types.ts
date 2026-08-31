@@ -43,7 +43,7 @@ export type Profile = {
   character_options: CharacterOptions | null;
   created_at: string;
   updated_at: string;
-};
+} & AddressFields; // self-editable ที่อยู่ — see migration 0061
 
 export const profileFullName = (p: Pick<Profile, "prefix" | "first_name" | "last_name">) =>
   `${p.prefix ?? ""}${p.first_name} ${p.last_name}`.trim();
@@ -247,6 +247,95 @@ export type StudentGuardianFinancial = {
   occupation: string | null;
   workplace: string | null;
   monthly_income: number | null;
+  updated_at: string;
+};
+
+// ------------------------------------------------------------------- core HR
+// See supabase/migrations/0061_hr_core.sql for the full grill rationale.
+
+export type EmployeeStatus = "onboarding" | "active" | "suspended" | "resigned" | "terminated";
+export type ContractType = "probation" | "fixed_term" | "indefinite";
+export type DocumentCategory = "contract" | "payslip" | "id_card" | "other";
+
+export const EMPLOYEE_STATUS_LABEL: Record<EmployeeStatus, string> = {
+  onboarding: "กำลังบรรจุ",
+  active: "ปฏิบัติงาน",
+  suspended: "พักงาน",
+  resigned: "ลาออก",
+  terminated: "เลิกจ้าง",
+};
+
+export const CONTRACT_TYPE_LABEL: Record<ContractType, string> = {
+  probation: "ทดลองงาน",
+  fixed_term: "มีกำหนดระยะเวลา",
+  indefinite: "ไม่มีกำหนดระยะเวลา",
+};
+
+export const DOCUMENT_CATEGORY_LABEL: Record<DocumentCategory, string> = {
+  contract: "สัญญาจ้าง",
+  payslip: "ใบรับเงินเดือน",
+  id_card: "บัตรประชาชน/เอกสารประจำตัว",
+  other: "เอกสารอื่นๆ",
+};
+
+export type SalaryGrade = {
+  id: string;
+  code: string;
+  name: string;
+  min_salary: number | null;
+  max_salary: number | null;
+  created_at: string;
+};
+
+/** Org structure + job position + status, 1:1 with a profile. */
+export type EmployeePosition = {
+  id: string;
+  profile_id: string;
+  manager_id: string | null;
+  job_title_id: string | null;
+  career_path_notes: string | null;
+  employee_status: EmployeeStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Split from EmployeePosition for narrower RLS — self + can_manage_hr() only. */
+export type EmployeeCompensation = {
+  id: string;
+  profile_id: string;
+  salary_grade_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Insert-only — the trigger-driven source of truth for EmployeePosition.employee_status. */
+export type EmployeeStatusHistoryEntry = {
+  id: string;
+  profile_id: string;
+  status: EmployeeStatus;
+  reason: string;
+  changed_by: string;
+  created_at: string;
+};
+
+export type EmployeeDocument = {
+  id: string;
+  profile_id: string;
+  category: DocumentCategory;
+  file_path: string; // object path in the private 'employee-documents' bucket
+  file_name: string;
+  uploaded_by: string;
+  created_at: string;
+};
+
+export type Contract = {
+  id: string;
+  profile_id: string;
+  contract_type: ContractType;
+  start_date: string;
+  end_date: string | null; // null = ไม่มีกำหนด
+  document_id: string | null;
+  created_at: string;
   updated_at: string;
 };
 
@@ -941,6 +1030,14 @@ export type Database = {
           | "must_change_password"
           | "avatar_path"
           | "character_options"
+          | "house_no"
+          | "village_no"
+          | "alley"
+          | "road"
+          | "subdistrict"
+          | "district"
+          | "province"
+          | "postal_code"
         > &
           Partial<
             Pick<
@@ -958,6 +1055,14 @@ export type Database = {
               | "must_change_password"
               | "avatar_path"
               | "character_options"
+              | "house_no"
+              | "village_no"
+              | "alley"
+              | "road"
+              | "subdistrict"
+              | "district"
+              | "province"
+              | "postal_code"
             >
           >
       >;
@@ -1069,6 +1174,15 @@ export type Database = {
         StudentLeaveRequest,
         InsertOf<StudentLeaveRequest, "days" | "status" | "approved_by" | "approved_at">
       >;
+      salary_grades: Table<SalaryGrade, InsertOf<SalaryGrade, "min_salary" | "max_salary">>;
+      employee_positions: Table<
+        EmployeePosition,
+        InsertOf<EmployeePosition, "manager_id" | "job_title_id" | "career_path_notes" | "employee_status">
+      >;
+      employee_compensation: Table<EmployeeCompensation, InsertOf<EmployeeCompensation, "salary_grade_id">>;
+      employee_status_history: Table<EmployeeStatusHistoryEntry, InsertOf<EmployeeStatusHistoryEntry, never>>;
+      documents: Table<EmployeeDocument, InsertOf<EmployeeDocument, never>>;
+      contracts: Table<Contract, InsertOf<Contract, "end_date" | "document_id">>;
       academic_terms: Table<AcademicTerm, InsertOf<AcademicTerm, "start_date" | "end_date" | "status">>;
       academic_events: Table<
         AcademicEvent,
@@ -1184,6 +1298,9 @@ export type Database = {
       exam_attempt_status: ExamAttemptStatus;
       exam_attempt_event_type: ExamAttemptEventType;
       practice_attempt_status: PracticeAttemptStatus;
+      employee_status: EmployeeStatus;
+      contract_type: ContractType;
+      document_category: DocumentCategory;
     };
     CompositeTypes: Record<string, never>;
   };

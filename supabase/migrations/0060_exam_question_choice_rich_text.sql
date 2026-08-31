@@ -14,8 +14,10 @@ alter table exam_question_choices
 -- exam_question_choices_for_attempt is an explicit column allowlist (0047) —
 -- the live exam-taking client won't receive label_json unless it's listed
 -- here too (same reasoning as 0050's exam_questions_for_attempt update).
+-- label_json is appended last, not inserted after label — CREATE OR REPLACE
+-- VIEW can only add columns at the end, never reorder existing ones.
 create or replace view exam_question_choices_for_attempt with (security_barrier) as
-  select id, question_id, label, label_json, position
+  select id, question_id, label, position, label_json
   from exam_question_choices;
 
 -- Choice images reuse the existing exam-question-images bucket and its

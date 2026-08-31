@@ -96,6 +96,14 @@ export type ProfileEdit = Pick<
   | "is_active"
   | "teacher_code"
   | "learning_area_id"
+  | "house_no"
+  | "village_no"
+  | "alley"
+  | "road"
+  | "subdistrict"
+  | "district"
+  | "province"
+  | "postal_code"
 > & {
   /** Roles other than dept_head — dept_head is implied by positionTitleIds. */
   roles: Role[];
@@ -171,7 +179,20 @@ export function useUpdateProfile() {
 
 export type MyProfileEdit = Pick<
   Profile,
-  "prefix" | "first_name" | "last_name" | "email" | "national_id" | "date_of_birth"
+  | "prefix"
+  | "first_name"
+  | "last_name"
+  | "email"
+  | "national_id"
+  | "date_of_birth"
+  | "house_no"
+  | "village_no"
+  | "alley"
+  | "road"
+  | "subdistrict"
+  | "district"
+  | "province"
+  | "postal_code"
 >;
 
 /**
