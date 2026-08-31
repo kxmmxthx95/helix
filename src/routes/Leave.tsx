@@ -48,7 +48,7 @@ export function Leave() {
   const mayApprove = canManage(profile.roles);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className="page-fill">
       <Select className="w-48" value={view} onChange={(e) => setView(e.target.value as LeaveView)}>
         <option value="mine">คำขอลาของฉัน</option>
         {mayApprove && <option value="approvals">คำขอลา</option>}
@@ -165,29 +165,29 @@ function MyRequestsSection({ profileId }: { profileId: string }) {
           <table className="w-full min-w-[36rem] text-xs">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
-                <th className="px-2 py-2 font-medium">ประเภท</th>
-                <th className="px-2 py-2 font-medium">วันที่</th>
-                <th className="px-2 py-2 font-medium">เหตุผล</th>
-                <th className="px-2 py-2 font-medium">สถานะ</th>
-                <th className="px-2 py-2 font-medium" />
+                <th className="px-3 py-2 font-medium">ประเภท</th>
+                <th className="px-3 py-2 font-medium">วันที่</th>
+                <th className="px-3 py-2 font-medium">เหตุผล</th>
+                <th className="px-3 py-2 font-medium">สถานะ</th>
+                <th className="px-3 py-2 font-medium" />
               </tr>
             </thead>
             <tbody>
               {[0, 1, 2].map((i) => (
                 <tr key={i} className="border-t border-border">
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2">
                     <Skeleton className="h-3 w-16" />
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2">
                     <Skeleton className="h-3 w-32" />
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2">
                     <Skeleton className="h-3 w-24" />
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2">
                     <Skeleton className="h-4 w-16 rounded-full" />
                   </td>
-                  <td className="px-2 py-2" />
+                  <td className="px-3 py-2" />
                 </tr>
               ))}
             </tbody>
@@ -202,11 +202,11 @@ function MyRequestsSection({ profileId }: { profileId: string }) {
           <table className="w-full min-w-[36rem] text-xs">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
-                <th className="px-2 py-2 font-medium">ประเภท</th>
-                <th className="px-2 py-2 font-medium">วันที่</th>
-                <th className="px-2 py-2 font-medium">เหตุผล</th>
-                <th className="px-2 py-2 font-medium">สถานะ</th>
-                <th className="px-2 py-2 font-medium" />
+                <th className="px-3 py-2 font-medium">ประเภท</th>
+                <th className="px-3 py-2 font-medium">วันที่</th>
+                <th className="px-3 py-2 font-medium">เหตุผล</th>
+                <th className="px-3 py-2 font-medium">สถานะ</th>
+                <th className="px-3 py-2 font-medium" />
               </tr>
             </thead>
             <tbody>
@@ -215,17 +215,17 @@ function MyRequestsSection({ profileId }: { profileId: string }) {
                   (r.status === "pending" || r.status === "approved") && r.start_date > todayIso();
                 return (
                   <tr key={r.id} className="border-t border-border align-top">
-                    <td className="px-2 py-2 font-medium">{typeName(r.leave_type_id)}</td>
-                    <td className="px-2 py-2 text-muted-foreground">
+                    <td className="px-3 py-2 font-medium">{typeName(r.leave_type_id)}</td>
+                    <td className="px-3 py-2 text-muted-foreground">
                       {r.start_date} – {r.end_date} ({r.days} วัน)
                     </td>
-                    <td className="px-2 py-2 text-muted-foreground">{r.reason}</td>
-                    <td className="px-2 py-2">
+                    <td className="px-3 py-2 text-muted-foreground">{r.reason}</td>
+                    <td className="px-3 py-2">
                       <span className={cn("rounded-full px-2 py-0.5 text-xs", LEAVE_STATUS_STYLE[r.status])}>
                         {LEAVE_STATUS_LABEL[r.status]}
                       </span>
                     </td>
-                    <td className="px-2 py-2">
+                    <td className="px-3 py-2">
                       {cancellable && (
                         <Button
                           size="sm"
@@ -374,35 +374,35 @@ function ApprovalsSection({ approverId }: { approverId: string }) {
           <table className="w-full min-w-[48rem] text-xs">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
-                <th className="px-2 py-2 font-medium">ผู้ขอ</th>
-                <th className="px-2 py-2 font-medium">ประเภท</th>
-                <th className="px-2 py-2 font-medium">วันที่</th>
-                <th className="px-2 py-2 font-medium">เหตุผล</th>
-                <th className="px-2 py-2 font-medium">ไฟล์แนบ</th>
-                <th className="px-2 py-2 font-medium">สถานะ</th>
-                <th className="px-2 py-2 font-medium" />
+                <th className="px-3 py-2 font-medium">ผู้ขอ</th>
+                <th className="px-3 py-2 font-medium">ประเภท</th>
+                <th className="px-3 py-2 font-medium">วันที่</th>
+                <th className="px-3 py-2 font-medium">เหตุผล</th>
+                <th className="px-3 py-2 font-medium">ไฟล์แนบ</th>
+                <th className="px-3 py-2 font-medium">สถานะ</th>
+                <th className="px-3 py-2 font-medium" />
               </tr>
             </thead>
             <tbody>
               {[0, 1, 2].map((i) => (
                 <tr key={i} className="border-t border-border">
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2">
                     <Skeleton className="h-3 w-20" />
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2">
                     <Skeleton className="h-3 w-16" />
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2">
                     <Skeleton className="h-3 w-32" />
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2">
                     <Skeleton className="h-3 w-24" />
                   </td>
-                  <td className="px-2 py-2" />
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2" />
+                  <td className="px-3 py-2">
                     <Skeleton className="h-4 w-16 rounded-full" />
                   </td>
-                  <td className="px-2 py-2" />
+                  <td className="px-3 py-2" />
                 </tr>
               ))}
             </tbody>
@@ -417,25 +417,25 @@ function ApprovalsSection({ approverId }: { approverId: string }) {
           <table className="w-full min-w-[48rem] text-xs">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
-                <th className="px-2 py-2 font-medium">ผู้ขอ</th>
-                <th className="px-2 py-2 font-medium">ประเภท</th>
-                <th className="px-2 py-2 font-medium">วันที่</th>
-                <th className="px-2 py-2 font-medium">เหตุผล</th>
-                <th className="px-2 py-2 font-medium">ไฟล์แนบ</th>
-                <th className="px-2 py-2 font-medium">สถานะ</th>
-                <th className="px-2 py-2 font-medium" />
+                <th className="px-3 py-2 font-medium">ผู้ขอ</th>
+                <th className="px-3 py-2 font-medium">ประเภท</th>
+                <th className="px-3 py-2 font-medium">วันที่</th>
+                <th className="px-3 py-2 font-medium">เหตุผล</th>
+                <th className="px-3 py-2 font-medium">ไฟล์แนบ</th>
+                <th className="px-3 py-2 font-medium">สถานะ</th>
+                <th className="px-3 py-2 font-medium" />
               </tr>
             </thead>
             <tbody>
               {requests.map((r) => (
                 <tr key={r.id} className="border-t border-border align-top">
-                  <td className="px-2 py-2 font-medium">{nameById.get(r.profile_id) ?? "—"}</td>
-                  <td className="px-2 py-2 text-muted-foreground">{typeName(r.leave_type_id)}</td>
-                  <td className="px-2 py-2 text-muted-foreground">
+                  <td className="px-3 py-2 font-medium">{nameById.get(r.profile_id) ?? "—"}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{typeName(r.leave_type_id)}</td>
+                  <td className="px-3 py-2 text-muted-foreground">
                     {r.start_date} – {r.end_date} ({r.days} วัน)
                   </td>
-                  <td className="px-2 py-2 text-muted-foreground">{r.reason}</td>
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2 text-muted-foreground">{r.reason}</td>
+                  <td className="px-3 py-2">
                     {r.attachment_path && (
                       <button
                         type="button"
@@ -446,12 +446,12 @@ function ApprovalsSection({ approverId }: { approverId: string }) {
                       </button>
                     )}
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2">
                     <span className={cn("rounded-full px-2 py-0.5 text-xs", LEAVE_STATUS_STYLE[r.status])}>
                       {LEAVE_STATUS_LABEL[r.status]}
                     </span>
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-3 py-2">
                     {r.status === "pending" && (
                       <div className="flex gap-2">
                         <Button
