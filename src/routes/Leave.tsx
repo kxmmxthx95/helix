@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
+import { Button, EmptyState, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { useProfiles } from "@/hooks/useProfiles";
 import {
   leaveAttachmentUrl,
@@ -44,23 +44,49 @@ type LeaveView = "mine" | "approvals";
 export function Leave() {
   const { profile } = useAuth();
   const [view, setView] = useState<LeaveView>("mine");
+  const [newLeaveOpen, setNewLeaveOpen] = useState(false);
+  const [approvalStatus, setApprovalStatus] = useState<LeaveStatus | "">("pending");
   if (!profile) return null;
   const mayApprove = canManage(profile.roles);
 
   return (
     <div className="page-fill">
-      <Select className="w-48" value={view} onChange={(e) => setView(e.target.value as LeaveView)}>
-        <option value="mine">คำขอลาของฉัน</option>
-        {mayApprove && <option value="approvals">คำขอลา</option>}
-      </Select>
+      <div className="flex items-center gap-2">
+        <Select className="w-48" value={view} onChange={(e) => setView(e.target.value as LeaveView)}>
+          <option value="mine">คำขอลาของฉัน</option>
+          {mayApprove && <option value="approvals">คำขอลา</option>}
+        </Select>
+        {view === "mine" && (
+          <Button size="sm" variant="outline" className="ml-auto shrink-0" onClick={() => setNewLeaveOpen(true)}>
+            + ลาใหม่
+          </Button>
+        )}
+        {view === "approvals" && (
+          <Select
+            className="ml-auto w-40 shrink-0"
+            value={approvalStatus}
+            onChange={(e) => setApprovalStatus(e.target.value as LeaveStatus | "")}
+            aria-label="สถานะคำขอ"
+          >
+            <option value="">ทุกสถานะ</option>
+            {(Object.keys(LEAVE_STATUS_LABEL) as LeaveStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {LEAVE_STATUS_LABEL[s]}
+              </option>
+            ))}
+          </Select>
+        )}
+      </div>
 
       {view === "mine" && (
         <>
           <QuotaSection profileId={profile.id} />
-          <MyRequestsSection profileId={profile.id} />
+          <MyRequestsSection profileId={profile.id} open={newLeaveOpen} onOpenChange={setNewLeaveOpen} />
         </>
       )}
-      {view === "approvals" && mayApprove && <ApprovalsSection approverId={profile.id} />}
+      {view === "approvals" && mayApprove && (
+        <ApprovalsSection approverId={profile.id} status={approvalStatus} />
+      )}
     </div>
   );
 }
@@ -103,13 +129,20 @@ function QuotaSection({ profileId }: { profileId: string }) {
   );
 }
 
-function MyRequestsSection({ profileId }: { profileId: string }) {
+function MyRequestsSection({
+  profileId,
+  open,
+  onOpenChange,
+}: {
+  profileId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const toast = useToast();
   const { data: types = [] } = useLeaveTypes();
   const { data: requests = [], isLoading } = useMyLeaveRequests(profileId);
   const request = useRequestLeave();
   const cancel = useCancelLeaveRequest();
-  const [open, setOpen] = useState(false);
 
   const [leaveTypeId, setLeaveTypeId] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -142,7 +175,7 @@ function MyRequestsSection({ profileId }: { profileId: string }) {
         onSuccess: () => {
           toast("ส่งคำขอลาสำเร็จ");
           reset();
-          setOpen(false);
+          onOpenChange(false);
         },
         onError: (err) => toast(err instanceof Error ? err.message : "ส่งคำขอไม่สำเร็จ", "error"),
       },
@@ -152,14 +185,7 @@ function MyRequestsSection({ profileId }: { profileId: string }) {
   const typeName = (id: string) => types.find((t) => t.id === id)?.name ?? "—";
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-medium">ประวัติคำขอลา ({requests.length})</p>
-        <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-          + ลาใหม่
-        </Button>
-      </div>
-
+    <div className={cn("flex flex-col", !isLoading && requests.length === 0 ? "flex-1" : "space-y-3")}>
       {isLoading && (
         <div className="overflow-hidden rounded-lg border border-border bg-card" role="status" aria-label="กำลังโหลด">
           <table className="w-full min-w-[36rem] text-xs">
@@ -195,7 +221,9 @@ function MyRequestsSection({ profileId }: { profileId: string }) {
         </div>
       )}
       {!isLoading && requests.length === 0 && (
-        <p className="text-xs text-muted-foreground">ยังไม่มีคำขอลา</p>
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="ยังไม่มีคำขอลา" description="กด + ลาใหม่เพื่อส่งคำขอลา" />
+        </div>
       )}
       {requests.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-border bg-card">
@@ -248,13 +276,13 @@ function MyRequestsSection({ profileId }: { profileId: string }) {
       <Sheet
         open={open}
         onOpenChange={(o) => {
-          setOpen(o);
+          onOpenChange(o);
           if (!o) reset();
         }}
         title="ลาใหม่"
         footer={
           <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
               ยกเลิก
             </Button>
             <Button
@@ -334,8 +362,7 @@ function MyRequestsSection({ profileId }: { profileId: string }) {
   );
 }
 
-function ApprovalsSection({ approverId }: { approverId: string }) {
-  const [status, setStatusFilter] = useState<LeaveStatus | "">("pending");
+function ApprovalsSection({ approverId, status }: { approverId: string; status: LeaveStatus | "" }) {
   const { data: requests = [], isLoading } = useLeaveApprovals(status);
   const { data: types = [] } = useLeaveTypes();
   const { data: profiles = [] } = useProfiles({ search: "", departmentId: "", role: "", active: "" });
@@ -353,22 +380,7 @@ function ApprovalsSection({ approverId }: { approverId: string }) {
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">คำขอลา ({requests.length})</p>
-        <Select
-          className="w-40"
-          value={status}
-          onChange={(e) => setStatusFilter(e.target.value as LeaveStatus | "")}
-        >
-          <option value="">ทุกสถานะ</option>
-          {(Object.keys(LEAVE_STATUS_LABEL) as LeaveStatus[]).map((s) => (
-            <option key={s} value={s}>
-              {LEAVE_STATUS_LABEL[s]}
-            </option>
-          ))}
-        </Select>
-      </div>
+    <div className={cn("flex flex-col", !isLoading && requests.length === 0 ? "flex-1" : "space-y-2")}>
       {isLoading && (
         <div className="overflow-hidden rounded-lg border border-border" role="status" aria-label="กำลังโหลด">
           <table className="w-full min-w-[48rem] text-xs">
@@ -410,7 +422,9 @@ function ApprovalsSection({ approverId }: { approverId: string }) {
         </div>
       )}
       {!isLoading && requests.length === 0 && (
-        <p className="text-xs text-muted-foreground">ไม่มีคำขอ</p>
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="ไม่มีคำขอ" description="ลองเปลี่ยนสถานะที่กรองด้านบน" />
+        </div>
       )}
       {requests.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-border">

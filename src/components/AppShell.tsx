@@ -609,10 +609,10 @@ function AppShellInner() {
               aria-label="ดูมุมมองบทบาท"
               title="ดูมุมมองบทบาท (เมนู/สิทธิ์เท่านั้น ข้อมูลยังเป็นของผู้ดูแลระบบสูงสุด)"
             >
-              <option value="">มุมมอง: ผู้ดูแลระบบสูงสุด (จริง)</option>
+              <option value="">ผู้ดูแลระบบสูงสุด (จริง)</option>
               {ROLES.filter((r) => r !== "super_admin").map((r) => (
                 <option key={r} value={r}>
-                  มุมมอง: {ROLE_LABEL[r]}
+                  {ROLE_LABEL[r]}
                 </option>
               ))}
             </Select>

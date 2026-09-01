@@ -99,7 +99,7 @@ function SchoolSettingsCard() {
 
   if (isLoading || !form || !settings) {
     return (
-      <Card className="space-y-4" role="status" aria-label="กำลังโหลด">
+      <div className="space-y-4" role="status" aria-label="กำลังโหลด">
         <div className="flex items-center gap-4">
           <Skeleton className="h-16 w-16 shrink-0 rounded-lg" />
           <Skeleton className="h-8 w-28" />
@@ -109,14 +109,14 @@ function SchoolSettingsCard() {
         <Skeleton className="h-3 w-24" />
         <Skeleton className="h-9 w-full" />
         <Skeleton className="h-9 w-28" />
-      </Card>
+      </div>
     );
   }
 
   const logoUrl = schoolLogoUrl(settings);
 
   return (
-    <Card className="space-y-4">
+    <div className="space-y-4">
       <div className="flex items-center gap-4">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted">
           {logoUrl ? (
@@ -199,7 +199,7 @@ function SchoolSettingsCard() {
           {update.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
         </Button>
       </form>
-    </Card>
+    </div>
   );
 }
 
@@ -683,13 +683,13 @@ function PeriodsTab({ departmentId }: { departmentId: string }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex w-full gap-0 overflow-x-auto border-b border-border" role="tablist">
+      <div className="flex w-full gap-0 border-b border-border" role="tablist">
         <button
           type="button"
           role="tab"
           aria-selected={gradeTab === null}
           onClick={() => setGradeTab(null)}
-          className={lineTab(gradeTab === null)}
+          className={lineTab(gradeTab === null, true)}
         >
           <span className="truncate">ทั้งแผนก (default)</span>
         </button>
@@ -700,7 +700,7 @@ function PeriodsTab({ departmentId }: { departmentId: string }) {
             role="tab"
             aria-selected={gradeTab === g.id}
             onClick={() => setGradeTab(g.id)}
-            className={lineTab(gradeTab === g.id)}
+            className={lineTab(gradeTab === g.id, true)}
           >
             <span className="truncate">{g.name}</span>
           </button>
@@ -774,7 +774,7 @@ function PeriodDefinitionsCard({
 
   if (isLoading) {
     return (
-      <Card className="space-y-3" role="status" aria-label="กำลังโหลด">
+      <div className="space-y-3" role="status" aria-label="กำลังโหลด">
         <div className="flex justify-end gap-2">
           <Skeleton className="h-8 w-24" />
           <Skeleton className="h-8 w-24" />
@@ -784,7 +784,7 @@ function PeriodDefinitionsCard({
             <Skeleton key={i} className="h-10 w-full" />
           ))}
         </div>
-      </Card>
+      </div>
     );
   }
 
@@ -798,7 +798,7 @@ function PeriodDefinitionsCard({
   }
 
   return (
-    <Card className="space-y-3">
+    <div className="space-y-3">
       {actions}
 
       <div className="overflow-x-auto rounded-lg border border-border bg-card">
@@ -845,7 +845,7 @@ function PeriodDefinitionsCard({
       </div>
 
       {sheets}
-    </Card>
+    </div>
   );
 }
 
@@ -1798,49 +1798,45 @@ export function Settings() {
 
   return (
     <div className="space-y-4">
-      <div className="flex w-full gap-0 overflow-x-auto border-b border-border" role="tablist">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => {
-              setTab(t.id);
-              setCreatingTerm(false);
-            }}
-            className={lineTab(tab === t.id, true)}
-          >
-            <span className="truncate">{t.label}</span>
-          </button>
-        ))}
-      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Select
+          className="w-auto min-w-[12rem]"
+          value={tab}
+          onChange={(e) => {
+            setTab(e.target.value as SettingsTab);
+            setCreatingTerm(false);
+          }}
+          aria-label="หมวดตั้งค่า"
+        >
+          {tabs.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </Select>
 
-      {(showDeptPicker || tab === "terms") && (
-        <div className="flex flex-wrap items-center gap-2">
-          {showDeptPicker && (
-            <Select
-              className="w-auto min-w-[10rem]"
-              value={pickedDept}
-              onChange={(e) => setPickedDept(e.target.value)}
-              aria-label="แผนก"
-              placeholder="เลือกแผนก"
-            >
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </Select>
-          )}
-          {tab === "terms" && deptSettingsId && (
-            <Button size="sm" className="ml-auto shrink-0" onClick={() => setCreatingTerm(true)}>
-              <Plus className="h-3.5 w-3.5" />
-              เพิ่มเทอม
-            </Button>
-          )}
-        </div>
-      )}
+        {showDeptPicker && (
+          <Select
+            className="w-auto min-w-[10rem]"
+            value={pickedDept}
+            onChange={(e) => setPickedDept(e.target.value)}
+            aria-label="แผนก"
+            placeholder="เลือกแผนก"
+          >
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
+        )}
+        {tab === "terms" && deptSettingsId && (
+          <Button size="sm" className="ml-auto shrink-0" onClick={() => setCreatingTerm(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            เพิ่มเทอม
+          </Button>
+        )}
+      </div>
 
       {tab === "school" && orgWide && <SchoolSettingsCard />}
 
