@@ -478,6 +478,7 @@ function AppShellInner() {
       onClick={cycle}
       aria-label={`Theme: ${preference}. Tap to cycle.`}
       title={`Theme: ${preference}`}
+      className="text-muted-foreground"
     >
       {preference === "system" ? (
         <Monitor className="h-3 w-3" />
@@ -506,8 +507,8 @@ function AppShellInner() {
   );
 
   const signOutButton = (
-    <Button variant="ghost" size="icon" onClick={signOut} aria-label="ออกจากระบบ">
-      <LogOut className="h-3 w-3" />
+    <Button variant="ghost" size="icon" onClick={signOut} aria-label="ออกจากระบบ" className="text-muted-foreground">
+      <LogOut className="h-3.5 w-3.5" />
     </Button>
   );
 
