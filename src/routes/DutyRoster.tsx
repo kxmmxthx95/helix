@@ -1,17 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Plus } from "@/components/icons";
+import { CalendarIcon, Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { X } from "@/components/icons";
-import { Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner, Switch } from "@/components/ui";
-import { useAcademicEvents } from "@/hooks/useAcademicTerms";
+import { Avatar, Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner, Switch } from "@/components/ui";
+import { avatarUrl } from "@/hooks/useAvatar";
 import {
   expandFixedDutyAssignments,
   expandWeeklyTemplateAssignments,
   summarizeDutyCounts,
   useAddWeeklyTemplateStaff,
-  useAssignDuty,
   useCancelDutyTransfer,
   useDecideDutyTransfer,
   useDeleteDutyPoint,
@@ -20,9 +18,7 @@ import {
   useDutyTransferApprovals,
   useDutyWeeklyTemplate,
   useIncomingDutyTransfers,
-  useMaterializeDutyDay,
   useMyDutyTransferRequests,
-  useRemoveDutyAssignment,
   useRemoveWeeklyTemplateStaff,
   useRequestDutyTransfer,
   useRespondDutyTransfer,
@@ -40,14 +36,83 @@ const addDays = (iso: string, days: number) => {
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
 };
+const daysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
 const MONTH_NAMES = Array.from({ length: 12 }, (_, i) =>
   new Intl.DateTimeFormat("th-TH", { month: "long" }).format(new Date(2000, i, 1)),
 );
-const daysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
 
 // 0=อาทิตย์..6=เสาร์, matches JS Date#getDay() — see migration 0065.
 const WEEKDAY_LABELS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+// Native <input type="month"> always shows ค.ศ. in its popup, no override
+// possible — same constraint as BuddhistDateSelect (ui.tsx), so a real
+// เดือน/ปี พ.ศ. picker needs its own small button+panel instead.
+function MonthYearPicker({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const [ceYear, month] = value.split("-").map(Number) as [number, number];
+  const yearBE = ceYear + 543;
+
+  useEffect(() => {
+    if (!open) return;
+    function onOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, [open]);
+
+  return (
+    <div ref={ref} className={cn("relative", className)}>
+      <Button type="button" variant="outline" size="sm" className="w-full justify-start" onClick={() => setOpen((v) => !v)}>
+        <CalendarIcon className="h-3.5 w-3.5" />
+        {MONTH_NAMES[month - 1]} {yearBE}
+      </Button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-56 rounded-lg border border-border bg-card p-2 shadow-lg">
+          <div className="mb-2 flex items-center justify-between">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onChange(`${ceYear - 1}-${String(month).padStart(2, "0")}`)}
+            >
+              ‹
+            </Button>
+            <span className="text-sm font-medium">{yearBE}</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onChange(`${ceYear + 1}-${String(month).padStart(2, "0")}`)}
+            >
+              ›
+            </Button>
+          </div>
+          <div className="grid grid-cols-3 gap-1">
+            {MONTH_NAMES.map((name, i) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => {
+                  onChange(`${ceYear}-${String(i + 1).padStart(2, "0")}`);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "rounded-md px-2 py-1.5 text-xs",
+                  i + 1 === month ? "bg-foreground text-background" : "hover:bg-muted",
+                )}
+              >
+                {name.slice(0, 3)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const TRANSFER_STATUS_LABEL: Record<DutyTransferStatus, string> = {
   pending_target: "รอผู้รับยืนยัน",
@@ -71,8 +136,12 @@ type View = "assign" | "mine" | "requests" | "summary" | "points";
 
 export function DutyRoster() {
   const { profile } = useAuth();
+  const now = new Date();
   const [view, setView] = useState<View>("mine");
   const [departmentId, setDepartmentId] = useState("");
+  const [creatingPoint, setCreatingPoint] = useState(false);
+  const [requestStatus, setRequestStatus] = useState<DutyTransferStatus | "">("pending_admin");
+  const [monthValue, setMonthValue] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
   const { data: departments = [] } = useDepartments();
 
   if (!profile) return null;
@@ -90,9 +159,10 @@ export function DutyRoster() {
           {mayManage && <option value="summary">สรุปรายเดือน</option>}
           {canDept && <option value="points">จุดเวร</option>}
         </Select>
+        {view === "summary" && mayManage && <MonthYearPicker value={monthValue} onChange={setMonthValue} className="ml-auto w-40" />}
         {mayManage && orgWide && (view === "assign" || view === "summary") && (
           <Select
-            className="ml-auto w-48"
+            className={cn("w-48", view === "assign" && "ml-auto")}
             value={departmentId}
             onChange={(e) => setDepartmentId(e.target.value)}
             placeholder="ทุกแผนก"
@@ -104,13 +174,33 @@ export function DutyRoster() {
             ))}
           </Select>
         )}
+        {view === "points" && canDept && (
+          <Button size="sm" className="ml-auto shrink-0" onClick={() => setCreatingPoint(true)}>
+            <Plus className="h-3.5 w-3.5" />
+            เพิ่มจุดเวร
+          </Button>
+        )}
+        {view === "requests" && mayManage && (
+          <Select
+            className="ml-auto w-48"
+            value={requestStatus}
+            onChange={(e) => setRequestStatus(e.target.value as DutyTransferStatus | "")}
+          >
+            <option value="">ทุกสถานะ</option>
+            {(Object.keys(TRANSFER_STATUS_LABEL) as DutyTransferStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {TRANSFER_STATUS_LABEL[s]}
+              </option>
+            ))}
+          </Select>
+        )}
       </div>
 
       {view === "mine" && <MineView profileId={profile.id} />}
       {view === "assign" && mayManage && <AssignView departmentId={departmentId} createdBy={profile.id} />}
-      {view === "requests" && mayManage && <RequestsView />}
-      {view === "summary" && mayManage && <SummaryView departmentId={departmentId} />}
-      {view === "points" && canDept && <PointsView />}
+      {view === "requests" && mayManage && <RequestsView status={requestStatus} />}
+      {view === "summary" && mayManage && <SummaryView departmentId={departmentId} monthValue={monthValue} />}
+      {view === "points" && canDept && <PointsView creating={creatingPoint} onCreatingChange={setCreatingPoint} />}
     </div>
   );
 }
@@ -127,17 +217,23 @@ function useNameById(departmentId: string) {
 
 // -------------------------------------------------------------------- points
 // Lookup table for เวรประจำวัน (migration 0063/0064) — same shape as LeaveTypesCard.
-function PointsView() {
+function PointsView({ creating, onCreatingChange }: { creating: boolean; onCreatingChange: (v: boolean) => void }) {
   const { data: points = [], isLoading } = useDutyPoints();
   const staff = useEligibleStaff("");
   const nameById = useNameById("");
   const [editing, setEditing] = useState<DutyPoint | null>(null);
-  const [creating, setCreating] = useState(false);
 
   const sheets = (
     <>
       <DutyPointSheet mode="edit" dutyPoint={editing} staff={staff} nameById={nameById} open={editing !== null} onClose={() => setEditing(null)} />
-      <DutyPointSheet mode="create" dutyPoint={null} staff={staff} nameById={nameById} open={creating} onClose={() => setCreating(false)} />
+      <DutyPointSheet
+        mode="create"
+        dutyPoint={null}
+        staff={staff}
+        nameById={nameById}
+        open={creating}
+        onClose={() => onCreatingChange(false)}
+      />
     </>
   );
 
@@ -165,7 +261,7 @@ function PointsView() {
           title="ไม่พบข้อมูล"
           description="ยังไม่มีจุดเวร"
           action={
-            <Button size="sm" onClick={() => setCreating(true)}>
+            <Button size="sm" onClick={() => onCreatingChange(true)}>
               <Plus className="h-3.5 w-3.5" />
               เพิ่มจุดเวร
             </Button>
@@ -177,35 +273,35 @@ function PointsView() {
   }
 
   return (
-    <Card className="space-y-3">
-      <div className="flex justify-end">
-        <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="h-3.5 w-3.5" />
-          เพิ่มจุดเวร
-        </Button>
+    <div className="space-y-3">
+      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+        <table className="w-full text-xs">
+          <thead className="bg-muted text-left text-xs text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 font-medium">ชื่อจุดเวร</th>
+              <th className="px-3 py-2 font-medium">โหมด</th>
+              <th className="px-3 py-2 font-medium">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {points.map((p) => (
+              <tr
+                key={p.id}
+                onClick={() => setEditing(p)}
+                className={cn("cursor-pointer border-t border-border hover:bg-muted/50", !p.active && "text-muted-foreground")}
+              >
+                <td className="px-3 py-2 font-medium">{p.name}</td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {p.mode === "fixed" ? `ประจำ: ${nameById.get(p.fixed_staff_id ?? "") ?? "—"}` : "หมุนเวียน"}
+                </td>
+                <td className="px-3 py-2">{p.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-      <ul className="divide-y divide-border text-sm">
-        {points.map((p) => (
-          <li
-            key={p.id}
-            onClick={() => setEditing(p)}
-            className={cn(
-              "flex cursor-pointer items-center justify-between gap-2 py-1.5",
-              !p.active && "text-muted-foreground",
-            )}
-          >
-            <span>
-              {p.name}
-              {p.mode === "fixed" && (
-                <span className="ml-2 text-xs text-muted-foreground">ประจำ: {nameById.get(p.fixed_staff_id ?? "") ?? "—"}</span>
-              )}
-            </span>
-            {!p.active && <span className="text-xs">ปิดใช้งาน</span>}
-          </li>
-        ))}
-      </ul>
       {sheets}
-    </Card>
+    </div>
   );
 }
 
@@ -329,353 +425,111 @@ function DutyPointSheet({
 }
 
 // ------------------------------------------------------------------- assign
-// "จัดตารางเวร" no longer picks a calendar date by default (grill decision
-// 2026-09-01) — a rotating point's roster is a weekly template (who's on
-// duty each อาทิตย์-เสาร์, repeating every week). Overriding one specific
-// date is still possible, just tucked behind a toggle.
+// "จัดตารางเวร" is a teacher × weekday grid (grill decision 2026-09-01): one
+// select per cell picks which rotating duty point that teacher has that
+// weekday (or none), repeating every week. No specific-date override — the
+// template is the only source of truth for rotating points now.
 function AssignView({ departmentId, createdBy }: { departmentId: string; createdBy: string }) {
-  const [showOverride, setShowOverride] = useState(false);
-
-  return (
-    <div className="space-y-4">
-      <WeeklyTemplateEditor departmentId={departmentId} createdBy={createdBy} />
-
-      <div className="border-t border-border pt-3">
-        <Button size="sm" variant="outline" onClick={() => setShowOverride((v) => !v)}>
-          {showOverride ? "ซ่อนการแก้เฉพาะวันที่" : "แก้เฉพาะวันที่ระบุ"}
-        </Button>
-        {showOverride && (
-          <div className="mt-3">
-            <DateOverridePanel departmentId={departmentId} createdBy={createdBy} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <WeeklyTemplateEditor departmentId={departmentId} createdBy={createdBy} />;
 }
 
 function WeeklyTemplateEditor({ departmentId, createdBy }: { departmentId: string; createdBy: string }) {
-  const [weekday, setWeekday] = useState(() => new Date().getDay());
+  const toast = useToast();
   const { data: points = [], isLoading: pointsLoading } = useDutyPoints();
   const { data: template = [], isLoading: templateLoading } = useDutyWeeklyTemplate();
   const staff = useEligibleStaff(departmentId);
   const nameById = useNameById(departmentId);
+  const add = useAddWeeklyTemplateStaff();
+  const remove = useRemoveWeeklyTemplateStaff();
 
   const rotatingPoints = points.filter((p) => p.active && p.mode === "rotating");
   const isLoading = pointsLoading || templateLoading;
 
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-1.5">
-        {WEEKDAY_ORDER.map((wd) => (
-          <button
-            key={wd}
-            type="button"
-            onClick={() => setWeekday(wd)}
-            className={cn(
-              "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-              wd === weekday ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {WEEKDAY_LABELS[wd]}
-          </button>
+  // At most one duty point per teacher per weekday, so one row id per cell.
+  const cellByKey = useMemo(() => {
+    const map = new Map<string, { id: string; duty_point_id: string }>();
+    for (const t of template) {
+      if (nameById.has(t.staff_id)) map.set(`${t.staff_id}|${t.weekday}`, { id: t.id, duty_point_id: t.duty_point_id });
+    }
+    return map;
+  }, [template, nameById]);
+
+  async function handleChange(staffId: string, weekday: number, dutyPointId: string) {
+    const current = cellByKey.get(`${staffId}|${weekday}`);
+    if ((current?.duty_point_id ?? "") === dutyPointId) return;
+    try {
+      if (current) await remove.mutateAsync(current.id);
+      if (dutyPointId) await add.mutateAsync({ dutyPointId, weekday, staffId, createdBy });
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error");
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <Card className="space-y-2" role="status" aria-label="กำลังโหลด">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-8 w-full" />
         ))}
-      </div>
+      </Card>
+    );
+  }
 
-      {isLoading && (
-        <Card className="space-y-2" role="status" aria-label="กำลังโหลด">
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-8 w-full" />
-          ))}
-        </Card>
-      )}
-
-      {!isLoading && rotatingPoints.length === 0 && (
+  if (rotatingPoints.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
         <EmptyState title="ยังไม่มีจุดเวรแบบหมุนเวียน" description="เพิ่ม/ตั้งโหมดจุดเวรได้ที่เมนู จุดเวร" />
-      )}
-
-      {!isLoading && rotatingPoints.length > 0 && (
-        <div className="space-y-2">
-          {rotatingPoints.map((point) => (
-            <WeekdayPointRow
-              key={point.id}
-              pointId={point.id}
-              pointName={point.name}
-              weekday={weekday}
-              rows={template.filter((t) => t.duty_point_id === point.id && t.weekday === weekday && nameById.has(t.staff_id))}
-              staff={staff}
-              nameById={nameById}
-              createdBy={createdBy}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function WeekdayPointRow({
-  pointId,
-  pointName,
-  weekday,
-  rows,
-  staff,
-  nameById,
-  createdBy,
-}: {
-  pointId: string;
-  pointName: string;
-  weekday: number;
-  rows: { id: string; staff_id: string }[];
-  staff: { id: string }[];
-  nameById: Map<string, string>;
-  createdBy: string;
-}) {
-  const toast = useToast();
-  const add = useAddWeeklyTemplateStaff();
-  const remove = useRemoveWeeklyTemplateStaff();
-  const [picked, setPicked] = useState("");
-
-  const assignedIds = new Set(rows.map((r) => r.staff_id));
-  const options = staff.filter((p) => !assignedIds.has(p.id));
-
-  function submitAdd() {
-    if (!picked) return;
-    add.mutate(
-      { dutyPointId: pointId, weekday, staffId: picked, createdBy },
-      {
-        onSuccess: () => setPicked(""),
-        onError: (err) => toast(err instanceof Error ? err.message : "เพิ่มไม่สำเร็จ", "error"),
-      },
-    );
-  }
-
-  return (
-    <Card className="space-y-2">
-      <p className="text-sm font-medium">{pointName}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {rows.length === 0 && <span className="text-xs text-muted-foreground">ยังไม่มีคนเข้าเวรวันนี้</span>}
-        {rows.map((r) => (
-          <span key={r.id} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs">
-            {nameById.get(r.staff_id) ?? "—"}
-            <button
-              type="button"
-              aria-label="เอาออก"
-              onClick={() => remove.mutate(r.id)}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        ))}
       </div>
-      {options.length > 0 && (
-        <div className="flex gap-2">
-          <Select className="w-56" value={picked} onChange={(e) => setPicked(e.target.value)} placeholder="เพิ่มคนเข้าเวร">
-            {options.map((p) => (
-              <option key={p.id} value={p.id}>
-                {nameById.get(p.id) ?? p.id}
-              </option>
-            ))}
-          </Select>
-          <Button size="sm" variant="outline" onClick={submitAdd} disabled={!picked || add.isPending}>
-            เพิ่ม
-          </Button>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-// -------------------------------------------------------- date override
-// Editing one specific calendar date without touching the weekly template.
-// Materializes the WHOLE day's template roster into real duty_assignments
-// rows before allowing edits — see useMaterializeDutyDay's comment for why a
-// partial override isn't safe here.
-function DateOverridePanel({ departmentId, createdBy }: { departmentId: string; createdBy: string }) {
-  const [date, setDate] = useState(todayIso());
-  const { data: points = [], isLoading: pointsLoading } = useDutyPoints();
-  const { data: assignments = [], isLoading: assignmentsLoading } = useDutyAssignmentsRange(date, date);
-  const { data: template = [], isLoading: templateLoading } = useDutyWeeklyTemplate();
-  const { data: events = [] } = useAcademicEvents();
-  const staff = useEligibleStaff(departmentId);
-  const nameById = useNameById(departmentId);
-
-  const activePoints = points.filter((p) => p.active);
-  const isLoading = pointsLoading || assignmentsLoading || templateLoading;
-  const isHoliday = events.some(
-    (e) => !e.staff_attend && e.departmentIds.length === 0 && date >= e.start_date && date <= e.end_date,
-  );
-
-  const templateForDate = useMemo(
-    () => expandWeeklyTemplateAssignments(points, template, assignments, date, date),
-    [points, template, assignments, date],
-  );
-
-  return (
-    <div className="space-y-3">
-      <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" aria-label="วันที่" />
-
-      {isHoliday && (
-        <p className="rounded-lg bg-warning/15 px-3 py-2 text-xs text-warning">
-          วันนี้เป็นวันหยุดทั้งโรงเรียน — ตรวจสอบก่อนมอบหมายเวร
-        </p>
-      )}
-
-      {isLoading && (
-        <Card className="space-y-2" role="status" aria-label="กำลังโหลด">
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-8 w-full" />
-          ))}
-        </Card>
-      )}
-
-      {!isLoading && activePoints.length === 0 && (
-        <EmptyState title="ยังไม่มีจุดเวร" description="เพิ่มจุดเวรได้ที่เมนู จุดเวร ด้านบน" />
-      )}
-
-      {!isLoading && activePoints.length > 0 && (
-        <div className="space-y-2">
-          {activePoints.map((point) => (
-            <DutyPointRow
-              key={point.id}
-              pointId={point.id}
-              pointName={point.name}
-              date={date}
-              assignments={assignments.filter((a) => a.duty_point_id === point.id && nameById.has(a.staff_id))}
-              staff={staff}
-              nameById={nameById}
-              createdBy={createdBy}
-              fixedStaffName={point.mode === "fixed" ? nameById.get(point.fixed_staff_id ?? "") : undefined}
-              templateStaff={
-                point.mode === "rotating"
-                  ? templateForDate
-                      .filter((v) => v.duty_point_id === point.id)
-                      .map((v) => ({ id: v.staff_id, name: nameById.get(v.staff_id) ?? "—" }))
-                  : undefined
-              }
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DutyPointRow({
-  pointId,
-  pointName,
-  date,
-  assignments,
-  staff,
-  nameById,
-  createdBy,
-  fixedStaffName,
-  templateStaff,
-}: {
-  pointId: string;
-  pointName: string;
-  date: string;
-  assignments: { id: string; staff_id: string }[];
-  staff: { id: string }[];
-  nameById: Map<string, string>;
-  createdBy: string;
-  fixedStaffName?: string;
-  templateStaff?: { id: string; name: string }[];
-}) {
-  const toast = useToast();
-  const assign = useAssignDuty();
-  const remove = useRemoveDutyAssignment();
-  const materialize = useMaterializeDutyDay();
-  const [picked, setPicked] = useState("");
-
-  const assignedIds = new Set(assignments.map((a) => a.staff_id));
-  const options = staff.filter((p) => !assignedIds.has(p.id));
-  // Multiple people can share a rotating point on one weekday — showing one
-  // of them as a real row while the rest stay virtual would hide the rest
-  // everywhere else (see expandWeeklyTemplateAssignments), so editing that
-  // day starts by materializing everyone the template already has.
-  const templatePending = assignments.length === 0 && !fixedStaffName && (templateStaff?.length ?? 0) > 0;
-
-  function add() {
-    if (!picked) return;
-    assign.mutate(
-      { dutyPointId: pointId, staffId: picked, date, createdBy },
-      {
-        onSuccess: () => setPicked(""),
-        onError: (err) => toast(err instanceof Error ? err.message : "มอบหมายไม่สำเร็จ", "error"),
-      },
     );
   }
 
-  function startOverride() {
-    materialize.mutate(
-      (templateStaff ?? []).map((t) => ({ dutyPointId: pointId, staffId: t.id, date, createdBy })),
-      { onError: (err) => toast(err instanceof Error ? err.message : "แก้ไขไม่สำเร็จ", "error") },
-    );
-  }
-
-  return (
-    <Card className="space-y-2">
-      <p className="text-sm font-medium">{pointName}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {assignments.length === 0 && fixedStaffName && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
-            {fixedStaffName} · ประจำ
-          </span>
-        )}
-        {templatePending &&
-          templateStaff!.map((t) => (
-            <span key={t.id} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
-              {t.name}
-            </span>
-          ))}
-        {assignments.length === 0 && !fixedStaffName && !templatePending && (
-          <span className="text-xs text-muted-foreground">ยังไม่มีคนเข้าเวร</span>
-        )}
-        {assignments.map((a) => (
-          <span
-            key={a.id}
-            className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs"
-          >
-            {nameById.get(a.staff_id) ?? "—"}
-            <button
-              type="button"
-              aria-label="เอาออก"
-              onClick={() => remove.mutate(a.id)}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        ))}
+  if (staff.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <EmptyState title="ไม่พบรายชื่อครู" />
       </div>
-      {templatePending ? (
-        <Button size="sm" variant="outline" onClick={startOverride} disabled={materialize.isPending}>
-          {materialize.isPending ? <Spinner className="h-3 w-3" /> : "แก้เฉพาะวันนี้"}
-        </Button>
-      ) : (
-        options.length > 0 && (
-          <div className="flex gap-2">
-            <Select
-              className="w-56"
-              value={picked}
-              onChange={(e) => setPicked(e.target.value)}
-              placeholder={fixedStaffName && assignments.length === 0 ? "แก้เฉพาะวันนี้" : "เพิ่มคนเข้าเวร"}
-            >
-              {options.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {nameById.get(p.id) ?? p.id}
-                </option>
-              ))}
-            </Select>
-            <Button size="sm" variant="outline" onClick={add} disabled={!picked || assign.isPending}>
-              เพิ่ม
-            </Button>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {staff.map((p) => (
+        <Card key={p.id} className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Avatar name={nameById.get(p.id) ?? p.id} src={avatarUrl(p)} className="h-7 w-7 shrink-0 text-[10px]" />
+            <div className="text-xs font-medium leading-tight">
+              <p>{`${p.prefix ?? ""}${p.first_name}`}</p>
+              <p>{p.last_name}</p>
+            </div>
           </div>
-        )
-      )}
-    </Card>
+          <div className="grid grid-cols-7 gap-2">
+            {WEEKDAY_ORDER.map((wd) => {
+              const cell = cellByKey.get(`${p.id}|${wd}`);
+              return (
+                <div key={wd} className="flex flex-col gap-1">
+                  <span className="flex items-center gap-1 font-ui text-[10px] font-medium text-foreground">
+                    {WEEKDAY_LABELS[wd]}
+                    {cell && <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />}
+                  </span>
+                  <Select
+                    className="w-full"
+                    value={cell?.duty_point_id ?? ""}
+                    onChange={(e) => handleChange(p.id, wd, e.target.value)}
+                  >
+                    <option value="">ไม่มีเวร</option>
+                    {rotatingPoints.map((point) => (
+                      <option key={point.id} value={point.id}>
+                        {point.name}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      ))}
+    </div>
   );
 }
 
@@ -914,8 +768,7 @@ function RequestTransferSheet({
 }
 
 // ----------------------------------------------------------------- requests
-function RequestsView() {
-  const [status, setStatus] = useState<DutyTransferStatus | "">("pending_admin");
+function RequestsView({ status }: { status: DutyTransferStatus | "" }) {
   const { data: requests = [], isLoading } = useDutyTransferApprovals(status);
   const { data: points = [] } = useDutyPoints();
   const nameById = useNameById("");
@@ -925,17 +778,7 @@ function RequestsView() {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium">คำขอโอนเวร ({requests.length})</p>
-        <Select className="w-48" value={status} onChange={(e) => setStatus(e.target.value as DutyTransferStatus | "")}>
-          <option value="">ทุกสถานะ</option>
-          {(Object.keys(TRANSFER_STATUS_LABEL) as DutyTransferStatus[]).map((s) => (
-            <option key={s} value={s}>
-              {TRANSFER_STATUS_LABEL[s]}
-            </option>
-          ))}
-        </Select>
-      </div>
+      <p className="text-sm font-medium">คำขอโอนเวร ({requests.length})</p>
 
       {isLoading && (
         <Card className="space-y-2" role="status" aria-label="กำลังโหลด">
@@ -998,14 +841,12 @@ function RequestsView() {
 }
 
 // ------------------------------------------------------------------ summary
-function SummaryView({ departmentId }: { departmentId: string }) {
-  const now = new Date();
-  const [year, setYear] = useState(now.getFullYear() + 543);
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const ceYear = year - 543;
+function SummaryView({ departmentId, monthValue }: { departmentId: string; monthValue: string }) {
+  const [ceYearStr, monthStr] = monthValue.split("-");
+  const ceYear = Number(ceYearStr);
+  const month = Number(monthStr);
   const startDate = `${ceYear}-${String(month).padStart(2, "0")}-01`;
   const endDate = `${ceYear}-${String(month).padStart(2, "0")}-${String(daysInMonth(ceYear, month)).padStart(2, "0")}`;
-  const years = Array.from({ length: 4 }, (_, i) => now.getFullYear() + 543 - i);
 
   const { data: assignments = [], isLoading } = useDutyAssignmentsRange(startDate, endDate);
   const { data: points = [] } = useDutyPoints();
@@ -1027,23 +868,6 @@ function SummaryView({ departmentId }: { departmentId: string }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Select className="w-32" value={String(month)} onChange={(e) => setMonth(Number(e.target.value))}>
-          {MONTH_NAMES.map((name, i) => (
-            <option key={name} value={i + 1}>
-              {name}
-            </option>
-          ))}
-        </Select>
-        <Select className="w-24" value={String(year)} onChange={(e) => setYear(Number(e.target.value))}>
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </Select>
-      </div>
-
       {isLoading && (
         <Card className="space-y-2" role="status" aria-label="กำลังโหลด">
           {[0, 1, 2].map((i) => (

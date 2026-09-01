@@ -117,9 +117,9 @@ function allDaysInRange(startDate: string, endDate: string): string[] {
 /**
  * Same idea as expandFixedDutyAssignments, for a 'rotating' point's weekly
  * template (0065) instead: every weekday, all 7 days, any number of staff.
- * A real row for the point+date suppresses ALL of that day's virtual rows —
- * see the "materialize the whole day" comment on WeekdayOverridePanel in
- * DutyRoster.tsx for why a partial override isn't supported.
+ * A real duty_assignments row for the point+date (there's currently no UI
+ * path that creates one for a rotating point — the grid only ever writes to
+ * duty_weekly_template) suppresses ALL of that day's virtual rows.
  */
 export function expandWeeklyTemplateAssignments(
   points: Pick<DutyPoint, "id" | "mode" | "active">[],
@@ -187,55 +187,6 @@ export function useRemoveWeeklyTemplateStaff() {
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["duty_weekly_template"] }),
-  });
-}
-
-export function useAssignDuty() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (params: { dutyPointId: string; staffId: string; date: string; createdBy: string }) => {
-      const { error } = await supabase.from("duty_assignments").insert({
-        duty_point_id: params.dutyPointId,
-        staff_id: params.staffId,
-        date: params.date,
-        created_by: params.createdBy,
-      });
-      if (error) throw error;
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["duty_assignments"] }),
-  });
-}
-
-/**
- * Materializes a rotating point's whole templated day into real rows in one
- * shot — the entry point for "แก้เฉพาะวันที่" overrides. Whole-day, not
- * per-person: suppressing virtual rows once ANY real row exists for a
- * point+date (see expandWeeklyTemplateAssignments) means a partial
- * materialize would silently drop the rest of that day's template roster
- * everywhere else in the app.
- */
-export function useMaterializeDutyDay() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (rows: { dutyPointId: string; staffId: string; date: string; createdBy: string }[]) => {
-      if (rows.length === 0) return;
-      const { error } = await supabase.from("duty_assignments").insert(
-        rows.map((r) => ({ duty_point_id: r.dutyPointId, staff_id: r.staffId, date: r.date, created_by: r.createdBy })),
-      );
-      if (error) throw error;
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["duty_assignments"] }),
-  });
-}
-
-export function useRemoveDutyAssignment() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("duty_assignments").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["duty_assignments"] }),
   });
 }
 
