@@ -359,10 +359,16 @@ export type StaffAttendanceStatusRow = {
 // เวรประจำวัน — see migration 0063. School-wide duty points (เวรประตู, ...);
 // any number of staff per point per day.
 
+/** 'fixed' = one teacher covers this point every school day, no manual daily assignment. See migration 0064. */
+export type DutyMode = "rotating" | "fixed";
+
 export type DutyPoint = {
   id: string;
   name: string;
   active: boolean;
+  mode: DutyMode;
+  /** Set iff mode is 'fixed' — see migration 0064. */
+  fixed_staff_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -397,6 +403,20 @@ export type DutyTransferRequest = {
   status: DutyTransferStatus;
   created_at: string;
   updated_at: string;
+};
+
+/**
+ * Weekly recurring roster for a 'rotating' duty point — who's on duty each
+ * weekday, repeating every week. weekday: 0=อาทิตย์..6=เสาร์ (JS Date#getDay()).
+ * See migration 0065. Irrelevant to 'fixed' points (they use fixed_staff_id).
+ */
+export type DutyWeeklyTemplate = {
+  id: string;
+  duty_point_id: string;
+  weekday: number;
+  staff_id: string;
+  created_by: string;
+  created_at: string;
 };
 
 // ------------------------------------------------------------- curriculum
@@ -1234,12 +1254,13 @@ export type Database = {
         StudentLeaveRequest,
         InsertOf<StudentLeaveRequest, "days" | "status" | "approved_by" | "approved_at">
       >;
-      duty_points: Table<DutyPoint, InsertOf<DutyPoint, "active">>;
+      duty_points: Table<DutyPoint, InsertOf<DutyPoint, "active" | "mode" | "fixed_staff_id">>;
       duty_assignments: Table<DutyAssignment, InsertOf<DutyAssignment, never>>;
       duty_transfer_requests: Table<
         DutyTransferRequest,
-        InsertOf<DutyTransferRequest, "status" | "duty_point_id" | "date">
+        InsertOf<DutyTransferRequest, "status" | "duty_point_id" | "date" | "assignment_id">
       >;
+      duty_weekly_template: Table<DutyWeeklyTemplate, InsertOf<DutyWeeklyTemplate, never>>;
       salary_grades: Table<SalaryGrade, InsertOf<SalaryGrade, "min_salary" | "max_salary">>;
       employee_positions: Table<
         EmployeePosition,

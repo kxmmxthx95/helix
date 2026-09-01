@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DutyAssignment, DutyPoint, DutyTransferRequest, DutyTransferStatus } from "@/lib/database.types";
+import type {
+  DutyAssignment,
+  DutyPoint,
+  DutyTransferRequest,
+  DutyTransferStatus,
+  DutyWeeklyTemplate,
+} from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
 // ------------------------------------------------------------------ duty_points
@@ -16,7 +22,7 @@ export function useDutyPoints() {
   });
 }
 
-export type DutyPointDraft = Pick<DutyPoint, "name" | "active">;
+export type DutyPointDraft = Pick<DutyPoint, "name" | "active" | "mode" | "fixed_staff_id">;
 
 export function useSaveDutyPoint() {
   const qc = useQueryClient();
@@ -64,6 +70,126 @@ export function summarizeDutyCounts(assignments: { staff_id: string }[]): Map<st
   return counts;
 }
 
+const SCHOOL_WEEKDAYS = new Set([1, 2, 3, 4, 5]); // จ-ศ, see migration 0064 grill decision
+
+function schoolDaysInRange(startDate: string, endDate: string): string[] {
+  const days: string[] = [];
+  for (const cur = new Date(startDate); cur <= new Date(endDate); cur.setDate(cur.getDate() + 1)) {
+    if (SCHOOL_WEEKDAYS.has(cur.getDay())) days.push(cur.toISOString().slice(0, 10));
+  }
+  return days;
+}
+
+/**
+ * Fixed-mode duty points have no real `duty_assignments` row on a normal
+ * day — only exceptions (a manager override, or a materialized transfer
+ * request) do. Expand each fixed point's rule into virtual rows for every
+ * school day not already covered by a real row, so "เวรของฉัน" and the
+ * monthly summary see the full picture. See migration 0064.
+ */
+export function expandFixedDutyAssignments(
+  points: Pick<DutyPoint, "id" | "mode" | "fixed_staff_id" | "active">[],
+  realAssignments: Pick<DutyAssignment, "duty_point_id" | "date">[],
+  startDate: string,
+  endDate: string,
+): { duty_point_id: string; staff_id: string; date: string }[] {
+  const covered = new Set(realAssignments.map((a) => `${a.duty_point_id}|${a.date}`));
+  const days = schoolDaysInRange(startDate, endDate);
+  const virtual: { duty_point_id: string; staff_id: string; date: string }[] = [];
+  for (const p of points) {
+    if (p.mode !== "fixed" || !p.fixed_staff_id || !p.active) continue;
+    for (const date of days) {
+      if (covered.has(`${p.id}|${date}`)) continue;
+      virtual.push({ duty_point_id: p.id, staff_id: p.fixed_staff_id, date });
+    }
+  }
+  return virtual;
+}
+
+function allDaysInRange(startDate: string, endDate: string): string[] {
+  const days: string[] = [];
+  for (const cur = new Date(startDate); cur <= new Date(endDate); cur.setDate(cur.getDate() + 1)) {
+    days.push(cur.toISOString().slice(0, 10));
+  }
+  return days;
+}
+
+/**
+ * Same idea as expandFixedDutyAssignments, for a 'rotating' point's weekly
+ * template (0065) instead: every weekday, all 7 days, any number of staff.
+ * A real row for the point+date suppresses ALL of that day's virtual rows —
+ * see the "materialize the whole day" comment on WeekdayOverridePanel in
+ * DutyRoster.tsx for why a partial override isn't supported.
+ */
+export function expandWeeklyTemplateAssignments(
+  points: Pick<DutyPoint, "id" | "mode" | "active">[],
+  template: Pick<DutyWeeklyTemplate, "duty_point_id" | "weekday" | "staff_id">[],
+  realAssignments: Pick<DutyAssignment, "duty_point_id" | "date">[],
+  startDate: string,
+  endDate: string,
+): { duty_point_id: string; staff_id: string; date: string }[] {
+  const rotatingPointIds = new Set(points.filter((p) => p.mode === "rotating" && p.active).map((p) => p.id));
+  const covered = new Set(realAssignments.map((a) => `${a.duty_point_id}|${a.date}`));
+  const byPointWeekday = new Map<string, string[]>();
+  for (const t of template) {
+    if (!rotatingPointIds.has(t.duty_point_id)) continue;
+    const key = `${t.duty_point_id}|${t.weekday}`;
+    const staffIds = byPointWeekday.get(key) ?? [];
+    staffIds.push(t.staff_id);
+    byPointWeekday.set(key, staffIds);
+  }
+
+  const virtual: { duty_point_id: string; staff_id: string; date: string }[] = [];
+  for (const date of allDaysInRange(startDate, endDate)) {
+    const weekday = new Date(date).getDay();
+    for (const pointId of rotatingPointIds) {
+      if (covered.has(`${pointId}|${date}`)) continue;
+      for (const staffId of byPointWeekday.get(`${pointId}|${weekday}`) ?? []) {
+        virtual.push({ duty_point_id: pointId, staff_id: staffId, date });
+      }
+    }
+  }
+  return virtual;
+}
+
+export function useDutyWeeklyTemplate() {
+  return useQuery({
+    queryKey: ["duty_weekly_template"],
+    queryFn: async (): Promise<DutyWeeklyTemplate[]> => {
+      const { data, error } = await supabase.from("duty_weekly_template").select("*");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useAddWeeklyTemplateStaff() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { dutyPointId: string; weekday: number; staffId: string; createdBy: string }) => {
+      const { error } = await supabase.from("duty_weekly_template").insert({
+        duty_point_id: params.dutyPointId,
+        weekday: params.weekday,
+        staff_id: params.staffId,
+        created_by: params.createdBy,
+      });
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["duty_weekly_template"] }),
+  });
+}
+
+export function useRemoveWeeklyTemplateStaff() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("duty_weekly_template").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["duty_weekly_template"] }),
+  });
+}
+
 export function useAssignDuty() {
   const qc = useQueryClient();
   return useMutation({
@@ -74,6 +200,28 @@ export function useAssignDuty() {
         date: params.date,
         created_by: params.createdBy,
       });
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["duty_assignments"] }),
+  });
+}
+
+/**
+ * Materializes a rotating point's whole templated day into real rows in one
+ * shot — the entry point for "แก้เฉพาะวันที่" overrides. Whole-day, not
+ * per-person: suppressing virtual rows once ANY real row exists for a
+ * point+date (see expandWeeklyTemplateAssignments) means a partial
+ * materialize would silently drop the rest of that day's template roster
+ * everywhere else in the app.
+ */
+export function useMaterializeDutyDay() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (rows: { dutyPointId: string; staffId: string; date: string; createdBy: string }[]) => {
+      if (rows.length === 0) return;
+      const { error } = await supabase.from("duty_assignments").insert(
+        rows.map((r) => ({ duty_point_id: r.dutyPointId, staff_id: r.staffId, date: r.date, created_by: r.createdBy })),
+      );
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["duty_assignments"] }),
@@ -148,15 +296,31 @@ function invalidateDutyTransfers(qc: ReturnType<typeof useQueryClient>) {
   void qc.invalidateQueries({ queryKey: ["duty_assignments"] });
 }
 
+/**
+ * `assignmentId` for a normal (already-materialized) duty. For a fixed-mode
+ * point's virtual day, pass `dutyPointId` + `date` instead — the DB trigger
+ * lazy-creates the `duty_assignments` row and fills in `assignment_id`. See
+ * migration 0064.
+ */
 export function useRequestDutyTransfer() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { assignmentId: string; requesterId: string; targetStaffId: string }) => {
-      const { error } = await supabase.from("duty_transfer_requests").insert({
-        assignment_id: params.assignmentId,
-        requester_id: params.requesterId,
-        target_staff_id: params.targetStaffId,
-      });
+    mutationFn: async (
+      params: { requesterId: string; targetStaffId: string } & (
+        | { assignmentId: string; dutyPointId?: undefined; date?: undefined }
+        | { assignmentId?: undefined; dutyPointId: string; date: string }
+      ),
+    ) => {
+      const { error } = await supabase.from("duty_transfer_requests").insert(
+        params.assignmentId
+          ? { assignment_id: params.assignmentId, requester_id: params.requesterId, target_staff_id: params.targetStaffId }
+          : {
+              duty_point_id: params.dutyPointId,
+              date: params.date,
+              requester_id: params.requesterId,
+              target_staff_id: params.targetStaffId,
+            },
+      );
       if (error) throw error;
     },
     onSettled: () => invalidateDutyTransfers(qc),

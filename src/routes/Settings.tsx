@@ -39,12 +39,6 @@ import {
   type LeaveTypeDraft,
 } from "@/hooks/useLeave";
 import {
-  useDeleteDutyPoint,
-  useDutyPoints,
-  useSaveDutyPoint,
-  type DutyPointDraft,
-} from "@/hooks/useDutyRoster";
-import {
   useDeleteSalaryGrade,
   useSalaryGrades,
   useSaveSalaryGrade,
@@ -52,7 +46,6 @@ import {
 } from "@/hooks/useEmployees";
 import type {
   AcademicTerm,
-  DutyPoint,
   LeaveType,
   PeriodDefinition,
   PeriodType,
@@ -1387,167 +1380,6 @@ function LeaveTypeSheet({
   );
 }
 
-// -------------------------------------------------------------------- duty_points
-// Lookup table for เวรประจำวัน (migration 0063) — same shape as LeaveTypesCard.
-
-function DutyPointsCard() {
-  const { data: points = [], isLoading } = useDutyPoints();
-  const [editing, setEditing] = useState<DutyPoint | null>(null);
-  const [creating, setCreating] = useState(false);
-
-  const sheets = (
-    <>
-      <DutyPointSheet mode="edit" dutyPoint={editing} open={editing !== null} onClose={() => setEditing(null)} />
-      <DutyPointSheet mode="create" dutyPoint={null} open={creating} onClose={() => setCreating(false)} />
-    </>
-  );
-
-  if (isLoading) {
-    return (
-      <Card className="space-y-3" role="status" aria-label="กำลังโหลด">
-        <div className="flex justify-end">
-          <Skeleton className="h-8 w-24" />
-        </div>
-        <ul className="divide-y divide-border">
-          {[0, 1, 2].map((i) => (
-            <li key={i} className="py-1.5">
-              <Skeleton className="h-3.5 w-32" />
-            </li>
-          ))}
-        </ul>
-      </Card>
-    );
-  }
-
-  if (points.length === 0) {
-    return (
-      <>
-        <EmptyState
-          title="ไม่พบข้อมูล"
-          description="ยังไม่มีจุดเวร"
-          action={
-            <Button size="sm" onClick={() => setCreating(true)}>
-              <Plus className="h-3.5 w-3.5" />
-              เพิ่มจุดเวร
-            </Button>
-          }
-        />
-        {sheets}
-      </>
-    );
-  }
-
-  return (
-    <Card className="space-y-3">
-      <div className="flex justify-end">
-        <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="h-3.5 w-3.5" />
-          เพิ่มจุดเวร
-        </Button>
-      </div>
-      <ul className="divide-y divide-border text-sm">
-        {points.map((p) => (
-          <li
-            key={p.id}
-            onClick={() => setEditing(p)}
-            className={cn(
-              "flex cursor-pointer items-center justify-between gap-2 py-1.5",
-              !p.active && "text-muted-foreground",
-            )}
-          >
-            <span>{p.name}</span>
-            {!p.active && <span className="text-xs">ปิดใช้งาน</span>}
-          </li>
-        ))}
-      </ul>
-      {sheets}
-    </Card>
-  );
-}
-
-function DutyPointSheet({
-  mode,
-  dutyPoint,
-  open,
-  onClose,
-}: {
-  mode: "create" | "edit";
-  dutyPoint: DutyPoint | null;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const toast = useToast();
-  const save = useSaveDutyPoint();
-  const del = useDeleteDutyPoint();
-
-  const blank = (): DutyPointDraft => ({ name: "", active: true });
-
-  const [draft, setDraft] = useState<DutyPointDraft>(blank);
-
-  useEffect(() => {
-    if (!open) return;
-    setDraft(dutyPoint ? { name: dutyPoint.name, active: dutyPoint.active } : blank());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, dutyPoint]);
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!draft.name.trim()) return;
-    save.mutate(
-      { id: dutyPoint?.id, ...draft },
-      {
-        onSuccess: () => {
-          toast("บันทึกสำเร็จ");
-          onClose();
-        },
-        onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
-      },
-    );
-  }
-
-  return (
-    <Sheet
-      open={open}
-      onOpenChange={(o) => !o && onClose()}
-      title={mode === "create" ? "เพิ่มจุดเวร" : "แก้ไขจุดเวร"}
-      footer={
-        dutyPoint ? (
-          <Button
-            variant="outline"
-            className="w-full text-destructive"
-            onClick={() =>
-              del.mutate(dutyPoint.id, {
-                onSuccess: onClose,
-                onError: (err) => toast(err instanceof Error ? err.message : "ลบไม่สำเร็จ", "error"),
-              })
-            }
-          >
-            ลบจุดเวร
-          </Button>
-        ) : undefined
-      }
-    >
-      <form onSubmit={submit} className="space-y-4">
-        <Field label="ชื่อจุดเวร">
-          <Input
-            value={draft.name}
-            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-            placeholder="เช่น เวรประตู, เวรโรงอาหาร"
-            required
-          />
-        </Field>
-        <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-          <span className="text-xs font-medium">เปิดใช้งาน</span>
-          <Switch checked={draft.active} onChange={(active) => setDraft({ ...draft, active })} size="sm" />
-        </div>
-        <Button type="submit" className="w-full" disabled={!draft.name.trim() || save.isPending}>
-          {save.isPending ? <Spinner className="h-3 w-3" /> : mode === "create" ? "เพิ่ม" : "บันทึก"}
-        </Button>
-      </form>
-    </Sheet>
-  );
-}
-
 function SalaryGradesCard() {
   const { data: grades = [], isLoading } = useSalaryGrades();
   const [editing, setEditing] = useState<SalaryGrade | null>(null);
@@ -1736,7 +1568,7 @@ function SalaryGradeSheet({
   );
 }
 
-type SettingsTab = "school" | "department" | "terms" | "periods" | "leave_types" | "salary_grades" | "duty_points";
+type SettingsTab = "school" | "department" | "terms" | "periods" | "leave_types" | "salary_grades";
 
 const lineTab = (active: boolean, grow = false) =>
   cn(
@@ -1777,7 +1609,6 @@ export function Settings() {
           { id: "department" as const, label: "ตั้งค่าแผนก" },
           { id: "terms" as const, label: "ภาคเรียน" },
           { id: "periods" as const, label: "ตารางคาบเวลา" },
-          { id: "duty_points" as const, label: "จุดเวร" },
         ]
       : []),
   ];
@@ -1789,7 +1620,6 @@ export function Settings() {
     tab !== "school" &&
     tab !== "leave_types" &&
     tab !== "salary_grades" &&
-    tab !== "duty_points" &&
     departments.length > 0;
 
   if (!orgWide && !isDeptHead) {
@@ -1843,8 +1673,6 @@ export function Settings() {
       {tab === "leave_types" && orgWide && <LeaveTypesCard />}
 
       {tab === "salary_grades" && mayManageHr && <SalaryGradesCard />}
-
-      {tab === "duty_points" && canDept && <DutyPointsCard />}
 
       {tab === "department" && deptSettingsId && (
         <DepartmentSettingsCard
