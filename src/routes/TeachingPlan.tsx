@@ -1,7 +1,7 @@
 import { Fragment, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronForward, Plus } from "@/components/icons";
-import { Button, Card, Field, Input, Skeleton, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Skeleton, Spinner } from "@/components/ui";
 import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
@@ -57,23 +57,60 @@ export function TeachingPlan() {
     };
   }
 
+  if (!isLoading && assignments.length === 0) {
+    return (
+      <div className="page-fill">
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="ยังไม่มีวิชาที่ได้รับมอบหมาย" description="ติดต่อผู้ดูแลเพื่อมอบหมายภาระงานสอน" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Card className="space-y-3 p-0">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[48rem] text-xs">
-          <thead className="bg-muted text-left text-xs text-muted-foreground">
-            <tr>
-              <th className="w-8 px-3 py-2" />
-              <th className="px-3 py-2 font-medium">รหัสวิชา</th>
-              <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
-              <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
-              <th className="px-3 py-2 font-medium">แผนก</th>
-              <th className="px-3 py-2 font-medium">ระดับชั้น</th>
-              <th className="px-3 py-2 font-medium">ห้อง</th>
-            </tr>
-          </thead>
-          <tbody>
-            {assignments.map((a) => {
+    <div className="page-fill">
+      <Card className="overflow-hidden p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[48rem] text-xs">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="w-8 px-3 py-2" />
+                <th className="px-3 py-2 font-medium">รหัสวิชา</th>
+                <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
+                <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
+                <th className="px-3 py-2 font-medium">แผนก</th>
+                <th className="px-3 py-2 font-medium">ระดับชั้น</th>
+                <th className="px-3 py-2 font-medium">ห้อง</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading
+                ? [0, 1, 2].map((i) => (
+                    <tr key={i} className="h-[40px] border-t border-border" role="status" aria-label="กำลังโหลด">
+                      <td className="px-3 py-0">
+                        <Skeleton className="h-3 w-3 shrink-0" />
+                      </td>
+                      <td className="px-3 py-0">
+                        <Skeleton className="h-3 w-12" />
+                      </td>
+                      <td className="px-3 py-0">
+                        <Skeleton className="h-3 w-16" />
+                      </td>
+                      <td className="px-3 py-0">
+                        <Skeleton className="h-3 w-24" />
+                      </td>
+                      <td className="px-3 py-0">
+                        <Skeleton className="h-3 w-16" />
+                      </td>
+                      <td className="px-3 py-0">
+                        <Skeleton className="h-3 w-10" />
+                      </td>
+                      <td className="px-3 py-0">
+                        <Skeleton className="h-3 w-10" />
+                      </td>
+                    </tr>
+                  ))
+                : assignments.map((a) => {
               const l = label(a);
               const open = expandedId === a.id;
               return (
@@ -107,29 +144,11 @@ export function TeachingPlan() {
                 </Fragment>
               );
             })}
-          </tbody>
-        </table>
-      </div>
-
-      {isLoading && (
-        <div role="status" aria-label="กำลังโหลด">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="flex h-[40px] items-center gap-3 border-t border-border px-3">
-              <Skeleton className="h-3 w-3 shrink-0" />
-              <Skeleton className="h-3 w-12" />
-              <Skeleton className="h-3 w-16" />
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-3 w-16" />
-              <Skeleton className="h-3 w-10" />
-              <Skeleton className="h-3 w-10" />
-            </div>
-          ))}
+            </tbody>
+          </table>
         </div>
-      )}
-      {!isLoading && assignments.length === 0 && (
-        <p className="px-3 py-8 text-center text-sm text-muted-foreground">ยังไม่มีวิชาที่ได้รับมอบหมาย</p>
-      )}
-    </Card>
+      </Card>
+    </div>
   );
 }
 

@@ -273,7 +273,7 @@ function MineView({ profileId }: { profileId: string }) {
   }, [myRequests]);
 
   return (
-    <div className="space-y-4">
+    <div className={cn("flex flex-col gap-4", !isLoading && assignments.length === 0 && "flex-1")}>
       {pendingIncoming.length > 0 && (
         <div className="space-y-2">
           <p className="text-sm font-medium">คำขอให้คุณรับเวรแทน ({pendingIncoming.length})</p>
@@ -303,7 +303,7 @@ function MineView({ profileId }: { profileId: string }) {
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className={cn("flex flex-col gap-2", !isLoading && assignments.length === 0 && "flex-1")}>
         <p className="text-sm font-medium">เวรของฉัน</p>
         {isLoading && (
           <Card className="space-y-2" role="status" aria-label="กำลังโหลด">
@@ -312,7 +312,11 @@ function MineView({ profileId }: { profileId: string }) {
             ))}
           </Card>
         )}
-        {!isLoading && assignments.length === 0 && <EmptyState title="ไม่มีเวร" description="ยังไม่มีเวรที่ได้รับมอบหมาย" />}
+        {!isLoading && assignments.length === 0 && (
+          <div className="flex flex-1 items-center justify-center">
+            <EmptyState title="ไม่มีเวร" description="ยังไม่มีเวรที่ได้รับมอบหมาย" />
+          </div>
+        )}
         {!isLoading && assignments.length > 0 && (
           <div className="overflow-x-auto rounded-lg border border-border bg-card">
             <table className="w-full text-xs">

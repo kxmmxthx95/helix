@@ -72,7 +72,7 @@ function RosterView({ departmentId }: { departmentId: string }) {
   const visible = rows.filter((r) => nameById.has(r.profile_id));
 
   return (
-    <div className="space-y-3">
+    <div className={cn("flex flex-col gap-3", !isLoading && visible.length === 0 && "flex-1")}>
       <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" aria-label="วันที่" />
 
       {isLoading && (
@@ -104,7 +104,9 @@ function RosterView({ departmentId }: { departmentId: string }) {
         </div>
       )}
       {!isLoading && visible.length === 0 && (
-        <EmptyState title="ไม่มีข้อมูล" description="อาจเป็นวันหยุด หรือไม่มีพนักงานที่ต้องบันทึกเวลาในวันนี้" />
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="ไม่มีข้อมูล" description="อาจเป็นวันหยุด หรือไม่มีพนักงานที่ต้องบันทึกเวลาในวันนี้" />
+        </div>
       )}
       {visible.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-border bg-card">

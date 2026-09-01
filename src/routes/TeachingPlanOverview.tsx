@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { ChevronForward } from "@/components/icons";
-import { Card, Select, Skeleton } from "@/components/ui";
+import { ChevronForward, Users } from "@/components/icons";
+import { Card, EmptyState, Select, Skeleton } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
@@ -35,45 +35,53 @@ export function TeachingPlanOverview() {
   }
 
   return (
-    <div className="space-y-4">
-      {orgWide && departments.length > 0 && (
-        <Select
-          className="w-auto min-w-[10rem]"
-          value={pickedDept}
-          onChange={(e) => setPickedDept(e.target.value)}
-          aria-label="แผนก"
-          placeholder="เลือกแผนก"
-        >
-          {departments.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </Select>
-      )}
+    <div className="page-fill">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {orgWide && departments.length > 0 && (
+          <Select
+            className="w-auto min-w-[10rem]"
+            value={pickedDept}
+            onChange={(e) => setPickedDept(e.target.value)}
+            aria-label="แผนก"
+            placeholder="เลือกแผนก"
+          >
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
+        )}
 
-      {splitsByTerm && (
-        <div className="inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
-          {[1, 2].map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTerm(t as 1 | 2)}
-              className={cn(
-                "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                term === t
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              {TERM_LABEL[t]}
-            </button>
-          ))}
-        </div>
-      )}
+        {splitsByTerm && (
+          <div className="flex w-full shrink-0 gap-0 border-b border-border" role="tablist">
+            {([1, 2] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={term === t}
+                onClick={() => setTerm(t)}
+                className={cn(
+                  "inline-flex h-8 min-w-0 flex-1 items-center justify-center border-b-2 px-3 text-xs font-medium transition-colors -mb-px",
+                  term === t
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {TERM_LABEL[t]}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {departmentId && (
-        <OverviewBoard departmentId={departmentId} academicYear={academicYear} term={splitsByTerm ? term : null} />
+      {orgWide && !departmentId ? (
+        <EmptyState title="เลือกแผนก" description="เลือกแผนกเพื่อดูภาพรวมแผนการสอน" icon={Users} />
+      ) : (
+        departmentId && (
+          <OverviewBoard departmentId={departmentId} academicYear={academicYear} term={splitsByTerm ? term : null} />
+        )
       )}
     </div>
   );
@@ -143,78 +151,69 @@ function OverviewBoard({
     [assignments, units],
   );
 
+  const tableHead = (
+    <thead className="bg-muted text-left text-xs text-muted-foreground">
+      <tr>
+        <th className="w-8 px-3 py-2" />
+        <th className="px-3 py-2 font-medium">ครูผู้สอน</th>
+        <th className="px-3 py-2 font-medium">รหัสวิชา</th>
+        <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
+        <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
+        <th className="px-3 py-2 font-medium">แผนก</th>
+        <th className="px-3 py-2 font-medium">ระดับชั้น</th>
+        <th className="px-3 py-2 font-medium">ห้อง</th>
+        <th className="px-3 py-2 font-medium">ความคืบหน้า</th>
+      </tr>
+    </thead>
+  );
+
+  if (!isLoading && rows.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <EmptyState title="ไม่มีภาระงานสอน" description="ยังไม่มีภาระงานสอนในแผนกนี้" />
+      </div>
+    );
+  }
+
   return (
-    <Card className="space-y-3 p-0">
-      {isLoading ? (
-        <div role="status" aria-label="กำลังโหลด" className="overflow-x-auto">
-          <table className="w-full min-w-[56rem] text-xs">
-            <thead className="bg-muted text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="w-8 px-3 py-2" />
-                <th className="px-3 py-2 font-medium">ครูผู้สอน</th>
-                <th className="px-3 py-2 font-medium">รหัสวิชา</th>
-                <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
-                <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
-                <th className="px-3 py-2 font-medium">แผนก</th>
-                <th className="px-3 py-2 font-medium">ระดับชั้น</th>
-                <th className="px-3 py-2 font-medium">ห้อง</th>
-                <th className="px-3 py-2 font-medium">ความคืบหน้า</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[0, 1, 2, 3].map((i) => (
-                <tr key={i} className="h-[40px] border-t border-border">
-                  <td className="px-3 py-0">
-                    <Skeleton className="h-3 w-3" />
-                  </td>
-                  <td className="px-3 py-0">
-                    <Skeleton className="h-3 w-24" />
-                  </td>
-                  <td className="px-3 py-0">
-                    <Skeleton className="h-3 w-12" />
-                  </td>
-                  <td className="px-3 py-0">
-                    <Skeleton className="h-3 w-20" />
-                  </td>
-                  <td className="px-3 py-0">
-                    <Skeleton className="h-3 w-28" />
-                  </td>
-                  <td className="px-3 py-0">
-                    <Skeleton className="h-3 w-16" />
-                  </td>
-                  <td className="px-3 py-0">
-                    <Skeleton className="h-3 w-14" />
-                  </td>
-                  <td className="px-3 py-0">
-                    <Skeleton className="h-3 w-10" />
-                  </td>
-                  <td className="px-3 py-0">
-                    <Skeleton className="h-4 w-20 rounded-full" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[56rem] text-xs">
-              <thead className="bg-muted text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="w-8 px-3 py-2" />
-                  <th className="px-3 py-2 font-medium">ครูผู้สอน</th>
-                  <th className="px-3 py-2 font-medium">รหัสวิชา</th>
-                  <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
-                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
-                  <th className="px-3 py-2 font-medium">แผนก</th>
-                  <th className="px-3 py-2 font-medium">ระดับชั้น</th>
-                  <th className="px-3 py-2 font-medium">ห้อง</th>
-                  <th className="px-3 py-2 font-medium">ความคืบหน้า</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => {
+    <Card className="overflow-hidden p-0">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[56rem] text-xs">
+          {tableHead}
+          <tbody>
+            {isLoading
+              ? [0, 1, 2, 3].map((i) => (
+                  <tr key={i} className="h-[40px] border-t border-border" role="status" aria-label="กำลังโหลด">
+                    <td className="px-3 py-0">
+                      <Skeleton className="h-3 w-3" />
+                    </td>
+                    <td className="px-3 py-0">
+                      <Skeleton className="h-3 w-24" />
+                    </td>
+                    <td className="px-3 py-0">
+                      <Skeleton className="h-3 w-12" />
+                    </td>
+                    <td className="px-3 py-0">
+                      <Skeleton className="h-3 w-20" />
+                    </td>
+                    <td className="px-3 py-0">
+                      <Skeleton className="h-3 w-28" />
+                    </td>
+                    <td className="px-3 py-0">
+                      <Skeleton className="h-3 w-16" />
+                    </td>
+                    <td className="px-3 py-0">
+                      <Skeleton className="h-3 w-14" />
+                    </td>
+                    <td className="px-3 py-0">
+                      <Skeleton className="h-3 w-10" />
+                    </td>
+                    <td className="px-3 py-0">
+                      <Skeleton className="h-4 w-20 rounded-full" />
+                    </td>
+                  </tr>
+                ))
+              : rows.map((r) => {
                   const l = label(r.assignment);
                   const open = selectedId === r.assignment.id;
                   const rowUnits = units.filter((u) => u.teaching_assignment_id === r.assignment.id);
@@ -262,15 +261,9 @@ function OverviewBoard({
                     </Fragment>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-
-          {rows.length === 0 && (
-            <p className="px-3 py-8 text-center text-sm text-muted-foreground">ยังไม่มีภาระงานสอนในแผนกนี้</p>
-          )}
-        </>
-      )}
+          </tbody>
+        </table>
+      </div>
     </Card>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { ChevronBack, ChevronForward, X } from "@/components/icons";
+import { ChevronBack, ChevronForward, PersonAddIcon, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
@@ -165,6 +165,12 @@ export function Enrollment() {
         )}
       </div>
 
+      {orgWide && !departmentId ? (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="เลือกแผนก" description="เลือกแผนกเพื่อลงทะเบียนนักเรียน" icon={PersonAddIcon} />
+        </div>
+      ) : (
+        <>
       {isKg && (
         <Card className="text-sm text-muted-foreground">
           แผนกอนุบาลไม่ใช้ระบบรุ่น — จัดชั้นนักเรียนที่หน้ารายชื่อนักเรียนได้เลย
@@ -197,6 +203,8 @@ export function Enrollment() {
           entryYear={cohorts.find((c) => c.id === pickedCohort)?.entry_year ?? 0}
           departmentId={departmentId}
         />
+      )}
+        </>
       )}
     </div>
   );
