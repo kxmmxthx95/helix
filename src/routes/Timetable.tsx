@@ -437,7 +437,7 @@ function ScheduleList({
                     </div>
                   </>
                 ) : (
-                  <span className="min-w-0 truncate font-ui">{item.label}</span>
+                  <span className="min-w-0 truncate font-sarabun">{item.label}</span>
                 )}
               </div>
               <ChevronForward className="h-3 w-3 shrink-0 text-muted-foreground" />
