@@ -252,6 +252,12 @@ export function Curriculum() {
         </div>
       </div>
 
+      {orgWide && !departmentId ? (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="เลือกแผนก" description="เลือกแผนกเพื่อดูโครงสร้างหลักสูตร" icon={ClipboardIcon} />
+        </div>
+      ) : (
+        <>
       {((isKg && kgAcademicYear !== null) || pickedCohort) && visibleGradeLevels.length > 0 && (
         <div className="flex w-full shrink-0 gap-0 overflow-x-auto border-b border-border" role="tablist">
           {visibleGradeLevels.map((g) => (
@@ -297,6 +303,8 @@ export function Curriculum() {
           gradeLevels={gradeLevels}
           mayEdit={mayEdit}
         />
+      )}
+        </>
       )}
     </div>
   );
