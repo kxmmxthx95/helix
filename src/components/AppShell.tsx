@@ -471,6 +471,16 @@ function AppShellInner() {
         ? "โปรไฟล์"
         : "ระบบจัดการสถานศึกษา");
 
+  const themeLabel =
+    preference === "system" ? "ตามระบบ" : preference === "dark" ? "โหมดมืด" : "โหมดสว่าง";
+
+  const sidebarActionClass = (active = false) =>
+    cn(
+      "font-ui tappable flex items-center rounded-lg text-xs font-semibold transition-colors",
+      collapsed ? "justify-center px-0 py-2.5 w-full" : "gap-3 px-3 py-2 w-full",
+      active ? "bg-foreground/10 text-accent" : "text-foreground",
+    );
+
   const themeButton = (
     <Button
       variant="ghost"
@@ -570,7 +580,6 @@ function AppShellInner() {
       >
         <div className="flex h-12 shrink-0 items-center gap-2 px-3">
           <div className="h-8 w-8 shrink-0" aria-hidden />
-          <img src="/logo.webp" alt="Helix" className="ml-auto h-6 w-auto dark:invert" />
         </div>
 
         <nav
@@ -642,12 +651,51 @@ function AppShellInner() {
               ))}
             </Select>
           )}
+          <div className={cn("hidden flex-col gap-1.5 lg:flex", collapsed ? "items-center" : "px-1")}>
+            {maySeeSettings && (
+              <button
+                type="button"
+                onClick={() => navigate("/settings")}
+                title="ตั้งค่าระบบ"
+                className={sidebarActionClass(location.pathname === "/settings")}
+              >
+                <SettingsIcon className="h-3 w-3 shrink-0" />
+                {!collapsed && <span className="truncate">ตั้งค่าระบบ</span>}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={cycle}
+              title={`Theme: ${preference}`}
+              aria-label={`Theme: ${preference}. Tap to cycle.`}
+              className={sidebarActionClass()}
+            >
+              {preference === "system" ? (
+                <Monitor className="h-3 w-3 shrink-0" />
+              ) : preference === "dark" ? (
+                <Sun className="h-3 w-3 shrink-0" />
+              ) : (
+                <Moon className="h-3 w-3 shrink-0" />
+              )}
+              {!collapsed && <span className="truncate">{themeLabel}</span>}
+            </button>
+            <button
+              type="button"
+              onClick={signOut}
+              aria-label="ออกจากระบบ"
+              title="ออกจากระบบ"
+              className={sidebarActionClass()}
+            >
+              <LogOut className="h-3.5 w-3.5 shrink-0" />
+              {!collapsed && <span className="truncate">ออกจากระบบ</span>}
+            </button>
+          </div>
         </div>
       </aside>
       {avatarInput}
 
       {/* Main pane */}
-      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl bg-background dark:bg-muted shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.08)]">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden bg-background dark:bg-muted max-lg:rounded-none max-lg:shadow-none lg:rounded-2xl lg:shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.08)]">
         <header
           className={cn(
             "glass sticky top-0 z-20 shrink-0 pt-safe lg:hidden",
@@ -758,26 +806,20 @@ function AppShellInner() {
           <div className="mx-auto flex min-h-full w-full max-w-6xl flex-1 flex-col px-shell pb-[max(1rem,env(safe-area-inset-bottom))]">
             <header
               className={cn(
-                "sticky top-0 z-20 hidden h-12 shrink-0 items-center bg-background dark:bg-muted lg:flex",
-                collapsed ? "gap-1" : "gap-2",
+                "sticky top-0 z-20 hidden h-12 shrink-0 items-center bg-background dark:bg-muted lg:relative lg:flex",
                 !isStudentHome && "border-b border-border/60",
               )}
             >
               {!isStudentHome && (
-                <p
-                  className={cn(
-                    "font-heading text-sm font-semibold text-foreground",
-                    collapsed && "pl-2",
-                  )}
-                >
+                <p className="font-heading pointer-events-none absolute inset-x-0 truncate text-center text-sm font-semibold text-foreground">
                   {pageTitle}
                 </p>
               )}
-              <div className="ml-auto flex items-center gap-1">
-                {settingsButton}
-                {themeButton}
-                {signOutButton}
-              </div>
+              <img
+                src="/logo.webp"
+                alt="Helix"
+                className="relative z-10 ml-auto h-6 w-auto dark:invert"
+              />
             </header>
             <motion.div
               key={location.pathname}
