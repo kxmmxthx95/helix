@@ -306,6 +306,7 @@ function EmployeeDetailSheet({
   const visibleTabs = TABS.filter((t) =>
     t.key === "position" ? true : t.key === "attendance" ? canSeeAttendance : canSeeSensitive,
   );
+  const activeTab = visibleTabs.some((t) => t.key === tab) ? tab : (visibleTabs[0]?.key ?? "position");
 
   return (
     <Sheet
@@ -315,26 +316,25 @@ function EmployeeDetailSheet({
     >
       {row && (
         <div className="space-y-4">
-          <div className="flex gap-1 overflow-x-auto">
+          <Select
+            className="w-full"
+            value={activeTab}
+            onChange={(e) => setTab(e.target.value as Tab)}
+            aria-label="หมวดข้อมูลพนักงาน"
+          >
             {visibleTabs.map((t) => (
-              <Button
-                key={t.key}
-                size="sm"
-                variant={tab === t.key ? "default" : "outline"}
-                onClick={() => setTab(t.key)}
-                className="shrink-0"
-              >
+              <option key={t.key} value={t.key}>
                 {t.label}
-              </Button>
+              </option>
             ))}
-          </div>
+          </Select>
 
-          {tab === "position" && <PositionPanel row={row} employees={employees} mayManageHr={mayManageHr} />}
-          {tab === "compensation" && canSeeSensitive && <CompensationPanel row={row} mayManageHr={mayManageHr} />}
-          {tab === "status" && canSeeSensitive && <StatusPanel row={row} mayManageHr={mayManageHr} me={me} />}
-          {tab === "contracts" && canSeeSensitive && <ContractsPanel row={row} mayManageHr={mayManageHr} me={me} />}
-          {tab === "documents" && canSeeSensitive && <DocumentsPanel row={row} mayManageHr={mayManageHr} me={me} />}
-          {tab === "attendance" && canSeeAttendance && <AttendancePanel row={row} />}
+          {activeTab === "position" && <PositionPanel row={row} employees={employees} mayManageHr={mayManageHr} />}
+          {activeTab === "compensation" && canSeeSensitive && <CompensationPanel row={row} mayManageHr={mayManageHr} />}
+          {activeTab === "status" && canSeeSensitive && <StatusPanel row={row} mayManageHr={mayManageHr} me={me} />}
+          {activeTab === "contracts" && canSeeSensitive && <ContractsPanel row={row} mayManageHr={mayManageHr} me={me} />}
+          {activeTab === "documents" && canSeeSensitive && <DocumentsPanel row={row} mayManageHr={mayManageHr} me={me} />}
+          {activeTab === "attendance" && canSeeAttendance && <AttendancePanel row={row} />}
         </div>
       )}
     </Sheet>
