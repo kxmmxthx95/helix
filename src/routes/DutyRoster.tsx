@@ -620,7 +620,6 @@ function MineView({ profileId }: { profileId: string }) {
       )}
 
       <div className={cn("flex flex-col gap-2", !isLoading && rows.length === 0 && "flex-1")}>
-        <p className="text-sm font-medium">เวรของฉัน</p>
         {isLoading && (
           <Card className="space-y-2" role="status" aria-label="กำลังโหลด">
             {[0, 1, 2].map((i) => (
@@ -777,9 +776,7 @@ function RequestsView({ status }: { status: DutyTransferStatus | "" }) {
   const pointName = (id: string) => points.find((p) => p.id === id)?.name ?? "—";
 
   return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">คำขอโอนเวร ({requests.length})</p>
-
+    <div className={cn("flex flex-col gap-2", !isLoading && requests.length === 0 && "flex-1")}>
       {isLoading && (
         <Card className="space-y-2" role="status" aria-label="กำลังโหลด">
           {[0, 1, 2].map((i) => (
@@ -787,7 +784,11 @@ function RequestsView({ status }: { status: DutyTransferStatus | "" }) {
           ))}
         </Card>
       )}
-      {!isLoading && requests.length === 0 && <EmptyState title="ไม่มีคำขอ" />}
+      {!isLoading && requests.length === 0 && (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="ไม่มีคำขอ" />
+        </div>
+      )}
       {requests.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table className="w-full min-w-[42rem] text-xs">
@@ -867,7 +868,7 @@ function SummaryView({ departmentId, monthValue }: { departmentId: string; month
   );
 
   return (
-    <div className="space-y-3">
+    <div className={cn("flex flex-col gap-3", !isLoading && counts.size === 0 && "flex-1")}>
       {isLoading && (
         <Card className="space-y-2" role="status" aria-label="กำลังโหลด">
           {[0, 1, 2].map((i) => (
@@ -875,7 +876,11 @@ function SummaryView({ departmentId, monthValue }: { departmentId: string; month
           ))}
         </Card>
       )}
-      {!isLoading && counts.size === 0 && <EmptyState title="ไม่มีข้อมูล" description="ไม่มีเวรในเดือนนี้" />}
+      {!isLoading && counts.size === 0 && (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="ไม่มีข้อมูล" description="ไม่มีเวรในเดือนนี้" />
+        </div>
+      )}
       {counts.size > 0 && (
         <div className="overflow-x-auto rounded-lg border border-border bg-card">
           <table className="w-full text-xs">
