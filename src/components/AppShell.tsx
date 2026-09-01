@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { FiSidebar } from "react-icons/fi";
 import { useEffect, useRef, useState } from "react";
 import {
   AirplaneIcon,
@@ -10,7 +11,6 @@ import {
   ChevronBack,
   CheckmarkCircleIcon,
   ClipboardIcon,
-  ChevronForward,
   CloudOff,
   CheckboxOutlineIcon,
   DocumentTextIcon,
@@ -533,19 +533,44 @@ function AppShellInner() {
     </button>
   );
 
+  const sidebarToggle = (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="hover:bg-transparent active:bg-transparent"
+      onClick={() => setCollapsed((v) => !v)}
+      aria-label={collapsed ? "ขยายแถบด้านข้าง" : "หุบแถบด้านข้าง"}
+      aria-expanded={!collapsed}
+      title={collapsed ? "ขยายแถบด้านข้าง" : "หุบแถบด้านข้าง"}
+    >
+      <FiSidebar className="h-3.5 w-3.5" />
+    </Button>
+  );
+
   return (
-    <div className="relative flex h-dvh overflow-hidden overscroll-none max-lg:flex-col max-lg:gap-0 max-lg:p-0 lg:flex-row lg:gap-2 lg:p-2">
+    <div
+      className={cn(
+        "relative flex h-dvh overflow-hidden overscroll-none max-lg:flex-col max-lg:gap-0 max-lg:p-0 lg:flex-row lg:p-2",
+        collapsed ? "lg:gap-0" : "lg:gap-2",
+      )}
+    >
       <div className="absolute inset-0 z-0 bg-muted dark:bg-background" aria-hidden />
 
-      {/* Desktop sidebar — fully hides (w-0) when collapsed; the toggle to bring it back lives in the main header, not in here, since this whole panel disappears. */}
+      {/* Desktop sidebar toggle — fixed at header slot (p-2 + px-3) whether expanded or collapsed */}
+      <div className="pointer-events-none absolute left-3 top-4 z-20 hidden lg:block">
+        <div className="pointer-events-auto">{sidebarToggle}</div>
+      </div>
+
+      {/* Desktop sidebar — w-0 when collapsed; toggle stays in the slot above. */}
       <aside
         className={cn(
           "font-ui bg-muted dark:bg-background relative z-10 hidden shrink-0 flex-col overflow-hidden transition-[width] duration-200 lg:flex",
           collapsed ? "w-0" : "w-56",
         )}
       >
-        <div className="flex h-12 shrink-0 items-center px-3">
-          <img src="/logo.webp" alt="Helix" className="h-6 w-auto dark:invert" />
+        <div className="flex h-12 shrink-0 items-center gap-2 px-3">
+          <div className="h-8 w-8 shrink-0" aria-hidden />
+          <img src="/logo.webp" alt="Helix" className="ml-auto h-6 w-auto dark:invert" />
         </div>
 
         <nav
@@ -706,36 +731,6 @@ function AppShellInner() {
           </nav>
         </Sheet>
 
-        <header
-          className={cn(
-            "sticky top-0 z-20 hidden h-12 shrink-0 items-center gap-2 px-shell lg:flex",
-            !isStudentHome && "border-b border-border/60",
-          )}
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCollapsed((v) => !v)}
-            aria-label={collapsed ? "ขยายแถบด้านข้าง" : "หุบแถบด้านข้าง"}
-            aria-expanded={!collapsed}
-            title={collapsed ? "ขยายแถบด้านข้าง" : "หุบแถบด้านข้าง"}
-          >
-            {collapsed ? (
-              <ChevronForward className="h-3 w-3" />
-            ) : (
-              <ChevronBack className="h-3 w-3" />
-            )}
-          </Button>
-          <div className="mx-auto flex h-full w-full max-w-6xl items-center">
-            {!isStudentHome && <p className="font-heading text-sm font-semibold text-foreground">{pageTitle}</p>}
-            <div className="ml-auto flex items-center gap-1">
-              {settingsButton}
-              {themeButton}
-              {signOutButton}
-            </div>
-          </div>
-        </header>
-
         {!online && (
           <div
             className={cn(
@@ -760,10 +755,33 @@ function AppShellInner() {
         )}
 
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
-          <div className="mx-auto flex min-h-full w-full max-w-6xl flex-1 flex-col px-shell pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="mx-auto flex min-h-full w-full max-w-6xl flex-1 flex-col px-shell pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <header
+              className={cn(
+                "sticky top-0 z-20 hidden h-12 shrink-0 items-center bg-background dark:bg-muted lg:flex",
+                collapsed ? "gap-1" : "gap-2",
+                !isStudentHome && "border-b border-border/60",
+              )}
+            >
+              {!isStudentHome && (
+                <p
+                  className={cn(
+                    "font-heading text-sm font-semibold text-foreground",
+                    collapsed && "pl-2",
+                  )}
+                >
+                  {pageTitle}
+                </p>
+              )}
+              <div className="ml-auto flex items-center gap-1">
+                {settingsButton}
+                {themeButton}
+                {signOutButton}
+              </div>
+            </header>
             <motion.div
               key={location.pathname}
-              className="flex min-h-0 flex-1 flex-col"
+              className="flex min-h-0 flex-1 flex-col pt-4"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
