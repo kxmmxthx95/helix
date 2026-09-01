@@ -616,11 +616,6 @@ function AppShellInner() {
               ))}
             </Select>
           )}
-          <div className={cn("flex items-center gap-1", collapsed && "flex-col")}>
-            {settingsButton}
-            {themeButton}
-            {signOutButton}
-          </div>
         </div>
       </aside>
       {avatarInput}
@@ -732,6 +727,11 @@ function AppShellInner() {
           </Button>
           <div className="mx-auto flex h-full w-full max-w-6xl items-center">
             {!isStudentHome && <p className="font-heading text-sm font-semibold text-foreground">{pageTitle}</p>}
+            <div className="ml-auto flex items-center gap-1">
+              {settingsButton}
+              {themeButton}
+              {signOutButton}
+            </div>
           </div>
         </header>
 
