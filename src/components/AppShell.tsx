@@ -759,10 +759,11 @@ function AppShellInner() {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto overscroll-contain">
-          <div className="mx-auto w-full max-w-6xl px-shell pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+          <div className="mx-auto flex min-h-full w-full max-w-6xl flex-1 flex-col px-shell pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <motion.div
               key={location.pathname}
+              className="flex min-h-0 flex-1 flex-col"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18, ease: "easeOut" }}

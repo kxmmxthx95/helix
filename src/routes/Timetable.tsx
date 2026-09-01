@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { GraduationCap, Plus, Users, X } from "@/components/icons";
+import { ChevronBack, ChevronForward, Plus, TimetableIcon, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { EmptyState, Select, Skeleton } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
@@ -43,7 +43,7 @@ export function Timetable() {
 
   const [pickedDept, setPickedDept] = useState("");
   const [term, setTerm] = useState<1 | 2>(1);
-  const [view, setView] = useState<View>(mayEdit ? "classroom" : "teacher");
+  const [view, setView] = useState<View | "">("");
   const [classroomId, setClassroomId] = useState("");
   const [teacherId, setTeacherId] = useState("");
 
@@ -64,8 +64,9 @@ export function Timetable() {
 
   useEffect(() => {
     if (isStudent) return;
-    if (!classroomId && classrooms.length > 0) setClassroomId(classrooms[0]!.id);
-  }, [isStudent, classroomId, classrooms]);
+    setClassroomId("");
+    setTeacherId("");
+  }, [departmentId, isStudent]);
 
   if (!me) return null;
 
@@ -108,11 +109,26 @@ export function Timetable() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="page-fill">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <Select
+          className="h-8 w-auto min-w-[10rem] shrink-0"
+          value={view}
+          onChange={(e) => {
+            setView(e.target.value as View);
+            setClassroomId("");
+            setTeacherId("");
+          }}
+          aria-label="เลือกตาราง"
+          placeholder="เลือกตาราง"
+        >
+          <option value="classroom">ตารางเรียน</option>
+          <option value="teacher">ตารางสอน</option>
+        </Select>
+
         {orgWide && departments.length > 0 && (
           <Select
-            className="w-auto min-w-[10rem]"
+            className="h-8 w-auto min-w-[10rem]"
             value={pickedDept}
             onChange={(e) => setPickedDept(e.target.value)}
             aria-label="แผนก"
@@ -126,98 +142,76 @@ export function Timetable() {
           </Select>
         )}
 
-        {splitsByTerm && (
-          <div className="inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
-            {[1, 2].map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTerm(t as 1 | 2)}
-                className={cn(
-                  "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                  term === t
-                    ? "bg-foreground/10 text-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                {TERM_LABEL[t]}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {view === "classroom" ? (
-          <Select value={classroomId} onChange={(e) => setClassroomId(e.target.value)} className="h-8 w-auto">
-            {classrooms.map((c) => (
-              <option key={c.id} value={c.id}>
-                {gradeLevels.find((g) => g.id === c.grade_level_id)?.name ?? "—"}/{c.name}
-              </option>
-            ))}
-          </Select>
-        ) : (
+        {departmentId && splitsByTerm && (
           <Select
-            value={teacherId}
-            onChange={(e) => setTeacherId(e.target.value)}
-            className="h-8 w-auto min-w-[10rem]"
-            aria-label="ครูผู้สอน"
-            placeholder="เลือกครูผู้สอน"
+            className="ml-auto h-8 w-auto min-w-[10rem] shrink-0"
+            value={String(term)}
+            onChange={(e) => setTerm(Number(e.target.value) as 1 | 2)}
+            aria-label="ภาคเรียน"
           >
-            {teachers.map((t) => (
-              <option key={t.id} value={t.id}>
-                {profileFullName(t)}
+            {([1, 2] as const).map((t) => (
+              <option key={t} value={t}>
+                {TERM_LABEL[t]}
               </option>
             ))}
           </Select>
         )}
 
-        <div className="ml-auto inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
-          {([
-            { id: "classroom" as const, label: "มุมมองห้องเรียน", Icon: GraduationCap },
-            { id: "teacher" as const, label: "มุมมองครู", Icon: Users },
-          ]).map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setView(id)}
-              aria-label={label}
-              title={label}
-              className={cn(
-                "inline-flex h-full w-8 shrink-0 items-center justify-center rounded-md transition-colors",
-                view === id
-                  ? "bg-foreground/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              <Icon className="h-4 w-4" />
-            </button>
-          ))}
-        </div>
       </div>
 
-      {departmentId && view === "classroom" && classroomId && (
-        <ClassroomTimetable
-          departmentId={departmentId}
-          classroomId={classroomId}
-          academicYear={academicYear}
-          term={scheduleTerm}
-          mayEdit={mayEdit}
-          classrooms={classrooms}
-          gradeLevels={gradeLevels}
-          teachers={teachers}
-        />
-      )}
+      {!departmentId ? (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="เลือกแผนก" description="เลือกแผนกเพื่อดูตารางเรียน" icon={TimetableIcon} />
+        </div>
+      ) : !view ? (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="เลือกตาราง" description="เลือกตารางเรียนหรือตารางสอน" icon={TimetableIcon} />
+        </div>
+      ) : (
+        <>
+          {view === "classroom" &&
+            (classroomId ? (
+              <ClassroomTimetable
+                departmentId={departmentId}
+                classroomId={classroomId}
+                academicYear={academicYear}
+                term={scheduleTerm}
+                mayEdit={mayEdit}
+                classrooms={classrooms}
+                gradeLevels={gradeLevels}
+                teachers={teachers}
+                onBack={() => setClassroomId("")}
+              />
+            ) : (
+              <ScheduleList
+                items={classrooms.map((c) => ({
+                  id: c.id,
+                  label: `${gradeLevels.find((g) => g.id === c.grade_level_id)?.name ?? "—"}/${c.name}`,
+                }))}
+                onSelect={setClassroomId}
+              />
+            ))}
 
-      {departmentId && view === "teacher" && teacherId && (
-        <TeacherTimetable
-          departmentId={departmentId}
-          teacherId={teacherId}
-          academicYear={academicYear}
-          term={scheduleTerm}
-          mayEdit={mayEdit}
-          classrooms={classrooms}
-          gradeLevels={gradeLevels}
-          teachers={teachers}
-        />
+          {view === "teacher" &&
+            (teacherId ? (
+              <TeacherTimetable
+                departmentId={departmentId}
+                teacherId={teacherId}
+                academicYear={academicYear}
+                term={scheduleTerm}
+                mayEdit={mayEdit}
+                classrooms={classrooms}
+                gradeLevels={gradeLevels}
+                teachers={teachers}
+                onBack={() => setTeacherId("")}
+              />
+            ) : (
+              <ScheduleList
+                items={teachers.map((t) => ({ id: t.id, label: profileFullName(t) }))}
+                onSelect={setTeacherId}
+              />
+            ))}
+        </>
       )}
     </div>
   );
@@ -232,6 +226,7 @@ function ClassroomTimetable({
   classrooms,
   gradeLevels,
   teachers,
+  onBack,
 }: {
   departmentId: string;
   classroomId: string;
@@ -241,8 +236,13 @@ function ClassroomTimetable({
   classrooms: Classroom[];
   gradeLevels: GradeLevel[];
   teachers: ProfileRow[];
+  onBack?: () => void;
 }) {
   const classroomGradeLevelId = classrooms.find((c) => c.id === classroomId)?.grade_level_id ?? null;
+  const classroom = classrooms.find((c) => c.id === classroomId);
+  const classroomLabel = classroom
+    ? `${gradeLevels.find((g) => g.id === classroom.grade_level_id)?.name ?? "—"}/${classroom.name}`
+    : "—";
   const { data: defaultPeriods = [], isLoading: loadingDefaultPeriods } = useDepartmentPeriods(departmentId);
   const { data: gradePeriods = [], isLoading: loadingGradePeriods } = usePeriodsForGrade(
     departmentId,
@@ -272,24 +272,27 @@ function ClassroomTimetable({
   );
 
   return (
-    <TimetableGrid
-      periods={periods}
-      entries={entries}
-      candidates={candidates}
-      mode="classroom"
-      mayEdit={mayEdit}
-      isLoading={loadingDefaultPeriods || loadingGradePeriods || loadingEntries}
-      subjectLabel={(id) => subjects.find((s) => s.id === id)?.code ?? "—"}
-      teacherLabel={(id) => {
-        const t = teachers.find((x) => x.id === id);
-        return t ? profileFullName(t) : "—";
-      }}
-      roomLabel={(id) => {
-        const c = classrooms.find((x) => x.id === id);
-        const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.name;
-        return c ? `${g ?? "—"}/${c.name}` : "—";
-      }}
-    />
+    <>
+      {onBack && <BackHeader label={classroomLabel} onBack={onBack} />}
+      <TimetableGrid
+        periods={periods}
+        entries={entries}
+        candidates={candidates}
+        mode="classroom"
+        mayEdit={mayEdit}
+        isLoading={loadingDefaultPeriods || loadingGradePeriods || loadingEntries}
+        subjectLabel={(id) => subjects.find((s) => s.id === id)?.code ?? "—"}
+        teacherLabel={(id) => {
+          const t = teachers.find((x) => x.id === id);
+          return t ? profileFullName(t) : "—";
+        }}
+        roomLabel={(id) => {
+          const c = classrooms.find((x) => x.id === id);
+          const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.name;
+          return c ? `${g ?? "—"}/${c.name}` : "—";
+        }}
+      />
+    </>
   );
 }
 
@@ -302,6 +305,7 @@ function TeacherTimetable({
   classrooms,
   gradeLevels,
   teachers,
+  onBack,
 }: {
   departmentId: string;
   teacherId: string;
@@ -311,7 +315,12 @@ function TeacherTimetable({
   classrooms: Classroom[];
   gradeLevels: GradeLevel[];
   teachers: ProfileRow[];
+  onBack: () => void;
 }) {
+  const teacherLabelText = (() => {
+    const t = teachers.find((x) => x.id === teacherId);
+    return t ? profileFullName(t) : "—";
+  })();
   const { data: periods = [], isLoading: loadingPeriods } = useDepartmentPeriods(departmentId);
   const { data: entries = [], isLoading: loadingEntries } = useTeacherSchedule(teacherId, academicYear, term);
   const { data: assignments = [] } = useDepartmentTeachingAssignments(departmentId, academicYear, term);
@@ -331,24 +340,70 @@ function TeacherTimetable({
   );
 
   return (
-    <TimetableGrid
-      periods={periods}
-      entries={entries}
-      candidates={candidates}
-      mode="teacher"
-      mayEdit={mayEdit}
-      isLoading={loadingPeriods || loadingEntries}
-      subjectLabel={(id) => subjects.find((s) => s.id === id)?.code ?? "—"}
-      teacherLabel={(id) => {
-        const t = teachers.find((x) => x.id === id);
-        return t ? profileFullName(t) : "—";
-      }}
-      roomLabel={(id) => {
-        const c = classrooms.find((x) => x.id === id);
-        const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.name;
-        return c ? `${g ?? "—"}/${c.name}` : "—";
-      }}
-    />
+    <>
+      <BackHeader label={teacherLabelText} onBack={onBack} />
+      <TimetableGrid
+        periods={periods}
+        entries={entries}
+        candidates={candidates}
+        mode="teacher"
+        mayEdit={mayEdit}
+        isLoading={loadingPeriods || loadingEntries}
+        subjectLabel={(id) => subjects.find((s) => s.id === id)?.code ?? "—"}
+        teacherLabel={(id) => {
+          const t = teachers.find((x) => x.id === id);
+          return t ? profileFullName(t) : "—";
+        }}
+        roomLabel={(id) => {
+          const c = classrooms.find((x) => x.id === id);
+          const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.name;
+          return c ? `${g ?? "—"}/${c.name}` : "—";
+        }}
+      />
+    </>
+  );
+}
+
+function BackHeader({ label, onBack }: { label: string; onBack: () => void }) {
+  return (
+    <div className="mb-2 flex shrink-0 items-center gap-1">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-1 rounded-md px-1.5 py-1 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <ChevronBack className="h-4 w-4" />
+        {label}
+      </button>
+    </div>
+  );
+}
+
+function ScheduleList({
+  items,
+  onSelect,
+}: {
+  items: { id: string; label: string }[];
+  onSelect: (id: string) => void;
+}) {
+  if (items.length === 0) {
+    return <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีรายการในแผนกนี้" />;
+  }
+  return (
+    <ul className="divide-y divide-border overflow-y-auto rounded-lg border border-border bg-card text-sm">
+      {items.map((item) => (
+        <li key={item.id}>
+          <button
+            type="button"
+            onClick={() => onSelect(item.id)}
+            className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-muted"
+          >
+            <span className="min-w-0 truncate">{item.label}</span>
+            <ChevronForward className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 

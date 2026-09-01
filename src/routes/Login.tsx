@@ -134,8 +134,8 @@ export function Login() {
                 />
               </Field>
 
-              {error && <p className="text-sm text-destructive">{error}</p>}
-              {notice && <p className="text-sm text-success">{notice}</p>}
+              {error && <p className="text-xs text-destructive">{error}</p>}
+              {notice && <p className="text-xs text-success">{notice}</p>}
 
               <Button type="submit" size="lg" className="w-full" disabled={busy}>
                 {busy ? <Spinner /> : mode === "signin" ? "เข้าสู่ระบบ" : "ตั้งรหัสผ่านใหม่"}

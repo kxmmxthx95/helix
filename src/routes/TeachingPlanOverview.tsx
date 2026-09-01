@@ -76,12 +76,12 @@ export function TeachingPlanOverview() {
         )}
       </div>
 
-      {orgWide && !departmentId ? (
-        <EmptyState title="เลือกแผนก" description="เลือกแผนกเพื่อดูภาพรวมแผนการสอน" icon={Users} />
+      {!departmentId ? (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="เลือกแผนก" description="เลือกแผนกเพื่อดูภาพรวมแผนการสอน" icon={Users} />
+        </div>
       ) : (
-        departmentId && (
-          <OverviewBoard departmentId={departmentId} academicYear={academicYear} term={splitsByTerm ? term : null} />
-        )
+        <OverviewBoard departmentId={departmentId} academicYear={academicYear} term={splitsByTerm ? term : null} />
       )}
     </div>
   );

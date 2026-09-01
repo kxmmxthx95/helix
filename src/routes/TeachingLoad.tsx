@@ -88,12 +88,11 @@ export function TeachingLoad() {
         )}
       </div>
 
-      {orgWide && !departmentId ? (
+      {!departmentId ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="เลือกแผนก" description="เลือกแผนกเพื่อดูภาระงานสอน" icon={Users} />
         </div>
       ) : (
-        departmentId && (
         <TeachingLoadBoard
           departmentId={departmentId}
           academicYear={academicYear}
@@ -104,7 +103,6 @@ export function TeachingLoad() {
           selectedTeacherId={selectedTeacherId}
           onSelectTeacher={setSelectedTeacherId}
         />
-        )
       )}
     </div>
   );
