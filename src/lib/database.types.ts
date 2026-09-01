@@ -57,6 +57,11 @@ export type SchoolSettings = {
   updated_at: string;
   /** Roles allowed to use the time-clock feature — empty = off for everyone. See migration 0032. */
   time_tracking_roles: Role[];
+  // Org-wide (whole-school) LINE attendance-digest cutoffs — null = off. See migration 0066.
+  attendance_digest_time: string | null;
+  attendance_digest_last_sent: string | null;
+  staff_attendance_digest_time: string | null;
+  staff_attendance_digest_last_sent: string | null;
 };
 
 /** One row per department, always present — see migration 0002 seed trigger. */
@@ -73,6 +78,11 @@ export type DepartmentSettings = {
   checkin_lat: number | null;
   checkin_lng: number | null;
   checkin_radius_m: number | null;
+  // Per-department LINE attendance-digest cutoffs — null = off. See migration 0066.
+  attendance_digest_time: string | null;
+  attendance_digest_last_sent: string | null;
+  staff_attendance_digest_time: string | null;
+  staff_attendance_digest_last_sent: string | null;
   updated_at: string;
 };
 

@@ -15,7 +15,10 @@ export function useSchoolSettings() {
   });
 }
 
-export type SchoolSettingsEdit = Pick<SchoolSettings, "name_th" | "name_en" | "time_tracking_roles">;
+export type SchoolSettingsEdit = Pick<
+  SchoolSettings,
+  "name_th" | "name_en" | "time_tracking_roles" | "attendance_digest_time" | "staff_attendance_digest_time"
+>;
 
 export function useUpdateSchoolSettings() {
   const qc = useQueryClient();
@@ -80,6 +83,8 @@ export type DepartmentSettingsEdit = Pick<
   | "checkin_lat"
   | "checkin_lng"
   | "checkin_radius_m"
+  | "attendance_digest_time"
+  | "staff_attendance_digest_time"
 >;
 
 export function useUpdateDepartmentSettings(departmentId: string | null) {
