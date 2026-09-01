@@ -185,10 +185,17 @@ export function Timetable() {
               />
             ) : (
               <ScheduleList
-                items={classrooms.map((c) => ({
-                  id: c.id,
-                  label: `${gradeLevels.find((g) => g.id === c.grade_level_id)?.name ?? "—"}/${c.name}`,
-                }))}
+                items={[...classrooms]
+                  .sort((a, b) => {
+                    const gradeOrder =
+                      (gradeLevels.findIndex((g) => g.id === a.grade_level_id) ?? -1) -
+                      (gradeLevels.findIndex((g) => g.id === b.grade_level_id) ?? -1);
+                    return gradeOrder !== 0 ? gradeOrder : a.name.localeCompare(b.name, undefined, { numeric: true });
+                  })
+                  .map((c) => ({
+                    id: c.id,
+                    label: `${gradeLevels.find((g) => g.id === c.grade_level_id)?.name ?? "—"}/${c.name}`,
+                  }))}
                 onSelect={setClassroomId}
               />
             ))}
@@ -430,7 +437,7 @@ function ScheduleList({
                     </div>
                   </>
                 ) : (
-                  <span className="min-w-0 truncate">{item.label}</span>
+                  <span className="min-w-0 truncate font-ui">{item.label}</span>
                 )}
               </div>
               <ChevronForward className="h-3 w-3 shrink-0 text-muted-foreground" />
