@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronBack, ChevronForward, Plus, TimetableIcon, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { EmptyState, Select, Skeleton } from "@/components/ui";
+import { EmptyState, Select, Skeleton, Avatar } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
+import { avatarUrl } from "@/hooks/useAvatar";
 import { useMyClassroom } from "@/hooks/useAttendance";
 import { useDepartmentPeriods, usePeriodsForGrade } from "@/hooks/usePeriodDefinitions";
 import { useSubjects } from "@/hooks/useCurriculum";
@@ -207,7 +208,13 @@ export function Timetable() {
               />
             ) : (
               <ScheduleList
-                items={teachers.map((t) => ({ id: t.id, label: profileFullName(t) }))}
+                items={teachers.map((t) => ({
+                  id: t.id,
+                  prefix: t.prefix,
+                  firstName: t.first_name,
+                  lastName: t.last_name,
+                  avatarSrc: avatarUrl(t),
+                }))}
                 onSelect={setTeacherId}
               />
             ))}
@@ -370,9 +377,9 @@ function BackHeader({ label, onBack }: { label: string; onBack: () => void }) {
       <button
         type="button"
         onClick={onBack}
-        className="flex items-center gap-1 rounded-md px-1.5 py-1 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-foreground hover:bg-muted"
       >
-        <ChevronBack className="h-4 w-4" />
+        <ChevronBack className="h-3.5 w-3.5" />
         {label}
       </button>
     </div>
@@ -383,26 +390,54 @@ function ScheduleList({
   items,
   onSelect,
 }: {
-  items: { id: string; label: string }[];
+  items: (
+    | { id: string; label: string }
+    | {
+        id: string;
+        prefix: string | null;
+        firstName: string;
+        lastName: string;
+        avatarSrc: string | null;
+      }
+  )[];
   onSelect: (id: string) => void;
 }) {
   if (items.length === 0) {
     return <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีรายการในแผนกนี้" />;
   }
   return (
-    <ul className="divide-y divide-border overflow-y-auto rounded-lg border border-border bg-card text-sm">
-      {items.map((item) => (
-        <li key={item.id}>
-          <button
-            type="button"
-            onClick={() => onSelect(item.id)}
-            className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-muted"
-          >
-            <span className="min-w-0 truncate">{item.label}</span>
-            <ChevronForward className="h-4 w-4 shrink-0 text-muted-foreground" />
-          </button>
-        </li>
-      ))}
+    <ul className="divide-y divide-border overflow-y-auto rounded-lg border border-border bg-card text-xs">
+      {items.map((item) => {
+        const isPerson = "firstName" in item;
+        return (
+          <li key={item.id}>
+            <button
+              type="button"
+              onClick={() => onSelect(item.id)}
+              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted"
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                {isPerson ? (
+                  <>
+                    <Avatar
+                      name={`${item.firstName} ${item.lastName}`}
+                      src={item.avatarSrc}
+                      className="h-7 w-7 shrink-0 text-[10px]"
+                    />
+                    <div className="min-w-0 font-sarabun leading-tight text-foreground">
+                      <p className="truncate font-medium">{`${item.prefix ?? ""}${item.firstName}`}</p>
+                      <p className="truncate font-medium">{item.lastName}</p>
+                    </div>
+                  </>
+                ) : (
+                  <span className="min-w-0 truncate">{item.label}</span>
+                )}
+              </div>
+              <ChevronForward className="h-3 w-3 shrink-0 text-muted-foreground" />
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -468,7 +503,7 @@ function TimetableGrid({
             <tr>
               <th className="w-12 px-2 py-2 font-medium">คาบ</th>
               {skeletonDays.map((d) => (
-                <th key={d} className="px-2 py-2 font-medium">
+                <th key={d} className="px-2 py-2 text-center font-medium">
                   {DAY_LABEL[d] ?? d}
                 </th>
               ))}
@@ -509,7 +544,7 @@ function TimetableGrid({
           <tr>
             <th className="w-12 px-2 py-2 font-medium">คาบ</th>
             {days.map((d) => (
-              <th key={d} className="px-2 py-2 font-medium">
+              <th key={d} className="px-2 py-2 text-center font-medium">
                 {DAY_LABEL[d] ?? d}
               </th>
             ))}
