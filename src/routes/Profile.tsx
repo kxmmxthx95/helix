@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { AvatarBuilder } from "@/components/AvatarBuilder";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, BuddhistDateSelect, Card, Field, Input, Spinner } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
@@ -216,7 +215,6 @@ function AvatarUpload() {
   const toast = useToast();
   const uploadAvatar = useUploadAvatar();
   const [inputEl, setInputEl] = useState<HTMLInputElement | null>(null);
-  const [builderOpen, setBuilderOpen] = useState(false);
 
   if (!profile) return null;
   const src = avatarUrl(profile);
@@ -239,20 +237,6 @@ function AvatarUpload() {
         <Avatar name={profileFullName(profile)} src={src} className="h-16 w-16 text-lg" />
       </button>
       <input ref={setInputEl} type="file" accept="image/*" className="hidden" onChange={onChosen} />
-      <button
-        type="button"
-        onClick={() => setBuilderOpen(true)}
-        className="text-[11px] font-medium text-accent hover:underline"
-      >
-        สร้าง Avatar
-      </button>
-      <AvatarBuilder
-        open={builderOpen}
-        onOpenChange={setBuilderOpen}
-        profileId={profile.id}
-        initialOptions={profile.character_options}
-        onSaved={() => void refreshProfile()}
-      />
     </div>
   );
 }

@@ -64,13 +64,10 @@ function greeting() {
 export function Dashboard() {
   const { profile, myStudent } = useAuth();
   const isParent = profile?.roles.includes("parent") ?? false;
-  const isStudent = profile?.roles.includes("student") ?? false;
   const { data: children = [] } = useMyChildren(isParent ? (profile?.id ?? null) : null);
   const { data: schoolSettings } = useSchoolSettings();
   const showClockWidget =
     !!profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r));
-
-  if (isStudent) return profile && <StudentCharacterCard />;
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
@@ -102,25 +99,6 @@ export function Dashboard() {
       {children.map((child) => (
         <BehaviorScoreSection key={child.id} student={child} />
       ))}
-    </div>
-  );
-}
-
-/**
- * Godot HTML5 export (assets-src/GodotProject, see grill decision) — fixed
- * GreenNinja player, no character picker. aspect-[320/176] matches the
- * project's base viewport (project.godot window/size) so Godot's own
- * stretch/aspect="keep" letterboxes correctly instead of us guessing a height.
- */
-function StudentCharacterCard() {
-  return (
-    <div className="-mx-3 aspect-[320/176] w-[calc(100%+1.5rem)]">
-      <iframe
-        src="/godot-game/index.html"
-        title="สนามฝึกนินจา"
-        className="h-full w-full border-0"
-        allow="autoplay"
-      />
     </div>
   );
 }
