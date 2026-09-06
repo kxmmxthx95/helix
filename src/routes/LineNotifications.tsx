@@ -28,7 +28,7 @@ import {
   type SchoolSettingsEdit,
 } from "@/hooks/useSettings";
 import { profileFullName } from "@/lib/database.types";
-import { canManage, isOrgWide, roleLabels } from "@/lib/roles";
+import { canManageUsers, isOrgWide, roleLabels } from "@/lib/roles";
 
 function LineDigestOrgCard() {
   const toast = useToast();
@@ -320,7 +320,10 @@ export function LineNotifications() {
   const { profile } = useAuth();
   const { data: departments = [] } = useDepartments();
   const orgWide = profile ? isOrgWide(profile.roles) : false;
-  const mayManage = profile ? canManage(profile.roles) : false;
+  // super_admin only (grill decision) — LINE notification prefs touch every
+  // profile school-wide, narrower than the department-scoped canManage() most
+  // other admin pages use.
+  const mayManage = profile ? canManageUsers(profile.roles) : false;
   const [pickedDept, setPickedDept] = useState("");
 
   // Org-wide has no home department — default the picker to the first one.
