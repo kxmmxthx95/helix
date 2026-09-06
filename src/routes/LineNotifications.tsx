@@ -28,7 +28,7 @@ import {
   type SchoolSettingsEdit,
 } from "@/hooks/useSettings";
 import { profileFullName } from "@/lib/database.types";
-import { canManageUsers, isOrgWide, roleLabels } from "@/lib/roles";
+import { canManageUsers, roleLabels } from "@/lib/roles";
 
 function LineDigestOrgCard() {
   const toast = useToast();
@@ -102,7 +102,7 @@ function LineDigestOrgCard() {
   );
 }
 
-function LineDigestDeptCard({ departmentId }: { departmentId: string }) {
+function LineDigestDeptCardBody({ departmentId }: { departmentId: string }) {
   const toast = useToast();
   const { data: settings, isLoading } = useDepartmentSettings(departmentId);
   const update = useUpdateDepartmentSettings(departmentId);
@@ -122,61 +122,87 @@ function LineDigestDeptCard({ departmentId }: { departmentId: string }) {
 
   if (isLoading || !form) {
     return (
-      <Card className="space-y-3" role="status" aria-label="กำลังโหลด">
-        <Skeleton className="h-3.5 w-40" />
+      <div className="space-y-3" role="status" aria-label="กำลังโหลด">
         <div className="grid grid-cols-2 gap-3">
           <Skeleton className="h-9 w-full" />
           <Skeleton className="h-9 w-full" />
         </div>
         <Skeleton className="h-9 w-20" />
-      </Card>
+      </div>
     );
   }
 
   return (
+    <form
+      className="space-y-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        update.mutate(form, { onSuccess: () => toast("บันทึกสำเร็จ") });
+      }}
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="สรุปการมาเรียนนักเรียน">
+          <Input
+            type="time"
+            value={form.attendance_digest_time ?? ""}
+            onChange={(e) => setForm({ ...form, attendance_digest_time: e.target.value || null })}
+          />
+        </Field>
+        <Field label="สรุปการเข้างานบุคลากร">
+          <Input
+            type="time"
+            value={form.staff_attendance_digest_time ?? ""}
+            onChange={(e) =>
+              setForm({ ...form, staff_attendance_digest_time: e.target.value || null })
+            }
+          />
+        </Field>
+      </div>
+      <Button type="submit" disabled={update.isPending}>
+        {update.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
+      </Button>
+    </form>
+  );
+}
+
+/** Owns its own department picker — a select per card, not one shared above both digest cards. */
+function LineDigestDeptCard({ departments }: { departments: { id: string; name: string }[] }) {
+  const [departmentId, setDepartmentId] = useState("");
+
+  useEffect(() => {
+    if (!departmentId && departments.length > 0) setDepartmentId(departments[0]!.id);
+  }, [departments, departmentId]);
+
+  return (
     <Card className="space-y-2">
-      <form
-        className="space-y-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          update.mutate(form, { onSuccess: () => toast("บันทึกสำเร็จ") });
-        }}
-      >
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-medium">สรุปสถิติรายวัน (เฉพาะแผนกนี้)</p>
+          <p className="text-sm font-medium">สรุปสถิติรายวัน (รายแผนก)</p>
           <p className="text-xs text-muted-foreground">
             ไม่กำหนดเวลา = ปิดการแจ้งเตือน — ส่งให้ผู้บริหารแผนกเมื่อถึงเวลานี้ (คลาดเคลื่อนได้ถึง 5 นาที)
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="สรุปการมาเรียนนักเรียน">
-            <Input
-              type="time"
-              value={form.attendance_digest_time ?? ""}
-              onChange={(e) => setForm({ ...form, attendance_digest_time: e.target.value || null })}
-            />
-          </Field>
-          <Field label="สรุปการเข้างานบุคลากร">
-            <Input
-              type="time"
-              value={form.staff_attendance_digest_time ?? ""}
-              onChange={(e) =>
-                setForm({ ...form, staff_attendance_digest_time: e.target.value || null })
-              }
-            />
-          </Field>
-        </div>
-        <Button type="submit" disabled={update.isPending}>
-          {update.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
-        </Button>
-      </form>
+        <Select
+          className="w-auto min-w-[10rem] shrink-0"
+          value={departmentId}
+          onChange={(e) => setDepartmentId(e.target.value)}
+          aria-label="แผนก"
+        >
+          {departments.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </Select>
+      </div>
+      {departmentId && <LineDigestDeptCardBody key={departmentId} departmentId={departmentId} />}
     </Card>
   );
 }
 
 const EMPTY_FILTERS: ProfileFilters = { search: "", departmentId: "", role: "", active: "" };
 
-function LineNotificationUsersCard({ orgWide }: { orgWide: boolean }) {
+function LineNotificationUsersCard() {
   const [filters, setFilters] = useState<ProfileFilters>(EMPTY_FILTERS);
   const { data: departments = [] } = useDepartments();
   const { data: rows, isLoading, error } = useProfiles(filters);
@@ -203,20 +229,18 @@ function LineNotificationUsersCard({ orgWide }: { orgWide: boolean }) {
             type="search"
           />
         </div>
-        {orgWide && (
-          <Select
-            className="w-auto min-w-[10rem]"
-            value={filters.departmentId}
-            onChange={(e) => setFilters({ ...filters, departmentId: e.target.value })}
-            placeholder="ทุกแผนก"
-          >
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </Select>
-        )}
+        <Select
+          className="w-auto min-w-[10rem]"
+          value={filters.departmentId}
+          onChange={(e) => setFilters({ ...filters, departmentId: e.target.value })}
+          placeholder="ทุกแผนก"
+        >
+          {departments.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </Select>
       </div>
 
       {isLoading && (
@@ -319,19 +343,11 @@ function LineNotificationUsersCard({ orgWide }: { orgWide: boolean }) {
 export function LineNotifications() {
   const { profile } = useAuth();
   const { data: departments = [] } = useDepartments();
-  const orgWide = profile ? isOrgWide(profile.roles) : false;
   // super_admin only (grill decision) — LINE notification prefs touch every
   // profile school-wide, narrower than the department-scoped canManage() most
-  // other admin pages use.
+  // other admin pages use. super_admin is always org-wide, so every card
+  // here can assume whole-school scope.
   const mayManage = profile ? canManageUsers(profile.roles) : false;
-  const [pickedDept, setPickedDept] = useState("");
-
-  // Org-wide has no home department — default the picker to the first one.
-  useEffect(() => {
-    if (orgWide && !pickedDept && departments.length > 0) setPickedDept(departments[0]!.id);
-  }, [orgWide, departments, pickedDept]);
-
-  const deptSettingsId = orgWide ? pickedDept : profile?.department_id ?? "";
 
   if (!mayManage) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงหน้านี้</Card>;
@@ -339,25 +355,9 @@ export function LineNotifications() {
 
   return (
     <div className="space-y-4">
-      {orgWide && <LineDigestOrgCard />}
-
-      {orgWide && departments.length > 0 && (
-        <Select
-          className="w-auto min-w-[10rem]"
-          value={pickedDept}
-          onChange={(e) => setPickedDept(e.target.value)}
-          aria-label="แผนก"
-        >
-          {departments.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </Select>
-      )}
-      {deptSettingsId && <LineDigestDeptCard key={deptSettingsId} departmentId={deptSettingsId} />}
-
-      <LineNotificationUsersCard orgWide={orgWide} />
+      <LineDigestOrgCard />
+      {departments.length > 0 && <LineDigestDeptCard departments={departments} />}
+      <LineNotificationUsersCard />
     </div>
   );
 }
