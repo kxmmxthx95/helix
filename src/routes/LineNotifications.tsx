@@ -70,12 +70,9 @@ function LineDigestOrgCard() {
           update.mutate(form, { onSuccess: () => toast("บันทึกสำเร็จ") });
         }}
       >
-        <div>
-          <p className="text-sm font-medium">สรุปสถิติรายวัน (ภาพรวมทั้งโรงเรียน)</p>
-          <p className="text-xs text-muted-foreground">
-            ไม่กำหนดเวลา = ปิดการแจ้งเตือน — ส่งให้ผู้บริหารระดับโรงเรียนเมื่อถึงเวลานี้ (คลาดเคลื่อนได้ถึง 5 นาที)
-          </p>
-        </div>
+        <p className="text-xs text-muted-foreground">
+          ไม่กำหนดเวลา = ปิดการแจ้งเตือน — ส่งให้ผู้บริหารระดับโรงเรียนเมื่อถึงเวลานี้ (คลาดเคลื่อนได้ถึง 5 นาที)
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <Field label="สรุปการมาเรียนนักเรียน">
             <Input
@@ -142,12 +139,9 @@ function LineDigestDeptCard({ departmentId }: { departmentId: string }) {
           update.mutate(form, { onSuccess: () => toast("บันทึกสำเร็จ") });
         }}
       >
-        <div>
-          <p className="text-sm font-medium">สรุปสถิติรายวัน (เฉพาะแผนกนี้)</p>
-          <p className="text-xs text-muted-foreground">
-            ไม่กำหนดเวลา = ปิดการแจ้งเตือน — ส่งให้ผู้บริหารแผนกเมื่อถึงเวลานี้ (คลาดเคลื่อนได้ถึง 5 นาที)
-          </p>
-        </div>
+        <p className="text-xs text-muted-foreground">
+          ไม่กำหนดเวลา = ปิดการแจ้งเตือน — ส่งให้ผู้บริหารแผนกเมื่อถึงเวลานี้ (คลาดเคลื่อนได้ถึง 5 นาที)
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <Field label="สรุปการมาเรียนนักเรียน">
             <Input
