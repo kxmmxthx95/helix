@@ -23,7 +23,7 @@ export type SchoolSettingsEdit = Pick<
 export function useUpdateSchoolSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (patch: SchoolSettingsEdit) => {
+    mutationFn: async (patch: Partial<SchoolSettingsEdit>) => {
       const { error } = await supabase.from("school_settings").update(patch).eq("id", 1);
       if (error) throw error;
     },
@@ -90,7 +90,7 @@ export type DepartmentSettingsEdit = Pick<
 export function useUpdateDepartmentSettings(departmentId: string | null) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (patch: DepartmentSettingsEdit) => {
+    mutationFn: async (patch: Partial<DepartmentSettingsEdit>) => {
       if (!departmentId) throw new Error("no department");
       const { error } = await supabase
         .from("department_settings")

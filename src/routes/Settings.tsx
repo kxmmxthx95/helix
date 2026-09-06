@@ -60,7 +60,10 @@ function SchoolSettingsCard() {
   const update = useUpdateSchoolSettings();
   const upload = useUploadLogo();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [form, setForm] = useState<SchoolSettingsEdit | null>(null);
+  const [form, setForm] = useState<Pick<
+    SchoolSettingsEdit,
+    "name_th" | "name_en" | "time_tracking_roles"
+  > | null>(null);
 
   useEffect(() => {
     if (settings) {
@@ -68,8 +71,6 @@ function SchoolSettingsCard() {
         name_th: settings.name_th,
         name_en: settings.name_en,
         time_tracking_roles: settings.time_tracking_roles,
-        attendance_digest_time: settings.attendance_digest_time,
-        staff_attendance_digest_time: settings.staff_attendance_digest_time,
       });
     }
   }, [settings]);
@@ -172,31 +173,6 @@ function SchoolSettingsCard() {
           </div>
         </Card>
 
-        <Card className="space-y-2">
-          <p className="text-sm font-medium">แจ้งเตือน LINE สรุปสถิติรายวัน (ภาพรวมทั้งโรงเรียน)</p>
-          <p className="text-xs text-muted-foreground">
-            ไม่กำหนดเวลา = ปิดการแจ้งเตือน — ส่งให้ผู้บริหารระดับโรงเรียนเมื่อถึงเวลานี้ (คลาดเคลื่อนได้ถึง 5 นาที)
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="สรุปการมาเรียนนักเรียน">
-              <Input
-                type="time"
-                value={form.attendance_digest_time ?? ""}
-                onChange={(e) => setForm({ ...form, attendance_digest_time: e.target.value || null })}
-              />
-            </Field>
-            <Field label="สรุปการเข้างานบุคลากร">
-              <Input
-                type="time"
-                value={form.staff_attendance_digest_time ?? ""}
-                onChange={(e) =>
-                  setForm({ ...form, staff_attendance_digest_time: e.target.value || null })
-                }
-              />
-            </Field>
-          </div>
-        </Card>
-
         <Button type="submit" disabled={update.isPending}>
           {update.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
         </Button>
@@ -209,7 +185,17 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
   const toast = useToast();
   const { data: settings, isLoading } = useDepartmentSettings(departmentId);
   const update = useUpdateDepartmentSettings(departmentId);
-  const [form, setForm] = useState<DepartmentSettingsEdit | null>(null);
+  const [form, setForm] = useState<Pick<
+    DepartmentSettingsEdit,
+    | "score_collect_pct"
+    | "score_exam_pct"
+    | "min_periods_per_week"
+    | "max_periods_per_week"
+    | "work_start_time"
+    | "checkin_lat"
+    | "checkin_lng"
+    | "checkin_radius_m"
+  > | null>(null);
 
   const [locating, setLocating] = useState(false);
 
@@ -224,8 +210,6 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
         checkin_lat: settings.checkin_lat,
         checkin_lng: settings.checkin_lng,
         checkin_radius_m: settings.checkin_radius_m,
-        attendance_digest_time: settings.attendance_digest_time,
-        staff_attendance_digest_time: settings.staff_attendance_digest_time,
       });
     }
   }, [settings]);
@@ -385,31 +369,6 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
           >
             {locating ? <Spinner className="h-3.5 w-3.5" /> : "ใช้ตำแหน่งปัจจุบัน"}
           </Button>
-        </div>
-      </Card>
-
-      <Card className="space-y-2">
-        <p className="text-sm font-medium">แจ้งเตือน LINE สรุปสถิติรายวัน (เฉพาะแผนกนี้)</p>
-        <p className="text-xs text-muted-foreground">
-          ไม่กำหนดเวลา = ปิดการแจ้งเตือน — ส่งให้ผู้บริหารแผนกเมื่อถึงเวลานี้ (คลาดเคลื่อนได้ถึง 5 นาที)
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="สรุปการมาเรียนนักเรียน">
-            <Input
-              type="time"
-              value={form.attendance_digest_time ?? ""}
-              onChange={(e) => setForm({ ...form, attendance_digest_time: e.target.value || null })}
-            />
-          </Field>
-          <Field label="สรุปการเข้างานบุคลากร">
-            <Input
-              type="time"
-              value={form.staff_attendance_digest_time ?? ""}
-              onChange={(e) =>
-                setForm({ ...form, staff_attendance_digest_time: e.target.value || null })
-              }
-            />
-          </Field>
         </div>
       </Card>
 

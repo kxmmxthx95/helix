@@ -28,6 +28,8 @@ export type Profile = {
   national_id: string | null;
   date_of_birth: string | null;
   line_user_id: string | null;
+  /** Off = skip this profile at LINE-notify drain time, even if line_user_id is set. See migration 0067. */
+  line_notifications_enabled: boolean;
   is_active: boolean;
   teacher_code: string | null; // display/reference code — not the login id
   learning_area_id: string | null; // required iff role includes 'teacher', see migration 0017
@@ -1108,6 +1110,7 @@ export type Database = {
           | "national_id"
           | "date_of_birth"
           | "line_user_id"
+          | "line_notifications_enabled"
           | "is_active"
           | "teacher_code"
           | "learning_area_id"
@@ -1132,6 +1135,7 @@ export type Database = {
               | "national_id"
               | "date_of_birth"
               | "line_user_id"
+              | "line_notifications_enabled"
               | "is_active"
               | "teacher_code"
               | "learning_area_id"
@@ -1371,6 +1375,10 @@ export type Database = {
       staff_attendance_status: {
         Args: { p_start: string; p_end: string };
         Returns: StaffAttendanceStatusRow[];
+      };
+      set_line_notifications_enabled: {
+        Args: { p_profile_id: string; p_enabled: boolean };
+        Returns: void;
       };
     };
     Enums: {

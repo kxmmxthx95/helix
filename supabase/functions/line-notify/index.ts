@@ -34,9 +34,17 @@ Deno.serve(async (req) => {
   if (error) return new Response(error.message, { status: 500 });
 
   for (const row of pending ?? []) {
-    const { data: profile } = await admin.from("profiles").select("line_user_id").eq("id", row.profile_id).single();
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("line_user_id, line_notifications_enabled")
+      .eq("id", row.profile_id)
+      .single();
     if (!profile?.line_user_id) {
       await admin.from("line_notifications").update({ status: "error", error: "no line_user_id" }).eq("id", row.id);
+      continue;
+    }
+    if (!profile.line_notifications_enabled) {
+      await admin.from("line_notifications").update({ status: "error", error: "notifications disabled" }).eq("id", row.id);
       continue;
     }
 

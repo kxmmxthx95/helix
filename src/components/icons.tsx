@@ -31,6 +31,7 @@ import LibraryOutline from "react-ionicons/lib/LibraryOutline";
 import IonLogOut from "react-ionicons/lib/LogOut";
 import MenuOutline from "react-ionicons/lib/MenuOutline";
 import IonMoon from "react-ionicons/lib/Moon";
+import NotificationsOutline from "react-ionicons/lib/NotificationsOutline";
 import Options from "react-ionicons/lib/Options";
 import PeopleOutline from "react-ionicons/lib/PeopleOutline";
 import PersonAddOutline from "react-ionicons/lib/PersonAddOutline";
@@ -130,6 +131,7 @@ export const ExpandIcon = wrap(ExpandOutline);
 export const ContractIcon = wrap(ContractOutline);
 export const BriefcaseIcon = wrap(BriefcaseOutline);
 export const ShieldIcon = wrap(ShieldOutline);
+export const NotificationIcon = wrap(NotificationsOutline);
 
 /** No ionicons bold/underline glyph exists — plain monoline SVGs matching the wrap()'d icons' size contract instead. */
 export function BoldIcon({ className, size }: IconProps) {

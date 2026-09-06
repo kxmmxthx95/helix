@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
 // ผูกบัญชี LINE — grill decision, 2026-08-17. The school's Messaging API
@@ -31,3 +31,23 @@ export function useGenerateLinkCode() {
 }
 
 export const LINE_LINK_CODE_TTL_MINUTES = CODE_TTL_MINUTES;
+
+/**
+ * Manager-facing toggle (ตารางแจ้งเตือนไลน์) — goes through
+ * set_line_notifications_enabled (migration 0067) rather than a plain
+ * profiles update, since profiles_manage RLS is super_admin-only and this
+ * needs to work for the whole can_manage() group within their department.
+ */
+export function useSetLineNotificationsEnabled() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ profileId, enabled }: { profileId: string; enabled: boolean }) => {
+      const { error } = await supabase.rpc("set_line_notifications_enabled", {
+        p_profile_id: profileId,
+        p_enabled: enabled,
+      });
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["profiles"] }),
+  });
+}
