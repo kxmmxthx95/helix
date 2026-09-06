@@ -115,17 +115,6 @@ const TABS = [
     teacherOrManagerOnly: false,
   },
   {
-    to: "/line-notifications",
-    label: "แจ้งเตือนไลน์",
-    icon: NotificationIcon,
-    section: "บริหารจัดการ",
-    managerOnly: false,
-    orgWideOnly: false,
-    deptManagerOnly: true,
-    academicManagerOnly: false,
-    teacherOrManagerOnly: false,
-  },
-  {
     to: "/subjects",
     label: "คลังรายวิชา",
     icon: BookIcon,
@@ -365,6 +354,17 @@ const TABS = [
     deptManagerOnly: false,
     academicManagerOnly: false,
     teacherOrManagerOnly: true,
+  },
+  {
+    to: "/line-notifications",
+    label: "แจ้งเตือนไลน์",
+    icon: NotificationIcon,
+    section: "สนับสนุน",
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: true,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: false,
   },
 ];
 
