@@ -590,8 +590,8 @@ function AppShellInner() {
           collapsed ? "w-0" : "w-56",
         )}
       >
-        <div className="flex h-12 shrink-0 items-center gap-2 px-3">
-          <div className="h-8 w-8 shrink-0" aria-hidden />
+        <div className="flex h-12 shrink-0 items-center px-3">
+          <img src="/logo.webp" alt="Helix" className="ml-auto h-6 w-auto dark:invert" />
         </div>
 
         <nav
@@ -827,11 +827,6 @@ function AppShellInner() {
                   {pageTitle}
                 </p>
               )}
-              <img
-                src="/logo.webp"
-                alt="Helix"
-                className="relative z-10 ml-auto h-6 w-auto dark:invert"
-              />
             </header>
             <motion.div
               key={location.pathname}
