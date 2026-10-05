@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { AppShell } from "@/components/AppShell";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -14,6 +14,7 @@ import { ScoreRecording } from "@/routes/ScoreRecording";
 import { Profile } from "@/routes/Profile";
 import { Dashboard } from "@/routes/Dashboard";
 import { Login } from "@/routes/Login";
+import { StudentLogin } from "@/routes/StudentLogin";
 import { Onboarding } from "@/routes/Onboarding";
 import { Classrooms } from "@/routes/Classrooms";
 import { Curriculum } from "@/routes/Curriculum";
@@ -38,6 +39,7 @@ import { Users } from "@/routes/Users";
 
 function Gate() {
   const { session, profile, loading, onboardingStep, onboardingLoading } = useAuth();
+  const location = useLocation();
 
   if (loading || (session && !profile) || (session && onboardingLoading)) {
     return (
@@ -47,7 +49,7 @@ function Gate() {
     );
   }
 
-  if (!session) return <Login />;
+  if (!session) return location.pathname === "/student-login" ? <StudentLogin /> : <Login />;
 
   // Blocks the whole menu until the student's required data is filled in and
   // their password changed — regardless of which path they're on. See

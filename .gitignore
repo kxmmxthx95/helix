@@ -16,3 +16,5 @@ assets-src/
 
 # Supabase CLI local branch state
 supabase/.branches/
+.vercel
+.env*

@@ -265,7 +265,11 @@ export function useDeleteUser() {
   return useMutation({
     mutationFn: async (userId: string) => {
       const { data, error } = await supabase.functions.invoke("delete-user", { body: { userId } });
-      if (error) throw error;
+      if (error) {
+        // non-2xx: supabase-js hides the JSON body behind a generic message
+        const detail = await (error as { context?: Response }).context?.json().catch(() => null);
+        throw new Error(detail?.error ?? error.message);
+      }
       if (data && typeof data === "object" && "error" in data && data.error) {
         throw new Error(String(data.error));
       }

@@ -92,7 +92,7 @@ export function useStudents(filters: StudentFilters) {
 
       const { data, error } = await q;
       if (error) throw error;
-      return data as StudentListItem[];
+      return data as unknown as StudentListItem[];
     },
     placeholderData: (previous) => previous,
   });

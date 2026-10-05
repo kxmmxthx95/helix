@@ -18,6 +18,28 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// Tables that FK to profiles with ON DELETE RESTRICT; any row blocks the delete.
+const BLOCKERS: [table: string, columns: string[], label: string][] = [
+  ["classroom_homeroom_teachers", ["teacher_id"], "ครูประจำชั้น"],
+  ["teaching_assignments", ["teacher_id"], "ภาระการสอน"],
+  ["exam_sessions", ["teacher_id"], "รอบสอบ"],
+  ["exam_questions", ["created_by"], "ข้อสอบ"],
+  ["practice_sets", ["created_by"], "ชุดฝึกหัด"],
+  ["leave_requests", ["profile_id"], "คำขอลา"],
+  ["student_leave_requests", ["submitted_by"], "คำขอลาของนักเรียน"],
+  ["attendance_records", ["recorded_by"], "บันทึกเช็กชื่อ"],
+  ["period_attendance_records", ["recorded_by"], "บันทึกเช็กชื่อรายคาบ"],
+  ["behavior_records", ["recorded_by"], "บันทึกพฤติกรรม"],
+  ["time_clock_records", ["profile_id", "recorded_by"], "บันทึกเวลาเข้า-ออก"],
+  ["premises_exit_requests", ["profile_id"], "คำขอออกนอกสถานที่"],
+  ["employee_status_history", ["changed_by"], "ประวัติสถานะบุคลากร"],
+  ["documents", ["uploaded_by"], "เอกสาร"],
+  ["duty_assignments", ["staff_id", "created_by"], "เวร"],
+  ["duty_transfer_requests", ["requester_id", "target_staff_id"], "คำขอแลกเวร"],
+  ["duty_points", ["fixed_staff_id"], "จุดเวร"],
+  ["duty_weekly_template", ["staff_id", "created_by"], "แม่แบบเวรรายสัปดาห์"],
+];
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -56,7 +78,22 @@ Deno.serve(async (req) => {
 
   const admin = createClient(supabaseUrl, serviceRoleKey);
   const { error } = await admin.auth.admin.deleteUser(userId);
-  if (error) return json({ error: error.message }, 400);
+  if (error) {
+    const found: string[] = [];
+    for (const [table, columns, label] of BLOCKERS) {
+      for (const col of columns) {
+        const { count } = await admin.from(table).select("*", { count: "exact", head: true }).eq(col, userId);
+        if (count) {
+          found.push(`${label} ${count} รายการ`);
+          break;
+        }
+      }
+    }
+    if (found.length > 0) {
+      return json({ error: `ลบไม่ได้ เพราะผู้ใช้ยังมีข้อมูลผูกอยู่: ${found.join(", ")} — ย้ายหรือลบข้อมูลเหล่านี้ก่อน` }, 400);
+    }
+    return json({ error: error.message }, 400);
+  }
 
   return json({ ok: true });
 });

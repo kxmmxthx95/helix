@@ -60,6 +60,7 @@ export function Users() {
   const { data: rows, isLoading, error } = useProfiles(filters);
   const { page, setPage, pageCount, pageRows } = usePagination(rows ?? [], [filters]);
   const deleteUser = useDeleteUser();
+  const toast = useToast();
   const updateUser = useUpdateProfile();
 
   const mayManage = me ? canManageUsers(me.roles) : false;
@@ -266,9 +267,9 @@ export function Users() {
                               )
                             ) {
                               deleteUser.mutate(row.id, {
-                                onError: (err) => {
-                                  alert(err instanceof Error ? err.message : "ลบไม่สำเร็จ");
-                                },
+                                onSuccess: () => toast("ลบผู้ใช้งานสำเร็จ"),
+                                onError: (err) =>
+                                  toast(err instanceof Error ? err.message : "ลบไม่สำเร็จ", "error"),
                               });
                             }
                           }}
@@ -364,9 +365,9 @@ export function Users() {
                               )
                             ) {
                               deleteUser.mutate(row.id, {
-                                onError: (err) => {
-                                  alert(err instanceof Error ? err.message : "ลบไม่สำเร็จ");
-                                },
+                                onSuccess: () => toast("ลบผู้ใช้งานสำเร็จ"),
+                                onError: (err) =>
+                                  toast(err instanceof Error ? err.message : "ลบไม่สำเร็จ", "error"),
                               });
                             }
                           }}
@@ -793,6 +794,7 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
   const { data: departments = [] } = useDepartments();
   const { data: positionTitles = [] } = usePositionTitles();
   const update = useUpdateProfile();
+  const deleteUser = useDeleteUser();
   const [draft, setDraft] = useState<ProfileEdit | null>(null);
   const isStudent = profile?.roles.includes("student") ?? false;
   const { data: linkedStudent } = useStudentByProfile(isStudent ? (profile?.id ?? null) : null);
@@ -828,6 +830,18 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
     close();
   }
 
+  function remove() {
+    if (!profile || profile.id === me?.id) return;
+    if (!confirm(`ลบ "${profileFullName(profile)}" ถาวร? บัญชีเข้าสู่ระบบจะถูกลบด้วย กู้คืนไม่ได้`)) return;
+    deleteUser.mutate(profile.id, {
+      onSuccess: () => {
+        toast("ลบผู้ใช้งานสำเร็จ");
+        close();
+      },
+      onError: (err) => toast(err instanceof Error ? err.message : "ลบไม่สำเร็จ", "error"),
+    });
+  }
+
   function close() {
     setDraft(null);
     onClose();
@@ -839,14 +853,24 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
       onOpenChange={(open) => !open && close()}
       title="แก้ไขผู้ใช้งาน"
       description={profile ? profileFullName(profile) : undefined}
+      headerEnd={
+        <Button size="icon" variant="ghost" aria-label="ปิด" onClick={close}>
+          <X className="h-4 w-4" />
+        </Button>
+      }
       footer={
         profile && current ? (
-          <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={close}>
-              ยกเลิก
-            </Button>
-            <Button className="flex-1" onClick={save}>
+          <div className="space-y-2">
+            <Button className="w-full" onClick={save}>
               บันทึก
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full text-destructive"
+              disabled={profile.id === me?.id || deleteUser.isPending}
+              onClick={remove}
+            >
+              ลบผู้ใช้งาน
             </Button>
           </div>
         ) : undefined
@@ -1022,9 +1046,6 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
     if (draft.loginId.replace(/\D/g, "").length !== 10) e.loginId = "เบอร์โทรต้องเป็นตัวเลข 10 หลัก";
     if (!draft.first_name.trim()) e.first_name = "กรอกชื่อ";
     if (!draft.last_name.trim()) e.last_name = "กรอกนามสกุล";
-    if ((draft.national_id ?? "").replace(/\D/g, "").length !== 13) {
-      e.national_id = "เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก";
-    }
     if (!draft.date_of_birth) e.date_of_birth = "เลือกวันเดือนปีเกิดให้ครบ";
     if (!role) e.role = "เลือกสิทธิ์";
     if (role === "teacher" && !draft.learning_area_id) e.learning_area_id = "เลือกกลุ่มสาระ";
@@ -1087,7 +1108,7 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
 
     const avatarBase64 = avatarFile ? await blobToBase64(await compressImage(avatarFile)) : undefined;
     const phone = draft.loginId.replace(/\D/g, "");
-    const nationalId = (draft.national_id ?? "").replace(/\D/g, "");
+    const nationalId = (draft.national_id ?? "").replace(/\D/g, "") || null;
     const password = draft.password || autoPassword!;
     const outcome = await invite.mutateAsync([
       {
@@ -1182,7 +1203,7 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
           />
         </Field>
 
-        <Field label="เลขบัตรประชาชน (ใช้ยืนยันตอนลืมรหัสผ่าน)" error={errors.national_id} required>
+        <Field label="เลขบัตรประชาชน (ใช้ยืนยันตอนลืมรหัสผ่าน)" error={errors.national_id}>
           <Input
             inputMode="numeric"
             autoComplete="off"
