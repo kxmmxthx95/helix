@@ -78,7 +78,7 @@ export function Character({
           <CharacterArt
             cls={cls ?? "math"}
             prefix={prefix}
-            className={cn("h-48 w-auto drop-shadow-lg", silhouette && "brightness-0 opacity-40")}
+            className={cn("h-[min(19rem,42dvh)] w-auto drop-shadow-lg", silhouette && "brightness-0 opacity-40")}
           />
         </motion.div>
       </motion.div>
