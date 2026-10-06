@@ -93,7 +93,7 @@ export function Character({
 }
 
 export function ClassPicker({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const { myStudent, refreshProfile } = useAuth();
+  const { myStudent, refreshMyStudent } = useAuth();
   const toast = useToast();
   const save = useSetCharacterClass();
   if (!myStudent) return null;
@@ -104,7 +104,7 @@ export function ClassPicker({ open, onOpenChange }: { open: boolean; onOpenChang
       { studentId: myStudent!.id, characterClass },
       {
         onSuccess: async () => {
-          await refreshProfile();
+          await refreshMyStudent();
           onOpenChange(false);
         },
         onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),

@@ -33,6 +33,8 @@ type AuthState = {
   refreshOnboarding: () => Promise<void>;
   /** Re-fetches the profile row (e.g. after an avatar upload) — roles are left untouched. */
   refreshProfile: () => Promise<void>;
+  /** Re-fetches only the student row (e.g. after picking a game career) — unlike refreshOnboarding it doesn't flip the loading gate. */
+  refreshMyStudent: () => Promise<void>;
   /** The signed-in account's real roles — never swapped by viewAsRole, unlike profile.roles. */
   actualRoles: Role[];
   /** Non-null while a super_admin is previewing another role's nav/routes. See VIEW_AS_KEY above. */
@@ -215,6 +217,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const withRoles: ProfileWithRoles = { ...profile, ...p };
         setProfile(withRoles);
         await loadOnboarding(withRoles);
+      },
+      refreshMyStudent: async () => {
+        if (!myStudent) return;
+        const { data } = await supabase.from("students").select("*").eq("id", myStudent.id).maybeSingle();
+        if (data) setMyStudent(data);
       },
       refreshProfile: async () => {
         if (!session || !profile) return;

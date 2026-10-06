@@ -178,8 +178,14 @@ export function useImportStudents() {
 export function useSetCharacterClass() {
   return useMutation({
     mutationFn: async ({ studentId, characterClass }: { studentId: string; characterClass: CharacterClass }) => {
-      const { error } = await supabase.from("students").update({ character_class: characterClass }).eq("id", studentId);
+      const { data, error } = await supabase
+        .from("students")
+        .update({ character_class: characterClass })
+        .eq("id", studentId)
+        .select("id");
       if (error) throw error;
+      // RLS filters silently — 0 rows back means the write never happened.
+      if (!data.length) throw new Error("บันทึกอาชีพไม่สำเร็จ");
     },
   });
 }
