@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { Character, ClassPicker, GameIcon } from "@/components/game/parts";
+import { Character, GameIcon } from "@/components/game/parts";
 import { AirplaneIcon, BookIcon, CalendarIcon, CheckmarkCircleIcon, RibbonIcon, SettingsIcon } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { Avatar } from "@/components/ui";
@@ -11,7 +11,6 @@ import { summarizeAttendance, useAttendanceRange } from "@/hooks/useAttendance";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { STARTING_SCORE, summarizeBehaviorScore, useBehaviorRecords } from "@/hooks/useBehaviorRecords";
 import { profileFullName } from "@/lib/database.types";
-import { CHARACTER_CLASSES, isCharacterClass } from "@/lib/game";
 import {
   AttendanceSummarySection,
   BehaviorScoreSection,
@@ -49,7 +48,6 @@ export function GameHome() {
   const { profile, myStudent } = useAuth();
   const navigate = useNavigate();
   const [panel, setPanel] = useState<Panel | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   const studentId = myStudent?.id ?? null;
   const month = currentMonthRange();
@@ -68,9 +66,6 @@ export function GameHome() {
     const st = assignmentStatus(item, submissions?.get(item.id) ?? null, scores?.has(item.id) ?? false);
     return st === "missing" || st === "late";
   }).length;
-
-  const cls = isCharacterClass(myStudent?.character_class ?? null) ? (myStudent!.character_class as typeof CHARACTER_CLASSES[number]["id"]) : null;
-  const clsLabel = CHARACTER_CLASSES.find((c) => c.id === cls)?.label;
 
   let termPct: number | null = null;
   if (term?.start_date && term.end_date) {
@@ -114,15 +109,10 @@ export function GameHome() {
         </div>
 
         <div className="flex flex-col items-center">
-          <Character cls={cls} prefix={myStudent?.prefix ?? null} onClick={() => !cls && setPickerOpen(true)} />
+          <Character />
           <p className="mt-1 text-lg font-extrabold text-white [text-shadow:0_2px_0_rgb(43_15_58)]">
             {myStudent ? `${myStudent.first_name} ${myStudent.last_name}` : profile ? profileFullName(profile) : ""}
           </p>
-          {clsLabel && (
-            <button type="button" onClick={() => setPickerOpen(true)} className="tappable text-xs font-bold text-white/90 underline">
-              {clsLabel} · เปลี่ยนอาชีพ
-            </button>
-          )}
         </div>
 
         <div className="flex flex-col gap-4 rounded-2xl bg-[#2b0f3a]/40 p-2">
@@ -148,7 +138,6 @@ export function GameHome() {
         {myStudent && profile && panel === "behavior" && <BehaviorScoreSection student={myStudent} />}
         {myStudent && profile && panel === "leave" && <StudentLeaveSection student={myStudent} submittedBy={profile.id} />}
       </Sheet>
-      <ClassPicker open={pickerOpen} onOpenChange={setPickerOpen} />
     </div>
   );
 }

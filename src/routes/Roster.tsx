@@ -36,7 +36,6 @@ import type {
   StudentStatus,
 } from "@/lib/database.types";
 import { canManage, canManageUsers, isOrgWide, STUDENT_PREFIXES } from "@/lib/roles";
-import { studentGender } from "@/lib/game";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 
 const EMPTY: StudentFilters = { search: "", departmentId: "", status: "studying", gradeLevelId: "", classroomId: "" };
@@ -47,6 +46,13 @@ const STATUS_LABEL: Record<StudentStatus, string> = {
   graduated: "จบการศึกษา",
   dropped: "พ้นสภาพ",
 };
+
+/** Derive เพศ from Thai student name title (no separate gender column). */
+function studentGender(prefix: string | null): "ชาย" | "หญิง" | null {
+  if (prefix === "เด็กชาย" || prefix === "นาย") return "ชาย";
+  if (prefix === "เด็กหญิง" || prefix === "นางสาว") return "หญิง";
+  return null;
+}
 
 export const RELATIONSHIP_LABEL: Record<GuardianRelationship, string> = {
   father: "บิดา",
