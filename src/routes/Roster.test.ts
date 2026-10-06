@@ -23,6 +23,7 @@ function student(overrides: Partial<Student>): Student {
     subdistrict: null,
     district: null,
     province: null,
+    character_class: null,
     postal_code: null,
     family_status: null,
     blood_type: null,

@@ -205,6 +205,7 @@ export type Student = {
   chronic_disease: string | null;
   drug_allergy: string | null;
   food_allergy: string | null;
+  character_class: string | null; // game avatar career — see src/lib/game.ts CHARACTER_CLASSES
   created_at: string;
   updated_at: string;
 };
@@ -1177,6 +1178,7 @@ export type Database = {
           | "chronic_disease"
           | "drug_allergy"
           | "food_allergy"
+          | "character_class"
         >
       >;
       guardianships: Table<{ parent_id: string; student_id: string }>;

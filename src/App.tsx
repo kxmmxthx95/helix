@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { AppShell } from "@/components/AppShell";
+import { GameShell } from "@/components/game/GameShell";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ToastProvider } from "@/components/Toast";
 import { Spinner } from "@/components/ui";
@@ -13,6 +14,7 @@ import { Practice } from "@/routes/Practice";
 import { ScoreRecording } from "@/routes/ScoreRecording";
 import { Profile } from "@/routes/Profile";
 import { Dashboard } from "@/routes/Dashboard";
+import { GameHome } from "@/routes/GameHome";
 import { Login } from "@/routes/Login";
 import { StudentLogin } from "@/routes/StudentLogin";
 import { Onboarding } from "@/routes/Onboarding";
@@ -56,10 +58,12 @@ function Gate() {
   // migration 0022 / src/lib/onboarding.ts.
   if (onboardingStep) return <Onboarding step={onboardingStep} />;
 
+  const isStudent = profile?.roles.includes("student") ?? false;
+
   return (
     <Routes>
-      <Route element={<AppShell />}>
-        <Route index element={<Dashboard />} />
+      <Route element={isStudent ? <GameShell /> : <AppShell />}>
+        <Route index element={isStudent ? <GameHome /> : <Dashboard />} />
         <Route path="users" element={<Users />} />
         <Route path="roster" element={<Roster />} />
         <Route path="classrooms" element={<Classrooms />} />

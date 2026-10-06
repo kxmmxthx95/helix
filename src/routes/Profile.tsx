@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
+import { ClassPicker } from "@/components/game/parts";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, BuddhistDateSelect, Card, Field, Input, Spinner } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
@@ -19,7 +20,7 @@ function pickEditable(p: MyProfileEdit): MyProfileEdit {
 }
 
 export function Profile() {
-  const { profile, myStudent, refreshProfile } = useAuth();
+  const { profile, myStudent, refreshProfile, signOut } = useAuth();
   const toast = useToast();
   const { data: departments = [] } = useDepartments();
   const { data: gradeLevels = [] } = useAllGradeLevels();
@@ -29,6 +30,7 @@ export function Profile() {
   const update = useUpdateMyProfile();
 
   const [draft, setDraft] = useState<MyProfileEdit | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   if (!profile) return null;
 
@@ -64,6 +66,19 @@ export function Profile() {
           <p className="text-xs text-muted-foreground">{roleLabels(profile.roles)}</p>
         </div>
       </Card>
+
+      {isStudent && (
+        // Game shell has no sidebar — these live here (+ the ⚙ on the home screen).
+        <Card className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={() => setPickerOpen(true)}>
+            เปลี่ยนอาชีพตัวละคร
+          </Button>
+          <Button variant="outline" className="flex-1" onClick={signOut}>
+            ออกจากระบบ
+          </Button>
+          <ClassPicker open={pickerOpen} onOpenChange={setPickerOpen} />
+        </Card>
+      )}
 
       <Card className="space-y-3">
         <PrefixNameFields

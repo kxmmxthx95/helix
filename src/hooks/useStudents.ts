@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Profile, Student, StudentStatus } from "@/lib/database.types";
+import type { CharacterClass } from "@/lib/game";
 import { supabase } from "@/lib/supabase";
 
 export type StudentFilters = {
@@ -170,5 +171,15 @@ export function useImportStudents() {
       return { inserted: fresh.length, skipped: [...taken] };
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["students"] }),
+  });
+}
+
+/** Student picks their own game avatar career — allowed by students_update_self (0022) since it isn't an admin-locked column. */
+export function useSetCharacterClass() {
+  return useMutation({
+    mutationFn: async ({ studentId, characterClass }: { studentId: string; characterClass: CharacterClass }) => {
+      const { error } = await supabase.from("students").update({ character_class: characterClass }).eq("id", studentId);
+      if (error) throw error;
+    },
   });
 }

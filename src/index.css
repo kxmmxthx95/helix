@@ -57,6 +57,29 @@
     --glass-alpha: 0.72;
   }
 
+  /* Student game skin (GameShell sets this on <html>). Light-only: `.dark` is overridden too. */
+  .theme-game,
+  .dark.theme-game {
+    --background: 330 100% 97%;
+    --foreground: 280 45% 16%;
+    --card: 40 100% 97%;
+    --card-foreground: 280 45% 16%;
+    --primary: 330 85% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 320 60% 92%;
+    --secondary-foreground: 280 45% 16%;
+    --muted: 320 50% 93%;
+    --muted-foreground: 285 25% 38%;
+    --accent: 280 60% 45%;
+    --accent-foreground: 0 0% 100%;
+    --border: 285 40% 30%;
+    --input: 300 35% 70%;
+    --ring: 330 85% 55%;
+    --radius: 1rem;
+    --glass: 40 100% 97%;
+    --glass-alpha: 0.95;
+  }
+
   * {
     @apply border-border;
   }
@@ -128,6 +151,19 @@
 }
 
 @layer components {
+  /* Game skin shapes: chunky outline + bottom "press" shadow on cards and fields. */
+  .theme-game .glass {
+    border-width: 2px;
+    border-radius: 1.25rem;
+    box-shadow: 0 3px 0 hsl(var(--border));
+  }
+  .theme-game input,
+  .theme-game select,
+  .theme-game textarea {
+    border-width: 2px;
+    border-radius: 0.875rem;
+  }
+
   .glass {
     background-color: hsl(var(--glass) / var(--glass-alpha));
     -webkit-backdrop-filter: blur(16px) saturate(180%);

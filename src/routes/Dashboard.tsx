@@ -42,14 +42,14 @@ const LEAVE_STATUS_STYLE: Record<StudentLeaveStatus, string> = {
 const STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent", "leave"];
 const MONTH_LABEL = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric" }).format(new Date());
 
-function currentMonthRange() {
+export function currentMonthRange() {
   const now = new Date();
   const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
   return { start, end };
 }
 
-function currentAcademicYearRange() {
+export function currentAcademicYearRange() {
   const now = new Date();
   return { start: `${now.getFullYear()}-01-01`, end: `${now.getFullYear()}-12-31` };
 }
@@ -187,7 +187,7 @@ function QuickClockSection({ profileId, departmentId }: { profileId: string; dep
 }
 
 /** role="student"/"parent" only — full to-do list + submit flow lives at /assignments. */
-function AssignmentSummarySection({ student }: { student: Student }) {
+export function AssignmentSummarySection({ student }: { student: Student }) {
   const navigate = useNavigate();
   const { data: items = [], isLoading } = useMyAssignments(student.id);
   const { data: scores } = useMyItemScores(student.id);
@@ -226,7 +226,7 @@ function AssignmentSummarySection({ student }: { student: Student }) {
 }
 
 /** role="student"/"parent" only — teacher/admin get the full check-in workspace at /attendance instead. */
-function AttendanceSummarySection({ student }: { student: Student }) {
+export function AttendanceSummarySection({ student }: { student: Student }) {
   const { start, end } = currentMonthRange();
   const { data: records = [], isLoading } = useAttendanceRange({
     studentId: student.id,
@@ -260,7 +260,7 @@ function AttendanceSummarySection({ student }: { student: Student }) {
 }
 
 /** role="student"/"parent" only — teacher/admin get the roster workspace at /behavior instead. */
-function BehaviorScoreSection({ student }: { student: Student }) {
+export function BehaviorScoreSection({ student }: { student: Student }) {
   const { start, end } = currentAcademicYearRange();
   const { data: records = [], isLoading } = useBehaviorRecords({
     studentId: student.id,
@@ -288,7 +288,7 @@ function BehaviorScoreSection({ student }: { student: Student }) {
 }
 
 /** role="student"/"parent" only — teacher/admin approve these at Attendance.tsx's "คำขอลา" view instead. */
-function StudentLeaveSection({ student, submittedBy }: { student: Student; submittedBy: string }) {
+export function StudentLeaveSection({ student, submittedBy }: { student: Student; submittedBy: string }) {
   const toast = useToast();
   const { data: requests = [], isLoading } = useStudentLeaveRequests(student.id);
   const request = useRequestStudentLeave();
