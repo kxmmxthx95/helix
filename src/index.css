@@ -90,6 +90,12 @@
     height: 100%;
   }
 
+  /* The app shells are fixed to the viewport; if iOS Safari leaves a strip below them
+     (toolbar collapse), it should blend with the shell instead of flashing white. */
+  html {
+    @apply bg-muted dark:bg-background;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     /* Latin: Inter · Thai body: Sarabun */

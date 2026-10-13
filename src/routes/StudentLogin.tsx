@@ -55,7 +55,7 @@ export function StudentLogin() {
   }
 
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden overscroll-none bg-[#ffe3ee]">
+    <div className="fixed inset-0 flex flex-col overflow-hidden overscroll-none bg-[#ffe3ee]">
       <img
         src="/student-login-bg.webp"
         alt=""

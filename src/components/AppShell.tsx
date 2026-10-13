@@ -584,7 +584,7 @@ function AppShellInner() {
   return (
     <div
       className={cn(
-        "relative flex h-dvh overflow-hidden overscroll-none max-lg:flex-col max-lg:gap-0 max-lg:p-0 lg:flex-row lg:p-2",
+        "fixed inset-0 flex overflow-hidden overscroll-none max-lg:flex-col max-lg:gap-0 max-lg:p-0 lg:flex-row lg:p-2",
         collapsed ? "lg:gap-0" : "lg:gap-2",
       )}
     >

@@ -57,7 +57,7 @@ function GameShellInner() {
   const title = TABS.find((t) => t.to === location.pathname)?.label ?? TITLES[location.pathname] ?? "";
 
   return (
-    <div className="flex h-dvh justify-center overflow-hidden overscroll-none bg-[#5b2a86]">
+    <div className="fixed inset-0 flex justify-center overflow-hidden overscroll-none bg-[#5b2a86]">
       <div className="relative flex h-full w-full max-w-[430px] flex-col overflow-hidden">
         <img
           src="/game/bg-home.webp"

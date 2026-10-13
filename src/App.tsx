@@ -46,7 +46,7 @@ function Gate() {
 
   if (loading || (session && !profile) || (session && onboardingLoading)) {
     return (
-      <div className="flex h-dvh items-center justify-center">
+      <div className="fixed inset-0 flex items-center justify-center">
         <Spinner className="h-5 w-5 text-muted-foreground" />
       </div>
     );
