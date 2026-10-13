@@ -6,7 +6,15 @@ export function UpdatePrompt() {
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
-  } = useRegisterSW();
+  } = useRegisterSW({
+    // The browser only re-checks sw.js on navigation; installed/long-lived tabs never would.
+    onRegisteredSW(_url, reg) {
+      if (!reg) return;
+      const check = () => void reg.update().catch(() => {});
+      setInterval(check, 30 * 60 * 1000);
+      document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && check());
+    },
+  });
 
   if (!needRefresh) return null;
 
