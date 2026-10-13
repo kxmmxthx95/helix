@@ -31,7 +31,7 @@ import {
   useTransferProgress,
 } from "@/hooks/useTransferIntakes";
 import { profileFullName, type StudentStatus } from "@/lib/database.types";
-import { isOrgWide } from "@/lib/roles";
+import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<StudentStatus, string> = {
@@ -54,15 +54,17 @@ export function StatusManagement() {
   const { profile: me } = useAuth();
   const { data: departments = [] } = useDepartments();
   const orgWide = me ? isOrgWide(me.roles) : false;
+  const mayManage = me ? canManage(me.roles) : false;
 
-  const [pickedDept, setPickedDept] = useState("");
+  // dept_head is locked to their own department (RLS enforces it too).
+  const [pickedDept, setPickedDept] = useState(orgWide ? "" : (me?.department_id ?? ""));
   const [subTab, setSubTab] = useState<SubTab | "">("");
   const [pickedGrade, setPickedGrade] = useState("");
   const { data: gradeLevels = [] } = useGradeLevels(pickedDept || null);
 
   useEffect(() => setPickedGrade(""), [pickedDept, subTab]);
 
-  if (!me || !orgWide) {
+  if (!me || !mayManage) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
   }
 
@@ -77,11 +79,13 @@ export function StatusManagement() {
             aria-label="แผนก"
             placeholder="เลือกแผนก"
           >
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
+            {departments
+              .filter((d) => orgWide || d.id === me.department_id)
+              .map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
           </Select>
         )}
 
