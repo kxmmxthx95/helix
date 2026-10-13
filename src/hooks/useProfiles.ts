@@ -148,7 +148,28 @@ export function useUpdateProfile() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, roles, positionTitleIds, ...patch }: ProfileEdit & { id: string }) => {
+    mutationFn: async ({
+      id,
+      roles,
+      positionTitleIds,
+      originalPhone,
+      phone,
+      ...patch
+    }: ProfileEdit & { id: string; originalPhone?: string | null }) => {
+      // Staff phone is the login id, so it goes through an Edge Function that also updates auth.
+      if (originalPhone !== undefined && (phone || null) !== (originalPhone || null)) {
+        const { data, error } = await supabase.functions.invoke("update-user-phone", {
+          body: { userId: id, phone },
+        });
+        if (error) {
+          const detail = await (error as { context?: Response }).context?.json().catch(() => null);
+          throw new Error(detail?.error ?? error.message);
+        }
+        if (data && typeof data === "object" && "error" in data && data.error) {
+          throw new Error(String(data.error));
+        }
+      }
+
       const { error: profileError } = await supabase.from("profiles").update(patch).eq("id", id);
       if (profileError) throw profileError;
 

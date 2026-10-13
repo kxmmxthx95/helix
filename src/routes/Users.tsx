@@ -2,7 +2,6 @@ import {
   CalendarIcon,
   CallIcon,
   CameraIcon,
-  LocationIcon,
   Plus,
   ProfileIcon,
   Search,
@@ -53,7 +52,7 @@ import { profileFullName } from "@/lib/database.types";
 import { blobToBase64, compressImage } from "@/lib/image";
 import { passwordFromDob } from "@/lib/password";
 import { canManageUsers, isOrgWide, PREFIXES, ROLE_LABEL, ROLES, STUDENT_PREFIXES, roleLabels, type Role } from "@/lib/roles";
-import { AddressInputs, pickAddress } from "@/routes/Roster";
+import { pickAddress } from "@/routes/Roster";
 
 const EMPTY: ProfileFilters = { search: "", departmentId: "", role: "", active: "" };
 
@@ -895,7 +894,7 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
   function save() {
     if (!profile || !current) return;
     update.mutate(
-      { id: profile.id, ...current },
+      { id: profile.id, originalPhone: profile.phone, ...current },
       {
         onSuccess: () => toast("บันทึกข้อมูลผู้ใช้งานสำเร็จ"),
         onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
@@ -927,22 +926,15 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
       onOpenChange={(open) => !open && close()}
       title="แก้ไขผู้ใช้งาน"
       description={profile ? profileFullName(profile) : undefined}
-      headerEnd={
-        <CloseButton onClick={close} />
-      }
+      headerEnd={<CloseButton onClick={close} />}
       footer={
         profile && current ? (
-          <div className="space-y-2">
-            <Button className="w-full" onClick={save}>
-              บันทึก
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={close}>
+              ยกเลิก
             </Button>
-            <Button
-              variant="outline"
-              className="w-full text-destructive"
-              disabled={profile.id === me?.id || deleteUser.isPending}
-              onClick={remove}
-            >
-              ลบผู้ใช้งาน
+            <Button className="flex-1" onClick={save}>
+              บันทึก
             </Button>
           </div>
         ) : undefined
@@ -963,16 +955,20 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
           </FormSection>
 
           <FormSection icon={<CallIcon className="h-4 w-4" />} title="ข้อมูลติดต่อ" description="ใช้สำหรับติดต่อและยืนยันตัวตน">
-            <Field label="อีเมล (ข้อมูลติดต่อ ไม่ใช่รหัสเข้าระบบ)">
+            <Field label="เบอร์โทร (รหัสผู้ใช้)">
               <Input
-                type="email"
-                value={current.email ?? ""}
-                onChange={(e) => setDraft({ ...current, email: e.target.value || null })}
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                value={current.phone ?? ""}
+                onChange={(e) =>
+                  setDraft({ ...current, phone: e.target.value.replace(/\D/g, "").slice(0, 10) || null })
+                }
+                maxLength={10}
               />
-            </Field>
-
-            <Field label="เบอร์โทร (รหัสผู้ใช้เข้าระบบ — แก้ที่นี่ไม่ได้)">
-              <Input type="tel" value={current.phone ?? ""} disabled readOnly />
+              {!isStudent && (
+                <p className="mt-1.5 text-xs text-muted-foreground">เปลี่ยนเบอร์ = เปลี่ยนรหัสเข้าระบบด้วย</p>
+              )}
             </Field>
 
             {isStudent && (
@@ -981,7 +977,15 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
               </Field>
             )}
 
-            <Field label="เลขบัตรประชาชน">
+            <Field label="อีเมล (ไม่บังคับ)">
+              <Input
+                type="email"
+                value={current.email ?? ""}
+                onChange={(e) => setDraft({ ...current, email: e.target.value || null })}
+              />
+            </Field>
+
+            <Field label="เลขบัตรประชาชน (ใช้ยืนยันตอนลืมรหัสผ่าน)">
               <Input
                 inputMode="numeric"
                 autoComplete="off"
@@ -1001,17 +1005,13 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
           </FormSection>
 
           <FormSection icon={<CalendarIcon className="h-4 w-4" />} title="วันเดือนปีเกิด">
-            <Field label="วันเดือนปีเกิด">
+            <Field label="วัน / เดือน / ปี (พ.ศ.)" required>
               <BuddhistDateSelect
                 key={profile?.id}
                 value={current.date_of_birth ?? ""}
                 onChange={(v) => setDraft({ ...current, date_of_birth: v || null })}
               />
             </Field>
-          </FormSection>
-
-          <FormSection icon={<LocationIcon className="h-4 w-4" />} title="ที่อยู่">
-            <AddressInputs value={current} onChange={(patch) => setDraft({ ...current, ...patch })} />
           </FormSection>
 
           <FormSection icon={<ShieldIcon className="h-4 w-4" />} title="สิทธิ์และบัญชี">
@@ -1056,6 +1056,22 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
                 label="เปิดใช้งานบัญชี"
               />
             </div>
+          </FormSection>
+
+          <FormSection
+            icon={<TrashIcon className="h-4 w-4" />}
+            title="ลบผู้ใช้งาน"
+            description="ลบถาวร บัญชีเข้าสู่ระบบจะถูกลบด้วย กู้คืนไม่ได้"
+          >
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full text-destructive"
+              disabled={profile.id === me?.id || deleteUser.isPending}
+              onClick={remove}
+            >
+              ลบผู้ใช้งาน
+            </Button>
           </FormSection>
         </div>
       )}
