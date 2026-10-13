@@ -828,6 +828,35 @@ export type DocFile = {
   created_at: string;
 };
 
+export type DocTaskType = "lesson_plan" | "worksheet" | "exam" | "media" | "other";
+
+/** งานเอกสาร — due-dated submission request; null department/learning area = no filter on that axis. See migration 0072. */
+export type DocTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  doc_type: DocTaskType;
+  due_date: string; // YYYY-MM-DD
+  department_id: string | null;
+  learning_area_id: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** A teacher's file submitted against a DocTask (private 'subject-documents' bucket, `tasks/...` path). */
+export type DocTaskFile = {
+  id: string;
+  task_id: string;
+  teacher_id: string;
+  title: string;
+  file_path: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: string;
+};
+
 /** A set of bank questions to practice — either curated by a teacher (visible to every classroom currently studying the subject) or a student's own self-serve random pull. Every PracticeAttempt points at one of these either way. */
 export type PracticeSet = {
   id: string;
@@ -1383,6 +1412,8 @@ export type Database = {
       doc_lessons: Table<DocLesson, InsertOf<DocLesson, "sort_order" | "created_at" | "updated_at">>;
       doc_topics: Table<DocTopic, InsertOf<DocTopic, "sort_order" | "created_at" | "updated_at">>;
       doc_files: Table<DocFile, InsertOf<DocFile, "description">>;
+      doc_tasks: Table<DocTask, InsertOf<DocTask, "description" | "department_id" | "learning_area_id">>;
+      doc_task_files: Table<DocTaskFile, InsertOf<DocTaskFile, never>>;
       practice_lessons: Table<PracticeLesson, InsertOf<PracticeLesson, "sort_order" | "created_at" | "updated_at">>;
       practice_topics: Table<PracticeTopic, InsertOf<PracticeTopic, "sort_order" | "created_at" | "updated_at">>;
       practice_sets: Table<PracticeSet, InsertOf<PracticeSet, "title" | "topic_id" | "topic" | "difficulty">>;
