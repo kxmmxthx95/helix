@@ -6,8 +6,6 @@ import {
   BarChartIcon,
   BookIcon,
   CheckmarkCircleIcon,
-  ChevronBack,
-  ChevronForward,
   DownloadIcon,
   HelpCircleIcon,
   ListIcon,
@@ -17,9 +15,10 @@ import {
 } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, EmptyState, Field, Input, Pagination, Select, Spinner } from "@/components/ui";
 import { useLearningAreas } from "@/hooks/useCurriculum";
 import { useAllGradeLevels, useDocCoverage, useSaveDocTargets, type CoverageRow } from "@/hooks/useDocuments";
+import { usePagination } from "@/hooks/usePagination";
 import { useDepartments, useProfiles } from "@/hooks/useProfiles";
 import { profileFullName, type SubjectType } from "@/lib/database.types";
 import { coverageCsv, coverageStats, type CoverageStatus } from "@/lib/docCoverage";
@@ -41,7 +40,6 @@ export const SUBJECT_TYPES: { value: SubjectType; label: string }[] = [
   { value: "activity", label: "กิจกรรม" },
 ];
 
-const PAGE_SIZES = [10, 20, 50];
 /** Select value for "ทั้งหมด" — distinct from "" (nothing picked yet) so the select shows the word instead of its placeholder. */
 const ALL = "all";
 
@@ -125,8 +123,6 @@ export function DocCoverageTab() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("");
   const [view, setView] = useState<"list" | "grid">("list");
-  const [pageSize, setPageSize] = useState(10);
-  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null); // expanded row
   const [menu, setMenu] = useState<string | null>(null); // ⋯ menu row
@@ -158,16 +154,8 @@ export function DocCoverageTab() {
   const shown = scoped
     .filter((r) => !filter || stats.get(r.key)!.status === filter)
     .sort((a, b) => a.code.localeCompare(b.code, "th") || a.gradeSort - b.gradeSort);
-  const pageCount = Math.max(1, Math.ceil(shown.length / pageSize));
-  const cur = Math.min(page, pageCount);
-  const pageRows = shown.slice((cur - 1) * pageSize, cur * pageSize);
-  const from = shown.length ? (cur - 1) * pageSize + 1 : 0;
-  const to = Math.min(cur * pageSize, shown.length);
+  const { page, setPage, pageCount, pageRows } = usePagination(shown, [gradeId, areaId, type, search, filter, deptPick]);
 
-  const set = <T,>(fn: (v: T) => void) => (v: T) => {
-    fn(v);
-    setPage(1);
-  };
 
   const pageKeys = pageRows.map((r) => r.key);
   const allOnPage = pageKeys.length > 0 && pageKeys.every((k) => selected.has(k));
@@ -225,30 +213,30 @@ export function DocCoverageTab() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-56 flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-8" value={search} onChange={(e) => set(setSearch)(e.target.value)} placeholder="ค้นหารหัสวิชา ชื่อวิชา หรือคำสำคัญ..." aria-label="ค้นหา" />
+          <Input className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ค้นหารหัสวิชา ชื่อวิชา หรือคำสำคัญ..." aria-label="ค้นหา" />
         </div>
         <div className={cn("grid min-w-0 flex-[2] grid-cols-2 gap-3", canPickDept ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
           {canPickDept && (
-            <Select aria-label="แผนก" placeholder="เลือกแผนก" value={deptPick} onChange={(e) => { set(setDeptPick)(e.target.value); setGradeId(""); }}>
+            <Select aria-label="แผนก" placeholder="เลือกแผนก" value={deptPick} onChange={(e) => { setDeptPick(e.target.value); setGradeId(""); }}>
               <option value={ALL}>ทั้งหมด</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </Select>
           )}
-          <Select aria-label="ระดับชั้น" placeholder="เลือกระดับชั้น" value={gradeId} onChange={(e) => set(setGradeId)(e.target.value)}>
+          <Select aria-label="ระดับชั้น" placeholder="เลือกระดับชั้น" value={gradeId} onChange={(e) => setGradeId(e.target.value)}>
             <option value={ALL}>ทั้งหมด</option>
             {grades.filter((g) => !deptId || g.department_id === deptId).map((g) => (
               <option key={g.id} value={g.id}>{g.name}</option>
             ))}
           </Select>
-          <Select aria-label="กลุ่มสาระ" placeholder="เลือกกลุ่มสาระ" value={areaId} onChange={(e) => set(setAreaId)(e.target.value)}>
+          <Select aria-label="กลุ่มสาระ" placeholder="เลือกกลุ่มสาระ" value={areaId} onChange={(e) => setAreaId(e.target.value)}>
             <option value={ALL}>ทั้งหมด</option>
             {areas.map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </Select>
-          <Select aria-label="ประเภทวิชา" placeholder="เลือกประเภทวิชา" value={type} onChange={(e) => set(setType)(e.target.value)}>
+          <Select aria-label="ประเภทวิชา" placeholder="เลือกประเภทวิชา" value={type} onChange={(e) => setType(e.target.value)}>
             <option value={ALL}>ทั้งหมด</option>
             {SUBJECT_TYPES.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
@@ -280,10 +268,10 @@ export function DocCoverageTab() {
       </div>
 
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <StatCard tone="accent" icon={<BookIcon className="h-6 w-6" />} label="ทั้งหมด" value={scoped.length} active={filter === ""} onClick={() => set(setFilter)("")} />
-        <StatCard tone="success" icon={<CheckmarkCircleIcon className="h-6 w-6" />} label="ครบถ้วน" value={counts.complete} percent={pct(counts.complete)} active={filter === "complete"} onClick={() => set(setFilter)("complete")} />
-        <StatCard tone="warning" icon={<TimeIcon className="h-6 w-6" />} label="ยังไม่ครบ" value={counts.partial} percent={pct(counts.partial)} active={filter === "partial"} onClick={() => set(setFilter)("partial")} />
-        <StatCard tone="destructive" icon={<AlertTriangle className="h-6 w-6" />} label="ยังไม่บันทึก" value={counts.empty} percent={pct(counts.empty)} active={filter === "empty"} onClick={() => set(setFilter)("empty")} />
+        <StatCard tone="accent" icon={<BookIcon className="h-6 w-6" />} label="ทั้งหมด" value={scoped.length} active={filter === ""} onClick={() => setFilter("")} />
+        <StatCard tone="success" icon={<CheckmarkCircleIcon className="h-6 w-6" />} label="ครบถ้วน" value={counts.complete} percent={pct(counts.complete)} active={filter === "complete"} onClick={() => setFilter("complete")} />
+        <StatCard tone="warning" icon={<TimeIcon className="h-6 w-6" />} label="ยังไม่ครบ" value={counts.partial} percent={pct(counts.partial)} active={filter === "partial"} onClick={() => setFilter("partial")} />
+        <StatCard tone="destructive" icon={<AlertTriangle className="h-6 w-6" />} label="ยังไม่บันทึก" value={counts.empty} percent={pct(counts.empty)} active={filter === "empty"} onClick={() => setFilter("empty")} />
       </div>
 
       {selected.size > 0 && (
@@ -402,48 +390,11 @@ export function DocCoverageTab() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>แสดง {from} - {to} จาก {shown.length.toLocaleString("th-TH")} รายการ</span>
-        <div className="flex items-center gap-4">
-          <Pager page={cur} pageCount={pageCount} onChange={setPage} />
-          <label className="flex items-center gap-2">
-            จำนวนต่อหน้า
-            <Select className="w-auto min-w-16" value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}>
-              {PAGE_SIZES.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </Select>
-          </label>
-        </div>
-      </div>
+      <Pagination page={page} pageCount={pageCount} onChange={setPage} />
 
       <TargetSheet rows={targetFor} onClose={() => setTargetFor(null)} onSaved={() => setSelected(new Set())} />
       <GradeSummarySheet open={summaryOpen} onClose={() => setSummaryOpen(false)} rows={scoped} />
     </div>
-  );
-}
-
-/** 1 2 3 … N with the current page's neighbours — collapses the middle on long lists. */
-function Pager({ page, pageCount, onChange }: { page: number; pageCount: number; onChange: (p: number) => void }) {
-  const pages = [...new Set([1, 2, page - 1, page, page + 1, pageCount - 1, pageCount])].filter((p) => p >= 1 && p <= pageCount).sort((a, b) => a - b);
-  const btn = "flex h-8 min-w-8 items-center justify-center rounded-lg border border-border px-2 text-xs disabled:pointer-events-none disabled:opacity-40";
-  return (
-    <nav aria-label="หน้า" className="flex items-center gap-1">
-      <button type="button" aria-label="ก่อนหน้า" className={btn} disabled={page <= 1} onClick={() => onChange(page - 1)}>
-        <ChevronBack className="h-3.5 w-3.5" />
-      </button>
-      {pages.map((p, i) => (
-        <Fragment key={p}>
-          {i > 0 && p - pages[i - 1]! > 1 && <span className="px-1">...</span>}
-          <button type="button" aria-current={p === page ? "page" : undefined} className={cn(btn, p === page ? "border-foreground bg-foreground text-background" : "hover:bg-muted")} onClick={() => onChange(p)}>
-            {p}
-          </button>
-        </Fragment>
-      ))}
-      <button type="button" aria-label="ถัดไป" className={btn} disabled={page >= pageCount} onClick={() => onChange(page + 1)}>
-        <ChevronForward className="h-3.5 w-3.5" />
-      </button>
-    </nav>
   );
 }
 
