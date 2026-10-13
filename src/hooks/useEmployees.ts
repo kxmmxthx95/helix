@@ -315,3 +315,22 @@ export function useSalaryGradeCounts() {
     },
   });
 }
+
+/** Employees (profiles with an employee_positions row) in one department — the department settings header stat. */
+export function useDepartmentHeadcount(departmentId: string | null) {
+  return useQuery({
+    queryKey: ["employees", "headcount", departmentId],
+    enabled: !!departmentId,
+    queryFn: async (): Promise<number> => {
+      const { data: profiles, error } = await supabase.from("profiles").select("id").eq("department_id", departmentId!);
+      if (error) throw error;
+      if (profiles.length === 0) return 0;
+      const { count, error: posErr } = await supabase
+        .from("employee_positions")
+        .select("profile_id", { count: "exact", head: true })
+        .in("profile_id", profiles.map((p) => p.id));
+      if (posErr) throw posErr;
+      return count ?? 0;
+    },
+  });
+}
