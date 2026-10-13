@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import {
   AppsIcon,
+  BarChartIcon,
   BookIcon,
   ChevronForward,
+  ClipboardIcon,
   DocumentTextIcon,
   LibraryIcon,
   ListIcon,
@@ -48,6 +50,7 @@ import type { DocFile, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
+import { DocProgressTab, MyDocTasksTab } from "@/routes/DocProgress";
 import { EditableName, NewNameInput } from "@/routes/Practice";
 
 // เอกสาร — วิชา -> ระดับชั้น -> เนื้อหาหลัก -> เนื้อหาย่อย -> ไฟล์.
@@ -79,7 +82,44 @@ function TeacherDocuments() {
     },
     { enabled: isManager },
   );
-  return <DocBrowser subjects={isManager ? managerSubjects : teacherSubjects} canEdit showDepartments={isManager && orgWide} />;
+  const browser = <DocBrowser subjects={isManager ? managerSubjects : teacherSubjects} canEdit showDepartments={isManager && orgWide} />;
+
+  // งานเอกสาร tabs: reviewers (super_admin / director / dept_head) track progress, teachers answer their tasks.
+  const tabs = [
+    ...(me!.roles.some((r) => r === "super_admin" || r === "director" || r === "dept_head")
+      ? [{ id: "progress", label: "ติดตามความคืบหน้า", icon: BarChartIcon }]
+      : []),
+    { id: "docs", label: "เอกสารการสอน", icon: DocumentTextIcon },
+    ...(me!.roles.includes("teacher") ? [{ id: "mine", label: "งานของฉัน", icon: ClipboardIcon }] : []),
+  ];
+  // First tab is the landing one: progress overview for reviewers, documents list for everyone else.
+  const [tab, setTab] = useState(tabs[0]!.id);
+  if (tabs.length === 1) return browser;
+  return (
+    <div className="space-y-4">
+      <div role="tablist" aria-label="หมวดเอกสาร" className="flex w-full flex-wrap border-b border-border">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={cn(
+              "-mb-px flex flex-1 items-center justify-center gap-2 border-b-2 px-3.5 py-2.5 text-xs font-medium",
+              tab === t.id
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <t.icon className="h-4 w-4" />
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === "progress" ? <DocProgressTab /> : tab === "mine" ? <MyDocTasksTab /> : browser}
+    </div>
+  );
 }
 
 function StudentDocuments() {
