@@ -885,7 +885,7 @@ function formatShortDate(iso: string) {
 }
 
 /** Small "+ ชื่อ..." inline add row shared by the lesson table and each topic table. */
-function NewNameInput({
+export function NewNameInput({
   placeholder,
   onAdd,
 }: {
@@ -921,7 +921,7 @@ function NewNameInput({
 }
 
 /** Click-to-edit name — swaps to an Input on click, saves on blur/Enter. Used for both lesson and topic rename. */
-function EditableName({
+export function EditableName({
   value,
   onSave,
 }: {

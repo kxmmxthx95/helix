@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { Character, GameIcon } from "@/components/game/parts";
-import { AirplaneIcon, BookIcon, CalendarIcon, CheckmarkCircleIcon, RibbonIcon, SettingsIcon } from "@/components/icons";
+import { AirplaneIcon, BookIcon, CalendarIcon, CheckmarkCircleIcon, DocumentTextIcon, RibbonIcon, SettingsIcon } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { Avatar } from "@/components/ui";
 import { useActiveTerm } from "@/hooks/useAcademicTerms";
@@ -30,6 +30,7 @@ const SIDE_LEFT = [
 const SIDE_RIGHT = [
   { to: "/academic-events", name: "nav-calendar", label: "ปฏิทิน", icon: CalendarIcon },
   { to: "/practice", name: "nav-practice", label: "แบบฝึกหัด", icon: BookIcon },
+  { to: "/documents", name: "nav-documents", label: "เอกสาร", icon: DocumentTextIcon },
 ] as const;
 
 const sideBtn =

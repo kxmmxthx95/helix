@@ -793,6 +793,41 @@ export type PracticeTopic = {
   updated_at: string;
 };
 
+/** เอกสาร — บทเรียนหลัก under (subject, grade level). Own catalog, separate from practice_lessons. See migration 0071. */
+export type DocLesson = {
+  id: string;
+  subject_id: string;
+  grade_level_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** เอกสาร — เนื้อหาย่อย under a DocLesson. See migration 0071. */
+export type DocTopic = {
+  id: string;
+  lesson_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** One uploaded file under a DocTopic; the object lives in the private 'subject-documents' bucket. See migration 0071. */
+export type DocFile = {
+  id: string;
+  topic_id: string;
+  title: string;
+  description: string | null;
+  file_path: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  uploaded_by: string;
+  created_at: string;
+};
+
 /** A set of bank questions to practice — either curated by a teacher (visible to every classroom currently studying the subject) or a student's own self-serve random pull. Every PracticeAttempt points at one of these either way. */
 export type PracticeSet = {
   id: string;
@@ -1345,6 +1380,9 @@ export type Database = {
         InsertOf<ExamAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
       >;
       exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
+      doc_lessons: Table<DocLesson, InsertOf<DocLesson, "sort_order" | "created_at" | "updated_at">>;
+      doc_topics: Table<DocTopic, InsertOf<DocTopic, "sort_order" | "created_at" | "updated_at">>;
+      doc_files: Table<DocFile, InsertOf<DocFile, "description">>;
       practice_lessons: Table<PracticeLesson, InsertOf<PracticeLesson, "sort_order" | "created_at" | "updated_at">>;
       practice_topics: Table<PracticeTopic, InsertOf<PracticeTopic, "sort_order" | "created_at" | "updated_at">>;
       practice_sets: Table<PracticeSet, InsertOf<PracticeSet, "title" | "topic_id" | "topic" | "difficulty">>;
