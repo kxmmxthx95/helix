@@ -5,7 +5,6 @@ import {
   ChevronForward,
   DocumentTextIcon,
   EyeIcon,
-  Plus,
   Search,
   TimeIcon,
   Upload,
@@ -17,7 +16,6 @@ import { Avatar, Button, EmptyState, Field, Input, Pagination, Select, Spinner }
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useLearningAreas } from "@/hooks/useCurriculum";
 import {
-  useCreateDocTask,
   useDeleteDocTaskFile,
   useDocTaskFiles,
   useDocTasks,
@@ -408,114 +406,6 @@ function TeacherTasksSheet({
   );
 }
 
-function CreateTaskSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { profile: me } = useAuth();
-  const toast = useToast();
-  const orgWide = me!.roles.includes("super_admin") || me!.roles.includes("director");
-  const { data: departments = [] } = useDepartments();
-  const { data: areas = [] } = useLearningAreas();
-  const create = useCreateDocTask();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [docType, setDocType] = useState<DocTaskType>("lesson_plan");
-  const [due, setDue] = useState("");
-  const [deptId, setDeptId] = useState("");
-  const [areaId, setAreaId] = useState("");
-
-  function close() {
-    setTitle("");
-    setDescription("");
-    setDue("");
-    setDeptId("");
-    setAreaId("");
-    onClose();
-  }
-
-  const canSubmit = title.trim() && due && !create.isPending;
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!canSubmit) return;
-    create.mutate(
-      {
-        title: title.trim(),
-        description: description.trim() || null,
-        doc_type: docType,
-        due_date: due,
-        // dept_head tasks are always pinned to their own department (RLS requires it)
-        department_id: orgWide ? deptId || null : me!.department_id,
-        learning_area_id: areaId || null,
-        created_by: me!.id,
-      },
-      {
-        onSuccess: () => {
-          toast("สร้างงานเอกสารแล้ว");
-          close();
-        },
-        onError: () => toast("สร้างงานไม่สำเร็จ", "error"),
-      },
-    );
-  }
-
-  return (
-    <Sheet
-      open={open}
-      onOpenChange={(o) => !o && close()}
-      title="สร้างงานเอกสาร"
-      description="มอบหมายให้ครูส่งเอกสารภายในวันที่กำหนด"
-      footer={
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" className="flex-1" onClick={close}>ยกเลิก</Button>
-          <Button type="submit" form="create-doc-task" className="flex-1" disabled={!canSubmit}>
-            {create.isPending ? <Spinner /> : "สร้างงาน"}
-          </Button>
-        </div>
-      }
-    >
-      <form id="create-doc-task" onSubmit={submit} className="space-y-4">
-        <Field label="ชื่องาน" required>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="ประเภทเอกสาร" required>
-            <Select value={docType} onChange={(e) => setDocType(e.target.value as DocTaskType)}>
-              {DOC_TASK_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="วันครบกำหนด" required>
-            <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
-          </Field>
-        </div>
-        <Field label="รายละเอียด (ไม่บังคับ)">
-          <Input value={description} onChange={(e) => setDescription(e.target.value)} />
-        </Field>
-        <Field label="มอบหมายให้">
-          <div className="space-y-2">
-            {orgWide ? (
-              <Select value={deptId} onChange={(e) => setDeptId(e.target.value)} aria-label="แผนก">
-                <option value="">ทุกแผนก</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </Select>
-            ) : (
-              <p className="text-xs text-muted-foreground">ครูในแผนกของคุณ</p>
-            )}
-            <Select value={areaId} onChange={(e) => setAreaId(e.target.value)} aria-label="กลุ่มสาระ">
-              <option value="">ทุกกลุ่มสาระ</option>
-              {areas.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </Select>
-          </div>
-        </Field>
-      </form>
-    </Sheet>
-  );
-}
-
 // ------------------------------------------------------------- teacher view
 
 const typeColor = (t: DocTaskType) => TYPE_COLORS[DOC_TASK_TYPES.findIndex((x) => x.value === t)] ?? "#94a3b8";
@@ -817,7 +707,6 @@ export function ReviewDocsTab() {
   // Manual expand/collapse per task; no entry = default (open when the card has files waiting for review).
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [reviewingId, setReviewingId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
 
   const taskById = new Map(tasks.map((t) => [t.id, t]));
   const teacherById = new Map(teachers.map((t) => [t.id, t]));
@@ -900,9 +789,6 @@ export function ReviewDocsTab() {
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ค้นหางาน ครู หรือเอกสาร..." aria-label="ค้นหา" />
           </div>
-          <Button size="icon" aria-label="สร้างงานเอกสาร" onClick={() => setCreating(true)}>
-            <Plus className="h-3 w-3" />
-          </Button>
         </div>
       </div>
 
@@ -1018,7 +904,6 @@ export function ReviewDocsTab() {
         </div>
       )}
 
-      <CreateTaskSheet open={creating} onClose={() => setCreating(false)} />
       <ReviewSheet file={reviewing} task={reviewing ? taskById.get(reviewing.task_id) ?? null : null} teacher={reviewing ? teacherById.get(reviewing.teacher_id) ?? null : null} onClose={() => setReviewingId(null)} />
     </div>
   );
