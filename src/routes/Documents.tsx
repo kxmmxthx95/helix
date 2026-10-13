@@ -526,28 +526,10 @@ function SubjectDocs({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-pink-200/60 bg-gradient-to-r from-pink-100 via-pink-50 to-purple-100 p-5 dark:border-pink-400/20 dark:from-pink-500/15 dark:via-pink-500/5 dark:to-purple-500/15">
-        <div className="flex items-start gap-4">
-          <div className={cn("flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl", subjectTint(subject.id))}>
-            <BookIcon className="h-8 w-8" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold">{subject.name_th}</h1>
-            <p className="mt-1 text-xs text-muted-foreground">
-              รหัสวิชา {subject.code}
-              {grade && ` | ระดับชั้น ${gradeShortLabel(grade.code)}`}
-            </p>
-            <p className="mt-2 max-w-xl text-xs text-muted-foreground">
-              เอกสารการสอน สื่อประกอบการเรียน ใบงาน แบบฝึกหัด และสรุปเนื้อหา สำหรับรายวิชา{subject.name_th}
-              {grade && ` ระดับชั้น${grade.name}`}
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3">
-          <Stat icon={DocumentTextIcon} value={totalFiles} label="เอกสารทั้งหมด" />
-          <Stat icon={LibraryIcon} value={tree.length} label="เนื้อหาหลัก" />
-          {canEdit && <Stat icon={Users} value={classroomCount} label="ห้องเรียนที่ใช้" />}
-        </div>
+      <div className="flex flex-wrap gap-x-8 gap-y-3">
+        <Stat icon={DocumentTextIcon} value={totalFiles} label="เอกสารทั้งหมด" />
+        <Stat icon={LibraryIcon} value={tree.length} label="เนื้อหาหลัก" />
+        {canEdit && <Stat icon={Users} value={classroomCount} label="ห้องเรียนที่ใช้" />}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
