@@ -309,7 +309,7 @@ function DocBrowser({
           <p className="text-xs text-muted-foreground">เลือกวิชาเพื่อ{canEdit ? "จัดการ" : "ดู"}เอกสารการสอน</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-border bg-card p-0.5">
+          <div className="flex h-8 rounded-lg border border-border bg-card p-0.5">
             {(["grid", "list"] as const).map((v) => (
               <button
                 key={v}
@@ -318,7 +318,7 @@ function DocBrowser({
                 aria-pressed={view === v}
                 onClick={() => setView(v)}
                 className={cn(
-                  "flex h-6 w-8 items-center justify-center rounded-md",
+                  "flex h-full w-8 items-center justify-center rounded-md",
                   view === v ? "bg-muted text-foreground" : "text-muted-foreground",
                 )}
               >
@@ -538,7 +538,7 @@ function SubjectDocs({
             aria-label="ค้นหาเนื้อหา"
           />
         </div>
-        <div className="flex rounded-lg border border-border bg-card p-0.5">
+        <div className="flex h-8 rounded-lg border border-border bg-card p-0.5">
           {(["list", "grid"] as const).map((v) => (
             <button
               key={v}
@@ -547,7 +547,7 @@ function SubjectDocs({
               aria-pressed={view === v}
               onClick={() => setView(v)}
               className={cn(
-                "flex h-6 w-8 items-center justify-center rounded-md",
+                "flex h-full w-8 items-center justify-center rounded-md",
                 view === v ? "bg-muted text-foreground" : "text-muted-foreground",
               )}
             >

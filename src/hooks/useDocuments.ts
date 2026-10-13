@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DocFile, DocLesson, GradeLevel } from "@/lib/database.types";
+import type { DocFile, DocLesson, GradeLevel, SubjectType } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
 // เอกสาร — วิชา -> ระดับชั้น -> เนื้อหาหลัก -> ไฟล์.
@@ -319,38 +319,51 @@ export type CoverageRow = {
   code: string;
   nameTh: string;
   departmentId: string;
+  learningAreaId: string;
+  subjectType: SubjectType;
   gradeLevelId: string;
   gradeName: string;
   gradeSort: number;
+  lessonTarget: number;
+  topicTarget: number;
   lessons: CoverageLesson[];
 };
 
-type CoverageSubject = { code: string; name_th: string; department_id: string };
+type CoverageSubject = { code: string; name_th: string; department_id: string; learning_area_id: string; subject_type: SubjectType };
 type CoverageGrade = { name: string; sort_order: number };
+const SUBJECT_COLS = "code, name_th, department_id, learning_area_id, subject_type";
 
-/** Every curriculum (subject x grade) plus any that already have lessons, with per-lesson topic/file counts — for the ติดตามเนื้อหา tab. RLS limits lessons to what the caller reads. */
+/** Every curriculum (subject x grade) plus any that already have lessons, with per-lesson topic/file counts and targets — for the ติดตามเนื้อหา tab. RLS limits lessons to what the caller reads. */
 export function useDocCoverage() {
   return useQuery({
     queryKey: ["doc_summary", "coverage"],
     queryFn: async (): Promise<CoverageRow[]> => {
-      const [cur, les] = await Promise.all([
+      const [cur, les, tgt] = await Promise.all([
         supabase
           .from("curriculum_subjects")
-          .select("subject_id, grade_level_id, subjects!inner(code, name_th, department_id, is_active), grade_levels(name, sort_order)")
+          .select(`subject_id, grade_level_id, subjects!inner(${SUBJECT_COLS}, is_active), grade_levels(name, sort_order)`)
           .eq("subjects.is_active", true),
         supabase
           .from("doc_lessons")
-          .select("*, subjects(code, name_th, department_id), grade_levels(name, sort_order), doc_topics(count), doc_files(created_at, uploaded_by)")
+          .select(`*, subjects(${SUBJECT_COLS}), grade_levels(name, sort_order), doc_topics(count), doc_files(created_at, uploaded_by)`)
           .order("sort_order"),
+        supabase.from("doc_targets").select("*"),
       ]);
       if (cur.error) throw cur.error;
       if (les.error) throw les.error;
+      if (tgt.error) throw tgt.error;
+      const targets = new Map(tgt.data.map((t) => [`${t.subject_id}:${t.grade_level_id}`, t]));
       const out = new Map<string, CoverageRow>();
       const row = (subjectId: string, gradeId: string, s: CoverageSubject | null, g: CoverageGrade | null) => {
         const key = `${subjectId}:${gradeId}`;
         let r = out.get(key);
         if (!r && s) {
-          r = { key, subjectId, code: s.code, nameTh: s.name_th, departmentId: s.department_id, gradeLevelId: gradeId, gradeName: g?.name ?? "—", gradeSort: g?.sort_order ?? 0, lessons: [] };
+          const t = targets.get(key);
+          r = {
+            key, subjectId, code: s.code, nameTh: s.name_th, departmentId: s.department_id, learningAreaId: s.learning_area_id, subjectType: s.subject_type,
+            gradeLevelId: gradeId, gradeName: g?.name ?? "—", gradeSort: g?.sort_order ?? 0,
+            lessonTarget: t?.lesson_target ?? 0, topicTarget: t?.topic_target ?? 0, lessons: [],
+          };
           out.set(key, r);
         }
         return r;
@@ -376,5 +389,20 @@ export function useDocCoverage() {
       }
       return [...out.values()];
     },
+  });
+}
+
+/** Sets the lesson / topic targets for (subject x grade) pairs — one row each, upserted on the pair. */
+export function useSaveDocTargets() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ pairs, lessonTarget, topicTarget }: { pairs: { subjectId: string; gradeLevelId: string }[]; lessonTarget: number; topicTarget: number }) => {
+      const { error } = await supabase.from("doc_targets").upsert(
+        pairs.map((p) => ({ subject_id: p.subjectId, grade_level_id: p.gradeLevelId, lesson_target: lessonTarget, topic_target: topicTarget })),
+        { onConflict: "subject_id,grade_level_id" },
+      );
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_summary", "coverage"] }),
   });
 }

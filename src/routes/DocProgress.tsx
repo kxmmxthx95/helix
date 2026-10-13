@@ -318,6 +318,7 @@ function SummaryCard({
   value,
   percent,
   chevron,
+  active,
 }: {
   tone: "accent" | "success" | "warning" | "destructive";
   icon: React.ReactNode;
@@ -326,12 +327,15 @@ function SummaryCard({
   percent?: number;
   /** Shows a trailing arrow when the card is clickable. */
   chevron?: boolean;
+  /** Marks the card as the currently applied filter. */
+  active?: boolean;
 }) {
   const bg = { accent: "bg-accent/10", success: "bg-success/10", warning: "bg-warning/10", destructive: "bg-destructive/10" }[tone];
   const fg = { accent: "text-accent", success: "text-success", warning: "text-warning", destructive: "text-destructive" }[tone];
   const bar = { accent: "bg-accent", success: "bg-success", warning: "bg-warning", destructive: "bg-destructive" }[tone];
+  const ring = { accent: "ring-accent", success: "ring-success", warning: "ring-warning", destructive: "ring-destructive" }[tone];
   return (
-    <div className={cn("flex items-center gap-3 rounded-2xl p-3", bg)}>
+    <div className={cn("flex items-center gap-3 rounded-2xl p-3 ring-2 ring-transparent transition-shadow", bg, chevron && "group-hover:ring-border", active && ring)}>
       <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-background/70", fg)}>{icon}</span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs text-muted-foreground">{label}</p>
@@ -795,13 +799,6 @@ export function ReviewDocsTab() {
     .sort((a, b) => (sort === "newest" ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt)));
   const { page, setPage, pageCount, pageRows } = usePagination(shown, [tab, search, sort], 20);
 
-  const tabs: { id: ReviewTab; label: string; n: number }[] = [
-    { id: "pending", label: "รอตรวจ", n: count("pending") },
-    { id: "approved", label: "อนุมัติแล้ว", n: count("approved") },
-    { id: "returned", label: "ส่งกลับแก้ไข", n: count("returned") },
-    { id: "", label: "ทั้งหมด", n: items.length },
-  ];
-
   const teacherCell = (id: string) => {
     const p = personById.get(id);
     return (
@@ -815,26 +812,29 @@ export function ReviewDocsTab() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div role="tablist" aria-label="สถานะการตรวจ" className="flex flex-wrap gap-1 rounded-xl bg-muted p-1">
-          {tabs.map((t) => (
-            <button
-              key={t.label}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                tab === t.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {t.label} ({t.n})
-            </button>
-          ))}
-        </div>
-        <div className="relative min-w-40 max-w-md flex-1">
+        <div className="relative min-w-40 flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ค้นหาชื่อไฟล์ วิชา หรือชื่อครู..." aria-label="ค้นหา" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Select className="w-auto min-w-28" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="เรียงตาม">
+            <option value="newest">ใหม่ล่าสุด</option>
+            <option value="oldest">เก่าสุด</option>
+          </Select>
+          <div className="flex h-8 rounded-lg border border-border bg-card p-0.5">
+            {(["list", "grid"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-label={v === "grid" ? "มุมมองกริด" : "มุมมองรายการ"}
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className={cn("flex h-full w-8 items-center justify-center rounded-md", view === v ? "bg-muted text-foreground" : "text-muted-foreground")}
+              >
+                {v === "grid" ? <AppsIcon className="h-3.5 w-3.5" /> : <ListIcon className="h-3.5 w-3.5" />}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -846,36 +846,14 @@ export function ReviewDocsTab() {
             { tone: "warning", s: "returned", icon: <TimeIcon className="h-5 w-5" /> },
           ] as const
         ).map((c) => (
-          <button key={c.s} type="button" onClick={() => setTab(c.s)} className="text-left">
-            <SummaryCard tone={c.tone} icon={c.icon} label={REVIEW_STYLE[c.s].label} value={count(c.s)} chevron />
+          <button key={c.s} type="button" aria-pressed={tab === c.s} onClick={() => setTab(tab === c.s ? "" : c.s)} className="group text-left">
+            <SummaryCard tone={c.tone} icon={c.icon} label={REVIEW_STYLE[c.s].label} value={count(c.s)} chevron active={tab === c.s} />
           </button>
         ))}
         <SummaryCard tone="destructive" icon={<X className="h-5 w-5" />} label="เกินกำหนด" value={overdueCount} />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">เอกสารที่ครูอัปโหลด</h3>
-        <div className="flex items-center gap-2">
-          <Select className="w-auto min-w-28" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="เรียงตาม">
-            <option value="newest">ใหม่ล่าสุด</option>
-            <option value="oldest">เก่าสุด</option>
-          </Select>
-          <div className="flex rounded-lg border border-border bg-card p-0.5">
-            {(["list", "grid"] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                aria-label={v === "grid" ? "มุมมองกริด" : "มุมมองรายการ"}
-                aria-pressed={view === v}
-                onClick={() => setView(v)}
-                className={cn("flex h-6 w-8 items-center justify-center rounded-md", view === v ? "bg-muted text-foreground" : "text-muted-foreground")}
-              >
-                {v === "grid" ? <AppsIcon className="h-3.5 w-3.5" /> : <ListIcon className="h-3.5 w-3.5" />}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      <h3 className="text-sm font-semibold">เอกสารที่ครูอัปโหลด</h3>
 
       {shown.length === 0 ? (
         <EmptyState title="ไม่มีเอกสารให้ตรวจ" description="เอกสารที่ครูส่งหรืออัปโหลดจะแสดงที่นี่" icon={DocumentTextIcon} />

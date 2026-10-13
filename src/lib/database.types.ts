@@ -805,6 +805,16 @@ export type DocLesson = {
   updated_at: string;
 };
 
+/** เป้าหมายเนื้อหาต่อวิชา x ระดับชั้น (0 = ยังไม่ตั้ง). See migration 0080. */
+export type DocTarget = {
+  id: string;
+  subject_id: string;
+  grade_level_id: string;
+  lesson_target: number;
+  topic_target: number;
+  updated_at: string;
+};
+
 /** เอกสาร — เนื้อหาย่อย under a DocLesson. See migration 0071. */
 export type DocTopic = {
   id: string;
@@ -1423,6 +1433,7 @@ export type Database = {
       >;
       exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
       doc_lessons: Table<DocLesson, InsertOf<DocLesson, "sort_order" | "created_by" | "created_at" | "updated_at">>;
+      doc_targets: Table<DocTarget, InsertOf<DocTarget, "id" | "lesson_target" | "topic_target" | "updated_at">>;
       doc_topics: Table<DocTopic, InsertOf<DocTopic, "sort_order" | "created_at" | "updated_at">>;
       doc_files: Table<DocFile, InsertOf<DocFile, "description" | "topic_id" | "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
       doc_tasks: Table<DocTask, InsertOf<DocTask, "description" | "department_id" | "learning_area_id">>;
