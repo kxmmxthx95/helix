@@ -3,7 +3,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ChevronBack, ChevronForward, DownloadIcon, Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
+import { Button, Card, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import {
   useAcademicEvents,
   useDeleteAcademicEvent,
@@ -26,11 +26,20 @@ const EVENT_TYPE_LABEL: Record<AcademicEventType, string> = {
 };
 
 const EVENT_TYPE_DOT: Record<AcademicEventType, string> = {
-  holiday: "bg-destructive",
-  suspended: "bg-destructive",
-  exam_period: "bg-warning",
-  teacher_workday: "bg-primary",
-  school_event: "bg-accent",
+  holiday: "bg-pink-500",
+  suspended: "bg-orange-500",
+  exam_period: "bg-blue-500",
+  teacher_workday: "bg-violet-500",
+  school_event: "bg-emerald-500",
+};
+
+// Tinted chip per type — same hue as the dot, used on the grids and event rows.
+const EVENT_TYPE_CHIP: Record<AcademicEventType, string> = {
+  holiday: "bg-pink-100 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300",
+  suspended: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
+  exam_period: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+  teacher_workday: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+  school_event: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
 };
 
 const WEEKDAY_LABEL = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
@@ -44,7 +53,6 @@ const fromISODate = (s: string) => {
   return new Date(parts[0] ?? 1970, (parts[1] ?? 1) - 1, parts[2] ?? 1);
 };
 const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
-const addMonths = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth() + n, 1);
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 
 /** 6 weeks × 7 days (Sun-start), enough to cover any month plus lead/trail days. */
@@ -64,6 +72,18 @@ const ATTEND_DEFAULTS: Record<AcademicEventType, { students_attend: boolean; sta
   exam_period: { students_attend: true, staff_attend: true },
 };
 
+type CalView = "month" | "week" | "day" | "list";
+
+const VIEW_LABEL: Record<CalView, string> = { month: "เดือน", week: "สัปดาห์", day: "วัน", list: "รายการ" };
+const MONTH_LABELS = Array.from({ length: 12 }, (_, i) =>
+  new Date(2000, i, 1).toLocaleDateString("th-TH", { month: "long" }),
+);
+const startOfWeek = (d: Date) => addDays(d, -d.getDay());
+/** Same day-of-month in another month/year, clamped (31 Jan -> 28 Feb, not 3 Mar). */
+const withMonth = (d: Date, year: number, month: number) =>
+  new Date(year, month, Math.min(d.getDate(), new Date(year, month + 1, 0).getDate()));
+const shortDate = (iso: string) => fromISODate(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+
 export function AcademicEvents() {
   const { profile: me } = useAuth();
   const { data: events = [], isLoading } = useAcademicEvents();
@@ -73,9 +93,11 @@ export function AcademicEvents() {
   const orgWide = me ? isOrgWide(me.roles) : false;
   const mayEdit = me ? canManage(me.roles) : false;
 
-  const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
+  const [focus, setFocus] = useState(() => new Date());
+  const [view, setView] = useState<CalView>("month");
   const [editing, setEditing] = useState<AcademicEventRow | null>(null);
   const [creating, setCreating] = useState<string | null>(null); // ISO date pre-fill, or "" for the blank top button
+  const [hidden, setHidden] = useState<Set<AcademicEventType>>(new Set()); // types unticked in ตัวกรองกิจกรรม
 
   // A dept_head may only edit events linked to their own department — a
   // whole-school event (no links) is org-wide only. UI hides what the role
@@ -86,48 +108,164 @@ export function AcademicEvents() {
     return row.departmentIds.includes(me.department_id);
   }
 
+  const visibleEvents = useMemo(() => events.filter((ev) => !hidden.has(ev.event_type)), [events, hidden]);
+
   const eventsByDay = useMemo(() => {
     const map = new Map<string, AcademicEventRow[]>();
-    for (const ev of events) {
+    for (const ev of visibleEvents) {
       for (let d = fromISODate(ev.start_date); toISODate(d) <= ev.end_date; d = addDays(d, 1)) {
         const key = toISODate(d);
         map.set(key, [...(map.get(key) ?? []), ev]);
       }
     }
     return map;
-  }, [events]);
+  }, [visibleEvents]);
 
-  const days = useMemo(() => buildCalendarDays(cursor), [cursor]);
   const todayISO = toISODate(new Date());
+  const focusISO = toISODate(focus);
+  const monthStart = startOfMonth(focus);
+  const monthDays = useMemo(() => buildCalendarDays(monthStart), [monthStart.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(focus), i));
+  const monthEvents = useMemo(() => {
+    const first = toISODate(monthStart);
+    const last = toISODate(new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0));
+    return visibleEvents
+      .filter((ev) => ev.start_date <= last && ev.end_date >= first)
+      .sort((a, b) => a.start_date.localeCompare(b.start_date));
+  }, [visibleEvents, monthStart.getTime()]); // eslint-disable-line react-hooks/exhaustive-deps
+  const upcoming = useMemo(
+    () =>
+      visibleEvents
+        .filter((ev) => ev.end_date >= todayISO)
+        .sort((a, b) => a.start_date.localeCompare(b.start_date))
+        .slice(0, 5),
+    [visibleEvents, todayISO],
+  );
+
+  function go(dir: -1 | 1) {
+    if (view === "week") setFocus(addDays(focus, 7 * dir));
+    else if (view === "day") setFocus(addDays(focus, dir));
+    else setFocus(withMonth(focus, focus.getFullYear(), focus.getMonth() + dir));
+  }
+
+  function chip(ev: AcademicEventRow) {
+    return (
+      <button
+        key={ev.id}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (canEditRow(ev)) setEditing(ev);
+        }}
+        className={cn(
+          "font-sarabun flex w-full items-center gap-1.5 truncate rounded-lg px-2 py-1 text-left text-xs font-medium hover:opacity-80",
+          EVENT_TYPE_CHIP[ev.event_type],
+          canEditRow(ev) ? "cursor-pointer" : "cursor-default",
+        )}
+        title={ev.name}
+      >
+        <span className={cn("h-2 w-2 shrink-0 rounded-full", EVENT_TYPE_DOT[ev.event_type])} />
+        <span className="truncate">{ev.name}</span>
+      </button>
+    );
+  }
+
+  /** Date tile + name + type/range row, shared by the list view and "กิจกรรมที่ใกล้ถึง". */
+  function eventRow(ev: AcademicEventRow) {
+    const start = fromISODate(ev.start_date);
+    return (
+      <button
+        key={ev.id}
+        type="button"
+        onClick={() => canEditRow(ev) && setEditing(ev)}
+        className="flex w-full items-center gap-3 text-left text-xs"
+      >
+        <span
+          className={cn(
+            "flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl leading-tight",
+            EVENT_TYPE_CHIP[ev.event_type],
+          )}
+        >
+          <span className="text-base font-bold">{start.getDate()}</span>
+          <span className="text-[0.65rem]">{start.toLocaleDateString("th-TH", { month: "short" })}</span>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">{ev.name}</span>
+          <span className="block text-muted-foreground">
+            {EVENT_TYPE_LABEL[ev.event_type]}
+            {ev.end_date !== ev.start_date && ` · ${shortDate(ev.start_date)} - ${shortDate(ev.end_date)}`}
+          </span>
+        </span>
+      </button>
+    );
+  }
+
+  const canCreateOn = (day: Date) => mayEdit && day.getDay() !== 0 && day.getDay() !== 6;
+  const years = Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">
-            {cursor.toLocaleDateString("th-TH", { month: "long", year: "numeric" })}
-          </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="icon" onClick={() => go(-1)} aria-label="ก่อนหน้า">
+            <ChevronBack className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" onClick={() => go(1)} aria-label="ถัดไป">
+            <ChevronForward className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setFocus(new Date())}>
+            วันนี้
+          </Button>
+          <Select
+            className="w-32"
+            value={String(focus.getMonth())}
+            onChange={(e) => setFocus(withMonth(focus, focus.getFullYear(), Number(e.target.value)))}
+            aria-label="เดือน"
+          >
+            {MONTH_LABELS.map((m, i) => (
+              <option key={m} value={i}>
+                {m}
+              </option>
+            ))}
+          </Select>
+          <Select
+            className="w-24"
+            value={String(focus.getFullYear())}
+            onChange={(e) => setFocus(withMonth(focus, Number(e.target.value), focus.getMonth()))}
+            aria-label="ปี"
+          >
+            {years.map((y) => (
+              <option key={y} value={y}>
+                {y + 543}
+              </option>
+            ))}
+          </Select>
           {isLoading && (
             <span role="status" aria-label="กำลังโหลด">
               <Skeleton className="h-4 w-4 rounded-full" />
             </span>
           )}
-        </div>
-        <div className="flex items-center gap-1">
-          <Button variant="outline" size="icon" onClick={() => setCursor((c) => addMonths(c, -1))} aria-label="เดือนก่อนหน้า">
-            <ChevronBack className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setCursor(startOfMonth(new Date()))}>
-            วันนี้
-          </Button>
-          <Button variant="outline" size="icon" onClick={() => setCursor((c) => addMonths(c, 1))} aria-label="เดือนถัดไป">
-            <ChevronForward className="h-4 w-4" />
-          </Button>
+
+          <div role="tablist" aria-label="มุมมอง" className="ml-auto flex rounded-xl border border-border bg-card p-0.5">
+            {(Object.keys(VIEW_LABEL) as CalView[]).map((v) => (
+              <button
+                key={v}
+                type="button"
+                role="tab"
+                aria-selected={view === v}
+                onClick={() => setView(v)}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-medium",
+                  view === v ? "bg-muted text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {VIEW_LABEL[v]}
+              </button>
+            ))}
+          </div>
           {orgWide && (
             <Button
               variant="outline"
               size="icon"
-              className="ml-1"
               disabled={syncHolidays.isPending}
               aria-label="ดึงวันหยุดราชการ"
               onClick={() =>
@@ -141,71 +279,169 @@ export function AcademicEvents() {
             </Button>
           )}
           {mayEdit && (
-            <Button size="icon" variant="default" className="ml-1" onClick={() => setCreating("")} aria-label="เพิ่ม Event">
+            <Button size="icon" aria-label="เพิ่มกิจกรรม" onClick={() => setCreating("")}>
               <Plus className="h-4 w-4" />
             </Button>
           )}
         </div>
+
+      <div className="grid items-start gap-4 lg:grid-cols-[1fr_20rem]">
+      <div className="min-w-0 space-y-4">
+        {view === "month" && (
+          <div className="font-sarabun grid grid-cols-7 overflow-hidden rounded-2xl border-l border-t border-border bg-card">
+            {WEEKDAY_LABEL.map((w) => (
+              <div key={w} className="border-b border-r border-border py-2.5 text-center text-xs font-semibold">
+                {w}
+              </div>
+            ))}
+            {monthDays.map((day) => {
+              const iso = toISODate(day);
+              const dayEvents = eventsByDay.get(iso) ?? [];
+              const inMonth = day.getMonth() === focus.getMonth();
+              const isToday = iso === todayISO;
+              const canCreate = canCreateOn(day);
+              return (
+                <div
+                  key={iso}
+                  onClick={() => canCreate && setCreating(iso)}
+                  className={cn(
+                    "flex min-h-28 flex-col gap-1 border-b border-r border-border p-1.5 text-xs",
+                    !inMonth && "text-muted-foreground/60",
+                    isToday && "bg-muted/60",
+                    canCreate && "cursor-pointer hover:bg-muted/50",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium",
+                      isToday && "bg-primary text-primary-foreground",
+                    )}
+                  >
+                    {day.getDate()}
+                  </span>
+                  {dayEvents.slice(0, 2).map(chip)}
+                  {dayEvents.length > 2 && (
+                    <button
+                      type="button"
+                      className="px-1 text-left text-[0.7rem] text-muted-foreground hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFocus(day);
+                        setView("day");
+                      }}
+                    >
+                      +{dayEvents.length - 2}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {view === "week" && (
+          <div className="font-sarabun grid grid-cols-7 overflow-hidden rounded-2xl border-l border-t border-border bg-card">
+            {weekDays.map((day) => {
+              const iso = toISODate(day);
+              const isToday = iso === todayISO;
+              const canCreate = canCreateOn(day);
+              return (
+                <div key={iso} className="min-w-0">
+                  <div className="border-b border-r border-border py-2 text-center text-xs">
+                    <div className="font-semibold">{WEEKDAY_LABEL[day.getDay()]}</div>
+                    <span
+                      className={cn(
+                        "mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full font-medium",
+                        isToday && "bg-primary text-primary-foreground",
+                      )}
+                    >
+                      {day.getDate()}
+                    </span>
+                  </div>
+                  <div
+                    onClick={() => canCreate && setCreating(iso)}
+                    className={cn(
+                      "min-h-72 space-y-1 border-b border-r border-border p-1.5",
+                      isToday && "bg-muted/60",
+                      canCreate && "cursor-pointer hover:bg-muted/50",
+                    )}
+                  >
+                    {(eventsByDay.get(iso) ?? []).map(chip)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {view === "day" && (
+          <Card className="space-y-3">
+            <p className="text-sm font-semibold">
+              {focus.toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            </p>
+            {(eventsByDay.get(focusISO) ?? []).length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">ไม่มีกิจกรรมในวันนี้</p>
+            ) : (
+              (eventsByDay.get(focusISO) ?? []).map(eventRow)
+            )}
+            {canCreateOn(focus) && (
+              <Button variant="outline" size="sm" onClick={() => setCreating(focusISO)}>
+                <Plus className="h-3.5 w-3.5" /> เพิ่มกิจกรรมวันนี้
+              </Button>
+            )}
+          </Card>
+        )}
+
+        {view === "list" && (
+          <Card className="space-y-3">
+            {monthEvents.length === 0 ? (
+              <p className="py-6 text-center text-xs text-muted-foreground">ไม่มีกิจกรรมในเดือนนี้</p>
+            ) : (
+              monthEvents.map(eventRow)
+            )}
+          </Card>
+        )}
       </div>
 
-      <div className="font-sarabun grid grid-cols-7 border-l border-t border-border overflow-hidden rounded-lg bg-card">
-        {WEEKDAY_LABEL.map((w) => (
-          <div
-            key={w}
-            className="border-b border-r border-border py-1.5 text-center text-xs text-muted-foreground"
-          >
-            {w}
-          </div>
-        ))}
-        {days.map((day) => {
-          const iso = toISODate(day);
-          const dayEvents = eventsByDay.get(iso) ?? [];
-          const inMonth = day.getMonth() === cursor.getMonth();
-          const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-          const canCreate = mayEdit && !isWeekend;
-          return (
-            <div
-              key={iso}
-              onClick={() => canCreate && setCreating(iso)}
-              className={cn(
-                "flex min-h-20 flex-col gap-0.5 border-b border-r border-border p-1 text-xs",
-                inMonth ? "bg-background/40" : "opacity-40",
-                isWeekend && "bg-muted/30",
-                canCreate && "cursor-pointer hover:bg-muted/60",
-              )}
+      <aside className="space-y-4">
+        <Card className="space-y-2.5">
+          <p className="text-sm font-semibold">ตัวกรองกิจกรรม</p>
+          {(Object.keys(EVENT_TYPE_LABEL) as AcademicEventType[]).map((t) => (
+            <label key={t} className="flex cursor-pointer items-center gap-2.5 text-xs">
+              <input
+                type="checkbox"
+                checked={!hidden.has(t)}
+                onChange={() =>
+                  setHidden((h) => {
+                    const next = new Set(h);
+                    if (!next.delete(t)) next.add(t);
+                    return next;
+                  })
+                }
+              />
+              <span className={cn("h-2 w-2 rounded-full", EVENT_TYPE_DOT[t])} />
+              {EVENT_TYPE_LABEL[t]}
+            </label>
+          ))}
+        </Card>
+        <Card className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold">กิจกรรมที่ใกล้ถึง</p>
+            <button
+              type="button"
+              className="text-xs font-medium hover:underline"
+              onClick={() => {
+                setFocus(new Date());
+                setView("list");
+              }}
             >
-              <span
-                className={cn(
-                  "inline-flex h-6 w-6 items-center justify-center rounded-full text-[0.7rem]",
-                  iso === todayISO && "bg-accent text-accent-foreground",
-                )}
-              >
-                {day.getDate()}
-              </span>
-              {dayEvents.slice(0, 3).map((ev) => (
-                <button
-                  key={ev.id}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (canEditRow(ev)) setEditing(ev);
-                  }}
-                  className={cn(
-                    "font-sarabun flex items-center gap-1 truncate rounded px-1 py-0.5 text-left hover:bg-muted",
-                    canEditRow(ev) ? "cursor-pointer" : "cursor-default",
-                  )}
-                  title={ev.name}
-                >
-                  <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", EVENT_TYPE_DOT[ev.event_type])} />
-                  <span className="truncate">{ev.name}</span>
-                </button>
-              ))}
-              {dayEvents.length > 3 && (
-                <span className="px-1 text-[0.7rem] text-muted-foreground">+{dayEvents.length - 3} อื่นๆ</span>
-              )}
-            </div>
-          );
-        })}
+              ดูทั้งหมด
+            </button>
+          </div>
+          {upcoming.length === 0 && <p className="text-xs text-muted-foreground">ไม่มีกิจกรรม</p>}
+          {upcoming.map(eventRow)}
+        </Card>
+      </aside>
       </div>
 
       <EventSheet

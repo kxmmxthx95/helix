@@ -1,9 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Plus } from "@/components/icons";
+import {
+  AirplaneIcon,
+  BriefcaseIcon,
+  CalendarIcon,
+  CheckmarkCircleIcon,
+  ImageIcon,
+  LibraryIcon,
+  PencilIcon,
+  Plus,
+  ProfileIcon,
+  RibbonIcon,
+  Search,
+  SettingsIcon,
+  ShieldIcon,
+  TimeIcon,
+  Upload,
+  Users,
+  X,
+} from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner, Switch } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Pagination, Select, Skeleton, Spinner, Switch } from "@/components/ui";
 import {
   useAcademicTerms,
   useSaveAcademicTerm,
@@ -20,6 +38,7 @@ import {
   type DepartmentSettingsEdit,
   type SchoolSettingsEdit,
 } from "@/hooks/useSettings";
+import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import { getCurrentPosition } from "@/lib/geofence";
 import {
@@ -53,6 +72,54 @@ const TERM_STATUS_LABEL: Record<TermStatus, string> = {
 
 /** ทุก role ยกเว้น student/parent — ผู้เข้าข่ายบันทึกเวลาทำงาน (migration 0032). */
 const STAFF_ROLES: Role[] = ROLES.filter((r) => r !== "student" && r !== "parent");
+
+type IconComponent = (p: { className?: string }) => React.JSX.Element;
+
+const ROLE_ICON: Partial<Record<Role, { icon: IconComponent; tint: string }>> = {
+  super_admin: { icon: RibbonIcon, tint: "bg-pink-100 text-pink-600 dark:bg-pink-500/15 dark:text-pink-300" },
+  director: { icon: ShieldIcon, tint: "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300" },
+  staff: { icon: BriefcaseIcon, tint: "bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300" },
+  dept_head: { icon: Users, tint: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300" },
+  teacher: { icon: ProfileIcon, tint: "bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300" },
+};
+
+const TAB_ICON: Record<SettingsTab, IconComponent> = {
+  school: SettingsIcon,
+  leave_types: AirplaneIcon,
+  salary_grades: BriefcaseIcon,
+  department: LibraryIcon,
+  terms: CalendarIcon,
+};
+
+/** A settings section: tinted icon tile + title/subtitle header, then the body. */
+function SectionCard({
+  icon: Icon,
+  tint,
+  title,
+  subtitle,
+  children,
+}: {
+  icon: IconComponent;
+  tint: string;
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
+      <div className="flex items-center gap-3">
+        <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", tint)}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-base font-bold">{title}</h2>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
 
 function SchoolSettingsCard() {
   const toast = useToast();
@@ -94,71 +161,98 @@ function SchoolSettingsCard() {
   const logoUrl = schoolLogoUrl(settings);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted">
-          {logoUrl ? (
-            <img src={logoUrl} alt="โลโก้โรงเรียน" className="h-full w-full object-contain" />
-          ) : (
-            <span className="text-xs text-muted-foreground">ไม่มีโลโก้</span>
-          )}
-        </div>
-        <div className="space-y-1.5">
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) upload.mutate(file);
-              e.target.value = "";
-            }}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={upload.isPending}
-            onClick={() => fileRef.current?.click()}
-          >
-            {upload.isPending ? <Spinner className="h-3.5 w-3.5" /> : "อัปโหลดโลโก้"}
-          </Button>
-          <p className="text-xs text-muted-foreground">ใช้สร้าง Header เอกสาร</p>
-        </div>
-      </div>
-
-      <form
-        className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          update.mutate(form, { onSuccess: () => toast("บันทึกสำเร็จ") });
-        }}
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        update.mutate(form, { onSuccess: () => toast("บันทึกสำเร็จ") });
+      }}
+    >
+      <SectionCard
+        icon={SettingsIcon}
+        tint="bg-pink-100 text-pink-600 dark:bg-pink-500/15 dark:text-pink-300"
+        title="ข้อมูลโรงเรียน"
+        subtitle="ตั้งค่าข้อมูลพื้นฐานของโรงเรียนที่ใช้ในระบบ"
       >
-        <Field label="ชื่อโรงเรียน (ไทย)">
-          <Input
-            required
-            value={form.name_th}
-            onChange={(e) => setForm({ ...form, name_th: e.target.value })}
-          />
-        </Field>
-        <Field label="ชื่อโรงเรียน (อังกฤษ)">
-          <Input
-            value={form.name_en ?? ""}
-            onChange={(e) => setForm({ ...form, name_en: e.target.value || null })}
-          />
-        </Field>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex h-24 w-24 shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-full border border-border bg-muted text-xs text-muted-foreground">
+            {logoUrl ? (
+              <img src={logoUrl} alt="โลโก้โรงเรียน" className="h-full w-full object-contain" />
+            ) : (
+              <>
+                <ImageIcon className="h-5 w-5" />
+                เพิ่มโลโก้
+              </>
+            )}
+          </div>
+          <div className="flex min-w-[16rem] flex-1 items-center gap-4 rounded-xl border border-dashed border-border bg-muted/40 p-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+              <Upload className="h-6 w-6" />
+            </div>
+            <div className="space-y-1.5">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) upload.mutate(file);
+                  e.target.value = "";
+                }}
+              />
+              <p className="text-sm font-bold">อัปโหลดโลโก้โรงเรียน</p>
+              <p className="text-xs text-muted-foreground">รองรับไฟล์รูปภาพ ใช้สร้าง Header เอกสาร</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={upload.isPending}
+                onClick={() => fileRef.current?.click()}
+              >
+                {upload.isPending ? <Spinner className="h-3.5 w-3.5" /> : "เลือกไฟล์"}
+              </Button>
+            </div>
+          </div>
+        </div>
 
-        <Card className="space-y-2">
-          <p className="text-sm font-medium">เปิดใช้งานบันทึกเวลาทำงานสำหรับบทบาท</p>
-          <p className="text-xs text-muted-foreground">ไม่ติ๊ก = บทบาทนั้นไม่เห็นเมนู "เวลาทำงาน"</p>
-          <div className="space-y-1.5">
-            {STAFF_ROLES.map((role) => (
-              <label key={role} className="flex items-center justify-between gap-2 py-0.5 text-sm">
-                {ROLE_LABEL[role]}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="ชื่อโรงเรียน (ไทย)">
+            <Input
+              required
+              value={form.name_th}
+              onChange={(e) => setForm({ ...form, name_th: e.target.value })}
+            />
+          </Field>
+          <Field label="ชื่อโรงเรียน (อังกฤษ)">
+            <Input
+              value={form.name_en ?? ""}
+              onChange={(e) => setForm({ ...form, name_en: e.target.value || null })}
+            />
+          </Field>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        icon={TimeIcon}
+        tint="bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300"
+        title="สิทธิ์การใช้งานบันทึกเวลาทำงาน"
+        subtitle='เปิดใช้งานบันทึกเวลาทำงานสำหรับบทบาท (ไม่เปิด = บทบาทนั้นไม่เห็นเมนู "เวลาทำงาน")'
+      >
+        <div className="divide-y divide-border">
+          {STAFF_ROLES.map((role) => {
+            const meta = ROLE_ICON[role];
+            return (
+              <label key={role} className="flex items-center gap-3 py-2.5 text-sm">
+                {meta && (
+                  <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", meta.tint)}>
+                    <meta.icon className="h-4 w-4" />
+                  </span>
+                )}
+                <span className="flex-1 font-medium">{ROLE_LABEL[role]}</span>
                 <Switch
-                  size="sm"
                   checked={form.time_tracking_roles.includes(role)}
+                  label={ROLE_LABEL[role]}
                   onChange={(checked) =>
                     setForm({
                       ...form,
@@ -169,15 +263,18 @@ function SchoolSettingsCard() {
                   }
                 />
               </label>
-            ))}
-          </div>
-        </Card>
+            );
+          })}
+        </div>
+      </SectionCard>
 
-        <Button type="submit" disabled={update.isPending}>
-          {update.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
+      <div className="sticky bottom-4 z-10 flex justify-end">
+        <Button type="submit" disabled={update.isPending} className="shadow-lg">
+          {update.isPending ? <Spinner className="h-3 w-3" /> : <CheckmarkCircleIcon className="h-4 w-4" />}
+          บันทึกการตั้งค่า
         </Button>
-      </form>
-    </div>
+      </div>
+    </form>
   );
 }
 
@@ -646,10 +743,45 @@ function CreateTermSheet({
   );
 }
 
+const LEAVE_TINTS = [
+  "bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
+  "bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300",
+  "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
+  "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
+  "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
+  "bg-cyan-100 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300",
+];
+
+/** Deterministic tint per leave type (no icon/color column) — same code always lands on the same color. */
+function leaveTint(code: string) {
+  let hash = 0;
+  for (let i = 0; i < code.length; i++) hash = (hash * 31 + code.charCodeAt(i)) >>> 0;
+  return LEAVE_TINTS[hash % LEAVE_TINTS.length]!;
+}
+
+type LeaveSort = "order" | "name" | "quota";
+
 function LeaveTypesCard() {
+  const toast = useToast();
   const { data: types = [], isLoading } = useLeaveTypes();
+  const del = useDeleteLeaveType();
   const [editing, setEditing] = useState<LeaveType | null>(null);
   const [creating, setCreating] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<LeaveSort>("order");
+
+  const q = search.trim().toLowerCase();
+  const rows = types
+    .filter((t) => !q || t.name.toLowerCase().includes(q) || t.code.toLowerCase().includes(q))
+    .sort((a, b) =>
+      sort === "name"
+        ? a.name.localeCompare(b.name, "th")
+        : sort === "quota"
+          ? (b.max_days_per_year ?? Infinity) - (a.max_days_per_year ?? Infinity)
+          : 0,
+    );
+  const { page, setPage, pageCount, pageRows } = usePagination(rows, [search, sort]);
+  const firstIndex = (page - 1) * 20;
 
   const sheets = (
     <>
@@ -660,19 +792,12 @@ function LeaveTypesCard() {
 
   if (isLoading) {
     return (
-      <Card className="space-y-3" role="status" aria-label="กำลังโหลด">
-        <div className="flex justify-end">
-          <Skeleton className="h-8 w-24" />
-        </div>
-        <ul className="divide-y divide-border">
-          {[0, 1, 2].map((i) => (
-            <li key={i} className="space-y-1.5 py-1.5">
-              <Skeleton className="h-3.5 w-32" />
-              <Skeleton className="h-3 w-24" />
-            </li>
-          ))}
-        </ul>
-      </Card>
+      <div className="space-y-3" role="status" aria-label="กำลังโหลด">
+        <Skeleton className="h-10 w-full" />
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-16 w-full" />
+        ))}
+      </div>
     );
   }
 
@@ -695,33 +820,126 @@ function LeaveTypesCard() {
   }
 
   return (
-    <Card className="space-y-3">
-      <div className="flex justify-end">
-        <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="h-3.5 w-3.5" />
-          เพิ่มประเภท
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[12rem] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหาประเภทการลา..."
+            className="pl-9"
+            aria-label="ค้นหาประเภทการลา"
+          />
+        </div>
+        <Select className="w-44" value={sort} onChange={(e) => setSort(e.target.value as LeaveSort)} aria-label="เรียงตาม">
+          <option value="order">เรียงตาม: ลำดับ</option>
+          <option value="name">เรียงตาม: ชื่อ</option>
+          <option value="quota">เรียงตาม: โควตา</option>
+        </Select>
+        <Button size="icon" aria-label="เพิ่มประเภทการลา" onClick={() => setCreating(true)}>
+          <Plus className="h-4 w-4" />
         </Button>
       </div>
-      <ul className="divide-y divide-border text-sm">
-        {types.map((t) => (
-          <li
-            key={t.id}
-            onClick={() => setEditing(t)}
-            className="flex cursor-pointer items-center justify-between gap-2 py-1.5"
-          >
-            <span>
-              {t.name}
-              <span className="block text-xs text-muted-foreground">
-                {t.max_days_per_year !== null ? `${t.max_days_per_year} วัน/ปี` : "ไม่จำกัดโควตา"}
-                {t.requires_attachment_after_days !== null &&
-                  ` · บังคับแนบไฟล์ถ้าเกิน ${t.requires_attachment_after_days} วัน`}
-              </span>
-            </span>
-          </li>
-        ))}
-      </ul>
+
+      {rows.length === 0 ? (
+        <EmptyState title="ไม่พบประเภทการลา" description="ลองเปลี่ยนคำค้นหา" />
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+          <table className="w-full min-w-[40rem] text-sm">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="w-16 px-4 py-3 font-medium">#</th>
+                <th className="px-3 py-3 font-medium">ชื่อประเภทการลา</th>
+                <th className="px-3 py-3 text-center font-medium">จำนวนวันต่อปี</th>
+                <th className="px-3 py-3 text-center font-medium">ต้องแนบเอกสาร</th>
+                <th className="px-3 py-3 text-center font-medium">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageRows.map((t, i) => (
+                <tr
+                  key={t.id}
+                  onClick={() => setEditing(t)}
+                  className="cursor-pointer border-t border-border hover:bg-muted/50"
+                >
+                  <td className="px-4 py-3">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-xs font-medium">
+                      {firstIndex + i + 1}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={cn(
+                          "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+                          leaveTint(t.code),
+                        )}
+                      >
+                        <AirplaneIcon className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold">{t.name}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{t.code}</span>
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3 text-center font-medium">
+                    {t.max_days_per_year !== null ? `${t.max_days_per_year} วัน` : "ไม่จำกัด"}
+                  </td>
+                  <td className="px-3 py-3 text-center">
+                    {t.requires_attachment_after_days !== null ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                        <CheckmarkCircleIcon className="h-3.5 w-3.5" />
+                        ต้องแนบ (เกิน {t.requires_attachment_after_days} วัน)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-lg bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                        ไม่บังคับ
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        aria-label={`แก้ไข ${t.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditing(t);
+                        }}
+                      >
+                        <PencilIcon className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="text-destructive"
+                        aria-label={`ลบ ${t.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!confirm(`ลบประเภทการลา "${t.name}"?`)) return;
+                          del.mutate(t.id, { onError: () => toast("ลบไม่สำเร็จ อาจมีใบลาที่ใช้ประเภทนี้อยู่", "error") });
+                        }}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <p className="px-1 text-xs text-muted-foreground">ทั้งหมด {rows.length} รายการ</p>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+      </div>
       {sheets}
-    </Card>
+    </div>
   );
 }
 
@@ -1085,21 +1303,33 @@ export function Settings() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Select
-          className="w-auto min-w-[12rem]"
-          value={tab}
-          onChange={(e) => {
-            setTab(e.target.value as SettingsTab);
-            setCreatingTerm(false);
-          }}
-          aria-label="หมวดตั้งค่า"
-        >
-          {tabs.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.label}
-            </option>
-          ))}
-        </Select>
+        <div role="tablist" aria-label="หมวดตั้งค่า" className="flex w-full flex-wrap border-b border-border">
+          {tabs.map((t) => {
+            const Icon = TAB_ICON[t.id];
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => {
+                  setTab(t.id);
+                  setCreatingTerm(false);
+                }}
+                className={cn(
+                  "-mb-px flex flex-1 items-center justify-center gap-2 border-b-2 px-3.5 py-2.5 text-xs font-medium",
+                  active
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
 
         {showDeptPicker && (
           <Select
