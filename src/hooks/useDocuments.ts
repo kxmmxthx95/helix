@@ -309,3 +309,72 @@ export function useReviewDocFile() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_files"] }),
   });
 }
+
+// ------------------------------------------------------------------ coverage
+
+export type CoverageLesson = { id: string; name: string; createdBy: string | null; sortOrder: number; topicCount: number; fileCount: number; lastAt: string; lastBy: string | null };
+export type CoverageRow = {
+  key: string;
+  subjectId: string;
+  code: string;
+  nameTh: string;
+  departmentId: string;
+  gradeLevelId: string;
+  gradeName: string;
+  gradeSort: number;
+  lessons: CoverageLesson[];
+};
+
+type CoverageSubject = { code: string; name_th: string; department_id: string };
+type CoverageGrade = { name: string; sort_order: number };
+
+/** Every curriculum (subject x grade) plus any that already have lessons, with per-lesson topic/file counts — for the ติดตามเนื้อหา tab. RLS limits lessons to what the caller reads. */
+export function useDocCoverage() {
+  return useQuery({
+    queryKey: ["doc_summary", "coverage"],
+    queryFn: async (): Promise<CoverageRow[]> => {
+      const [cur, les] = await Promise.all([
+        supabase
+          .from("curriculum_subjects")
+          .select("subject_id, grade_level_id, subjects!inner(code, name_th, department_id, is_active), grade_levels(name, sort_order)")
+          .eq("subjects.is_active", true),
+        supabase
+          .from("doc_lessons")
+          .select("*, subjects(code, name_th, department_id), grade_levels(name, sort_order), doc_topics(count), doc_files(created_at, uploaded_by)")
+          .order("sort_order"),
+      ]);
+      if (cur.error) throw cur.error;
+      if (les.error) throw les.error;
+      const out = new Map<string, CoverageRow>();
+      const row = (subjectId: string, gradeId: string, s: CoverageSubject | null, g: CoverageGrade | null) => {
+        const key = `${subjectId}:${gradeId}`;
+        let r = out.get(key);
+        if (!r && s) {
+          r = { key, subjectId, code: s.code, nameTh: s.name_th, departmentId: s.department_id, gradeLevelId: gradeId, gradeName: g?.name ?? "—", gradeSort: g?.sort_order ?? 0, lessons: [] };
+          out.set(key, r);
+        }
+        return r;
+      };
+      for (const c of cur.data as unknown as { subject_id: string; grade_level_id: string; subjects: CoverageSubject; grade_levels: CoverageGrade }[])
+        row(c.subject_id, c.grade_level_id, c.subjects, c.grade_levels);
+      for (const l of les.data as unknown as (DocLesson & {
+        subjects: CoverageSubject | null;
+        grade_levels: CoverageGrade | null;
+        doc_topics: { count: number }[];
+        doc_files: { created_at: string; uploaded_by: string }[];
+      })[]) {
+        row(l.subject_id, l.grade_level_id, l.subjects, l.grade_levels)?.lessons.push({
+          id: l.id,
+          name: l.name,
+          sortOrder: l.sort_order,
+          topicCount: l.doc_topics[0]?.count ?? 0,
+          fileCount: l.doc_files.length,
+          createdBy: l.created_by,
+          lastAt: [l.updated_at, ...l.doc_files.map((f) => f.created_at)].sort().at(-1)!,
+          lastBy: [...l.doc_files].sort((a, b) => a.created_at.localeCompare(b.created_at)).at(-1)?.uploaded_by ?? null,
+        });
+      }
+      return [...out.values()];
+    },
+  });
+}

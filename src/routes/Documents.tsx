@@ -47,6 +47,7 @@ import type { DocFile, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
+import { DocCoverageTab } from "@/routes/DocCoverage";
 import { DocProgressTab, MyDocTasksTab, ReviewDocsTab } from "@/routes/DocProgress";
 import { EditableName } from "@/routes/Practice";
 
@@ -87,6 +88,7 @@ function TeacherDocuments() {
       ? [
           { id: "progress", label: "ภาพรวม", icon: BarChartIcon },
           { id: "review", label: "ตรวจเอกสาร", icon: CheckmarkCircleIcon },
+          { id: "coverage", label: "ติดตามเนื้อหา", icon: BookIcon },
         ]
       : []),
     { id: "docs", label: "เอกสารการสอน", icon: DocumentTextIcon },
@@ -117,7 +119,7 @@ function TeacherDocuments() {
           </button>
         ))}
       </div>
-      {tab === "progress" ? <DocProgressTab /> : tab === "review" ? <ReviewDocsTab /> : tab === "mine" ? <MyDocTasksTab /> : browser}
+      {tab === "progress" ? <DocProgressTab /> : tab === "review" ? <ReviewDocsTab /> : tab === "coverage" ? <DocCoverageTab /> : tab === "mine" ? <MyDocTasksTab /> : browser}
     </div>
   );
 }

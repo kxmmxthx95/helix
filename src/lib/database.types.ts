@@ -800,6 +800,7 @@ export type DocLesson = {
   grade_level_id: string;
   name: string;
   sort_order: number;
+  created_by: string | null; // see migration 0079
   created_at: string;
   updated_at: string;
 };
@@ -1421,7 +1422,7 @@ export type Database = {
         InsertOf<ExamAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
       >;
       exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
-      doc_lessons: Table<DocLesson, InsertOf<DocLesson, "sort_order" | "created_at" | "updated_at">>;
+      doc_lessons: Table<DocLesson, InsertOf<DocLesson, "sort_order" | "created_by" | "created_at" | "updated_at">>;
       doc_topics: Table<DocTopic, InsertOf<DocTopic, "sort_order" | "created_at" | "updated_at">>;
       doc_files: Table<DocFile, InsertOf<DocFile, "description" | "topic_id" | "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
       doc_tasks: Table<DocTask, InsertOf<DocTask, "description" | "department_id" | "learning_area_id">>;
