@@ -1,6 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { AppsIcon, BookIcon, ChevronForward, DocumentTextIcon, ListIcon, Plus, Search, X } from "@/components/icons";
+import {
+  AppsIcon,
+  BookIcon,
+  ChevronForward,
+  DocumentTextIcon,
+  LibraryIcon,
+  ListIcon,
+  Plus,
+  Search,
+  Upload,
+  Users,
+  X,
+} from "@/components/icons";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Pagination, Select } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
@@ -8,6 +20,7 @@ import { usePagination } from "@/hooks/usePagination";
 import { useSubjects } from "@/hooks/useCurriculum";
 import {
   DOC_ACCEPT,
+  type DocLessonNode,
   docFilePaths,
   docFileSignedUrl,
   useAllGradeLevels,
@@ -17,10 +30,10 @@ import {
   useDeleteDocLesson,
   useDeleteDocTopic,
   useDocFiles,
-  useDocLessons,
+  useDocTree,
   useDocSummary,
   useSubjectGradeLevelIds,
-  useDocTopics,
+  useSubjectClassroomCount,
   useUpdateDocLesson,
   useUpdateDocTopic,
   useUploadDocFile,
@@ -93,7 +106,7 @@ function StudentDocuments() {
               type="button"
               onClick={() => setSelectedId(s.id)}
               className={cn(
-                "tappable rounded-full px-3 py-1.5 text-xs font-medium",
+                "rounded-full px-3 py-1.5 text-xs font-medium",
                 current.id === s.id ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:bg-muted",
               )}
             >
@@ -247,7 +260,7 @@ function DocBrowser({
           </Select>
         )}
         {canEdit && (
-          <Button size="icon" aria-label="เพิ่มเอกสารการสอน" onClick={() => setAdding((a) => !a)}>
+          <Button className="active:scale-100" size="icon" aria-label="เพิ่มเอกสารการสอน" onClick={() => setAdding((a) => !a)}>
             <Plus className="h-3 w-3" />
           </Button>
         )}
@@ -283,7 +296,7 @@ function DocBrowser({
                 aria-pressed={view === v}
                 onClick={() => setView(v)}
                 className={cn(
-                  "tappable flex h-6 w-8 items-center justify-center rounded-md",
+                  "flex h-6 w-8 items-center justify-center rounded-md",
                   view === v ? "bg-muted text-foreground" : "text-muted-foreground",
                 )}
               >
@@ -357,7 +370,7 @@ function DocBrowser({
               key={s.id}
               type="button"
               onClick={() => setOpenId(s.id)}
-              className="tappable group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:shadow-md"
+              className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm hover:shadow-md"
             >
               <div className="flex min-w-0 items-start gap-3">
                 <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", subjectTint(s.id))}>
@@ -401,7 +414,17 @@ function DocBrowser({
   );
 }
 
-/** One subject: grade tabs (fixed for students), then lessons -> topics -> files. */
+function BackButton({ label, onBack }: { label: string; onBack: () => void }) {
+  return (
+    <Button className="active:scale-100" size="sm" variant="ghost" onClick={onBack}>
+      <ChevronForward className="h-3 w-3 rotate-180" /> {label}
+    </Button>
+  );
+}
+
+type LessonSort = "order" | "az" | "files";
+
+/** One subject at one grade: banner + stats, then lessons (expandable to topics) -> files. `fixedGradeLevelId` (students) pins the grade. */
 function SubjectDocs({
   subject,
   canEdit,
@@ -414,12 +437,18 @@ function SubjectDocs({
   onBack: () => void;
 }) {
   const [pickedGradeId, setPickedGradeId] = useState("");
-  const [lesson, setLesson] = useState<{ id: string; name: string } | null>(null);
   const [topic, setTopic] = useState<{ id: string; name: string } | null>(null);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<LessonSort>("order");
+  const [view, setView] = useState<"list" | "grid">("list");
+  const [adding, setAdding] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const { data: gradeLevels = [] } = useAllGradeLevels();
-
   const { data: curriculumGradeIds = [] } = useSubjectGradeLevelIds(subject.id);
   const { data: summary } = useDocSummary();
+  const create = useCreateDocLesson();
+  const toast = useToast();
+
   // Grades the subject really belongs to: curriculum bindings + suggested grade + any grade that already has lessons.
   // Falls back to every grade of the department only when none of those exist, so a new subject stays usable.
   const relevantIds = new Set([
@@ -430,200 +459,470 @@ function SubjectDocs({
   const deptGrades = gradeLevels.filter((g) => g.department_id === subject.department_id);
   const gradeOptions = relevantIds.size ? deptGrades.filter((g) => relevantIds.has(g.id)) : deptGrades;
   const gradeId = fixedGradeLevelId ?? (pickedGradeId || gradeOptions[0]?.id || "");
+  const grade = gradeLevels.find((g) => g.id === gradeId) ?? null;
 
-  if (lesson && topic) return <TopicFiles topic={topic} canEdit={canEdit} onBack={() => setTopic(null)} />;
-  if (lesson) {
-    return <TopicList lesson={lesson} canEdit={canEdit} onBack={() => setLesson(null)} onOpenTopic={setTopic} />;
-  }
+  const { data: tree = [] } = useDocTree(subject.id, gradeId || null);
+  const { data: classroomCount = 0 } = useSubjectClassroomCount(subject.id, gradeId || null);
+
+  if (topic) return <TopicFiles topic={topic} canEdit={canEdit} onBack={() => setTopic(null)} />;
+
+  const q = search.trim().toLowerCase();
+  const lessons = tree
+    .filter((l) => !q || l.name.toLowerCase().includes(q) || l.topics.some((t) => t.name.toLowerCase().includes(q)))
+    .sort((a, b) =>
+      sort === "files" ? b.fileCount - a.fileCount : sort === "az" ? a.name.localeCompare(b.name, "th") : 0,
+    );
+  const totalFiles = tree.reduce((n, l) => n + l.fileCount, 0);
 
   return (
-    <div className="space-y-3">
-      <BackButton label={`${subject.code} ${subject.name_th}`} onBack={onBack} />
-      {fixedGradeLevelId === undefined && (
-        <div className="flex flex-wrap gap-1.5">
-          {gradeOptions.map((g) => (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <BackButton label={`${subject.code} ${subject.name_th}`} onBack={onBack} />
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          ชั้นเรียน
+          {fixedGradeLevelId === undefined ? (
+            <Select value={gradeId} onChange={(e) => setPickedGradeId(e.target.value)} aria-label="ระดับชั้น" className="w-28">
+              {gradeOptions.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {gradeShortLabel(g.code)}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <span className="rounded-full bg-foreground px-3 py-1.5 font-medium text-background">
+              {grade ? gradeShortLabel(grade.code) : "-"}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-pink-200/60 bg-gradient-to-r from-pink-100 via-pink-50 to-purple-100 p-5 dark:border-pink-400/20 dark:from-pink-500/15 dark:via-pink-500/5 dark:to-purple-500/15">
+        <div className="flex items-start gap-4">
+          <div className={cn("flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl", subjectTint(subject.id))}>
+            <BookIcon className="h-8 w-8" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold">{subject.name_th}</h1>
+            <p className="mt-1 text-xs text-muted-foreground">
+              รหัสวิชา {subject.code}
+              {grade && ` | ระดับชั้น ${gradeShortLabel(grade.code)}`}
+            </p>
+            <p className="mt-2 max-w-xl text-xs text-muted-foreground">
+              เอกสารการสอน สื่อประกอบการเรียน ใบงาน แบบฝึกหัด และสรุปเนื้อหา สำหรับรายวิชา{subject.name_th}
+              {grade && ` ระดับชั้น${grade.name}`}
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3">
+          <Stat icon={DocumentTextIcon} value={totalFiles} label="เอกสารทั้งหมด" />
+          <Stat icon={LibraryIcon} value={tree.length} label="เนื้อหาหลัก" />
+          {canEdit && <Stat icon={Users} value={classroomCount} label="ห้องเรียนที่ใช้" />}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[12rem] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหาเนื้อหา..."
+            className="pl-9"
+            aria-label="ค้นหาเนื้อหา"
+          />
+        </div>
+        <div className="flex rounded-lg border border-border bg-card p-0.5">
+          {(["list", "grid"] as const).map((v) => (
             <button
-              key={g.id}
+              key={v}
               type="button"
-              onClick={() => setPickedGradeId(g.id)}
+              aria-label={v === "grid" ? "มุมมองกริด" : "มุมมองรายการ"}
+              aria-pressed={view === v}
+              onClick={() => setView(v)}
               className={cn(
-                "tappable rounded-full px-3 py-1.5 text-xs font-medium",
-                gradeId === g.id ? "bg-foreground text-background" : "bg-muted text-muted-foreground",
+                "flex h-6 w-8 items-center justify-center rounded-md",
+                view === v ? "bg-muted text-foreground" : "text-muted-foreground",
               )}
             >
-              {gradeShortLabel(g.code)}
+              {v === "grid" ? <AppsIcon className="h-3.5 w-3.5" /> : <ListIcon className="h-3.5 w-3.5" />}
             </button>
           ))}
         </div>
+        <Select value={sort} onChange={(e) => setSort(e.target.value as LessonSort)} aria-label="เรียงตาม" className="w-44">
+          <option value="order">เรียงตาม: ลำดับเนื้อหา</option>
+          <option value="az">เรียงตาม: ชื่อ A-Z</option>
+          <option value="files">เรียงตาม: เอกสารมากสุด</option>
+        </Select>
+        {canEdit && (
+          <>
+            <Button className="active:scale-100" size="icon" variant="outline" aria-label="อัพโหลดเอกสาร" onClick={() => setUploading(true)}>
+              <Upload className="h-3 w-3" />
+            </Button>
+            <Button className="active:scale-100" size="icon" aria-label="เพิ่มเนื้อหาหลัก" onClick={() => setAdding((a) => !a)}>
+              <Plus className="h-3 w-3" />
+            </Button>
+          </>
+        )}
+      </div>
+
+      {canEdit && gradeId && (
+        <AddLessonDialog
+          open={adding}
+          onClose={() => setAdding(false)}
+          onAdd={(name) =>
+            create.mutate(
+              { subject_id: subject.id, grade_level_id: gradeId, name, sort_order: tree.length },
+              { onSuccess: () => setAdding(false), onError: () => toast("เพิ่มไม่สำเร็จ", "error") },
+            )
+          }
+          pending={create.isPending}
+        />
       )}
-      {gradeId ? (
-        <LessonList subject={subject} gradeLevelId={gradeId} canEdit={canEdit} onOpenLesson={setLesson} />
-      ) : (
+
+      {canEdit && <UploadDocDialog open={uploading} onClose={() => setUploading(false)} tree={tree} />}
+
+      {!gradeId ? (
         <EmptyState title="ไม่พบระดับชั้น" description="ยังไม่มีห้องเรียนปัจจุบัน" />
+      ) : lessons.length === 0 ? (
+        <EmptyState
+          title={tree.length === 0 ? "ยังไม่มีเนื้อหาหลัก" : "ไม่พบเนื้อหา"}
+          description={tree.length === 0 ? (canEdit ? "กด “เพิ่มเนื้อหาหลัก” เพื่อเริ่มจัดหมวดเอกสาร" : "ครูยังไม่ได้เพิ่มเอกสาร") : "ลองเปลี่ยนคำค้นหา"}
+        />
+      ) : (
+        <div className={cn("gap-3", view === "grid" ? "grid items-start md:grid-cols-2" : "flex flex-col")}>
+          {lessons.map((l) => (
+            <LessonRow key={l.id} lesson={l} index={tree.indexOf(l)} canEdit={canEdit} onOpenTopic={setTopic} />
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
-function BackButton({ label, onBack }: { label: string; onBack: () => void }) {
+/** Centered modal shell — Escape / backdrop click close it. Children mount only while open, so their form state resets each time. */
+function Modal({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
   return (
-    <Button size="sm" variant="ghost" onClick={onBack}>
-      <ChevronForward className="h-3 w-3 rotate-180" /> {label}
-    </Button>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="animate-fade-in max-h-full w-full max-w-md space-y-4 overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-md"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-base font-bold">{title}</h2>
+        {children}
+      </div>
+    </div>
   );
 }
 
-function LessonList({
-  subject,
-  gradeLevelId,
-  canEdit,
-  onOpenLesson,
+function AddLessonDialog({
+  open,
+  onClose,
+  onAdd,
+  pending,
 }: {
-  subject: Subject;
-  gradeLevelId: string;
-  canEdit: boolean;
-  onOpenLesson: (l: { id: string; name: string }) => void;
+  open: boolean;
+  onClose: () => void;
+  onAdd: (name: string) => void;
+  pending: boolean;
 }) {
-  const { data: lessons = [] } = useDocLessons(subject.id, gradeLevelId);
-  const create = useCreateDocLesson();
-  const update = useUpdateDocLesson();
-  const remove = useDeleteDocLesson();
-  const toast = useToast();
+  return (
+    <Modal open={open} onClose={onClose} title="เพิ่มเนื้อหาหลัก">
+      <AddLessonForm onClose={onClose} onAdd={onAdd} pending={pending} />
+    </Modal>
+  );
+}
 
-  async function onDelete(l: { id: string; name: string }) {
-    const paths = await docFilePaths({ lessonId: l.id });
-    const extra = paths.length ? ` เอกสาร ${paths.length} ไฟล์ในบทเรียนนี้จะถูกลบด้วย` : "";
-    if (!confirm(`ลบบทเรียน "${l.name}"? เนื้อหาย่อยทั้งหมดจะถูกลบด้วย${extra}`)) return;
-    remove.mutate({ id: l.id, paths }, { onError: () => toast("ลบไม่สำเร็จ", "error") });
+function AddLessonForm({ onClose, onAdd, pending }: { onClose: () => void; onAdd: (name: string) => void; pending: boolean }) {
+  const [name, setName] = useState("");
+  function submit() {
+    const trimmed = name.trim();
+    if (trimmed && !pending) onAdd(trimmed);
+  }
+  return (
+    <>
+      <Field label="ชื่อเนื้อหาหลัก" required>
+        <Input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder="เช่น หน่วยที่ 1 ธาตุและตารางธาตุ"
+        />
+      </Field>
+      <div className="flex justify-end gap-2">
+        <Button className="active:scale-100" variant="outline" onClick={onClose}>
+          ยกเลิก
+        </Button>
+        <Button className="active:scale-100" onClick={submit} disabled={!name.trim() || pending}>
+          เพิ่ม
+        </Button>
+      </div>
+    </>
+  );
+}
+
+/** Upload from the subject page: pick เนื้อหาหลัก -> เนื้อหาย่อย, then the file. */
+function UploadDocDialog({
+  open,
+  onClose,
+  tree,
+}: {
+  open: boolean;
+  onClose: () => void;
+  tree: DocLessonNode[];
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title="อัพโหลดเอกสาร">
+      <UploadDocForm onClose={onClose} tree={tree} />
+    </Modal>
+  );
+}
+
+function UploadDocForm({ onClose, tree }: { onClose: () => void; tree: DocLessonNode[] }) {
+  const { profile: me } = useAuth();
+  const upload = useUploadDocFile();
+  const toast = useToast();
+  const [lessonId, setLessonId] = useState(tree.length === 1 ? tree[0]!.id : "");
+  const lesson = tree.find((l) => l.id === lessonId) ?? null;
+  const [topicId, setTopicId] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+
+  if (tree.every((l) => l.topics.length === 0)) {
+    return (
+      <>
+        <p className="text-xs text-muted-foreground">ยังไม่มีเนื้อหาย่อย เพิ่มเนื้อหาหลักและเนื้อหาย่อยก่อนจึงจะอัพโหลดเอกสารได้</p>
+        <div className="flex justify-end">
+          <Button className="active:scale-100" variant="outline" onClick={onClose}>
+            ปิด
+          </Button>
+        </div>
+      </>
+    );
+  }
+
+  function submit() {
+    if (!file || !topicId || !me) return;
+    upload.mutate(
+      { file, topicId, title: title.trim() || file.name, description: description.trim() || null, uploadedBy: me.id },
+      {
+        onSuccess: () => {
+          toast("อัพโหลดแล้ว");
+          onClose();
+        },
+        onError: (e) => toast(e instanceof Error && e.message ? e.message : "อัพโหลดไม่สำเร็จ", "error"),
+      },
+    );
   }
 
   return (
-    <NameList
-      title="เนื้อหาหลัก"
-      emptyTitle="ยังไม่มีเนื้อหาหลัก"
-      items={lessons}
-      canEdit={canEdit}
-      addPlaceholder="เพิ่มเนื้อหาหลัก"
-      onOpen={onOpenLesson}
-      onRename={(id, name) => update.mutate({ id, name })}
-      onDelete={(l) => void onDelete(l)}
-      onAdd={(name) =>
-        create.mutate(
-          { subject_id: subject.id, grade_level_id: gradeLevelId, name, sort_order: lessons.length },
-          { onError: () => toast("เพิ่มไม่สำเร็จ", "error") },
-        )
-      }
-    />
+    <>
+      <Field label="เนื้อหาหลัก" required>
+        <Select
+          value={lessonId}
+          onChange={(e) => {
+            setLessonId(e.target.value);
+            setTopicId("");
+          }}
+          placeholder="เลือกเนื้อหาหลัก"
+        >
+          {tree.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="เนื้อหาย่อย" required>
+        <Select value={topicId} onChange={(e) => setTopicId(e.target.value)} disabled={!lesson} placeholder="เลือกเนื้อหาย่อย">
+          {lesson?.topics.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="ไฟล์ (PDF, Word, PowerPoint, Excel, รูปภาพ — ไม่เกิน 20 MB)" required>
+        <input
+          type="file"
+          accept={DOC_ACCEPT}
+          className="text-xs"
+          onChange={(e) => {
+            const f = e.target.files?.[0] ?? null;
+            setFile(f);
+            if (f && !title) setTitle(f.name.replace(/\.[^.]+$/, ""));
+          }}
+        />
+      </Field>
+      <Field label="ชื่อเอกสาร">
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+      </Field>
+      <Field label="คำอธิบาย (ไม่บังคับ)">
+        <Input value={description} onChange={(e) => setDescription(e.target.value)} />
+      </Field>
+      <div className="flex justify-end gap-2">
+        <Button className="active:scale-100" variant="outline" onClick={onClose}>
+          ยกเลิก
+        </Button>
+        <Button className="active:scale-100" onClick={submit} disabled={!file || !topicId || upload.isPending}>
+          {upload.isPending ? "กำลังอัพโหลด…" : "อัพโหลด"}
+        </Button>
+      </div>
+    </>
   );
 }
 
-function TopicList({
+function Stat({ icon: Icon, value, label }: { icon: typeof BookIcon; value: number; label: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/60 text-foreground dark:bg-white/10">
+        <Icon className="h-5 w-5" />
+      </div>
+      <div>
+        <div className="text-base font-bold leading-tight">{value}</div>
+        <div className="text-[11px] text-muted-foreground">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+/** One เนื้อหาหลัก row: number, name, counts; expands to its เนื้อหาย่อย. Teachers can rename/delete (cascade, with a file-count confirm) and add topics. */
+function LessonRow({
   lesson,
+  index,
   canEdit,
-  onBack,
   onOpenTopic,
 }: {
-  lesson: { id: string; name: string };
+  lesson: DocLessonNode;
+  index: number;
   canEdit: boolean;
-  onBack: () => void;
   onOpenTopic: (t: { id: string; name: string }) => void;
 }) {
-  const { data: topics = [] } = useDocTopics(lesson.id);
-  const create = useCreateDocTopic();
-  const update = useUpdateDocTopic();
-  const remove = useDeleteDocTopic();
+  const [open, setOpen] = useState(false);
+  const updateLesson = useUpdateDocLesson();
+  const removeLesson = useDeleteDocLesson();
+  const createTopic = useCreateDocTopic();
+  const updateTopic = useUpdateDocTopic();
+  const removeTopic = useDeleteDocTopic();
   const toast = useToast();
 
-  async function onDelete(t: { id: string; name: string }) {
+  async function deleteLesson() {
+    const paths = await docFilePaths({ lessonId: lesson.id });
+    const extra = paths.length ? ` เอกสาร ${paths.length} ไฟล์ในบทเรียนนี้จะถูกลบด้วย` : "";
+    if (!confirm(`ลบเนื้อหาหลัก "${lesson.name}"? เนื้อหาย่อยทั้งหมดจะถูกลบด้วย${extra}`)) return;
+    removeLesson.mutate({ id: lesson.id, paths }, { onError: () => toast("ลบไม่สำเร็จ", "error") });
+  }
+
+  async function deleteTopic(t: { id: string; name: string }) {
     const paths = await docFilePaths({ topicId: t.id });
     const extra = paths.length ? ` เอกสาร ${paths.length} ไฟล์จะถูกลบด้วย` : "";
     if (!confirm(`ลบเนื้อหาย่อย "${t.name}"?${extra}`)) return;
-    remove.mutate({ id: t.id, paths }, { onError: () => toast("ลบไม่สำเร็จ", "error") });
+    removeTopic.mutate({ id: t.id, paths }, { onError: () => toast("ลบไม่สำเร็จ", "error") });
   }
 
   return (
-    <div className="space-y-3">
-      <BackButton label={lesson.name} onBack={onBack} />
-      <NameList
-        title="เนื้อหาย่อย"
-        emptyTitle="ยังไม่มีเนื้อหาย่อย"
-        items={topics}
-        canEdit={canEdit}
-        addPlaceholder="เพิ่มเนื้อหาย่อย"
-        onOpen={onOpenTopic}
-        onRename={(id, name) => update.mutate({ id, name })}
-        onDelete={(t) => void onDelete(t)}
-        onAdd={(name) =>
-          create.mutate(
-            { lesson_id: lesson.id, name, sort_order: topics.length },
-            { onError: () => toast("เพิ่มไม่สำเร็จ", "error") },
-          )
-        }
-      />
-    </div>
-  );
-}
-
-/** Shared row list for lessons and topics: click to open; teachers also get rename/delete and an add row. */
-function NameList({
-  title,
-  emptyTitle,
-  items,
-  canEdit,
-  addPlaceholder,
-  onOpen,
-  onRename,
-  onDelete,
-  onAdd,
-}: {
-  title: string;
-  emptyTitle: string;
-  items: { id: string; name: string }[];
-  canEdit: boolean;
-  addPlaceholder: string;
-  onOpen: (item: { id: string; name: string }) => void;
-  onRename: (id: string, name: string) => void;
-  onDelete: (item: { id: string; name: string }) => void;
-  onAdd: (name: string) => void;
-}) {
-  return (
-    <div className="space-y-3">
-      {items.length === 0 ? (
-        <EmptyState title={emptyTitle} description={canEdit ? "เพิ่มด้านล่างเพื่อเริ่มจัดหมวดเอกสาร" : "ครูยังไม่ได้เพิ่มเอกสาร"} />
-      ) : (
-        <div className="table-panel">
-          <table className="w-full text-xs">
-            <thead className="bg-muted text-left text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">{title}</th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id} className="border-t border-border hover:bg-muted">
-                  <td className="cursor-pointer px-3 py-3 font-medium" onClick={() => onOpen(item)}>
-                    {item.name}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {canEdit && (
-                      <div className="flex items-center justify-end gap-1">
-                        <EditableName value={item.name} onSave={(name) => onRename(item.id, name)} />
-                        <Button size="icon" variant="ghost" aria-label="ลบ" onClick={() => onDelete(item)}>
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="rounded-2xl border border-border bg-card shadow-sm">
+      <div className="flex items-center gap-3 p-3">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold">
+          {index + 1}
+        </span>
+        <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", subjectTint(lesson.id))}>
+          <LibraryIcon className="h-5 w-5" />
         </div>
-      )}
-      {canEdit && (
-        <div className="rounded-lg border border-border bg-card p-3">
-          <NewNameInput placeholder={addPlaceholder} onAdd={onAdd} />
+        <button type="button" onClick={() => setOpen((o) => !o)} className="min-w-0 flex-1 text-left">
+          <div className="truncate text-sm font-bold">{lesson.name}</div>
+          <div className="truncate text-[11px] text-muted-foreground">{lesson.topics.length} เนื้อหาย่อย</div>
+        </button>
+        <div className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
+          <DocumentTextIcon className="h-4 w-4" />
+          <div className="text-xs leading-tight">
+            <div className="font-bold text-foreground">{lesson.fileCount}</div>
+            <div className="text-[10px]">เอกสาร</div>
+          </div>
+        </div>
+        {canEdit && (
+          <div className="flex shrink-0 items-center gap-1">
+            <EditableName noMotion value={lesson.name} onSave={(name) => updateLesson.mutate({ id: lesson.id, name })} />
+            <Button className="active:scale-100" size="icon" variant="ghost" aria-label="ลบเนื้อหาหลัก" onClick={() => void deleteLesson()}>
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+        <Button className="active:scale-100"
+          size="icon"
+          variant="ghost"
+          aria-label={open ? "ซ่อนเนื้อหาย่อย" : "แสดงเนื้อหาย่อย"}
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+        >
+          <ChevronForward className={cn("h-3 w-3", open ? "-rotate-90" : "rotate-90")} />
+        </Button>
+      </div>
+
+      {open && (
+        <div className="space-y-2 border-t border-border p-3">
+          {lesson.topics.length === 0 ? (
+            <p className="px-1 text-xs text-muted-foreground">ยังไม่มีเนื้อหาย่อย</p>
+          ) : (
+            <ul className="divide-y divide-border rounded-lg border border-border">
+              {lesson.topics.map((t) => (
+                <li key={t.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted">
+                  <button type="button" onClick={() => onOpenTopic(t)} className="min-w-0 flex-1 text-left">
+                    <div className="truncate text-xs font-medium">{t.name}</div>
+                  </button>
+                  <span className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+                    <DocumentTextIcon className="h-3 w-3" /> {t.fileCount}
+                  </span>
+                  {canEdit && (
+                    <>
+                      <EditableName noMotion value={t.name} onSave={(name) => updateTopic.mutate({ id: t.id, name })} />
+                      <Button className="active:scale-100" size="icon" variant="ghost" aria-label="ลบเนื้อหาย่อย" onClick={() => void deleteTopic(t)}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {canEdit && (
+            <NewNameInput
+              placeholder="เพิ่มเนื้อหาย่อย"
+              onAdd={(name) =>
+                createTopic.mutate(
+                  { lesson_id: lesson.id, name, sort_order: lesson.topics.length },
+                  { onError: () => toast("เพิ่มไม่สำเร็จ", "error") },
+                )
+              }
+            />
+          )}
         </div>
       )}
     </div>
@@ -692,7 +991,7 @@ function TopicFiles({
           {files.map((f) => (
             <li key={f.id} className="flex items-center gap-2 px-3 py-2.5">
               <DocumentTextIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <button type="button" onClick={() => void open(f)} className="tappable min-w-0 flex-1 text-left">
+              <button type="button" onClick={() => void open(f)} className="min-w-0 flex-1 text-left">
                 <div className="truncate text-xs font-medium">{f.title}</div>
                 <div className="truncate text-[11px] text-muted-foreground">
                   {f.description ? `${f.description} · ` : ""}
@@ -700,7 +999,7 @@ function TopicFiles({
                 </div>
               </button>
               {canEdit && (
-                <Button
+                <Button className="active:scale-100"
                   size="icon"
                   variant="ghost"
                   aria-label="ลบไฟล์"
@@ -737,7 +1036,7 @@ function TopicFiles({
           <Field label="คำอธิบาย (ไม่บังคับ)">
             <Input value={description} onChange={(e) => setDescription(e.target.value)} />
           </Field>
-          <Button size="sm" onClick={submit} disabled={!file || upload.isPending}>
+          <Button className="active:scale-100" size="sm" onClick={submit} disabled={!file || upload.isPending}>
             {upload.isPending ? "กำลังอัพโหลด…" : "อัพโหลด"}
           </Button>
         </div>

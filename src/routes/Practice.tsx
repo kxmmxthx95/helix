@@ -924,9 +924,12 @@ export function NewNameInput({
 export function EditableName({
   value,
   onSave,
+  noMotion,
 }: {
   value: string;
   onSave: (name: string) => void;
+  /** Drops the press-scale animation on the pencil button. */
+  noMotion?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -937,6 +940,7 @@ export function EditableName({
         size="icon"
         variant="ghost"
         aria-label="แก้ไขชื่อ"
+        className={noMotion ? "active:scale-100" : undefined}
         onClick={() => {
           setDraft(value);
           setEditing(true);

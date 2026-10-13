@@ -35,23 +35,6 @@ export function useAllGradeLevels() {
 
 // ------------------------------------------------------------------- lessons
 
-export function useDocLessons(subjectId: string | null, gradeLevelId: string | null) {
-  return useQuery({
-    queryKey: ["doc_lessons", subjectId, gradeLevelId],
-    enabled: !!subjectId && !!gradeLevelId,
-    queryFn: async (): Promise<DocLesson[]> => {
-      const { data, error } = await supabase
-        .from("doc_lessons")
-        .select("*")
-        .eq("subject_id", subjectId!)
-        .eq("grade_level_id", gradeLevelId!)
-        .order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
 export function useCreateDocLesson() {
   const qc = useQueryClient();
   return useMutation({
@@ -75,22 +58,6 @@ export function useUpdateDocLesson() {
 }
 
 // -------------------------------------------------------------------- topics
-
-export function useDocTopics(lessonId: string | null) {
-  return useQuery({
-    queryKey: ["doc_topics", lessonId],
-    enabled: !!lessonId,
-    queryFn: async (): Promise<DocTopic[]> => {
-      const { data, error } = await supabase
-        .from("doc_topics")
-        .select("*")
-        .eq("lesson_id", lessonId!)
-        .order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-  });
-}
 
 export function useCreateDocTopic() {
   const qc = useQueryClient();
@@ -287,6 +254,61 @@ export function useSubjectGradeLevelIds(subjectId: string | null) {
         .eq("subject_id", subjectId!);
       if (error) throw error;
       return [...new Set(data.map((r) => r.grade_level_id))];
+    },
+  });
+}
+
+// ---------------------------------------------------------------------- tree
+
+export type DocLessonNode = DocLesson & {
+  topics: (DocTopic & { fileCount: number })[];
+  fileCount: number;
+};
+
+/** Lessons of one (subject, grade) with their topics and per-topic file counts. Keyed under "doc_summary" so every file/topic/lesson mutation (which already invalidates it) refreshes this too. */
+export function useDocTree(subjectId: string | null, gradeLevelId: string | null) {
+  return useQuery({
+    queryKey: ["doc_summary", "tree", subjectId, gradeLevelId],
+    enabled: !!subjectId && !!gradeLevelId,
+    queryFn: async (): Promise<DocLessonNode[]> => {
+      const { data, error } = await supabase
+        .from("doc_lessons")
+        .select("*, doc_topics(*, doc_files(count))")
+        .eq("subject_id", subjectId!)
+        .eq("grade_level_id", gradeLevelId!)
+        .order("sort_order");
+      if (error) throw error;
+      const rows = data as unknown as (DocLesson & { doc_topics: (DocTopic & { doc_files: { count: number }[] })[] })[];
+      return rows.map(({ doc_topics, ...lesson }) => {
+        const topics = doc_topics
+          .map(({ doc_files, ...t }) => ({ ...t, fileCount: doc_files[0]?.count ?? 0 }))
+          .sort((a, b) => a.sort_order - b.sort_order);
+        return { ...lesson, topics, fileCount: topics.reduce((n, t) => n + t.fileCount, 0) };
+      });
+    },
+  });
+}
+
+/** Classrooms of this grade that have a teaching assignment for the subject (any year) — the "ห้องเรียนที่ใช้" stat. */
+export function useSubjectClassroomCount(subjectId: string | null, gradeLevelId: string | null) {
+  return useQuery({
+    queryKey: ["teaching_assignments", "classroom_count", subjectId, gradeLevelId],
+    enabled: !!subjectId && !!gradeLevelId,
+    queryFn: async (): Promise<number> => {
+      const { data: ta, error } = await supabase
+        .from("teaching_assignments")
+        .select("classroom_id")
+        .eq("subject_id", subjectId!);
+      if (error) throw error;
+      const ids = [...new Set(ta.map((r) => r.classroom_id))];
+      if (ids.length === 0) return 0;
+      const { data, error: cErr } = await supabase
+        .from("classrooms")
+        .select("id")
+        .in("id", ids)
+        .eq("grade_level_id", gradeLevelId!);
+      if (cErr) throw cErr;
+      return data.length;
     },
   });
 }
