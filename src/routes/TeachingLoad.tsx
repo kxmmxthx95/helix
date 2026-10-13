@@ -248,7 +248,42 @@ function TeachingLoadBoard({
   }, [teachers, sortKey, sortDir, totalByTeacher]);
 
   const selectedTeacher = teachers.find((t) => t.id === selectedTeacherId);
-  const rows = assignments.filter((a) => a.teacher_id === selectedTeacherId);
+  const { data: classrooms = [] } = useClassroomsByDepartment(departmentId);
+  const { data: gradeLevels = [] } = useGradeLevels(departmentId);
+  const { data: allSubjects = [] } = useSubjects({
+    search: "",
+    departmentId,
+    learningAreaId: "",
+    gradeLevelId: "",
+    term: "",
+    subjectType: "",
+    includeInactive: true,
+  });
+  // ระดับชั้น → ห้อง → รหัสวิชา
+  const rows = useMemo(() => {
+    const classroomById = new Map(classrooms.map((c) => [c.id, c]));
+    const gradeOrder = new Map(gradeLevels.map((g) => [g.id, g.sort_order]));
+    const code = new Map(allSubjects.map((x) => [x.id, x.code]));
+    const key = (a: TeachingAssignment) => {
+      const c = classroomById.get(a.classroom_id);
+      return [
+        gradeOrder.get(c?.grade_level_id ?? "") ?? 0,
+        c?.name ?? "",
+        code.get(a.subject_id) ?? "",
+      ] as const;
+    };
+    return assignments
+      .filter((a) => a.teacher_id === selectedTeacherId)
+      .sort((x, y) => {
+        const [gx, cx, sx] = key(x);
+        const [gy, cy, sy] = key(y);
+        return (
+          gx - gy ||
+          cx.localeCompare(cy, "th", { numeric: true }) ||
+          sx.localeCompare(sy, "th", { numeric: true })
+        );
+      });
+  }, [assignments, selectedTeacherId, classrooms, gradeLevels, allSubjects]);
   const areaName = (t: ProfileRow) =>
     learningAreas.find((l) => l.id === t.learning_area_id)?.name ?? "—";
 

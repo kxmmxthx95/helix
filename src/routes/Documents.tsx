@@ -212,7 +212,6 @@ function DocBrowser({
   const [gradeCode, setGradeCode] = useState("");
   const [sort, setSort] = useState<SortKey>("az");
   const [view, setView] = useState<"grid" | "list">("grid");
-  const [adding, setAdding] = useState(false);
   const { data: gradeLevels = [] } = useAllGradeLevels();
   const { data: summary } = useDocSummary();
   const { data: departments = [] } = useDepartments();
@@ -304,27 +303,7 @@ function DocBrowser({
             ))}
           </Select>
         )}
-        {canEdit && (
-          <Button className="active:scale-100" size="icon" aria-label="เพิ่มเอกสารการสอน" onClick={() => setAdding((a) => !a)}>
-            <Plus className="h-3 w-3" />
-          </Button>
-        )}
       </div>
-
-      {adding && (
-        <Select
-          value=""
-          onChange={(e) => e.target.value && setOpenId(e.target.value)}
-          aria-label="เลือกวิชาที่จะเพิ่มเอกสาร"
-          placeholder="เลือกวิชาที่จะเพิ่มเอกสาร"
-        >
-          {subjects.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.code} {s.name_th}
-            </option>
-          ))}
-        </Select>
-      )}
 
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
