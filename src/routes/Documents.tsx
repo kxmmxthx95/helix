@@ -87,7 +87,7 @@ function TeacherDocuments() {
   // งานเอกสาร tabs: reviewers (super_admin / director / dept_head) track progress, teachers answer their tasks.
   const tabs = [
     ...(me!.roles.some((r) => r === "super_admin" || r === "director" || r === "dept_head")
-      ? [{ id: "progress", label: "ติดตามความคืบหน้า", icon: BarChartIcon }]
+      ? [{ id: "progress", label: "ภาพรวม", icon: BarChartIcon }]
       : []),
     { id: "docs", label: "เอกสารการสอน", icon: DocumentTextIcon },
     ...(me!.roles.includes("teacher") ? [{ id: "mine", label: "งานของฉัน", icon: ClipboardIcon }] : []),
