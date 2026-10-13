@@ -692,7 +692,7 @@ function ClassroomPanel({
   );
 }
 
-function HomeroomSheet({
+export function HomeroomSheet({
   open,
   onClose,
   classroomId,
