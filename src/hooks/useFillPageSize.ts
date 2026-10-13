@@ -24,15 +24,20 @@ export function useFillPageSize(
     const el = scrollRef.current;
     if (!el) return;
 
+    // Measure the panel that stretches to the viewport, not the scroll node itself: with few rows
+    // the scroll node can shrink to its content, which would lock the page size at `min`.
+    const box = el.closest<HTMLElement>(".table-panel") ?? el;
+
     const compute = () => {
       const thead = el.querySelector("thead");
       const headerH = thead instanceof HTMLElement ? thead.offsetHeight : rowHeight;
-      const next = Math.min(max, Math.max(min, Math.floor((el.clientHeight - headerH) / rowHeight)));
+      const next = Math.min(max, Math.max(min, Math.floor((box.clientHeight - headerH) / rowHeight)));
       setPageSize((prev) => (prev === next ? prev : next));
     };
 
     compute();
     const ro = new ResizeObserver(compute);
+    ro.observe(box);
     ro.observe(el);
     const thead = el.querySelector("thead");
     if (thead) ro.observe(thead);
