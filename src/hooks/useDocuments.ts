@@ -75,6 +75,26 @@ export function useDocFiles(lessonId: string | null) {
   });
 }
 
+/** supabase-js has no upload progress, so POST to the Storage REST endpoint with XHR (same call supabase-js makes). */
+async function uploadWithProgress(path: string, file: File, onProgress?: (pct: number) => void) {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("หมดเวลาเข้าสู่ระบบ");
+  const form = new FormData();
+  form.append("cacheControl", "3600");
+  form.append("", file);
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/${BUCKET}/${path}`);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("apikey", import.meta.env.VITE_SUPABASE_ANON_KEY);
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(Math.round((e.loaded / e.total) * 100));
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("อัพโหลดไม่สำเร็จ")));
+    xhr.onerror = () => reject(new Error("อัพโหลดไม่สำเร็จ"));
+    xhr.send(form);
+  });
+}
+
 /** Checks type/size, uploads to the private bucket under `${lessonId}/`, then inserts the row; removes the object again if the insert fails. */
 export function useUploadDocFile() {
   const qc = useQueryClient();
@@ -85,20 +105,21 @@ export function useUploadDocFile() {
       title,
       description,
       uploadedBy,
+      onProgress,
     }: {
       file: File;
       lessonId: string;
       title: string;
       description: string | null;
       uploadedBy: string;
+      onProgress?: (pct: number) => void;
     }) => {
       if (!DOC_MIME_TYPES.includes(file.type)) throw new Error("ชนิดไฟล์ไม่รองรับ");
       if (file.size > DOC_MAX_BYTES) throw new Error("ไฟล์ใหญ่เกิน 20 MB");
       // Storage keys must be ASCII-safe; the original name is kept in file_name.
       const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : "";
       const path = `${lessonId}/${crypto.randomUUID()}${ext}`;
-      const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
-      if (upErr) throw upErr;
+      await uploadWithProgress(path, file, onProgress);
       const { error } = await supabase.from("doc_files").insert({
         lesson_id: lessonId,
         title,

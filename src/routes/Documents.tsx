@@ -819,11 +819,12 @@ function UploadDocForm({ onClose, tree, preset }: { onClose: () => void; tree: D
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [progress, setProgress] = useState(0);
 
   function submit() {
     if (!file || !lessonId || !me) return;
     upload.mutate(
-      { file, lessonId, title: title.trim() || file.name, description: description.trim() || null, uploadedBy: me.id },
+      { file, lessonId, title: title.trim() || file.name, description: description.trim() || null, uploadedBy: me.id, onProgress: setProgress },
       {
         onSuccess: () => {
           toast("อัพโหลดแล้ว");
@@ -867,12 +868,23 @@ function UploadDocForm({ onClose, tree, preset }: { onClose: () => void; tree: D
       <Field label="คำอธิบาย (ไม่บังคับ)">
         <Input value={description} onChange={(e) => setDescription(e.target.value)} />
       </Field>
+      {upload.isPending && (
+        <div
+          role="progressbar"
+          aria-valuenow={progress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          className="h-2 w-full overflow-hidden rounded-full bg-muted"
+        >
+          <div className="h-full bg-accent transition-[width]" style={{ width: `${progress}%` }} />
+        </div>
+      )}
       <div className="flex justify-end gap-2">
         <Button className="active:scale-100" variant="outline" onClick={onClose}>
           ยกเลิก
         </Button>
         <Button className="active:scale-100" onClick={submit} disabled={!file || !lessonId || upload.isPending}>
-          {upload.isPending ? "กำลังอัพโหลด…" : "อัพโหลด"}
+          {upload.isPending ? `กำลังอัพโหลด ${progress}%` : "อัพโหลด"}
         </Button>
       </div>
     </>
