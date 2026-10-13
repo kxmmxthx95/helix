@@ -5,7 +5,6 @@ import { GameShell } from "@/components/game/GameShell";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ToastProvider } from "@/components/Toast";
 import { Spinner } from "@/components/ui";
-import { UpdatePrompt } from "@/components/UpdatePrompt";
 import { Assignments } from "@/routes/Assignments";
 import { Attendance } from "@/routes/Attendance";
 import { BehaviorScore } from "@/routes/BehaviorScore";
@@ -110,7 +109,6 @@ export default function App() {
             <Gate />
           </AuthProvider>
         </BrowserRouter>
-        <UpdatePrompt />
       </ToastProvider>
     </ThemeProvider>
   );
