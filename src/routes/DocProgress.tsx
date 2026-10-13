@@ -764,7 +764,7 @@ export function ReviewDocsTab() {
         f.title.toLowerCase().includes(q) ||
         f.file_name.toLowerCase().includes(q) ||
         (f.doc_lessons?.name ?? "").toLowerCase().includes(q) ||
-        (f.doc_lessons?.subjects?.name ?? "").toLowerCase().includes(q) ||
+        (f.doc_lessons?.subjects?.name_th ?? "").toLowerCase().includes(q) ||
         (teacher ? profileFullName(teacher).toLowerCase().includes(q) : false)
       );
     });
@@ -929,7 +929,7 @@ export function ReviewDocsTab() {
           <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
             {shownUploads.map((f) => {
               const teacher = teacherById.get(f.uploaded_by);
-              const where = [f.doc_lessons?.subjects?.name, f.doc_lessons?.name].filter(Boolean).join(" · ");
+              const where = [f.doc_lessons?.subjects?.name_th, f.doc_lessons?.name].filter(Boolean).join(" · ");
               return (
                 <li key={f.id}>
                   <button
