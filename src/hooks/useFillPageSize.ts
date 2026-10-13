@@ -19,9 +19,15 @@ export function useFillPageSize(
   const max = opts?.max ?? MAX;
   const [pageSize, setPageSize] = useState(min);
 
+  // The scroll node can be unmounted and remounted while `ready` stays true (skeleton while refetching,
+  // department switch), which would leave the observers on a detached element — so track the live node.
+  const [el, setEl] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => {
-    if (!ready) return;
-    const el = scrollRef.current;
+    const live = ready ? scrollRef.current : null;
+    setEl((prev) => (prev === live ? prev : live));
+  });
+
+  useLayoutEffect(() => {
     if (!el) return;
 
     // Measure the panel that stretches to the viewport, not the scroll node itself: with few rows
@@ -42,7 +48,7 @@ export function useFillPageSize(
     const thead = el.querySelector("thead");
     if (thead) ro.observe(thead);
     return () => ro.disconnect();
-  }, [scrollRef, ready, rowHeight, min, max]);
+  }, [el, rowHeight, min, max]);
 
   return pageSize;
 }
