@@ -150,19 +150,6 @@ export function DocProgressTab() {
   for (const { p } of rows) counts[p.status]++;
   const pct = (n: number) => (rows.length ? Math.round((n / rows.length) * 1000) / 10 : 0);
 
-  // By learning area (stacked bars of teachers by status; teachers with no data are left out)
-  const byArea = useMemo(() => {
-    const m = new Map<string, { name: string; complete: number; partial: number; none: number }>();
-    for (const { teacher, p } of rows) {
-      if (p.status === "nodata") continue;
-      const key = teacher.learning_area_id ?? "-";
-      const e = m.get(key) ?? { name: areaName.get(key) ?? "ไม่ระบุกลุ่มสาระ", complete: 0, partial: 0, none: 0 };
-      e[p.status]++;
-      m.set(key, e);
-    }
-    return [...m.values()].sort((a, b) => a.name.localeCompare(b.name, "th"));
-  }, [rows, areaName]);
-
   const q = search.trim().toLowerCase();
   const filtered = rows.filter(
     ({ teacher, p }) =>
@@ -187,38 +174,6 @@ export function DocProgressTab() {
           </button>
         ))}
       </div>
-
-      <section className="space-y-3 rounded-2xl border border-border bg-card p-4">
-        <h3 className="text-sm font-bold">ความคืบหน้าการอัปโหลดเนื้อหาหลัก รายกลุ่มสาระ</h3>
-        {byArea.length === 0 ? (
-          <p className="py-6 text-center text-xs text-muted-foreground">ยังไม่มีข้อมูล</p>
-        ) : (
-          <ul className="space-y-1.5">
-            {byArea.map((a) => {
-              const total = a.complete + a.partial + a.none;
-              const w = (n: number) => `${(n / total) * 100}%`;
-              return (
-                <li key={a.name} className="grid grid-cols-[8rem_1fr] items-center gap-3 text-xs">
-                  <span className="truncate">{a.name}</span>
-                  <div className="flex h-5 overflow-hidden rounded bg-muted text-[10px] font-medium text-white">
-                    {a.complete > 0 && <div className="flex items-center justify-center bg-success" style={{ width: w(a.complete) }}>{Math.round((a.complete / total) * 100)}%</div>}
-                    {a.partial > 0 && <div className="bg-warning" style={{ width: w(a.partial) }} />}
-                    {a.none > 0 && <div className="bg-destructive" style={{ width: w(a.none) }} />}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <div className="flex flex-wrap gap-3 text-[11px] text-muted-foreground">
-          {(["complete", "partial", "none"] as const).map((s) => (
-            <span key={s} className="flex items-center gap-1.5">
-              <span className={cn("h-2 w-2 rounded-full", LESSON_STATUS[s].bar)} />
-              {LESSON_STATUS[s].label}
-            </span>
-          ))}
-        </div>
-      </section>
 
       <div className="flex flex-wrap gap-2">
         <div className="relative min-w-40 flex-1">

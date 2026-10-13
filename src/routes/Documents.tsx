@@ -20,7 +20,7 @@ import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Pagination, Select } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
 import { usePagination } from "@/hooks/usePagination";
-import { useSubjects } from "@/hooks/useCurriculum";
+import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
 import {
   DOC_ACCEPT,
   type DocLessonNode,
@@ -47,7 +47,7 @@ import type { DocFile, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
-import { DocCoverageTab } from "@/routes/DocCoverage";
+import { DocCoverageTab, SUBJECT_TYPES } from "@/routes/DocCoverage";
 import { DocProgressTab, MyDocTasksTab, ReviewDocsTab } from "@/routes/DocProgress";
 import { EditableName } from "@/routes/Practice";
 
@@ -208,11 +208,14 @@ function DocBrowser({
   const [departmentId, setDepartmentId] = useState("");
   const [search, setSearch] = useState("");
   const [gradeCode, setGradeCode] = useState("");
+  const [areaId, setAreaId] = useState("");
+  const [subjectType, setSubjectType] = useState("");
   const [sort, setSort] = useState<SortKey>("az");
   const [view, setView] = useState<"grid" | "list">("grid");
   const { data: gradeLevels = [] } = useAllGradeLevels();
   const { data: summary } = useDocSummary();
   const { data: departments = [] } = useDepartments();
+  const { data: areas = [] } = useLearningAreas();
 
   const gradeById = new Map(gradeLevels.map((g) => [g.id, g]));
   // อนุบาล (K) → ประถม (P) → มัธยม (M), then by number — sort_order alone interleaves departments.
@@ -222,7 +225,7 @@ function DocBrowser({
   ].sort((a, b) => levelRank(a) - levelRank(b) || Number.parseInt(a.slice(1)) - Number.parseInt(b.slice(1)));
   const q = search.trim().toLowerCase();
   const cards = subjects
-    .filter((s) => !departmentId || s.department_id === departmentId)
+    .filter((s) => (!departmentId || s.department_id === departmentId) && (!areaId || s.learning_area_id === areaId) && (!subjectType || s.subject_type === subjectType))
     .map((s) => {
       const sum = summary?.get(s.id);
       const grades = [...(sum?.gradeLevelIds ?? [])]
@@ -246,7 +249,7 @@ function DocBrowser({
           : a.subject.name_th.localeCompare(b.subject.name_th, "th"),
     );
 
-  const { page, setPage, pageCount, pageRows } = usePagination(cards, [search, gradeCode, sort, departmentId], 20);
+  const { page, setPage, pageCount, pageRows } = usePagination(cards, [search, gradeCode, sort, departmentId, areaId, subjectType], 20);
 
   const open = subjects.find((s) => s.id === openId) ?? null;
   if (open) {
@@ -301,6 +304,22 @@ function DocBrowser({
             ))}
           </Select>
         )}
+        <Select value={areaId} onChange={(e) => setAreaId(e.target.value)} aria-label="กลุ่มสาระ" className={cn("w-44", !areaId && "ui-select-placeholder")}>
+          <option value="">ทุกกลุ่มสาระ</option>
+          {areas.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </Select>
+        <Select value={subjectType} onChange={(e) => setSubjectType(e.target.value)} aria-label="ประเภทวิชา" className={cn("w-40", !subjectType && "ui-select-placeholder")}>
+          <option value="">ทุกประเภทวิชา</option>
+          {SUBJECT_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </Select>
       </div>
 
       <div className="flex flex-wrap items-end justify-between gap-2">

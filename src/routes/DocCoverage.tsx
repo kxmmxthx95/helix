@@ -35,7 +35,7 @@ const STATUS: Record<CoverageStatus, { label: string; cls: string; bar: string }
 };
 const STATUS_LABELS = { empty: STATUS.empty.label, partial: STATUS.partial.label, complete: STATUS.complete.label };
 
-const SUBJECT_TYPES: { value: SubjectType; label: string }[] = [
+export const SUBJECT_TYPES: { value: SubjectType; label: string }[] = [
   { value: "basic", label: "พื้นฐาน" },
   { value: "additional", label: "เพิ่มเติม" },
   { value: "activity", label: "กิจกรรม" },
