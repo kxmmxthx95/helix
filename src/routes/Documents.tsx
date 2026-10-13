@@ -407,7 +407,7 @@ function DocBrowser({
           ))}
         </div>
       )}
-      <div className="mt-auto">
+      <div className="mt-auto py-3">
         <Pagination page={page} pageCount={pageCount} onChange={setPage} />
       </div>
     </div>
