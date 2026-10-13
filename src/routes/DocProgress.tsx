@@ -810,9 +810,12 @@ export function ReviewDocsTab() {
   const { data: tasks = [] } = useDocTasks();
   const { data: files = [] } = useDocTaskFiles();
   const { data: teachers = [] } = useProfiles({ search: "", departmentId: "", role: "teacher", active: "" });
+  const { data: departments = [] } = useDepartments();
+  const { data: areas = [] } = useLearningAreas();
   const [tab, setTab] = useState<ReviewTab>("pending");
   const [search, setSearch] = useState("");
-  const [taskFilter, setTaskFilter] = useState("");
+  // Manual expand/collapse per task; no entry = default (open when the card has files waiting for review).
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [reviewingId, setReviewingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -824,20 +827,45 @@ export function ReviewDocsTab() {
   const overdueCount = teachers.reduce((n, t) => n + teacherProgress(t, tasks, files, today).overdue, 0);
 
   const q = search.trim().toLowerCase();
-  const filtered = files
-    .filter((f) => {
-      if (tab && f.review_status !== tab) return false;
-      if (taskFilter && f.task_id !== taskFilter) return false;
-      if (!q) return true;
-      const teacher = teacherById.get(f.teacher_id);
-      return (
-        f.title.toLowerCase().includes(q) ||
-        f.file_name.toLowerCase().includes(q) ||
-        (teacher ? profileFullName(teacher).toLowerCase().includes(q) : false)
-      );
+  const cards = tasks
+    .map((task) => {
+      const taskFiles = files.filter((f) => f.task_id === task.id);
+      const titleMatch = !q || task.title.toLowerCase().includes(q);
+      const shownFiles = taskFiles
+        .filter((f) => !tab || f.review_status === tab)
+        .filter((f) => {
+          if (titleMatch) return true;
+          const teacher = teacherById.get(f.teacher_id);
+          return (
+            f.title.toLowerCase().includes(q) ||
+            f.file_name.toLowerCase().includes(q) ||
+            (teacher ? profileFullName(teacher).toLowerCase().includes(q) : false)
+          );
+        })
+        .sort((a, b) => b.created_at.localeCompare(a.created_at));
+      // Same rule as teacherProgress: a returned file doesn't count as submitted.
+      const submittedIds = new Set(taskFiles.filter((f) => f.review_status !== "returned").map((f) => f.teacher_id));
+      const returnedIds = new Set(taskFiles.filter((f) => f.review_status === "returned").map((f) => f.teacher_id));
+      const targeted = teachers.filter((t) => taskTargetsTeacher(task, t));
+      const missing = tab
+        ? []
+        : targeted
+            .filter((t) => !submittedIds.has(t.id))
+            .filter((t) => titleMatch || profileFullName(t).toLowerCase().includes(q));
+      const visible = tab ? shownFiles.length > 0 : titleMatch || shownFiles.length > 0 || missing.length > 0;
+      return {
+        task,
+        shownFiles,
+        missing,
+        returnedIds,
+        visible,
+        submitted: targeted.filter((t) => submittedIds.has(t.id)).length,
+        total: targeted.length,
+        waiting: taskFiles.filter((f) => f.review_status === "pending").length,
+      };
     })
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const { page, setPage, pageCount, pageRows } = usePagination(filtered, [tab, search, taskFilter]);
+    .filter((c) => c.visible)
+    .sort((a, b) => a.task.due_date.localeCompare(b.task.due_date));
   const reviewing = files.find((f) => f.id === reviewingId) ?? null;
 
   const tabs: { id: ReviewTab; label: string; n: number }[] = [
@@ -870,14 +898,8 @@ export function ReviewDocsTab() {
         <div className="flex flex-wrap gap-2">
           <div className="relative min-w-40">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ค้นหาครูหรือเอกสาร..." aria-label="ค้นหา" />
+            <Input className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ค้นหางาน ครู หรือเอกสาร..." aria-label="ค้นหา" />
           </div>
-          <Select className="w-auto min-w-32" value={taskFilter} onChange={(e) => setTaskFilter(e.target.value)} aria-label="งาน">
-            <option value="">ทุกงาน</option>
-            {tasks.map((t) => (
-              <option key={t.id} value={t.id}>{t.title}</option>
-            ))}
-          </Select>
           <Button size="icon" aria-label="สร้างงานเอกสาร" onClick={() => setCreating(true)}>
             <Plus className="h-3 w-3" />
           </Button>
@@ -899,72 +921,100 @@ export function ReviewDocsTab() {
         <SummaryCard tone="destructive" icon={<X className="h-5 w-5" />} label="เกินกำหนด" value={overdueCount} />
       </div>
 
-      {filtered.length === 0 ? (
-        <EmptyState title="ไม่มีเอกสารให้ตรวจ" description="เอกสารที่ครูส่งเข้ามาจะแสดงที่นี่" icon={DocumentTextIcon} />
+      {cards.length === 0 ? (
+        <EmptyState
+          title={tasks.length === 0 ? "ยังไม่มีงานที่สั่ง" : "ไม่มีเอกสารให้ตรวจ"}
+          description={tasks.length === 0 ? "กด + เพื่อสร้างงานเอกสารให้ครู" : "เอกสารที่ครูส่งเข้ามาจะแสดงที่นี่"}
+          icon={DocumentTextIcon}
+        />
       ) : (
         <div className="space-y-3">
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
-            <table className="w-full min-w-[56rem] text-xs">
-              <thead className="bg-muted text-left text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">เอกสาร</th>
-                  <th className="px-3 py-2 font-medium">ประเภท</th>
-                  <th className="px-3 py-2 font-medium">ครูผู้สอน</th>
-                  <th className="px-3 py-2 font-medium">วันที่ส่ง</th>
-                  <th className="px-3 py-2 font-medium">กำหนดส่ง</th>
-                  <th className="px-3 py-2 font-medium">สถานะ</th>
-                  <th className="px-3 py-2 text-right font-medium">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((f) => {
-                  const task = taskById.get(f.task_id);
-                  const teacher = teacherById.get(f.teacher_id);
-                  return (
-                    <tr key={f.id} onClick={() => setReviewingId(f.id)} className="cursor-pointer border-t border-border hover:bg-muted">
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-3">
-                          <FileKindBadge mime={f.mime_type} />
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-medium">{f.title}</div>
-                            <div className="truncate text-[11px] text-muted-foreground">{task?.title ?? f.file_name}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {task && (
-                          <span className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: `${typeColor(task.doc_type)}1f`, color: typeColor(task.doc_type) }}>
-                            {docTaskTypeLabel(task.doc_type)}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {teacher ? (
-                          <div className="flex items-center gap-2">
-                            <Avatar name={profileFullName(teacher)} src={avatarUrl(teacher)} className="h-7 w-7 text-[9px]" />
-                            {profileFullName(teacher)}
-                          </div>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 text-muted-foreground">{thDateTime(f.created_at)}</td>
-                      <td className={cn("px-3 py-2.5", task && f.created_at.slice(0, 10) > task.due_date && "text-destructive")}>
-                        {task ? thDate(task.due_date) : "—"}
-                      </td>
-                      <td className="px-3 py-2.5"><ReviewChip status={f.review_status} /></td>
-                      <td className="px-3 py-2.5 text-right">
-                        <Button size="icon" variant="outline" aria-label="ตรวจเอกสาร" onClick={(e) => { e.stopPropagation(); setReviewingId(f.id); }}>
-                          <EyeIcon className="h-3.5 w-3.5" />
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+          {cards.map(({ task, shownFiles, missing, returnedIds, submitted, total, waiting }) => {
+            const open = expanded[task.id] ?? waiting > 0;
+            const overdue = task.due_date < today;
+            const target = [
+              departments.find((d) => d.id === task.department_id)?.name,
+              areas.find((a) => a.id === task.learning_area_id)?.name,
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            return (
+              <div key={task.id} className="overflow-hidden rounded-xl border border-border bg-card">
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setExpanded((e) => ({ ...e, [task.id]: !open }))}
+                  className="flex w-full items-center gap-3 p-3 text-left hover:bg-muted"
+                >
+                  <ChevronForward className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-semibold">{task.title}</span>
+                      <span className="rounded-full px-2.5 py-0.5 text-[11px] font-medium" style={{ background: `${typeColor(task.doc_type)}1f`, color: typeColor(task.doc_type) }}>
+                        {docTaskTypeLabel(task.doc_type)}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      <span className={cn(overdue && submitted < total && "text-destructive")}>กำหนดส่ง {thDate(task.due_date)}</span>
+                      {` · ${target || "ครูทั้งหมด"}`}
+                    </p>
+                  </div>
+                  {waiting > 0 && <span className="shrink-0 rounded-full bg-warning/15 px-2.5 py-0.5 text-[11px] font-medium text-warning">รอตรวจ {waiting}</span>}
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    ส่งแล้ว {submitted}/{total} คน
+                  </span>
+                </button>
+
+                {open && (
+                  <div className="border-t border-border">
+                    {shownFiles.length > 0 && (
+                      <ul className="divide-y divide-border">
+                        {shownFiles.map((f) => {
+                          const teacher = teacherById.get(f.teacher_id);
+                          return (
+                            <li key={f.id}>
+                              <button type="button" onClick={() => setReviewingId(f.id)} className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-xs hover:bg-muted">
+                                <FileKindBadge mime={f.mime_type} />
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-medium">{f.title}</div>
+                                  <div className="truncate text-[11px] text-muted-foreground">
+                                    {teacher ? profileFullName(teacher) : "—"} · ส่งเมื่อ {thDateTime(f.created_at)}
+                                  </div>
+                                </div>
+                                <ReviewChip status={f.review_status} />
+                                <EyeIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                    {missing.length > 0 && (
+                      <div className={cn("space-y-1.5 bg-muted/40 p-3", shownFiles.length > 0 && "border-t border-border")}>
+                        <p className="text-xs font-medium text-muted-foreground">ยังไม่ส่ง ({missing.length})</p>
+                        <ul className="flex flex-wrap gap-2">
+                          {missing.map((t) => (
+                            <li key={t.id} className="inline-flex items-center gap-2 rounded-full bg-background py-1 pl-1 pr-3 text-xs">
+                              <Avatar name={profileFullName(t)} src={avatarUrl(t)} className="h-6 w-6 text-[9px]" />
+                              {profileFullName(t)}
+                              {returnedIds.has(t.id) ? (
+                                <span className="text-warning">รอแก้ไข</span>
+                              ) : (
+                                overdue && <span className="text-destructive">เกินกำหนด</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {shownFiles.length === 0 && missing.length === 0 && (
+                      <p className="px-3 py-4 text-center text-xs text-muted-foreground">ไม่มีรายการ</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
