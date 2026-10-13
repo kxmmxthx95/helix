@@ -279,3 +279,33 @@ export function useSubjectClassroomCount(subjectId: string | null, gradeLevelId:
     },
   });
 }
+
+export type RecentDocFile = DocFile & { doc_lessons: { name: string; subjects: { name: string } | null } | null };
+
+/** Uploads for the ตรวจเอกสาร tab: RLS returns files in subjects the caller can write plus files of teachers they review. */
+export function useRecentDocFiles() {
+  return useQuery({
+    queryKey: ["doc_files", "recent"],
+    queryFn: async (): Promise<RecentDocFile[]> => {
+      const { data, error } = await supabase
+        .from("doc_files")
+        .select("*, doc_lessons(name, subjects(name))")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return data as unknown as RecentDocFile[];
+    },
+  });
+}
+
+/** Approve, or send back with a note (required) — through review_doc_file(), see migration 0076. */
+export function useReviewDocFile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ fileId, status, note }: { fileId: string; status: "approved" | "returned"; note: string | null }) => {
+      const { error } = await supabase.rpc("review_doc_file", { p_file_id: fileId, p_status: status, p_note: note });
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_files"] }),
+  });
+}

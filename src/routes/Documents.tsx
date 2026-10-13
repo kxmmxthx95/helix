@@ -711,6 +711,8 @@ function LessonFiles({ lesson, canEdit, onClose }: { lesson: DocLessonNode; canE
                   <span className="block truncate text-xs font-medium">{f.title}</span>
                   <span className="block truncate text-[11px] text-muted-foreground">
                     {f.file_name} · {formatSize(f.size_bytes)}
+                    {f.review_status === "approved" && " · อนุมัติแล้ว"}
+                    {f.review_status === "returned" && ` · ส่งกลับแก้ไข${f.review_note ? `: ${f.review_note}` : ""}`}
                   </span>
                 </span>
                 <ChevronForward className="h-3 w-3 text-muted-foreground" />

@@ -828,6 +828,10 @@ export type DocFile = {
   size_bytes: number;
   uploaded_by: string;
   created_at: string;
+  review_status: DocTaskReviewStatus; // see migration 0076
+  review_note: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
 };
 
 export type DocTaskReviewStatus = "pending" | "approved" | "returned";
@@ -1419,7 +1423,7 @@ export type Database = {
       exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
       doc_lessons: Table<DocLesson, InsertOf<DocLesson, "sort_order" | "created_at" | "updated_at">>;
       doc_topics: Table<DocTopic, InsertOf<DocTopic, "sort_order" | "created_at" | "updated_at">>;
-      doc_files: Table<DocFile, InsertOf<DocFile, "description" | "topic_id">>;
+      doc_files: Table<DocFile, InsertOf<DocFile, "description" | "topic_id" | "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
       doc_tasks: Table<DocTask, InsertOf<DocTask, "description" | "department_id" | "learning_area_id">>;
       doc_task_files: Table<DocTaskFile, InsertOf<DocTaskFile, "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
       practice_lessons: Table<PracticeLesson, InsertOf<PracticeLesson, "sort_order" | "created_at" | "updated_at">>;
@@ -1437,6 +1441,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      review_doc_file: {
+        Args: { p_file_id: string; p_status: "approved" | "returned"; p_note: string | null };
+        Returns: void;
+      };
       review_doc_task_file: {
         Args: { p_file_id: string; p_status: "approved" | "returned"; p_note: string | null };
         Returns: void;

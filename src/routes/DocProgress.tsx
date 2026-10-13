@@ -22,7 +22,7 @@ import {
   useReviewDocTaskFile,
   useUploadDocTaskFile,
 } from "@/hooks/useDocTasks";
-import { DOC_ACCEPT, docFileSignedUrl } from "@/hooks/useDocuments";
+import { DOC_ACCEPT, docFileSignedUrl, useRecentDocFiles, useReviewDocFile } from "@/hooks/useDocuments";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments, useProfiles, type ProfileRow } from "@/hooks/useProfiles";
 import { profileFullName, type DocTask, type DocTaskFile, type DocTaskReviewStatus, type DocTaskType } from "@/lib/database.types";
@@ -706,11 +706,11 @@ export function ReviewDocsTab() {
   const [search, setSearch] = useState("");
   // Manual expand/collapse per task; no entry = default (open when the card has files waiting for review).
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState<ReviewTarget | null>(null);
+  const { data: uploads = [] } = useRecentDocFiles();
 
-  const taskById = new Map(tasks.map((t) => [t.id, t]));
   const teacherById = new Map(teachers.map((t) => [t.id, t]));
-  const count = (s: DocTaskReviewStatus) => files.filter((f) => f.review_status === s).length;
+  const count = (s: DocTaskReviewStatus) => files.filter((f) => f.review_status === s).length + uploads.filter((f) => f.review_status === s).length;
   // Teacher x task pairs past due with nothing (usable) submitted — same rule as the overview tab.
   const today = todayISO();
   const overdueCount = teachers.reduce((n, t) => n + teacherProgress(t, tasks, files, today).overdue, 0);
@@ -755,13 +755,25 @@ export function ReviewDocsTab() {
     })
     .filter((c) => c.visible)
     .sort((a, b) => a.task.due_date.localeCompare(b.task.due_date));
-  const reviewing = files.find((f) => f.id === reviewingId) ?? null;
+  const shownUploads = uploads
+    .filter((f) => !tab || f.review_status === tab)
+    .filter((f) => {
+      if (!q) return true;
+      const teacher = teacherById.get(f.uploaded_by);
+      return (
+        f.title.toLowerCase().includes(q) ||
+        f.file_name.toLowerCase().includes(q) ||
+        (f.doc_lessons?.name ?? "").toLowerCase().includes(q) ||
+        (f.doc_lessons?.subjects?.name ?? "").toLowerCase().includes(q) ||
+        (teacher ? profileFullName(teacher).toLowerCase().includes(q) : false)
+      );
+    });
 
   const tabs: { id: ReviewTab; label: string; n: number }[] = [
     { id: "pending", label: "รอตรวจ", n: count("pending") },
     { id: "approved", label: "อนุมัติแล้ว", n: count("approved") },
     { id: "returned", label: "ส่งกลับแก้ไข", n: count("returned") },
-    { id: "", label: "ทั้งหมด", n: files.length },
+    { id: "", label: "ทั้งหมด", n: files.length + uploads.length },
   ];
 
   return (
@@ -807,10 +819,10 @@ export function ReviewDocsTab() {
         <SummaryCard tone="destructive" icon={<X className="h-5 w-5" />} label="เกินกำหนด" value={overdueCount} />
       </div>
 
-      {cards.length === 0 ? (
+      {cards.length === 0 && shownUploads.length === 0 ? (
         <EmptyState
-          title={tasks.length === 0 ? "ยังไม่มีงานที่สั่ง" : "ไม่มีเอกสารให้ตรวจ"}
-          description={tasks.length === 0 ? "กด + เพื่อสร้างงานเอกสารให้ครู" : "เอกสารที่ครูส่งเข้ามาจะแสดงที่นี่"}
+          title="ไม่มีเอกสารให้ตรวจ"
+          description="เอกสารที่ครูส่งหรืออัปโหลดจะแสดงที่นี่"
           icon={DocumentTextIcon}
         />
       ) : (
@@ -859,7 +871,14 @@ export function ReviewDocsTab() {
                           const teacher = teacherById.get(f.teacher_id);
                           return (
                             <li key={f.id}>
-                              <button type="button" onClick={() => setReviewingId(f.id)} className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-xs hover:bg-muted">
+                              <button type="button" onClick={() =>
+                                  setReviewing({
+                                    kind: "task",
+                                    file: f,
+                                    heading: task.title,
+                                    meta: `${teacher ? profileFullName(teacher) : "—"} · ส่งเมื่อ ${thDate(f.created_at.slice(0, 10))} · กำหนดส่ง ${thDate(task.due_date)}`,
+                                  })
+                                } className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-xs hover:bg-muted">
                                 <FileKindBadge mime={f.mime_type} />
                                 <div className="min-w-0 flex-1">
                                   <div className="truncate text-sm font-medium">{f.title}</div>
@@ -904,24 +923,63 @@ export function ReviewDocsTab() {
         </div>
       )}
 
-      <ReviewSheet file={reviewing} task={reviewing ? taskById.get(reviewing.task_id) ?? null : null} teacher={reviewing ? teacherById.get(reviewing.teacher_id) ?? null : null} onClose={() => setReviewingId(null)} />
+      {shownUploads.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold">เอกสารที่ครูอัปโหลดในหมวดเอกสาร</h3>
+          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+            {shownUploads.map((f) => {
+              const teacher = teacherById.get(f.uploaded_by);
+              const where = [f.doc_lessons?.subjects?.name, f.doc_lessons?.name].filter(Boolean).join(" · ");
+              return (
+                <li key={f.id}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-xs hover:bg-muted"
+                    onClick={() =>
+                      setReviewing({
+                        kind: "doc",
+                        file: f,
+                        heading: where || "เอกสาร",
+                        meta: `${teacher ? profileFullName(teacher) : "—"} · อัปโหลดเมื่อ ${thDate(f.created_at.slice(0, 10))}`,
+                      })
+                    }
+                  >
+                    <FileKindBadge mime={f.mime_type} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium">{f.title}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">
+                        {[where, teacher ? profileFullName(teacher) : null].filter(Boolean).join(" · ")} · {thDateTime(f.created_at)}
+                      </div>
+                    </div>
+                    <ReviewChip status={f.review_status} />
+                    <EyeIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      <ReviewSheet target={reviewing} onClose={() => setReviewing(null)} />
     </div>
   );
 }
 
-function ReviewSheet({
-  file,
-  task,
-  teacher,
-  onClose,
-}: {
-  file: DocTaskFile | null;
-  task: DocTask | null;
-  teacher: ProfileRow | null;
-  onClose: () => void;
-}) {
+type ReviewTarget = {
+  kind: "task" | "doc";
+  file: Pick<DocTaskFile, "id" | "title" | "file_path" | "file_name" | "mime_type" | "review_status" | "review_note">;
+  heading: string;
+  meta: string;
+};
+
+/** Review dialog shared by task submissions (doc_task_files) and lesson uploads (doc_files). */
+function ReviewSheet({ target, onClose }: { target: ReviewTarget | null; onClose: () => void }) {
   const toast = useToast();
-  const review = useReviewDocTaskFile();
+  const reviewTask = useReviewDocTaskFile();
+  const reviewDoc = useReviewDocFile();
+  const review = target?.kind === "doc" ? reviewDoc : reviewTask;
+  const file = target?.file ?? null;
   const [note, setNote] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -989,13 +1047,10 @@ function ReviewSheet({
         <div className="space-y-4">
           <div className="space-y-1 rounded-xl border border-border p-3 text-xs">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium">{task?.title ?? "—"}</span>
+              <span className="text-sm font-medium">{target!.heading}</span>
               <ReviewChip status={file.review_status} />
             </div>
-            <div className="text-muted-foreground">
-              {teacher ? profileFullName(teacher) : "—"} · ส่งเมื่อ {thDate(file.created_at.slice(0, 10))}
-              {task ? ` · กำหนดส่ง ${thDate(task.due_date)}` : ""}
-            </div>
+            <div className="text-muted-foreground">{target!.meta}</div>
             <div className="text-muted-foreground">{file.file_name}</div>
             {file.review_note && <div className="text-destructive">หมายเหตุเดิม: {file.review_note}</div>}
           </div>
