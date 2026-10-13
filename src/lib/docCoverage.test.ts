@@ -3,7 +3,7 @@ import type { CoverageLesson } from "@/hooks/useDocuments";
 import { coverageCsv, coverageStats } from "@/lib/docCoverage";
 
 const lesson = (fileCount: number, lastAt = "2026-10-01T00:00:00Z"): CoverageLesson => ({
-  id: String(Math.random()), name: "บทที่ 1", createdBy: null, sortOrder: 0, topicCount: 2, fileCount, lastAt, lastBy: "u1",
+  id: String(Math.random()), name: "บทที่ 1", createdBy: null, sortOrder: 0, topicCount: 2, fileCount, okFileCount: fileCount, lastAt, lastBy: "u1",
 });
 
 describe("coverageStats", () => {

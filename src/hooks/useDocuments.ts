@@ -312,7 +312,7 @@ export function useReviewDocFile() {
 
 // ------------------------------------------------------------------ coverage
 
-export type CoverageLesson = { id: string; name: string; createdBy: string | null; sortOrder: number; topicCount: number; fileCount: number; lastAt: string; lastBy: string | null };
+export type CoverageLesson = { id: string; name: string; createdBy: string | null; sortOrder: number; topicCount: number; fileCount: number; /** Files not returned for rework — the ones that count as uploaded. */ okFileCount: number; lastAt: string; lastBy: string | null };
 export type CoverageRow = {
   key: string;
   subjectId: string;
@@ -345,7 +345,7 @@ export function useDocCoverage() {
           .eq("subjects.is_active", true),
         supabase
           .from("doc_lessons")
-          .select(`*, subjects(${SUBJECT_COLS}), grade_levels(name, sort_order), doc_topics(count), doc_files(created_at, uploaded_by)`)
+          .select(`*, subjects(${SUBJECT_COLS}), grade_levels(name, sort_order), doc_topics(count), doc_files(created_at, uploaded_by, review_status)`)
           .order("sort_order"),
         supabase.from("doc_targets").select("*"),
       ]);
@@ -374,7 +374,7 @@ export function useDocCoverage() {
         subjects: CoverageSubject | null;
         grade_levels: CoverageGrade | null;
         doc_topics: { count: number }[];
-        doc_files: { created_at: string; uploaded_by: string }[];
+        doc_files: { created_at: string; uploaded_by: string; review_status: string }[];
       })[]) {
         row(l.subject_id, l.grade_level_id, l.subjects, l.grade_levels)?.lessons.push({
           id: l.id,
@@ -382,6 +382,7 @@ export function useDocCoverage() {
           sortOrder: l.sort_order,
           topicCount: l.doc_topics[0]?.count ?? 0,
           fileCount: l.doc_files.length,
+          okFileCount: l.doc_files.filter((f) => f.review_status !== "returned").length,
           createdBy: l.created_by,
           lastAt: [l.updated_at, ...l.doc_files.map((f) => f.created_at)].sort().at(-1)!,
           lastBy: [...l.doc_files].sort((a, b) => a.created_at.localeCompare(b.created_at)).at(-1)?.uploaded_by ?? null,
@@ -404,5 +405,26 @@ export function useSaveDocTargets() {
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_summary", "coverage"] }),
+  });
+}
+
+/** teacher id -> "subjectId:gradeLevelId" pairs they teach in the latest academic year that has assignments — keys match CoverageRow.key. */
+export function useTeacherPairs() {
+  return useQuery({
+    queryKey: ["teaching_assignments", "doc_pairs"],
+    queryFn: async (): Promise<Map<string, Set<string>>> => {
+      const { data, error } = await supabase.from("teaching_assignments").select("teacher_id, subject_id, academic_year, classrooms(grade_level_id)");
+      if (error) throw error;
+      const rows = data as unknown as { teacher_id: string; subject_id: string; academic_year: number; classrooms: { grade_level_id: string } | null }[];
+      const year = Math.max(0, ...rows.map((r) => r.academic_year));
+      const out = new Map<string, Set<string>>();
+      for (const r of rows) {
+        if (r.academic_year !== year || !r.classrooms) continue;
+        const set = out.get(r.teacher_id) ?? new Set<string>();
+        set.add(`${r.subject_id}:${r.classrooms.grade_level_id}`);
+        out.set(r.teacher_id, set);
+      }
+      return out;
+    },
   });
 }
