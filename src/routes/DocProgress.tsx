@@ -107,7 +107,6 @@ export function DocProgressTab() {
   const [search, setSearch] = useState("");
   const [deptId, setDeptId] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | TeacherProgress["status"]>("");
-  const [creating, setCreating] = useState(false);
   const [viewing, setViewing] = useState<ProfileRow | null>(null);
 
   const today = todayISO();
@@ -250,9 +249,6 @@ export function DocProgressTab() {
           <option value="pending">รอดำเนินการ</option>
           <option value="overdue">เกินกำหนด</option>
         </Select>
-        <Button size="icon" aria-label="สร้างงานเอกสาร" onClick={() => setCreating(true)}>
-          <Plus className="h-3 w-3" />
-        </Button>
       </div>
 
       {filtered.length === 0 ? (
@@ -310,7 +306,6 @@ export function DocProgressTab() {
         </div>
       )}
 
-      <CreateTaskSheet open={creating} onClose={() => setCreating(false)} />
       <TeacherTasksSheet teacher={viewing} tasks={tasks} files={files} onClose={() => setViewing(null)} />
     </div>
   );
@@ -819,6 +814,7 @@ export function ReviewDocsTab() {
   const [search, setSearch] = useState("");
   const [taskFilter, setTaskFilter] = useState("");
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const taskById = new Map(tasks.map((t) => [t.id, t]));
   const teacherById = new Map(teachers.map((t) => [t.id, t]));
@@ -882,6 +878,9 @@ export function ReviewDocsTab() {
               <option key={t.id} value={t.id}>{t.title}</option>
             ))}
           </Select>
+          <Button size="icon" aria-label="สร้างงานเอกสาร" onClick={() => setCreating(true)}>
+            <Plus className="h-3 w-3" />
+          </Button>
         </div>
       </div>
 
@@ -969,6 +968,7 @@ export function ReviewDocsTab() {
         </div>
       )}
 
+      <CreateTaskSheet open={creating} onClose={() => setCreating(false)} />
       <ReviewSheet file={reviewing} task={reviewing ? taskById.get(reviewing.task_id) ?? null : null} teacher={reviewing ? teacherById.get(reviewing.teacher_id) ?? null : null} onClose={() => setReviewingId(null)} />
     </div>
   );
