@@ -301,3 +301,17 @@ export async function employeeDocumentSignedUrl(path: string): Promise<string | 
   if (error) return null;
   return data.signedUrl;
 }
+
+/** Headcount per salary grade (grade id -> employees), from employee_compensation. HR managers only — same readers as the salary-grade settings tab. */
+export function useSalaryGradeCounts() {
+  return useQuery({
+    queryKey: ["employee_compensation", "grade_counts"],
+    queryFn: async (): Promise<Map<string, number>> => {
+      const { data, error } = await supabase.from("employee_compensation").select("salary_grade_id");
+      if (error) throw error;
+      const counts = new Map<string, number>();
+      for (const r of data) if (r.salary_grade_id) counts.set(r.salary_grade_id, (counts.get(r.salary_grade_id) ?? 0) + 1);
+      return counts;
+    },
+  });
+}

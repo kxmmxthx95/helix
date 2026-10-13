@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import {
   AirplaneIcon,
+  AppsIcon,
   BriefcaseIcon,
   CalendarIcon,
   CheckmarkCircleIcon,
   ImageIcon,
   LibraryIcon,
+  ListIcon,
   PencilIcon,
   Plus,
   ProfileIcon,
@@ -49,6 +51,7 @@ import {
 } from "@/hooks/useLeave";
 import {
   useDeleteSalaryGrade,
+  useSalaryGradeCounts,
   useSalaryGrades,
   useSaveSalaryGrade,
   type SalaryGradeDraft,
@@ -1064,10 +1067,40 @@ function LeaveTypeSheet({
   );
 }
 
+type GradeSort = "order" | "salary" | "people";
+
+const baht = (n: number) => n.toLocaleString("en-US");
+/** "10,000 - 12,000" · "80,000 ขึ้นไป" · "ไม่เกิน 12,000" · "-" */
+function salaryRange(g: SalaryGrade) {
+  if (g.min_salary !== null && g.max_salary !== null) return `${baht(g.min_salary)} - ${baht(g.max_salary)}`;
+  if (g.min_salary !== null) return `${baht(g.min_salary)} ขึ้นไป`;
+  if (g.max_salary !== null) return `ไม่เกิน ${baht(g.max_salary)}`;
+  return "-";
+}
+
 function SalaryGradesCard() {
+  const toast = useToast();
   const { data: grades = [], isLoading } = useSalaryGrades();
+  const { data: counts } = useSalaryGradeCounts();
+  const del = useDeleteSalaryGrade();
   const [editing, setEditing] = useState<SalaryGrade | null>(null);
   const [creating, setCreating] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<GradeSort>("order");
+  const [view, setView] = useState<"list" | "grid">("list");
+
+  const q = search.trim().toLowerCase();
+  const rows = grades
+    .filter((g) => !q || g.name.toLowerCase().includes(q) || g.code.toLowerCase().includes(q))
+    .sort((a, b) =>
+      sort === "salary"
+        ? (a.min_salary ?? Infinity) - (b.min_salary ?? Infinity)
+        : sort === "people"
+          ? (counts?.get(b.id) ?? 0) - (counts?.get(a.id) ?? 0)
+          : 0,
+    );
+  const { page, setPage, pageCount, pageRows } = usePagination(rows, [search, sort]);
+  const firstIndex = (page - 1) * 20;
 
   const sheets = (
     <>
@@ -1076,21 +1109,45 @@ function SalaryGradesCard() {
     </>
   );
 
+  function actions(g: SalaryGrade) {
+    return (
+      <div className="flex items-center justify-center gap-1.5">
+        <Button
+          size="icon"
+          variant="outline"
+          aria-label={`แก้ไข ${g.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setEditing(g);
+          }}
+        >
+          <PencilIcon className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="icon"
+          variant="outline"
+          className="text-destructive"
+          aria-label={`ลบ ${g.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!confirm(`ลบระดับเงินเดือน "${g.name}"?`)) return;
+            del.mutate(g.id, { onError: () => toast("ลบไม่สำเร็จ", "error") });
+          }}
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
-      <Card className="space-y-3" role="status" aria-label="กำลังโหลด">
-        <div className="flex justify-end">
-          <Skeleton className="h-8 w-24" />
-        </div>
-        <ul className="divide-y divide-border">
-          {[0, 1, 2].map((i) => (
-            <li key={i} className="space-y-1.5 py-1.5">
-              <Skeleton className="h-3.5 w-32" />
-              <Skeleton className="h-3 w-24" />
-            </li>
-          ))}
-        </ul>
-      </Card>
+      <div className="space-y-3" role="status" aria-label="กำลังโหลด">
+        <Skeleton className="h-10 w-full" />
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
+      </div>
     );
   }
 
@@ -1113,33 +1170,108 @@ function SalaryGradesCard() {
   }
 
   return (
-    <Card className="space-y-3">
-      <div className="flex justify-end">
-        <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="h-3.5 w-3.5" />
-          เพิ่มระดับ
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[12rem] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหาระดับเงินเดือน..."
+            className="pl-9"
+            aria-label="ค้นหาระดับเงินเดือน"
+          />
+        </div>
+        <Select className="w-44" value={sort} onChange={(e) => setSort(e.target.value as GradeSort)} aria-label="เรียงตาม">
+          <option value="order">เรียงตาม: ลำดับ</option>
+          <option value="salary">เรียงตาม: เงินเดือน</option>
+          <option value="people">เรียงตาม: จำนวนบุคลากร</option>
+        </Select>
+        <div className="flex h-8 rounded-lg border border-border bg-card p-0.5">
+          {(["list", "grid"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-label={v === "grid" ? "มุมมองกริด" : "มุมมองรายการ"}
+              aria-pressed={view === v}
+              onClick={() => setView(v)}
+              className={cn(
+                "flex w-8 items-center justify-center rounded-md",
+                view === v ? "bg-muted text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {v === "grid" ? <AppsIcon className="h-3.5 w-3.5" /> : <ListIcon className="h-3.5 w-3.5" />}
+            </button>
+          ))}
+        </div>
+        <Button size="icon" aria-label="เพิ่มระดับเงินเดือน" onClick={() => setCreating(true)}>
+          <Plus className="h-4 w-4" />
         </Button>
       </div>
-      <ul className="divide-y divide-border text-sm">
-        {grades.map((g) => (
-          <li
-            key={g.id}
-            onClick={() => setEditing(g)}
-            className="flex cursor-pointer items-center justify-between gap-2 py-1.5"
-          >
-            <span>
-              {g.name}
-              <span className="block text-xs text-muted-foreground">
-                {g.min_salary !== null || g.max_salary !== null
-                  ? `${g.min_salary ?? "?"} – ${g.max_salary ?? "?"} บาท`
-                  : "ไม่ระบุช่วงเงินเดือน"}
+
+      {rows.length === 0 ? (
+        <EmptyState title="ไม่พบระดับเงินเดือน" description="ลองเปลี่ยนคำค้นหา" />
+      ) : view === "list" ? (
+        <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+          <table className="w-full min-w-[36rem] text-sm">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="w-16 px-4 py-3 font-medium">#</th>
+                <th className="px-3 py-3 font-medium">ชื่อระดับเงินเดือน</th>
+                <th className="px-3 py-3 font-medium">ช่วงเงินเดือน (บาท)</th>
+                <th className="px-3 py-3 font-medium">จำนวนบุคลากร</th>
+                <th className="px-3 py-3 text-center font-medium">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageRows.map((g, i) => (
+                <tr
+                  key={g.id}
+                  onClick={() => setEditing(g)}
+                  className="cursor-pointer border-t border-border hover:bg-muted/50"
+                >
+                  <td className="px-4 py-2.5">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-xs font-medium">
+                      {firstIndex + i + 1}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 font-medium">{g.name}</td>
+                  <td className="px-3 py-2.5">{salaryRange(g)}</td>
+                  <td className="px-3 py-2.5">{counts?.get(g.id) ?? 0} คน</td>
+                  <td className="px-3 py-2.5">{actions(g)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {pageRows.map((g, i) => (
+            <div
+              key={g.id}
+              onClick={() => setEditing(g)}
+              className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-card p-4 hover:bg-muted/50"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-medium">
+                {firstIndex + i + 1}
               </span>
-            </span>
-          </li>
-        ))}
-      </ul>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold">{g.name}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{salaryRange(g)} บาท</p>
+                <p className="mt-2 text-xs text-muted-foreground">{counts?.get(g.id) ?? 0} คน</p>
+              </div>
+              {actions(g)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <p className="px-1 text-xs text-muted-foreground">ทั้งหมด {rows.length} รายการ</p>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+      </div>
       {sheets}
-    </Card>
+    </div>
   );
 }
 
