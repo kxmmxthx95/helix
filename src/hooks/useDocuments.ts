@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DocFile, DocLesson, DocTopic, GradeLevel } from "@/lib/database.types";
+import type { DocFile, DocLesson, GradeLevel } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
-// เอกสาร — วิชา -> ระดับชั้น -> เนื้อหาหลัก -> เนื้อหาย่อย -> ไฟล์.
+// เอกสาร — วิชา -> ระดับชั้น -> เนื้อหาหลัก -> ไฟล์.
 // Own catalog (not practice_lessons). See migration 0071.
 
 const BUCKET = "subject-documents";
@@ -57,41 +57,17 @@ export function useUpdateDocLesson() {
   });
 }
 
-// -------------------------------------------------------------------- topics
-
-export function useCreateDocTopic() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (draft: { lesson_id: string; name: string; sort_order?: number }) => {
-      const { error } = await supabase.from("doc_topics").insert(draft);
-      if (error) throw error;
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_topics"] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
-  });
-}
-
-export function useUpdateDocTopic() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const { error } = await supabase.from("doc_topics").update({ name }).eq("id", id);
-      if (error) throw error;
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_topics"] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
-  });
-}
-
 // --------------------------------------------------------------------- files
 
-export function useDocFiles(topicId: string | null) {
+export function useDocFiles(lessonId: string | null) {
   return useQuery({
-    queryKey: ["doc_files", topicId],
-    enabled: !!topicId,
+    queryKey: ["doc_files", lessonId],
+    enabled: !!lessonId,
     queryFn: async (): Promise<DocFile[]> => {
       const { data, error } = await supabase
         .from("doc_files")
         .select("*")
-        .eq("topic_id", topicId!)
+        .eq("lesson_id", lessonId!)
         .order("created_at");
       if (error) throw error;
       return data;
@@ -99,36 +75,19 @@ export function useDocFiles(topicId: string | null) {
   });
 }
 
-/** Every file under the given topics (one lesson's worth) — for the lesson-level document viewer. */
-export function useDocFilesByTopics(topicIds: string[]) {
-  return useQuery({
-    queryKey: ["doc_files", "by_topics", topicIds],
-    enabled: topicIds.length > 0,
-    queryFn: async (): Promise<DocFile[]> => {
-      const { data, error } = await supabase
-        .from("doc_files")
-        .select("*")
-        .in("topic_id", topicIds)
-        .order("created_at");
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
-/** Checks type/size, uploads to the private bucket under `${topicId}/`, then inserts the row; removes the object again if the insert fails. */
+/** Checks type/size, uploads to the private bucket under `${lessonId}/`, then inserts the row; removes the object again if the insert fails. */
 export function useUploadDocFile() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
       file,
-      topicId,
+      lessonId,
       title,
       description,
       uploadedBy,
     }: {
       file: File;
-      topicId: string;
+      lessonId: string;
       title: string;
       description: string | null;
       uploadedBy: string;
@@ -137,11 +96,11 @@ export function useUploadDocFile() {
       if (file.size > DOC_MAX_BYTES) throw new Error("ไฟล์ใหญ่เกิน 20 MB");
       // Storage keys must be ASCII-safe; the original name is kept in file_name.
       const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : "";
-      const path = `${topicId}/${crypto.randomUUID()}${ext}`;
+      const path = `${lessonId}/${crypto.randomUUID()}${ext}`;
       const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
       if (upErr) throw upErr;
       const { error } = await supabase.from("doc_files").insert({
-        topic_id: topicId,
+        lesson_id: lessonId,
         title,
         description,
         file_path: path,
@@ -155,7 +114,7 @@ export function useUploadDocFile() {
         throw error;
       }
     },
-    onSettled: (_d, _e, vars) => void qc.invalidateQueries({ queryKey: ["doc_files", vars.topicId] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
+    onSettled: (_d, _e, vars) => void qc.invalidateQueries({ queryKey: ["doc_files", vars.lessonId] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
   });
 }
 
@@ -180,19 +139,9 @@ export async function docFileSignedUrl(path: string): Promise<string | null> {
 
 // ------------------------------------------------------------ cascade delete
 
-type Scope = { lessonId: string } | { topicId: string };
-
-/** Paths of every file under a lesson or topic — for the "จะลบเอกสาร N ไฟล์ด้วย" confirm and the pre-delete Storage cleanup. */
-export async function docFilePaths(scope: Scope): Promise<string[]> {
-  let topicIds: string[];
-  if ("topicId" in scope) topicIds = [scope.topicId];
-  else {
-    const { data, error } = await supabase.from("doc_topics").select("id").eq("lesson_id", scope.lessonId);
-    if (error) throw error;
-    topicIds = data.map((t) => t.id);
-  }
-  if (topicIds.length === 0) return [];
-  const { data, error } = await supabase.from("doc_files").select("file_path").in("topic_id", topicIds);
+/** Paths of every file under a lesson — for the "จะลบเอกสาร N ไฟล์ด้วย" confirm and the pre-delete Storage cleanup. */
+export async function docFilePaths(lessonId: string): Promise<string[]> {
+  const { data, error } = await supabase.from("doc_files").select("file_path").eq("lesson_id", lessonId);
   if (error) throw error;
   return data.map((f) => f.file_path);
 }
@@ -217,18 +166,6 @@ export function useDeleteDocLesson() {
   });
 }
 
-export function useDeleteDocTopic() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, paths }: { id: string; paths: string[] }) => {
-      await removeObjects(paths);
-      const { error } = await supabase.from("doc_topics").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_topics"] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
-  });
-}
-
 // ------------------------------------------------------------------- summary
 
 export type DocSubjectSummary = { gradeLevelIds: Set<string>; fileCount: number };
@@ -240,18 +177,18 @@ export function useDocSummary() {
     queryFn: async (): Promise<Map<string, DocSubjectSummary>> => {
       const { data, error } = await supabase
         .from("doc_lessons")
-        .select("subject_id, grade_level_id, doc_topics(doc_files(count))");
+        .select("subject_id, grade_level_id, doc_files(count)");
       if (error) throw error;
       const rows = data as unknown as {
         subject_id: string;
         grade_level_id: string;
-        doc_topics: { doc_files: { count: number }[] }[];
+        doc_files: { count: number }[];
       }[];
       const out = new Map<string, DocSubjectSummary>();
       for (const r of rows) {
         const s = out.get(r.subject_id) ?? { gradeLevelIds: new Set<string>(), fileCount: 0 };
         s.gradeLevelIds.add(r.grade_level_id);
-        for (const t of r.doc_topics) for (const f of t.doc_files) s.fileCount += f.count;
+        for (const f of r.doc_files) s.fileCount += f.count;
         out.set(r.subject_id, s);
       }
       return out;
@@ -277,12 +214,9 @@ export function useSubjectGradeLevelIds(subjectId: string | null) {
 
 // ---------------------------------------------------------------------- tree
 
-export type DocLessonNode = DocLesson & {
-  topics: (DocTopic & { fileCount: number })[];
-  fileCount: number;
-};
+export type DocLessonNode = DocLesson & { fileCount: number };
 
-/** Lessons of one (subject, grade) with their topics and per-topic file counts. Keyed under "doc_summary" so every file/topic/lesson mutation (which already invalidates it) refreshes this too. */
+/** Lessons of one (subject, grade) with per-lesson file counts. Keyed under "doc_summary" so every file/lesson mutation (which already invalidates it) refreshes this too. */
 export function useDocTree(subjectId: string | null, gradeLevelId: string | null) {
   return useQuery({
     queryKey: ["doc_summary", "tree", subjectId, gradeLevelId],
@@ -290,18 +224,13 @@ export function useDocTree(subjectId: string | null, gradeLevelId: string | null
     queryFn: async (): Promise<DocLessonNode[]> => {
       const { data, error } = await supabase
         .from("doc_lessons")
-        .select("*, doc_topics(*, doc_files(count))")
+        .select("*, doc_files(count)")
         .eq("subject_id", subjectId!)
         .eq("grade_level_id", gradeLevelId!)
         .order("sort_order");
       if (error) throw error;
-      const rows = data as unknown as (DocLesson & { doc_topics: (DocTopic & { doc_files: { count: number }[] })[] })[];
-      return rows.map(({ doc_topics, ...lesson }) => {
-        const topics = doc_topics
-          .map(({ doc_files, ...t }) => ({ ...t, fileCount: doc_files[0]?.count ?? 0 }))
-          .sort((a, b) => a.sort_order - b.sort_order);
-        return { ...lesson, topics, fileCount: topics.reduce((n, t) => n + t.fileCount, 0) };
-      });
+      const rows = data as unknown as (DocLesson & { doc_files: { count: number }[] })[];
+      return rows.map(({ doc_files, ...lesson }) => ({ ...lesson, fileCount: doc_files[0]?.count ?? 0 }));
     },
   });
 }

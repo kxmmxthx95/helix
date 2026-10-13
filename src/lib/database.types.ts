@@ -814,10 +814,12 @@ export type DocTopic = {
   updated_at: string;
 };
 
-/** One uploaded file under a DocTopic; the object lives in the private 'subject-documents' bucket. See migration 0071. */
+/** One uploaded file under a DocLesson; the object lives in the private 'subject-documents' bucket. See migration 0071. */
 export type DocFile = {
   id: string;
-  topic_id: string;
+  lesson_id: string;
+  /** Legacy: เนื้อหาย่อยไม่ใช้แล้ว; only set on files uploaded before migration 0075. */
+  topic_id: string | null;
   title: string;
   description: string | null;
   file_path: string;
@@ -1417,7 +1419,7 @@ export type Database = {
       exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
       doc_lessons: Table<DocLesson, InsertOf<DocLesson, "sort_order" | "created_at" | "updated_at">>;
       doc_topics: Table<DocTopic, InsertOf<DocTopic, "sort_order" | "created_at" | "updated_at">>;
-      doc_files: Table<DocFile, InsertOf<DocFile, "description">>;
+      doc_files: Table<DocFile, InsertOf<DocFile, "description" | "topic_id">>;
       doc_tasks: Table<DocTask, InsertOf<DocTask, "description" | "department_id" | "learning_area_id">>;
       doc_task_files: Table<DocTaskFile, InsertOf<DocTaskFile, "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
       practice_lessons: Table<PracticeLesson, InsertOf<PracticeLesson, "sort_order" | "created_at" | "updated_at">>;
