@@ -1,12 +1,37 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Plus, Users, X } from "@/components/icons";
+import {
+  BookIcon,
+  CalendarIcon,
+  Plus,
+  Search,
+  Users,
+  X,
+} from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
+import {
+  Avatar,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  Input,
+  Select,
+  Skeleton,
+  Spinner,
+} from "@/components/ui";
+import { avatarUrl } from "@/hooks/useAvatar";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
-import { useSubjects } from "@/hooks/useCurriculum";
-import { useCurriculumSubjectsAtGrade, useGradeLevels } from "@/hooks/useCurriculumStructure";
-import { useDepartments, useProfiles, type ProfileRow } from "@/hooks/useProfiles";
+import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
+import {
+  useCurriculumSubjectsAtGrade,
+  useGradeLevels,
+} from "@/hooks/useCurriculumStructure";
+import {
+  useDepartments,
+  useProfiles,
+  type ProfileRow,
+} from "@/hooks/useProfiles";
 import { useDepartmentSettings } from "@/hooks/useSettings";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import {
@@ -20,6 +45,14 @@ import { profileFullName, type TeachingAssignment } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
+
+const AREA_TONES = [
+  "bg-accent/10 text-accent",
+  "bg-success/15 text-success",
+  "bg-purple-500/10 text-purple-500",
+  "bg-warning/15 text-warning",
+  "bg-pink-500/10 text-pink-500",
+];
 
 const TERM_LABEL: Record<number, string> = { 1: "ภาคเรียน 1", 2: "ภาคเรียน 2" };
 
@@ -42,12 +75,26 @@ export function TeachingLoad() {
   const { data: deptSettings } = useDepartmentSettings(departmentId || null);
 
   if (!me || (!orgWide && !me.roles.includes("dept_head"))) {
-    return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
+    return (
+      <Card className="text-sm text-muted-foreground">
+        ไม่มีสิทธิ์เข้าถึงเมนูนี้
+      </Card>
+    );
   }
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+          <BookIcon className="h-6 w-6" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-heading text-xl font-semibold">ภาระงานสอน</h2>
+          <p className="text-xs text-muted-foreground">
+            จัดการภาระงานสอนของครู แสดงรายวิชาที่รับผิดชอบและจำนวนคาบตามภาคเรียน
+          </p>
+        </div>
+
         {orgWide && departments.length > 0 && (
           <Select
             className="w-auto min-w-[10rem]"
@@ -67,8 +114,8 @@ export function TeachingLoad() {
           </Select>
         )}
 
-        {splitsByTerm && (
-          <div className="ml-auto inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
+        {splitsByTerm ? (
+          <div className="inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
             {[1, 2].map((t) => (
               <button
                 key={t}
@@ -81,16 +128,27 @@ export function TeachingLoad() {
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
-                {TERM_LABEL[t]}
+                {TERM_LABEL[t]}/{academicYear}
               </button>
             ))}
           </div>
+        ) : (
+          departmentId && (
+            <span className="inline-flex h-8 items-center gap-2 rounded-lg border border-border px-3 text-xs">
+              <CalendarIcon className="h-3.5 w-3.5" />
+              ปีการศึกษา {academicYear}
+            </span>
+          )
         )}
       </div>
 
       {!departmentId ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="เลือกแผนก" description="เลือกแผนกเพื่อดูภาระงานสอน" icon={Users} />
+          <EmptyState
+            title="เลือกแผนก"
+            description="เลือกแผนกเพื่อดูภาระงานสอน"
+            icon={Users}
+          />
         </div>
       ) : (
         <TeachingLoadBoard
@@ -108,60 +166,17 @@ export function TeachingLoad() {
   );
 }
 
-function loadStatus(total: number, min: number | null, max: number | null): "low" | "high" | "ok" {
+function loadStatus(
+  total: number,
+  min: number | null,
+  max: number | null,
+): "low" | "high" | "ok" {
   if (min !== null && total < min) return "low";
   if (max !== null && total > max) return "high";
   return "ok";
 }
 
-function LoadBadge({ total, min, max }: { total: number; min: number | null; max: number | null }) {
-  const status = loadStatus(total, min, max);
-  return (
-    <span
-      className={cn(
-        "shrink-0 rounded-full px-2 py-0.5 text-xs",
-        status === "ok" ? "bg-muted text-muted-foreground" : "bg-warning/15 text-warning",
-      )}
-    >
-      {total} คาบ/สัปดาห์
-    </span>
-  );
-}
-
 type TeacherSortKey = "name" | "code" | "load";
-
-function SortTh({
-  label,
-  column,
-  sortKey,
-  sortDir,
-  onSort,
-}: {
-  label: string;
-  column: TeacherSortKey;
-  sortKey: TeacherSortKey;
-  sortDir: "asc" | "desc";
-  onSort: (key: TeacherSortKey) => void;
-}) {
-  const active = sortKey === column;
-  return (
-    <th
-      className="px-3 py-2 font-medium"
-      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
-    >
-      <button
-        type="button"
-        className="tappable inline-flex items-center gap-1 text-left hover:text-foreground"
-        onClick={() => onSort(column)}
-      >
-        {label}
-        <span className={active ? "text-foreground" : "text-muted-foreground/40"} aria-hidden>
-          {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
-        </span>
-      </button>
-    </th>
-  );
-}
 
 function TeachingLoadBoard({
   departmentId,
@@ -182,19 +197,27 @@ function TeachingLoadBoard({
   selectedTeacherId: string;
   onSelectTeacher: (id: string) => void;
 }) {
-  const { data: teachers = [] } = useProfiles({ search: "", departmentId, role: "teacher", active: "true" });
-  const { data: assignments = [], isLoading } = useDepartmentTeachingAssignments(
+  const { data: teachers = [] } = useProfiles({
+    search: "",
     departmentId,
-    academicYear,
-    term,
-  );
+    role: "teacher",
+    active: "true",
+  });
+  const { data: assignments = [], isLoading } =
+    useDepartmentTeachingAssignments(departmentId, academicYear, term);
   const del = useDeleteTeachingAssignment();
+  const { data: learningAreas = [] } = useLearningAreas();
+  const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<TeacherSortKey>("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const totalByTeacher = useMemo(() => {
     const totals = new Map<string, number>();
-    for (const a of assignments) totals.set(a.teacher_id, (totals.get(a.teacher_id) ?? 0) + a.periods_per_week);
+    for (const a of assignments)
+      totals.set(
+        a.teacher_id,
+        (totals.get(a.teacher_id) ?? 0) + a.periods_per_week,
+      );
     return totals;
   }, [assignments]);
 
@@ -208,10 +231,15 @@ function TeachingLoadBoard({
           cmp = profileFullName(a).localeCompare(profileFullName(b), "th");
           break;
         case "code":
-          cmp = (a.teacher_code ?? "").localeCompare(b.teacher_code ?? "", "th", { numeric: true });
+          cmp = (a.teacher_code ?? "").localeCompare(
+            b.teacher_code ?? "",
+            "th",
+            { numeric: true },
+          );
           break;
         case "load":
-          cmp = (totalByTeacher.get(a.id) ?? 0) - (totalByTeacher.get(b.id) ?? 0);
+          cmp =
+            (totalByTeacher.get(a.id) ?? 0) - (totalByTeacher.get(b.id) ?? 0);
           break;
       }
       return cmp * dir;
@@ -219,105 +247,235 @@ function TeachingLoadBoard({
     return list;
   }, [teachers, sortKey, sortDir, totalByTeacher]);
 
-  function onSort(key: TeacherSortKey) {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else {
-      setSortKey(key);
-      setSortDir("asc");
-    }
-  }
-
   const selectedTeacher = teachers.find((t) => t.id === selectedTeacherId);
   const rows = assignments.filter((a) => a.teacher_id === selectedTeacherId);
+  const areaName = (t: ProfileRow) =>
+    learningAreas.find((l) => l.id === t.learning_area_id)?.name ?? "—";
+
+  const subjectCountByTeacher = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const a of assignments)
+      counts.set(a.teacher_id, (counts.get(a.teacher_id) ?? 0) + 1);
+    return counts;
+  }, [assignments]);
+
+  const q = search.trim().toLowerCase();
+  const visibleTeachers = q
+    ? sortedTeachers.filter((t) =>
+        `${profileFullName(t)} ${t.teacher_code ?? ""}`
+          .toLowerCase()
+          .includes(q),
+      )
+    : sortedTeachers;
+
+  const totalPeriods = rows.reduce((sum, a) => sum + a.periods_per_week, 0);
+  const classroomCount = new Set(rows.map((a) => a.classroom_id)).size;
+  const loadState = loadStatus(totalPeriods, minPeriods, maxPeriods);
 
   return (
-    <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2 lg:items-stretch">
+    <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-stretch">
       <div className="table-panel">
-        <div className="table-panel-scroll">
-          <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-muted text-left text-xs text-muted-foreground">
-              <tr>
-                <SortTh label="รายชื่อ" column="name" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-                <SortTh label="รหัส" column="code" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-                <SortTh label="ภาระงานสอน" column="load" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-              </tr>
-            </thead>
-            <tbody>
-              {sortedTeachers.map((t) => (
-                <tr
-                  key={t.id}
+        <div className="shrink-0 space-y-3 border-b border-border p-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-9"
+              placeholder="ค้นหาชื่อครู..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="ค้นหาครู"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>ครูทั้งหมด {teachers.length} คน</span>
+            <Select
+              className="w-auto min-w-[8.5rem]"
+              value={`${sortKey}:${sortDir}`}
+              onChange={(e) => {
+                const [k, d] = e.target.value.split(":");
+                setSortKey(k as TeacherSortKey);
+                setSortDir(d as "asc" | "desc");
+              }}
+              aria-label="เรียงลำดับ"
+            >
+              <option value="name:asc">เรียงตาม ชื่อ A-Z</option>
+              <option value="name:desc">เรียงตาม ชื่อ Z-A</option>
+              <option value="code:asc">เรียงตาม รหัส</option>
+              <option value="load:desc">ภาระงานมาก-น้อย</option>
+              <option value="load:asc">ภาระงานน้อย-มาก</option>
+            </Select>
+          </div>
+        </div>
+
+        <ul className="table-panel-scroll space-y-1 p-2">
+          {visibleTeachers.map((t) => {
+            const active = selectedTeacherId === t.id;
+            const status = loadStatus(
+              totalByTeacher.get(t.id) ?? 0,
+              minPeriods,
+              maxPeriods,
+            );
+            return (
+              <li key={t.id}>
+                <button
+                  type="button"
                   onClick={() => onSelectTeacher(t.id)}
+                  aria-current={active}
                   className={cn(
-                    "cursor-pointer border-t border-border",
-                    selectedTeacherId === t.id ? "bg-foreground/10" : "hover:bg-muted active:bg-muted",
+                    "flex w-full items-center gap-3 rounded-xl border-l-4 px-3 py-2.5 text-left transition-colors",
+                    active
+                      ? "border-accent bg-accent/10"
+                      : "border-transparent hover:bg-muted",
                   )}
                 >
-                  <td className="px-3 py-2 font-medium">{profileFullName(t)}</td>
-                  <td className="px-3 py-2">{t.teacher_code || "—"}</td>
-                  <td className="px-3 py-2">
-                    <LoadBadge total={totalByTeacher.get(t.id) ?? 0} min={minPeriods} max={maxPeriods} />
-                  </td>
-                </tr>
-              ))}
-              {isLoading && (
-                <tr role="status" aria-label="กำลังโหลด">
-                  <td className="px-3 py-2">
-                    <Skeleton className="h-3 w-24" />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Skeleton className="h-3 w-12" />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Skeleton className="h-4 w-20 rounded-full" />
-                  </td>
-                </tr>
-              )}
-              {!isLoading && teachers.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                    ยังไม่มีครูในแผนกนี้
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  <Avatar
+                    name={profileFullName(t)}
+                    src={avatarUrl(t)}
+                    className="h-10 w-10"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">
+                      {profileFullName(t)}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {areaName(t)}
+                    </span>
+                  </span>
+                  <span
+                    title={`${totalByTeacher.get(t.id) ?? 0} คาบ/สัปดาห์`}
+                    className={cn(
+                      "shrink-0 rounded-full px-2.5 py-0.5 text-xs",
+                      active
+                        ? "bg-accent/15 font-medium text-accent"
+                        : status === "ok"
+                          ? "bg-muted text-muted-foreground"
+                          : "bg-warning/15 text-warning",
+                    )}
+                  >
+                    {subjectCountByTeacher.get(t.id) ?? 0} รายวิชา
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+          {isLoading && (
+            <li
+              role="status"
+              aria-label="กำลังโหลด"
+              className="flex items-center gap-3 px-3 py-2.5"
+            >
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <Skeleton className="h-3 w-32" />
+            </li>
+          )}
+          {!isLoading && visibleTeachers.length === 0 && (
+            <li className="px-3 py-8 text-center text-sm text-muted-foreground">
+              {teachers.length === 0
+                ? "ยังไม่มีครูในแผนกนี้"
+                : "ไม่พบครูที่ค้นหา"}
+            </li>
+          )}
+        </ul>
+
+        <div className="shrink-0 border-t border-border px-3 py-2 text-xs text-muted-foreground">
+          แสดง {visibleTeachers.length} จาก {teachers.length} คน
         </div>
       </div>
 
       {selectedTeacher ? (
-        <div className="flex min-h-0 flex-col gap-3">
-          <h3 className="shrink-0 text-sm font-semibold">{profileFullName(selectedTeacher)}</h3>
-
-          {mayEdit && (
-            <NewAssignmentForm
-              departmentId={departmentId}
-              teacherId={selectedTeacher.id}
-              academicYear={academicYear}
-              term={term}
-              existingAssignments={rows}
-            />
-          )}
-
-          {rows.length === 0 ? (
-            <div className="flex min-h-0 flex-1 items-center justify-center">
-              <EmptyState title="ยังไม่มีวิชาที่มอบหมาย" description="กดเพิ่มรายวิชาเพื่อมอบหมายภาระงานสอน" />
+        <div className="flex min-h-0 flex-col gap-4 overflow-auto">
+          <Card className="shrink-0 space-y-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <Avatar
+                name={profileFullName(selectedTeacher)}
+                src={avatarUrl(selectedTeacher)}
+                className="h-16 w-16 text-lg"
+              />
+              <div className="min-w-0 flex-1">
+                <h3 className="font-heading truncate text-lg font-semibold">
+                  {profileFullName(selectedTeacher)}
+                </h3>
+                <p className="truncate text-sm text-muted-foreground">
+                  {areaName(selectedTeacher)}
+                </p>
+              </div>
+              {mayEdit && (
+                <NewAssignmentForm
+                  departmentId={departmentId}
+                  teacherId={selectedTeacher.id}
+                  academicYear={academicYear}
+                  term={term}
+                  existingAssignments={rows}
+                />
+              )}
             </div>
-          ) : (
-            <div className="table-panel">
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <StatTile
+                icon={BookIcon}
+                tone="bg-accent/10 text-accent"
+                label="รายวิชาที่รับผิดชอบ"
+                value={rows.length}
+                unit="รายวิชา"
+              />
+              <StatTile
+                icon={Users}
+                tone="bg-success/15 text-success"
+                label="รวมคาบสอน"
+                value={totalPeriods}
+                unit="คาบ/สัปดาห์"
+                warn={
+                  loadState !== "ok"
+                    ? loadState === "low"
+                      ? `ต่ำกว่า ${minPeriods}`
+                      : `เกิน ${maxPeriods}`
+                    : undefined
+                }
+              />
+              <StatTile
+                icon={CalendarIcon}
+                tone="bg-purple-500/10 text-purple-500"
+                label="ห้องเรียนที่สอน"
+                value={classroomCount}
+                unit="ห้องเรียน"
+              />
+            </div>
+          </Card>
+
+          <div className="table-panel min-h-[12rem] shrink-0 lg:flex-1">
+            <div className="shrink-0 border-b border-border px-4 py-3 text-sm font-semibold">
+              รายวิชาที่รับผิดชอบ ({rows.length} รายวิชา)
+            </div>
+            {rows.length === 0 ? (
+              <div className="flex flex-1 items-center justify-center">
+                <EmptyState
+                  title="ยังไม่มีวิชาที่มอบหมาย"
+                  description="กดเพิ่มรายวิชาเพื่อมอบหมายภาระงานสอน"
+                />
+              </div>
+            ) : (
               <div className="table-panel-scroll">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-muted text-left text-xs text-muted-foreground">
                     <tr>
-                      <th className="px-3 py-2 font-medium">วิชา</th>
-                      <th className="px-3 py-2 font-medium">ห้อง</th>
-                      <th className="px-3 py-2 font-medium">คาบ/สัปดาห์</th>
-                      {mayEdit && <th className="w-px px-3 py-2 font-medium" />}
+                      <th className="px-3 py-2 font-medium">#</th>
+                      <th className="px-3 py-2 font-medium">รายวิชา</th>
+                      <th className="px-3 py-2 font-medium">รหัสวิชา</th>
+                      <th className="px-3 py-2 font-medium">ระดับชั้น</th>
+                      <th className="px-3 py-2 font-medium">ห้องเรียน</th>
+                      <th className="px-3 py-2 text-center font-medium">
+                        คาบ/สัปดาห์
+                      </th>
+                      {mayEdit && (
+                        <th className="w-px px-3 py-2 font-medium">จัดการ</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((a) => (
+                    {rows.map((a, i) => (
                       <AssignmentRow
                         key={a.id}
+                        index={i + 1}
                         assignment={a}
                         allAssignments={assignments}
                         teachers={teachers}
@@ -327,10 +485,21 @@ function TeachingLoadBoard({
                       />
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="border-t border-border bg-muted font-semibold">
+                      <td className="px-3 py-2.5" colSpan={5}>
+                        รวม
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        {totalPeriods}
+                      </td>
+                      {mayEdit && <td />}
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       ) : (
         <div className="table-panel">
@@ -343,7 +512,49 @@ function TeachingLoadBoard({
   );
 }
 
+function StatTile({
+  icon: Icon,
+  tone,
+  label,
+  value,
+  unit,
+  warn,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  tone: string;
+  label: string;
+  value: number;
+  unit: string;
+  warn?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-muted/60 p-3">
+      <div
+        className={cn(
+          "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+          tone,
+        )}
+      >
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-xs text-muted-foreground">{label}</p>
+        <p className="text-2xl font-semibold leading-tight">{value}</p>
+        <p
+          className={cn(
+            "truncate text-xs",
+            warn ? "text-warning" : "text-muted-foreground",
+          )}
+        >
+          {warn ? `${unit} · ${warn}` : unit}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function AssignmentRow({
+  index,
   assignment,
   allAssignments,
   teachers,
@@ -351,6 +562,7 @@ function AssignmentRow({
   mayEdit,
   onDelete,
 }: {
+  index: number;
   assignment: TeachingAssignment;
   allAssignments: TeachingAssignment[];
   teachers: ProfileRow[];
@@ -374,11 +586,15 @@ function AssignmentRow({
 
   const subject = subjects.find((s) => s.id === assignment.subject_id);
   const classroom = classrooms.find((c) => c.id === assignment.classroom_id);
-  const gradeLevel = gradeLevels.find((g) => g.id === classroom?.grade_level_id);
+  const gradeLevel = gradeLevels.find(
+    (g) => g.id === classroom?.grade_level_id,
+  );
   const gradeLabel = gradeLevel ? gradeShortLabel(gradeLevel.code) : null;
 
   const groupMates = assignment.group_id
-    ? allAssignments.filter((a) => a.id !== assignment.id && a.group_id === assignment.group_id)
+    ? allAssignments.filter(
+        (a) => a.id !== assignment.id && a.group_id === assignment.group_id,
+      )
     : [];
 
   function label(a: TeachingAssignment) {
@@ -392,30 +608,50 @@ function AssignmentRow({
 
   return (
     <tr className="border-t border-border">
-      <td className="px-3 py-2">
-        <span className="block font-medium">{subject?.code ?? "—"}</span>
-        {subject && <span className="block text-muted-foreground">{subject.name_th}</span>}
+      <td className="px-3 py-2.5 text-muted-foreground">{index}</td>
+      <td className="px-3 py-2.5">
+        <span className="block font-medium">{subject?.name_th ?? "—"}</span>
         {groupMates.length > 0 && (
           <span className="mt-0.5 block text-[10px] text-accent">
             เรียนรวม/แบ่งคาบกับ {groupMates.map(label).join(", ")}
           </span>
         )}
       </td>
-      <td className="px-3 py-2">{classroom ? `${gradeLabel ?? "—"}/${classroom.name}` : "—"}</td>
-      <td className="px-3 py-2">{assignment.periods_per_week}</td>
+      <td className="px-3 py-2.5 text-muted-foreground">
+        {subject?.code ?? "—"}
+      </td>
+      <td className="px-3 py-2.5">{gradeLabel ?? "—"}</td>
+      <td className="px-3 py-2.5">
+        {classroom ? `${gradeLabel ?? "—"}/${classroom.name}` : "—"}
+      </td>
+      <td className="px-3 py-2.5 text-center">{assignment.periods_per_week}</td>
       {mayEdit && (
-        <td className="px-3 py-2">
+        <td className="px-3 py-2.5">
           <div className="flex shrink-0 items-center justify-end gap-1.5">
             {assignment.group_id ? (
-              <Button variant="outline" size="sm" onClick={() => unlink.mutate(assignment.id)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => unlink.mutate(assignment.id)}
+              >
                 ยกเลิกผูก
               </Button>
             ) : (
-              <Button variant="ghost" size="icon" aria-label="ผูกกลุ่ม" onClick={() => setLinking(true)}>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="ผูกกลุ่ม"
+                onClick={() => setLinking(true)}
+              >
                 <Users className="h-3.5 w-3.5" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" aria-label="ลบ" onClick={onDelete}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="ลบ"
+              onClick={onDelete}
+            >
               <X className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -460,16 +696,27 @@ function GroupLinkSheet({
           <li key={c.id}>
             <button
               type="button"
-              onClick={() => link.mutate({ assignmentId: assignment.id, targetId: c.id }, { onSuccess: onClose })}
+              onClick={() =>
+                link.mutate(
+                  { assignmentId: assignment.id, targetId: c.id },
+                  { onSuccess: onClose },
+                )
+              }
               className="w-full py-2 text-left hover:text-accent"
             >
               {label(c)}
-              {c.group_id && <span className="ml-1 text-xs text-muted-foreground">(อยู่ในกลุ่มแล้ว)</span>}
+              {c.group_id && (
+                <span className="ml-1 text-xs text-muted-foreground">
+                  (อยู่ในกลุ่มแล้ว)
+                </span>
+              )}
             </button>
           </li>
         ))}
         {candidates.length === 0 && (
-          <li className="py-4 text-center text-sm text-muted-foreground">ไม่มีภาระงานสอนอื่นให้ผูก</li>
+          <li className="py-4 text-center text-sm text-muted-foreground">
+            ไม่มีภาระงานสอนอื่นให้ผูก
+          </li>
         )}
       </ul>
     </Sheet>
@@ -491,8 +738,11 @@ function NewAssignmentForm({
 }) {
   const [open, setOpen] = useState(false);
   const [classroomId, setClassroomId] = useState("");
-  const [subjectId, setSubjectId] = useState("");
-  const [periods, setPeriods] = useState("");
+  // subject id -> periods/week (string, editable); presence = selected
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  const [query, setQuery] = useState("");
+  const [areaId, setAreaId] = useState("");
+  const { data: learningAreas = [] } = useLearningAreas();
 
   const { data: classrooms = [] } = useClassroomsByDepartment(departmentId);
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
@@ -509,32 +759,54 @@ function NewAssignmentForm({
 
   const classroom = classrooms.find((c) => c.id === classroomId);
   const gradeLevelId = classroom?.grade_level_id ?? null;
-  const { data: curriculumRows = [] } = useCurriculumSubjectsAtGrade(gradeLevelId);
+  const { data: curriculumRows = [] } =
+    useCurriculumSubjectsAtGrade(gradeLevelId);
 
   const termRows = useMemo(
-    () => curriculumRows.filter((r) => (term === null ? r.term === null : r.term === term)),
+    () =>
+      curriculumRows.filter((r) =>
+        term === null ? r.term === null : r.term === term,
+      ),
     [curriculumRows, term],
   );
 
-  const subjectById = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
+  const subjectById = useMemo(
+    () => new Map(subjects.map((s) => [s.id, s])),
+    [subjects],
+  );
 
   const assignedSubjectIds = useMemo(() => {
     if (!classroomId) return new Set<string>();
     return new Set(
-      existingAssignments.filter((a) => a.classroom_id === classroomId).map((a) => a.subject_id),
+      existingAssignments
+        .filter((a) => a.classroom_id === classroomId)
+        .map((a) => a.subject_id),
     );
   }, [existingAssignments, classroomId]);
 
   const availableSubjects = useMemo(() => {
     if (!classroomId) return [];
     const seen = new Set<string>();
-    const out: { id: string; code: string; name_th: string; hours_per_week: number }[] = [];
+    const out: {
+      id: string;
+      code: string;
+      name_th: string;
+      hours_per_week: number;
+      learning_area_id: string;
+    }[] = [];
     for (const r of termRows) {
-      if (assignedSubjectIds.has(r.subject_id) || seen.has(r.subject_id)) continue;
+      if (assignedSubjectIds.has(r.subject_id) || seen.has(r.subject_id))
+        continue;
       seen.add(r.subject_id);
       const s = subjectById.get(r.subject_id);
       if (!s) continue;
-      out.push({ id: s.id, code: s.code, name_th: s.name_th, hours_per_week: s.hours_per_week });
+      out.push({
+        id: s.id,
+        code: s.code,
+        name_th: s.name_th,
+        hours_per_week: s.hours_per_week,
+        learning_area_id: s.learning_area_id,
+      });
     }
     out.sort((a, b) => a.code.localeCompare(b.code, "th", { numeric: true }));
     return out;
@@ -542,39 +814,42 @@ function NewAssignmentForm({
 
   useEffect(() => {
     setClassroomId("");
-    setSubjectId("");
-    setPeriods("");
+    setPicked({});
   }, [teacherId]);
 
   useEffect(() => {
-    setSubjectId("");
-    setPeriods("");
+    setPicked({});
+    setQuery("");
+    setAreaId("");
   }, [classroomId]);
 
-  function selectSubject(id: string, hours: number) {
-    setSubjectId(id);
-    setPeriods(String(hours));
+  function toggleSubject(id: string, hours: number) {
+    setPicked((p) => {
+      const { [id]: was, ...rest } = p;
+      return was === undefined ? { ...p, [id]: String(hours) } : rest;
+    });
   }
 
-  function submit() {
-    const periodsPerWeek = Number(periods);
-    if (!subjectId || !classroomId || !periodsPerWeek) return;
-    create.mutate(
-      {
-        teacher_id: teacherId,
-        subject_id: subjectId,
-        classroom_id: classroomId,
-        academic_year: academicYear,
-        term,
-        periods_per_week: periodsPerWeek,
-      },
-      {
-        onSuccess: () => {
-          setSubjectId("");
-          setPeriods("");
-        },
-      },
-    );
+  const chosen = availableSubjects.filter((s) => picked[s.id] !== undefined);
+
+  async function submit() {
+    if (!classroomId || chosen.length === 0) return;
+    try {
+      for (const s of chosen) {
+        await create.mutateAsync({
+          teacher_id: teacherId,
+          subject_id: s.id,
+          classroom_id: classroomId,
+          academic_year: academicYear,
+          term,
+          periods_per_week: Number(picked[s.id]),
+        });
+      }
+      setPicked({});
+      setOpen(false);
+    } catch {
+      // already-saved subjects drop out of the list on refetch; the rest stay selected
+    }
   }
 
   const gradeLevelName = useMemo(
@@ -594,11 +869,20 @@ function NewAssignmentForm({
     });
   }, [classrooms, gradeSort]);
 
-  const selectedSubject = availableSubjects.find((s) => s.id === subjectId);
+  const areaName = new Map(learningAreas.map((l) => [l.id, l.name]));
+  const areaIds = [
+    ...new Set(availableSubjects.map((s) => s.learning_area_id)),
+  ];
+  const q = query.trim().toLowerCase();
+  const shownSubjects = availableSubjects.filter(
+    (s) =>
+      (!areaId || s.learning_area_id === areaId) &&
+      (!q || `${s.code} ${s.name_th}`.toLowerCase().includes(q)),
+  );
 
   return (
     <>
-      <Button className="w-full shrink-0" onClick={() => setOpen(true)}>
+      <Button className="shrink-0" onClick={() => setOpen(true)}>
         <Plus className="h-3.5 w-3.5" />
         เพิ่มรายวิชา
       </Button>
@@ -607,35 +891,42 @@ function NewAssignmentForm({
         open={open}
         onOpenChange={(o) => {
           setOpen(o);
-          if (!o) {
-            setSubjectId("");
-            setPeriods("");
-          }
+          if (!o) setPicked({});
         }}
         side="left"
         title="เพิ่มรายวิชา"
+        description="เลือกรายวิชา และห้องเรียนเพื่อเพิ่มในภาระงานสอน"
         footer={
-          selectedSubject ? (
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                min={1}
-                placeholder="คาบ/สัปดาห์"
-                value={periods}
-                onChange={(e) => setPeriods(e.target.value)}
-                className="flex-1"
-                aria-label="คาบต่อสัปดาห์"
-              />
-              <Button onClick={submit} disabled={!periods || create.isPending}>
-                {create.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
-              </Button>
-            </div>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 text-xs text-muted-foreground">
+              เลือกแล้ว {chosen.length} รายวิชา
+            </span>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              ยกเลิก
+            </Button>
+            <Button
+              onClick={submit}
+              disabled={
+                chosen.length === 0 ||
+                chosen.some((s) => !Number(picked[s.id])) ||
+                create.isPending
+              }
+            >
+              {create.isPending ? (
+                <Spinner className="h-3 w-3" />
+              ) : (
+                "เพิ่มรายวิชา"
+              )}
+            </Button>
+          </div>
         }
       >
         <div className="space-y-3">
-          <Field label="ห้อง">
-            <Select value={classroomId} onChange={(e) => setClassroomId(e.target.value)}>
+          <Field label="ห้องเรียน" required>
+            <Select
+              value={classroomId}
+              onChange={(e) => setClassroomId(e.target.value)}
+            >
               <option value="">— เลือกห้อง —</option>
               {sortedClassrooms.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -646,29 +937,130 @@ function NewAssignmentForm({
           </Field>
 
           {!classroomId && (
-            <p className="py-6 text-center text-sm text-muted-foreground">เลือกห้องเพื่อดูรายวิชา</p>
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              เลือกห้องเพื่อดูรายวิชา
+            </p>
           )}
           {classroomId && availableSubjects.length === 0 && (
-            <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีรายวิชาให้มอบหมาย</p>
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              ไม่มีรายวิชาให้มอบหมาย
+            </p>
           )}
           {classroomId && availableSubjects.length > 0 && (
-            <ul className="divide-y divide-border rounded-lg border border-border text-xs">
-              {availableSubjects.map((s) => (
-                <li key={s.id}>
+            <>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="ค้นหารหัสวิชา หรือชื่อรายวิชา..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  aria-label="ค้นหารายวิชา"
+                />
+              </div>
+
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                {[
+                  ["", "ทั้งหมด"],
+                  ...areaIds.map((id) => [id, areaName.get(id) ?? "—"]),
+                ].map(([id, name]) => (
                   <button
+                    key={id}
                     type="button"
-                    onClick={() => selectSubject(s.id, s.hours_per_week)}
+                    onClick={() => setAreaId(id!)}
                     className={cn(
-                      "flex w-full flex-col px-3 py-2 text-left transition-colors",
-                      subjectId === s.id ? "bg-foreground/10" : "hover:bg-muted",
+                      "shrink-0 rounded-full border px-3 py-1 text-xs transition-colors",
+                      areaId === id
+                        ? "border-accent bg-accent/10 font-medium text-accent"
+                        : "border-transparent bg-muted text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    <span className="font-medium">{s.code}</span>
-                    <span className="text-[10px] text-muted-foreground">{s.name_th}</span>
+                    {name}
                   </button>
-                </li>
-              ))}
-            </ul>
+                ))}
+              </div>
+
+              <ul className="space-y-2">
+                {shownSubjects.map((s) => {
+                  const active = picked[s.id] !== undefined;
+                  const tone =
+                    AREA_TONES[
+                      Math.max(areaIds.indexOf(s.learning_area_id), 0) %
+                        AREA_TONES.length
+                    ];
+                  return (
+                    <li
+                      key={s.id}
+                      className={cn(
+                        "rounded-xl border transition-colors",
+                        active
+                          ? "border-accent bg-accent/10"
+                          : "border-border hover:bg-muted",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        role="checkbox"
+                        aria-checked={active}
+                        onClick={() => toggleSubject(s.id, s.hours_per_week)}
+                        className="flex w-full items-center gap-3 p-3 text-left"
+                      >
+                        <span
+                          className={cn(
+                            "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl",
+                            tone,
+                          )}
+                        >
+                          <BookIcon className="h-5 w-5" />
+                        </span>
+                        <span className="min-w-0 flex-1 text-xs">
+                          <span className="block font-medium">{s.code}</span>
+                          <span className="block truncate text-sm font-semibold">
+                            {s.name_th}
+                          </span>
+                          <span className="block truncate text-muted-foreground">
+                            {areaName.get(s.learning_area_id) ?? "—"}
+                          </span>
+                        </span>
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 text-[11px] leading-none",
+                            active
+                              ? "border-accent bg-accent text-accent-foreground"
+                              : "border-border",
+                          )}
+                        >
+                          {active && "✓"}
+                        </span>
+                      </button>
+                      {active && (
+                        <label className="flex items-center justify-end gap-2 px-3 pb-3 text-xs text-muted-foreground">
+                          คาบ/สัปดาห์
+                          <Input
+                            type="number"
+                            min={1}
+                            value={picked[s.id]}
+                            onChange={(e) =>
+                              setPicked((p) => ({
+                                ...p,
+                                [s.id]: e.target.value,
+                              }))
+                            }
+                            className="w-20"
+                          />
+                        </label>
+                      )}
+                    </li>
+                  );
+                })}
+                {shownSubjects.length === 0 && (
+                  <li className="py-6 text-center text-sm text-muted-foreground">
+                    ไม่พบรายวิชาที่ค้นหา
+                  </li>
+                )}
+              </ul>
+            </>
           )}
         </div>
       </Sheet>
