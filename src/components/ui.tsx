@@ -278,7 +278,7 @@ export function Pagination({
 }) {
   if (pageCount <= 1) return null;
   return (
-    <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+    <div className="flex items-center justify-between px-1 py-3 text-xs text-muted-foreground">
       <button
         type="button"
         className="tappable rounded-md px-2 py-1 hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
