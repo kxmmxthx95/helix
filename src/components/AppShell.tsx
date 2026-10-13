@@ -288,7 +288,7 @@ const TABS = [
   },
   {
     to: "/documents",
-    label: "เอกสาร",
+    label: "เอกสารการสอน",
     icon: DocumentTextIcon,
     section: "สอบและแบบฝึกหัด",
     managerOnly: false,

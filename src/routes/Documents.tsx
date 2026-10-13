@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { ChevronForward, DocumentTextIcon, X } from "@/components/icons";
+import { AppsIcon, BookIcon, ChevronForward, DocumentTextIcon, ListIcon, Plus, Search, X } from "@/components/icons";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Select } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Pagination, Select } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
+import { usePagination } from "@/hooks/usePagination";
 import { useSubjects } from "@/hooks/useCurriculum";
 import {
   DOC_ACCEPT,
@@ -17,6 +18,8 @@ import {
   useDeleteDocTopic,
   useDocFiles,
   useDocLessons,
+  useDocSummary,
+  useSubjectGradeLevelIds,
   useDocTopics,
   useUpdateDocLesson,
   useUpdateDocTopic,
@@ -25,10 +28,11 @@ import {
 import { useClassroomsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
 import { useMyCurrentClassroom } from "@/hooks/useExams";
 import { useMySubjects } from "@/hooks/usePractice";
+import { useDepartments } from "@/hooks/useProfiles";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import type { DocFile, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
-import { canManage } from "@/lib/roles";
+import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { EditableName, NewNameInput } from "@/routes/Practice";
 
@@ -46,12 +50,13 @@ export function Documents() {
 function TeacherDocuments() {
   const { profile: me } = useAuth();
   const isManager = canManage(me!.roles);
+  const orgWide = isOrgWide(me!.roles);
   const { data: assignments = [] } = useMyTeachingAssignments(!isManager ? me!.id : null);
   const { data: teacherSubjects = [] } = useSubjectsByIds([...new Set(assignments.map((a) => a.subject_id))]);
   const { data: managerSubjects = [] } = useSubjects(
     {
       search: "",
-      departmentId: me!.department_id ?? "",
+      departmentId: orgWide ? "" : (me!.department_id ?? ""),
       learningAreaId: "",
       gradeLevelId: "",
       term: "",
@@ -60,7 +65,7 @@ function TeacherDocuments() {
     },
     { enabled: isManager },
   );
-  return <DocBrowser subjects={isManager ? managerSubjects : teacherSubjects} canEdit />;
+  return <DocBrowser subjects={isManager ? managerSubjects : teacherSubjects} canEdit showDepartments={isManager && orgWide} />;
 }
 
 function StudentDocuments() {
@@ -110,46 +115,150 @@ function StudentDocBrowser({ studentId }: { studentId: string }) {
   return <DocBrowser subjects={subjects} fixedGradeLevelId={classrooms[0]?.grade_level_id ?? null} canEdit={false} />;
 }
 
-/** Subject + grade pickers, then lessons -> topics -> files. `fixedGradeLevelId` (students) hides the grade picker. */
+const SUBJECT_TINTS = [
+  "bg-pink-100 text-pink-600 dark:bg-pink-500/15 dark:text-pink-300",
+  "bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
+  "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
+  "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300",
+  "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
+  "bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300",
+  "bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
+  "bg-cyan-100 text-cyan-600 dark:bg-cyan-500/15 dark:text-cyan-300",
+];
+
+/** Deterministic tint per subject (subjects carry no color/icon field) — same id always lands on the same color. */
+function subjectTint(subjectId: string) {
+  let hash = 0;
+  for (let i = 0; i < subjectId.length; i++) hash = (hash * 31 + subjectId.charCodeAt(i)) >>> 0;
+  return SUBJECT_TINTS[hash % SUBJECT_TINTS.length]!;
+}
+
+type SortKey = "az" | "za" | "files";
+
+/** Landing: banner, search + grade filter, subject cards (grid/list). Opening a card goes to SubjectDocs. `fixedGradeLevelId` (students) pins the grade. */
 function DocBrowser({
   subjects,
   canEdit,
   fixedGradeLevelId,
+  showDepartments = false,
 }: {
   subjects: Subject[];
   canEdit: boolean;
   fixedGradeLevelId?: string | null;
+  /** Org-wide managers only — adds the แผนก filter. */
+  showDepartments?: boolean;
 }) {
-  const [subjectId, setSubjectId] = useState("");
-  const [pickedGradeId, setPickedGradeId] = useState("");
-  const [lesson, setLesson] = useState<{ id: string; name: string } | null>(null);
-  const [topic, setTopic] = useState<{ id: string; name: string } | null>(null);
+  const [openId, setOpenId] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
+  const [search, setSearch] = useState("");
+  const [gradeCode, setGradeCode] = useState("");
+  const [sort, setSort] = useState<SortKey>("az");
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [adding, setAdding] = useState(false);
   const { data: gradeLevels = [] } = useAllGradeLevels();
+  const { data: summary } = useDocSummary();
+  const { data: departments = [] } = useDepartments();
 
-  const subject = subjects.find((s) => s.id === subjectId) ?? null;
-  const gradeOptions = gradeLevels.filter((g) => g.department_id === subject?.department_id);
-  const gradeId = fixedGradeLevelId ?? pickedGradeId;
-  const grade = gradeLevels.find((g) => g.id === gradeId) ?? null;
-  const ready = !!subject && !!grade;
+  const gradeById = new Map(gradeLevels.map((g) => [g.id, g]));
+  const gradeCodes = [
+    ...new Map(gradeLevels.filter((g) => !departmentId || g.department_id === departmentId).map((g) => [g.code, g.sort_order])).entries(),
+  ]
+    .sort((a, b) => a[1] - b[1])
+    .map(([code]) => code);
+  const q = search.trim().toLowerCase();
+  const cards = subjects
+    .filter((s) => !departmentId || s.department_id === departmentId)
+    .map((s) => {
+      const sum = summary?.get(s.id);
+      const grades = [...(sum?.gradeLevelIds ?? [])]
+        .map((id) => gradeById.get(id))
+        .filter((g): g is NonNullable<typeof g> => !!g)
+        .sort((a, b) => a.sort_order - b.sort_order);
+      // No docs yet -> fall back to the subject's suggested grade so the card still carries a level badge.
+      const suggested = s.suggested_grade_level_id ? gradeById.get(s.suggested_grade_level_id) : undefined;
+      return { subject: s, grades: grades.length || !suggested ? grades : [suggested], files: sum?.fileCount ?? 0 };
+    })
+    .filter(
+      (c) =>
+        (!q || c.subject.name_th.toLowerCase().includes(q) || c.subject.code.toLowerCase().includes(q)) &&
+        (!gradeCode || c.grades.some((g) => g.code === gradeCode)),
+    )
+    .sort((a, b) =>
+      sort === "files"
+        ? b.files - a.files
+        : sort === "za"
+          ? b.subject.name_th.localeCompare(a.subject.name_th, "th")
+          : a.subject.name_th.localeCompare(b.subject.name_th, "th"),
+    );
 
-  if (ready && lesson && topic) {
-    return <TopicFiles topic={topic} canEdit={canEdit} onBack={() => setTopic(null)} />;
-  }
-  if (ready && lesson) {
-    return <TopicList lesson={lesson} canEdit={canEdit} onBack={() => setLesson(null)} onOpenTopic={setTopic} />;
+  const { page, setPage, pageCount, pageRows } = usePagination(cards, [search, gradeCode, sort, departmentId], 20);
+
+  const open = subjects.find((s) => s.id === openId) ?? null;
+  if (open) {
+    return (
+      <SubjectDocs subject={open} canEdit={canEdit} fixedGradeLevelId={fixedGradeLevelId} onBack={() => setOpenId("")} />
+    );
   }
 
   return (
-    <div className="space-y-3">
-      <div className="grid gap-2 sm:grid-cols-2">
+    <div className="page-fill gap-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[12rem] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหารายวิชา หรือรหัสวิชา..."
+            className="pl-9"
+            aria-label="ค้นหา"
+          />
+        </div>
+        {showDepartments && (
+          <Select
+            value={departmentId}
+            onChange={(e) => {
+              setDepartmentId(e.target.value);
+              setGradeCode("");
+            }}
+            aria-label="แผนก"
+            placeholder="ทุกแผนก"
+            className="w-40"
+          >
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </Select>
+        )}
+        {fixedGradeLevelId === undefined && (
+          <Select
+            value={gradeCode}
+            onChange={(e) => setGradeCode(e.target.value)}
+            aria-label="ระดับชั้น"
+            placeholder="ทุกระดับชั้น"
+            className="w-40"
+          >
+            {gradeCodes.map((c) => (
+              <option key={c} value={c}>
+                {gradeShortLabel(c)}
+              </option>
+            ))}
+          </Select>
+        )}
+        {canEdit && (
+          <Button size="icon" aria-label="เพิ่มเอกสารการสอน" onClick={() => setAdding((a) => !a)}>
+            <Plus className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+
+      {adding && (
         <Select
-          value={subjectId}
-          onChange={(e) => {
-            setSubjectId(e.target.value);
-            setPickedGradeId("");
-          }}
-          aria-label="วิชา"
-          placeholder="เลือกวิชา"
+          value=""
+          onChange={(e) => e.target.value && setOpenId(e.target.value)}
+          aria-label="เลือกวิชาที่จะเพิ่มเอกสาร"
+          placeholder="เลือกวิชาที่จะเพิ่มเอกสาร"
         >
           {subjects.map((s) => (
             <option key={s.id} value={s.id}>
@@ -157,30 +266,200 @@ function DocBrowser({
             </option>
           ))}
         </Select>
-        {fixedGradeLevelId === undefined ? (
-          <Select
-            value={pickedGradeId}
-            onChange={(e) => setPickedGradeId(e.target.value)}
-            disabled={!subject}
-            aria-label="ระดับชั้น"
-            placeholder="เลือกระดับชั้น"
-          >
-            {gradeOptions.map((g) => (
-              <option key={g.id} value={g.id}>
-                {gradeShortLabel(g.code)} {g.name}
-              </option>
+      )}
+
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 className="text-base font-bold">รายวิชาทั้งหมด</h2>
+          <p className="text-xs text-muted-foreground">เลือกวิชาเพื่อ{canEdit ? "จัดการ" : "ดู"}เอกสารการสอน</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-border bg-card p-0.5">
+            {(["grid", "list"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-label={v === "grid" ? "มุมมองกริด" : "มุมมองรายการ"}
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className={cn(
+                  "tappable flex h-6 w-8 items-center justify-center rounded-md",
+                  view === v ? "bg-muted text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {v === "grid" ? <AppsIcon className="h-3.5 w-3.5" /> : <ListIcon className="h-3.5 w-3.5" />}
+              </button>
             ))}
-          </Select>
-        ) : (
-          <div className="flex h-8 items-center text-xs text-muted-foreground">
-            {grade ? `ระดับชั้น ${gradeShortLabel(grade.code)}` : "ยังไม่มีห้องเรียนปัจจุบัน"}
           </div>
-        )}
+          <Select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortKey)}
+            aria-label="เรียงตาม"
+            className="w-44"
+          >
+            <option value="az">เรียงตาม: ชื่อ A-Z</option>
+            <option value="za">เรียงตาม: ชื่อ Z-A</option>
+            <option value="files">เรียงตาม: เอกสารมากสุด</option>
+          </Select>
+        </div>
       </div>
-      {ready ? (
-        <LessonList subject={subject} gradeLevelId={grade.id} canEdit={canEdit} onOpenLesson={setLesson} />
+
+      {cards.length === 0 ? (
+        <EmptyState title="ไม่พบรายวิชา" description="ลองเปลี่ยนคำค้นหาหรือระดับชั้น" />
+      ) : view === "list" ? (
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <table className="w-full min-w-[32rem] text-xs">
+            <thead className="bg-muted text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">รหัสวิชา</th>
+                <th className="px-3 py-2 font-medium">วิชา</th>
+                <th className="px-3 py-2 font-medium">ระดับชั้น</th>
+                <th className="px-3 py-2 text-right font-medium">เอกสาร</th>
+                <th className="w-10 px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {pageRows.map(({ subject: s, grades, files }) => (
+                <tr
+                  key={s.id}
+                  onClick={() => setOpenId(s.id)}
+                  className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
+                >
+                  <td className="px-3 py-3">{s.code}</td>
+                  <td className="max-w-xs truncate px-3 py-3">{s.name_th}</td>
+                  <td className="px-3 py-3">
+                    <span className="flex flex-wrap gap-1">
+                      {grades.slice(0, 3).map((g) => (
+                        <span key={g.id} className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent">
+                          {gradeShortLabel(g.code)}
+                        </span>
+                      ))}
+                      {grades.length > 3 && (
+                        <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent">
+                          +{grades.length - 3}
+                        </span>
+                      )}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 text-right">{files}</td>
+                  <td className="px-3 py-3 text-muted-foreground">
+                    <ChevronForward className="h-3 w-3" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
-        <EmptyState title="เลือกวิชา" description="เลือกวิชา (และระดับชั้น) เพื่อดูเอกสาร" />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {pageRows.map(({ subject: s, grades, files }) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setOpenId(s.id)}
+              className="tappable group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:shadow-md"
+            >
+              <div className="flex min-w-0 items-start gap-3">
+                <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", subjectTint(s.id))}>
+                  <BookIcon className="h-6 w-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-bold">{s.name_th}</div>
+                  <div className="truncate text-[11px] uppercase text-muted-foreground">{s.code}</div>
+                  {grades.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {grades.slice(0, 3).map((g) => (
+                        <span key={g.id} className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">
+                          {gradeShortLabel(g.code)}
+                        </span>
+                      ))}
+                      {grades.length > 3 && (
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">
+                          +{grades.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="mt-auto flex items-center justify-between gap-2 pt-2 text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <DocumentTextIcon className="h-3.5 w-3.5" /> เอกสาร {files} รายการ
+                </span>
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-foreground">
+                  <ChevronForward className="h-3.5 w-3.5" />
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="mt-auto">
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+      </div>
+    </div>
+  );
+}
+
+/** One subject: grade tabs (fixed for students), then lessons -> topics -> files. */
+function SubjectDocs({
+  subject,
+  canEdit,
+  fixedGradeLevelId,
+  onBack,
+}: {
+  subject: Subject;
+  canEdit: boolean;
+  fixedGradeLevelId?: string | null;
+  onBack: () => void;
+}) {
+  const [pickedGradeId, setPickedGradeId] = useState("");
+  const [lesson, setLesson] = useState<{ id: string; name: string } | null>(null);
+  const [topic, setTopic] = useState<{ id: string; name: string } | null>(null);
+  const { data: gradeLevels = [] } = useAllGradeLevels();
+
+  const { data: curriculumGradeIds = [] } = useSubjectGradeLevelIds(subject.id);
+  const { data: summary } = useDocSummary();
+  // Grades the subject really belongs to: curriculum bindings + suggested grade + any grade that already has lessons.
+  // Falls back to every grade of the department only when none of those exist, so a new subject stays usable.
+  const relevantIds = new Set([
+    ...curriculumGradeIds,
+    ...(subject.suggested_grade_level_id ? [subject.suggested_grade_level_id] : []),
+    ...(summary?.get(subject.id)?.gradeLevelIds ?? []),
+  ]);
+  const deptGrades = gradeLevels.filter((g) => g.department_id === subject.department_id);
+  const gradeOptions = relevantIds.size ? deptGrades.filter((g) => relevantIds.has(g.id)) : deptGrades;
+  const gradeId = fixedGradeLevelId ?? (pickedGradeId || gradeOptions[0]?.id || "");
+
+  if (lesson && topic) return <TopicFiles topic={topic} canEdit={canEdit} onBack={() => setTopic(null)} />;
+  if (lesson) {
+    return <TopicList lesson={lesson} canEdit={canEdit} onBack={() => setLesson(null)} onOpenTopic={setTopic} />;
+  }
+
+  return (
+    <div className="space-y-3">
+      <BackButton label={`${subject.code} ${subject.name_th}`} onBack={onBack} />
+      {fixedGradeLevelId === undefined && (
+        <div className="flex flex-wrap gap-1.5">
+          {gradeOptions.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => setPickedGradeId(g.id)}
+              className={cn(
+                "tappable rounded-full px-3 py-1.5 text-xs font-medium",
+                gradeId === g.id ? "bg-foreground text-background" : "bg-muted text-muted-foreground",
+              )}
+            >
+              {gradeShortLabel(g.code)}
+            </button>
+          ))}
+        </div>
+      )}
+      {gradeId ? (
+        <LessonList subject={subject} gradeLevelId={gradeId} canEdit={canEdit} onOpenLesson={setLesson} />
+      ) : (
+        <EmptyState title="ไม่พบระดับชั้น" description="ยังไม่มีห้องเรียนปัจจุบัน" />
       )}
     </div>
   );

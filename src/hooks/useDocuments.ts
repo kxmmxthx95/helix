@@ -59,7 +59,7 @@ export function useCreateDocLesson() {
       const { error } = await supabase.from("doc_lessons").insert(draft);
       if (error) throw error;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_lessons"] }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_lessons"] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
   });
 }
 
@@ -70,7 +70,7 @@ export function useUpdateDocLesson() {
       const { error } = await supabase.from("doc_lessons").update({ name }).eq("id", id);
       if (error) throw error;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_lessons"] }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_lessons"] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
   });
 }
 
@@ -99,7 +99,7 @@ export function useCreateDocTopic() {
       const { error } = await supabase.from("doc_topics").insert(draft);
       if (error) throw error;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_topics"] }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_topics"] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
   });
 }
 
@@ -110,7 +110,7 @@ export function useUpdateDocTopic() {
       const { error } = await supabase.from("doc_topics").update({ name }).eq("id", id);
       if (error) throw error;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_topics"] }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_topics"] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
   });
 }
 
@@ -171,7 +171,7 @@ export function useUploadDocFile() {
         throw error;
       }
     },
-    onSettled: (_d, _e, vars) => void qc.invalidateQueries({ queryKey: ["doc_files", vars.topicId] }),
+    onSettled: (_d, _e, vars) => void qc.invalidateQueries({ queryKey: ["doc_files", vars.topicId] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
   });
 }
 
@@ -184,7 +184,7 @@ export function useDeleteDocFile() {
       const { error } = await supabase.from("doc_files").delete().eq("id", file.id);
       if (error) throw error;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_files"] }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_files"] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
   });
 }
 
@@ -229,7 +229,7 @@ export function useDeleteDocLesson() {
       const { error } = await supabase.from("doc_lessons").delete().eq("id", id);
       if (error) throw error;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_lessons"] }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_lessons"] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
   });
 }
 
@@ -241,6 +241,52 @@ export function useDeleteDocTopic() {
       const { error } = await supabase.from("doc_topics").delete().eq("id", id);
       if (error) throw error;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_topics"] }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_topics"] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
+  });
+}
+
+// ------------------------------------------------------------------- summary
+
+export type DocSubjectSummary = { gradeLevelIds: Set<string>; fileCount: number };
+
+/** Per-subject grade levels that have lessons + total file count, for the subject cards. RLS already limits this to what the caller can read. */
+export function useDocSummary() {
+  return useQuery({
+    queryKey: ["doc_summary"],
+    queryFn: async (): Promise<Map<string, DocSubjectSummary>> => {
+      const { data, error } = await supabase
+        .from("doc_lessons")
+        .select("subject_id, grade_level_id, doc_topics(doc_files(count))");
+      if (error) throw error;
+      const rows = data as unknown as {
+        subject_id: string;
+        grade_level_id: string;
+        doc_topics: { doc_files: { count: number }[] }[];
+      }[];
+      const out = new Map<string, DocSubjectSummary>();
+      for (const r of rows) {
+        const s = out.get(r.subject_id) ?? { gradeLevelIds: new Set<string>(), fileCount: 0 };
+        s.gradeLevelIds.add(r.grade_level_id);
+        for (const t of r.doc_topics) for (const f of t.doc_files) s.fileCount += f.count;
+        out.set(r.subject_id, s);
+      }
+      return out;
+    },
+  });
+}
+
+/** Grade levels a subject is bound to in any academic year's curriculum (curriculum_subjects) — the grade tabs' source. */
+export function useSubjectGradeLevelIds(subjectId: string | null) {
+  return useQuery({
+    queryKey: ["curriculum_subjects", "grade_levels_of", subjectId],
+    enabled: !!subjectId,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from("curriculum_subjects")
+        .select("grade_level_id")
+        .eq("subject_id", subjectId!);
+      if (error) throw error;
+      return [...new Set(data.map((r) => r.grade_level_id))];
+    },
   });
 }
