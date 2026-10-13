@@ -1,4 +1,17 @@
-import { Plus, Search, SlidersHorizontal, Upload, X } from "@/components/icons";
+import {
+  CalendarIcon,
+  CallIcon,
+  CameraIcon,
+  LocationIcon,
+  Plus,
+  ProfileIcon,
+  Search,
+  ShieldIcon,
+  SlidersHorizontal,
+  TrashIcon,
+  Upload,
+  X,
+} from "@/components/icons";
 import { useEffect, useRef, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportUsersSheet } from "@/components/ImportUsersSheet";
@@ -548,6 +561,99 @@ function RolePicker({
   );
 }
 
+function CloseButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="ปิด"
+      onClick={onClick}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
+    >
+      <X className="h-4 w-4" />
+    </button>
+  );
+}
+
+function FormSection({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3 rounded-2xl border border-border bg-muted/40 p-3">
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold leading-tight">{title}</h3>
+          {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function AvatarCard({
+  name,
+  src,
+  busy,
+  onPick,
+  onRemove,
+}: {
+  name: string;
+  src: string | null;
+  busy?: boolean;
+  onPick: (file: File) => void;
+  onRemove: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  return (
+    <section className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 p-3">
+      <div className="relative shrink-0">
+        <Avatar name={name} src={src} className="h-16 w-16 text-xl" />
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => fileRef.current?.click()}
+          aria-label={src ? "เปลี่ยนรูป" : "เลือกรูป"}
+          className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background shadow-sm"
+        >
+          {busy ? <Spinner className="h-3.5 w-3.5" /> : <CameraIcon className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold">รูปโปรไฟล์</p>
+        <p className="text-xs text-muted-foreground">รองรับไฟล์ JPG, PNG ขนาดไม่เกิน 2MB</p>
+      </div>
+      {src && (
+        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onRemove}>
+          <TrashIcon className="h-3.5 w-3.5" />
+          ลบรูป
+        </Button>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) onPick(file);
+        }}
+      />
+    </section>
+  );
+}
+
 export function PrefixNameFields({
   prefix,
   firstName,
@@ -715,7 +821,6 @@ function EditAvatarField({ profile }: { profile: ProfileRow }) {
   const uploadAvatar = useUploadAvatar();
   const removeAvatar = useRemoveAvatar();
   const [override, setOverride] = useState<{ url: string | null } | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const busy = uploadAvatar.isPending || removeAvatar.isPending;
   const src = override ? override.url : avatarUrl(profile);
@@ -747,44 +852,13 @@ function EditAvatarField({ profile }: { profile: ProfileRow }) {
   }
 
   return (
-    <Field label="รูปโปรไฟล์">
-      <div className="flex justify-center">
-        <div className="relative">
-          <Avatar name={profileFullName(profile)} src={src} className="h-20 w-20 text-xl" />
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => fileRef.current?.click()}
-            aria-label={src ? "เปลี่ยนรูป" : "เลือกรูป"}
-            className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity hover:opacity-100"
-          >
-            {busy ? <Spinner className="h-5 w-5 text-white" /> : <Upload className="h-5 w-5 text-white" />}
-          </button>
-          {src && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void remove()}
-              aria-label="ลบรูป"
-              className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (file) void pick(file);
-          }}
-        />
-      </div>
-    </Field>
+    <AvatarCard
+      name={profileFullName(profile)}
+      src={src}
+      busy={busy}
+      onPick={(f) => void pick(f)}
+      onRemove={() => void remove()}
+    />
   );
 }
 
@@ -854,9 +928,7 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
       title="แก้ไขผู้ใช้งาน"
       description={profile ? profileFullName(profile) : undefined}
       headerEnd={
-        <Button size="icon" variant="ghost" aria-label="ปิด" onClick={close}>
-          <X className="h-4 w-4" />
-        </Button>
+        <CloseButton onClick={close} />
       }
       footer={
         profile && current ? (
@@ -880,101 +952,111 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
         <div className="space-y-4">
           <EditAvatarField key={profile.id} profile={profile} />
 
-          <PrefixNameFields
-            prefix={current.prefix}
-            firstName={current.first_name}
-            lastName={current.last_name}
-            prefixes={profile.roles.includes("student") ? STUDENT_PREFIXES : PREFIXES}
-            onChange={(patch) => setDraft({ ...current, ...patch })}
-          />
-
-          <Field label="อีเมล (ข้อมูลติดต่อ ไม่ใช่รหัสเข้าระบบ)">
-            <Input
-              type="email"
-              value={current.email ?? ""}
-              onChange={(e) => setDraft({ ...current, email: e.target.value || null })}
-            />
-          </Field>
-
-          <Field label="เบอร์โทร (รหัสผู้ใช้เข้าระบบ — แก้ที่นี่ไม่ได้)">
-            <Input type="tel" value={current.phone ?? ""} disabled readOnly />
-          </Field>
-
-          {isStudent && (
-            <Field label="รหัสนักเรียน">
-              <Input value={linkedStudent?.student_code ?? "—"} disabled readOnly />
-            </Field>
-          )}
-
-          <Field label="เลขบัตรประชาชน">
-            <Input
-              inputMode="numeric"
-              autoComplete="off"
-              value={current.national_id ?? ""}
-              onChange={(e) =>
-                setDraft({
-                  ...current,
-                  national_id: e.target.value.replace(/\D/g, "").slice(0, 13) || null,
-                })
-              }
-              pattern="[0-9]{13}"
-              minLength={13}
-              maxLength={13}
-              title="เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก"
-            />
-          </Field>
-
-          <Field label="วันเดือนปีเกิด">
-            <BuddhistDateSelect
-              key={profile?.id}
-              value={current.date_of_birth ?? ""}
-              onChange={(v) => setDraft({ ...current, date_of_birth: v || null })}
-            />
-          </Field>
-
-          <AddressInputs value={current} onChange={(patch) => setDraft({ ...current, ...patch })} />
-
-          <RolePicker
-            role={current.roles[0] ?? ""}
-            positionTitleIds={current.positionTitleIds}
-            positionTitles={positionTitles}
-            onRoleChange={setRole}
-            onAddTitle={addTitle}
-            onRemoveTitle={removeTitle}
-          />
-
-          {current.roles.includes("teacher") && (
-            <TeacherFields
-              teacherCode={current.teacher_code}
-              learningAreaId={current.learning_area_id}
+          <FormSection icon={<ProfileIcon className="h-4 w-4" />} title="ข้อมูลทั่วไป" description="ข้อมูลพื้นฐานของผู้ใช้งาน">
+            <PrefixNameFields
+              prefix={current.prefix}
+              firstName={current.first_name}
+              lastName={current.last_name}
+              prefixes={profile.roles.includes("student") ? STUDENT_PREFIXES : PREFIXES}
               onChange={(patch) => setDraft({ ...current, ...patch })}
             />
-          )}
+          </FormSection>
 
-          {me && isOrgWide(me.roles) && (
-            <Field label="แผนก">
-              <Select
-                value={current.department_id ?? ""}
-                onChange={(e) => setDraft({ ...current, department_id: e.target.value || null })}
-              >
-                <option value="">ทุกแผนก</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </Select>
+          <FormSection icon={<CallIcon className="h-4 w-4" />} title="ข้อมูลติดต่อ" description="ใช้สำหรับติดต่อและยืนยันตัวตน">
+            <Field label="อีเมล (ข้อมูลติดต่อ ไม่ใช่รหัสเข้าระบบ)">
+              <Input
+                type="email"
+                value={current.email ?? ""}
+                onChange={(e) => setDraft({ ...current, email: e.target.value || null })}
+              />
             </Field>
-          )}
 
-          <div className="flex items-center justify-between py-2">
-            <span className="text-sm font-medium">เปิดใช้งานบัญชี</span>
-            <Switch
-              checked={current.is_active}
-              onChange={(v) => setDraft({ ...current, is_active: v })}
-              label="เปิดใช้งานบัญชี"
+            <Field label="เบอร์โทร (รหัสผู้ใช้เข้าระบบ — แก้ที่นี่ไม่ได้)">
+              <Input type="tel" value={current.phone ?? ""} disabled readOnly />
+            </Field>
+
+            {isStudent && (
+              <Field label="รหัสนักเรียน">
+                <Input value={linkedStudent?.student_code ?? "—"} disabled readOnly />
+              </Field>
+            )}
+
+            <Field label="เลขบัตรประชาชน">
+              <Input
+                inputMode="numeric"
+                autoComplete="off"
+                value={current.national_id ?? ""}
+                onChange={(e) =>
+                  setDraft({
+                    ...current,
+                    national_id: e.target.value.replace(/\D/g, "").slice(0, 13) || null,
+                  })
+                }
+                pattern="[0-9]{13}"
+                minLength={13}
+                maxLength={13}
+                title="เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก"
+              />
+            </Field>
+          </FormSection>
+
+          <FormSection icon={<CalendarIcon className="h-4 w-4" />} title="วันเดือนปีเกิด">
+            <Field label="วันเดือนปีเกิด">
+              <BuddhistDateSelect
+                key={profile?.id}
+                value={current.date_of_birth ?? ""}
+                onChange={(v) => setDraft({ ...current, date_of_birth: v || null })}
+              />
+            </Field>
+          </FormSection>
+
+          <FormSection icon={<LocationIcon className="h-4 w-4" />} title="ที่อยู่">
+            <AddressInputs value={current} onChange={(patch) => setDraft({ ...current, ...patch })} />
+          </FormSection>
+
+          <FormSection icon={<ShieldIcon className="h-4 w-4" />} title="สิทธิ์และบัญชี">
+            <RolePicker
+              role={current.roles[0] ?? ""}
+              positionTitleIds={current.positionTitleIds}
+              positionTitles={positionTitles}
+              onRoleChange={setRole}
+              onAddTitle={addTitle}
+              onRemoveTitle={removeTitle}
             />
-          </div>
+
+            {current.roles.includes("teacher") && (
+              <TeacherFields
+                teacherCode={current.teacher_code}
+                learningAreaId={current.learning_area_id}
+                onChange={(patch) => setDraft({ ...current, ...patch })}
+              />
+            )}
+
+            {me && isOrgWide(me.roles) && (
+              <Field label="แผนก">
+                <Select
+                  value={current.department_id ?? ""}
+                  onChange={(e) => setDraft({ ...current, department_id: e.target.value || null })}
+                >
+                  <option value="">ทุกแผนก</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm font-medium">เปิดใช้งานบัญชี</span>
+              <Switch
+                checked={current.is_active}
+                onChange={(v) => setDraft({ ...current, is_active: v })}
+                label="เปิดใช้งานบัญชี"
+              />
+            </div>
+          </FormSection>
         </div>
       )}
     </Sheet>
@@ -1025,7 +1107,6 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
   >([]);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const avatarFileRef = useRef<HTMLInputElement>(null);
   const [failReason, setFailReason] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [attempted, setAttempted] = useState(false);
@@ -1135,6 +1216,7 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
       onOpenChange={(next) => !next && close()}
       title="เพิ่มผู้ใช้งาน"
       description="เบอร์โทรเป็นรหัสผู้ใช้เข้าระบบ — เว้นรหัสผ่านว่างไว้ได้ ระบบตั้งให้อัตโนมัติตามบทบาท"
+      headerEnd={<CloseButton onClick={close} />}
       footer={
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={close}>
@@ -1147,144 +1229,132 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
       }
     >
       <form id="create-user" onSubmit={submit} className="space-y-4" noValidate>
-        <Field label="รูปโปรไฟล์ (ไม่บังคับ)">
-          <div className="flex justify-center">
-            <div className="relative">
-              <Avatar
-                name={`${draft.first_name} ${draft.last_name}`.trim() || "?"}
-                src={avatarPreview}
-                className="h-20 w-20 text-xl"
-              />
-              <button
-                type="button"
-                onClick={() => avatarFileRef.current?.click()}
-                aria-label={avatarFile ? "เปลี่ยนรูป" : "เลือกรูป"}
-                className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity hover:opacity-100"
-              >
-                <Upload className="h-5 w-5 text-white" />
-              </button>
-            </div>
-            <input
-              ref={avatarFileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => pickAvatar(e.target.files?.[0] ?? null)}
-            />
-          </div>
-        </Field>
-
-        <Field label="เบอร์โทร (รหัสผู้ใช้)" error={errors.loginId} required>
-          <Input
-            type="tel"
-            inputMode="numeric"
-            autoComplete="tel"
-            value={draft.loginId}
-            onChange={(e) =>
-              setDraft({ ...draft, loginId: e.target.value.replace(/\D/g, "").slice(0, 10) })
-            }
-            maxLength={10}
-          />
-        </Field>
-
-        <PrefixNameFields
-          prefix={draft.prefix}
-          firstName={draft.first_name}
-          lastName={draft.last_name}
-          onChange={(patch) => setDraft({ ...draft, ...patch })}
-          errors={errors}
+        <AvatarCard
+          name={`${draft.first_name} ${draft.last_name}`.trim() || "?"}
+          src={avatarPreview}
+          onPick={pickAvatar}
+          onRemove={() => pickAvatar(null)}
         />
 
-        <Field label="อีเมล (ข้อมูลติดต่อ ไม่บังคับ)">
-          <Input
-            type="email"
-            value={draft.email ?? ""}
-            onChange={(e) => setDraft({ ...draft, email: e.target.value || null })}
-          />
-        </Field>
-
-        <Field label="เลขบัตรประชาชน (ใช้ยืนยันตอนลืมรหัสผ่าน)" error={errors.national_id}>
-          <Input
-            inputMode="numeric"
-            autoComplete="off"
-            value={draft.national_id ?? ""}
-            onChange={(e) =>
-              setDraft({
-                ...draft,
-                national_id: e.target.value.replace(/\D/g, "").slice(0, 13) || null,
-              })
-            }
-            maxLength={13}
-          />
-        </Field>
-
-        <Field label="วันเดือนปีเกิด" error={errors.date_of_birth} required>
-          <BuddhistDateSelect
-            key={open ? "open" : "closed"}
-            value={draft.date_of_birth ?? ""}
-            onChange={(v) => setDraft({ ...draft, date_of_birth: v || null })}
-          />
-        </Field>
-
-        <RolePicker
-          role={draft.roles[0] ?? ""}
-          positionTitleIds={draft.positionTitleIds}
-          positionTitles={positionTitles}
-          onRoleChange={setRole}
-          onAddTitle={addTitle}
-          onRemoveTitle={removeTitle}
-          roleError={errors.role}
-        />
-
-        {draft.roles.includes("teacher") && (
-          <TeacherFields
-            teacherCode={draft.teacher_code}
-            learningAreaId={draft.learning_area_id}
+        <FormSection icon={<ProfileIcon className="h-4 w-4" />} title="ข้อมูลทั่วไป" description="ข้อมูลพื้นฐานของผู้ใช้งาน">
+          <PrefixNameFields
+            prefix={draft.prefix}
+            firstName={draft.first_name}
+            lastName={draft.last_name}
             onChange={(patch) => setDraft({ ...draft, ...patch })}
-            error={errors.learning_area_id}
+            errors={errors}
           />
-        )}
+        </FormSection>
 
-        {role === "parent" && (
-          <LinkedStudentsField
-            selected={guardianStudents}
-            onAdd={addGuardianStudent}
-            onRemove={removeGuardianStudent}
-            error={errors.guardianStudents}
-          />
-        )}
-
-        <Field label="รหัสผ่าน (เว้นว่างได้)" error={errors.password} required={role === "super_admin"}>
-          <PasswordInput
-            value={draft.password}
-            onChange={(e) => setDraft({ ...draft, password: e.target.value })}
-          />
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            {role === "super_admin"
-              ? "ผู้ดูแลระบบต้องตั้งรหัสผ่านเอง"
-              : autoPassword
-                ? <>ถ้าเว้นว่าง รหัสผ่านเริ่มต้นคือ <span className="font-mono">{autoPassword}</span></>
-                : role === "parent"
-                  ? "เลือกนักเรียนที่ดูแลก่อน เพื่อดูรหัสผ่านเริ่มต้น"
-                  : "กรอกวันเดือนปีเกิดก่อน เพื่อดูรหัสผ่านเริ่มต้น"}
-          </p>
-        </Field>
-
-        {me && isOrgWide(me.roles) && (
-          <Field label="แผนก">
-            <Select
-              value={draft.department_id ?? ""}
-              onChange={(e) => setDraft({ ...draft, department_id: e.target.value || null })}
-            >
-              <option value="">ทุกแผนก</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </Select>
+        <FormSection icon={<CallIcon className="h-4 w-4" />} title="ข้อมูลติดต่อ" description="เบอร์โทรใช้เป็นรหัสเข้าสู่ระบบ">
+          <Field label="เบอร์โทร (รหัสผู้ใช้)" error={errors.loginId} required>
+            <Input
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel"
+              value={draft.loginId}
+              onChange={(e) =>
+                setDraft({ ...draft, loginId: e.target.value.replace(/\D/g, "").slice(0, 10) })
+              }
+              maxLength={10}
+            />
           </Field>
-        )}
+
+          <Field label="อีเมล (ไม่บังคับ)">
+            <Input
+              type="email"
+              value={draft.email ?? ""}
+              onChange={(e) => setDraft({ ...draft, email: e.target.value || null })}
+            />
+          </Field>
+
+          <Field label="เลขบัตรประชาชน (ใช้ยืนยันตอนลืมรหัสผ่าน)" error={errors.national_id}>
+            <Input
+              inputMode="numeric"
+              autoComplete="off"
+              value={draft.national_id ?? ""}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  national_id: e.target.value.replace(/\D/g, "").slice(0, 13) || null,
+                })
+              }
+              maxLength={13}
+            />
+          </Field>
+        </FormSection>
+
+        <FormSection icon={<CalendarIcon className="h-4 w-4" />} title="วันเดือนปีเกิด">
+          <Field label="วัน / เดือน / ปี (พ.ศ.)" error={errors.date_of_birth} required>
+            <BuddhistDateSelect
+              key={open ? "open" : "closed"}
+              value={draft.date_of_birth ?? ""}
+              onChange={(v) => setDraft({ ...draft, date_of_birth: v || null })}
+            />
+          </Field>
+        </FormSection>
+
+        <FormSection icon={<ShieldIcon className="h-4 w-4" />} title="สิทธิ์และบัญชี">
+          <RolePicker
+            role={draft.roles[0] ?? ""}
+            positionTitleIds={draft.positionTitleIds}
+            positionTitles={positionTitles}
+            onRoleChange={setRole}
+            onAddTitle={addTitle}
+            onRemoveTitle={removeTitle}
+            roleError={errors.role}
+          />
+
+          {draft.roles.includes("teacher") && (
+            <TeacherFields
+              teacherCode={draft.teacher_code}
+              learningAreaId={draft.learning_area_id}
+              onChange={(patch) => setDraft({ ...draft, ...patch })}
+              error={errors.learning_area_id}
+            />
+          )}
+
+          {role === "parent" && (
+            <LinkedStudentsField
+              selected={guardianStudents}
+              onAdd={addGuardianStudent}
+              onRemove={removeGuardianStudent}
+              error={errors.guardianStudents}
+            />
+          )}
+
+          <Field label="รหัสผ่าน (เว้นว่างได้)" error={errors.password} required={role === "super_admin"}>
+            <PasswordInput
+              value={draft.password}
+              onChange={(e) => setDraft({ ...draft, password: e.target.value })}
+            />
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {role === "super_admin"
+                ? "ผู้ดูแลระบบต้องตั้งรหัสผ่านเอง"
+                : autoPassword
+                  ? <>ถ้าเว้นว่าง รหัสผ่านเริ่มต้นคือ <span className="font-mono">{autoPassword}</span></>
+                  : role === "parent"
+                    ? "เลือกนักเรียนที่ดูแลก่อน เพื่อดูรหัสผ่านเริ่มต้น"
+                    : "กรอกวันเดือนปีเกิดก่อน เพื่อดูรหัสผ่านเริ่มต้น"}
+            </p>
+          </Field>
+
+          {me && isOrgWide(me.roles) && (
+            <Field label="แผนก">
+              <Select
+                value={draft.department_id ?? ""}
+                onChange={(e) => setDraft({ ...draft, department_id: e.target.value || null })}
+              >
+                <option value="">ทุกแผนก</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+        </FormSection>
 
         {failReason && <p className="text-sm text-destructive">{failReason}</p>}
       </form>

@@ -1,5 +1,9 @@
 import type React from "react";
 // Deep imports — the package barrel pulls every icon into the main chunk.
+import CallOutline from "react-ionicons/lib/CallOutline";
+import CameraOutline from "react-ionicons/lib/CameraOutline";
+import LocationOutline from "react-ionicons/lib/LocationOutline";
+import TrashOutline from "react-ionicons/lib/TrashOutline";
 import Add from "react-ionicons/lib/Add";
 import AppsOutline from "react-ionicons/lib/AppsOutline";
 import BarChartOutline from "react-ionicons/lib/BarChartOutline";
@@ -163,3 +167,7 @@ export function ItalicIcon({ className, size }: IconProps) {
     </svg>
   );
 }
+export const CallIcon = wrap(CallOutline);
+export const CameraIcon = wrap(CameraOutline);
+export const LocationIcon = wrap(LocationOutline);
+export const TrashIcon = wrap(TrashOutline);
