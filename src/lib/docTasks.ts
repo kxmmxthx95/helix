@@ -48,10 +48,13 @@ export type TeacherProgress = {
 export function teacherProgress(
   teacher: Teacher,
   tasks: DocTask[],
-  files: Pick<DocTaskFile, "task_id" | "teacher_id">[],
+  files: Pick<DocTaskFile, "task_id" | "teacher_id" | "review_status">[],
   today: string,
 ): TeacherProgress {
-  const have = new Set(files.filter((f) => f.teacher_id === teacher.id).map((f) => f.task_id));
+  // A returned file doesn't count — the task is open again until a new upload.
+  const have = new Set(
+    files.filter((f) => f.teacher_id === teacher.id && f.review_status !== "returned").map((f) => f.task_id),
+  );
   let submitted = 0;
   let pending = 0;
   let overdue = 0;

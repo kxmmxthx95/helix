@@ -828,6 +828,8 @@ export type DocFile = {
   created_at: string;
 };
 
+export type DocTaskReviewStatus = "pending" | "approved" | "returned";
+
 export type DocTaskType = "lesson_plan" | "worksheet" | "exam" | "media" | "other";
 
 /** งานเอกสาร — due-dated submission request; null department/learning area = no filter on that axis. See migration 0072. */
@@ -855,6 +857,10 @@ export type DocTaskFile = {
   mime_type: string;
   size_bytes: number;
   created_at: string;
+  review_status: DocTaskReviewStatus; // see migration 0073
+  review_note: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
 };
 
 /** A set of bank questions to practice — either curated by a teacher (visible to every classroom currently studying the subject) or a student's own self-serve random pull. Every PracticeAttempt points at one of these either way. */
@@ -1413,7 +1419,7 @@ export type Database = {
       doc_topics: Table<DocTopic, InsertOf<DocTopic, "sort_order" | "created_at" | "updated_at">>;
       doc_files: Table<DocFile, InsertOf<DocFile, "description">>;
       doc_tasks: Table<DocTask, InsertOf<DocTask, "description" | "department_id" | "learning_area_id">>;
-      doc_task_files: Table<DocTaskFile, InsertOf<DocTaskFile, never>>;
+      doc_task_files: Table<DocTaskFile, InsertOf<DocTaskFile, "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
       practice_lessons: Table<PracticeLesson, InsertOf<PracticeLesson, "sort_order" | "created_at" | "updated_at">>;
       practice_topics: Table<PracticeTopic, InsertOf<PracticeTopic, "sort_order" | "created_at" | "updated_at">>;
       practice_sets: Table<PracticeSet, InsertOf<PracticeSet, "title" | "topic_id" | "topic" | "difficulty">>;
@@ -1429,6 +1435,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      review_doc_task_file: {
+        Args: { p_file_id: string; p_status: "approved" | "returned"; p_note: string | null };
+        Returns: void;
+      };
       submit_exam_attempt: {
         Args: { p_attempt_id: string };
         Returns: void;

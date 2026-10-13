@@ -19,9 +19,15 @@ describe("docTasks", () => {
     expect(taskTargetsTeacher(task("x", "2026-01-01", { learning_area_id: "a1" }), teacher)).toBe(true);
   });
 
+  it("a returned file does not count as submitted", () => {
+    const tasks = [task("a", "2026-03-01")];
+    const p = teacherProgress(teacher, tasks, [{ task_id: "a", teacher_id: "t1", review_status: "returned" }], "2026-02-01");
+    expect(p).toMatchObject({ submitted: 0, pending: 1, status: "pending" });
+  });
+
   it("progress rolls up per teacher", () => {
     const tasks = [task("a", "2026-01-01"), task("b", "2026-03-01"), task("c", "2026-03-01", { department_id: "d2" })];
-    const p = teacherProgress(teacher, tasks, [{ task_id: "b", teacher_id: "t1" }], "2026-02-01");
+    const p = teacherProgress(teacher, tasks, [{ task_id: "b", teacher_id: "t1", review_status: "approved" }], "2026-02-01");
     expect(p).toMatchObject({ total: 2, submitted: 1, pending: 0, overdue: 1, percent: 50, status: "overdue" });
   });
 });

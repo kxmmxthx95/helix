@@ -4,6 +4,7 @@ import {
   AppsIcon,
   BarChartIcon,
   BookIcon,
+  CheckmarkCircleIcon,
   ChevronForward,
   ClipboardIcon,
   DocumentTextIcon,
@@ -50,7 +51,7 @@ import type { DocFile, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
-import { DocProgressTab, MyDocTasksTab } from "@/routes/DocProgress";
+import { DocProgressTab, MyDocTasksTab, ReviewDocsTab } from "@/routes/DocProgress";
 import { EditableName, NewNameInput } from "@/routes/Practice";
 
 // เอกสาร — วิชา -> ระดับชั้น -> เนื้อหาหลัก -> เนื้อหาย่อย -> ไฟล์.
@@ -87,7 +88,10 @@ function TeacherDocuments() {
   // งานเอกสาร tabs: reviewers (super_admin / director / dept_head) track progress, teachers answer their tasks.
   const tabs = [
     ...(me!.roles.some((r) => r === "super_admin" || r === "director" || r === "dept_head")
-      ? [{ id: "progress", label: "ภาพรวม", icon: BarChartIcon }]
+      ? [
+          { id: "progress", label: "ภาพรวม", icon: BarChartIcon },
+          { id: "review", label: "ตรวจเอกสาร", icon: CheckmarkCircleIcon },
+        ]
       : []),
     { id: "docs", label: "เอกสารการสอน", icon: DocumentTextIcon },
     ...(me!.roles.includes("teacher") ? [{ id: "mine", label: "งานของฉัน", icon: ClipboardIcon }] : []),
@@ -117,7 +121,7 @@ function TeacherDocuments() {
           </button>
         ))}
       </div>
-      {tab === "progress" ? <DocProgressTab /> : tab === "mine" ? <MyDocTasksTab /> : browser}
+      {tab === "progress" ? <DocProgressTab /> : tab === "review" ? <ReviewDocsTab /> : tab === "mine" ? <MyDocTasksTab /> : browser}
     </div>
   );
 }

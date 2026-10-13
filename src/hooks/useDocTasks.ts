@@ -113,3 +113,15 @@ export function useDeleteDocTaskFile() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_task_files"] }),
   });
 }
+
+/** Approve, or send back with a note (required) — through review_doc_task_file(), see migration 0073. */
+export function useReviewDocTaskFile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ fileId, status, note }: { fileId: string; status: "approved" | "returned"; note: string | null }) => {
+      const { error } = await supabase.rpc("review_doc_task_file", { p_file_id: fileId, p_status: status, p_note: note });
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_task_files"] }),
+  });
+}
