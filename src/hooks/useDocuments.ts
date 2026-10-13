@@ -99,6 +99,23 @@ export function useDocFiles(topicId: string | null) {
   });
 }
 
+/** Every file under the given topics (one lesson's worth) — for the lesson-level document viewer. */
+export function useDocFilesByTopics(topicIds: string[]) {
+  return useQuery({
+    queryKey: ["doc_files", "by_topics", topicIds],
+    enabled: topicIds.length > 0,
+    queryFn: async (): Promise<DocFile[]> => {
+      const { data, error } = await supabase
+        .from("doc_files")
+        .select("*")
+        .in("topic_id", topicIds)
+        .order("created_at");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 /** Checks type/size, uploads to the private bucket under `${topicId}/`, then inserts the row; removes the object again if the insert fails. */
 export function useUploadDocFile() {
   const qc = useQueryClient();
