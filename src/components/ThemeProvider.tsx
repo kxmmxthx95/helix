@@ -9,6 +9,7 @@ type ThemeContextValue = {
   /** Effective theme applied to the authenticated app shell. */
   resolved: ResolvedTheme;
   cycle: () => void;
+  setPreference: (preference: ThemePreference) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -60,6 +61,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       value={{
         preference,
         resolved,
+        setPreference,
         cycle: () =>
           setPreference((current) => {
             const i = ORDER.indexOf(current);
