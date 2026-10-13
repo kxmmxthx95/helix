@@ -173,11 +173,11 @@ function DocBrowser({
   const { data: departments = [] } = useDepartments();
 
   const gradeById = new Map(gradeLevels.map((g) => [g.id, g]));
+  // อนุบาล (K) → ประถม (P) → มัธยม (M), then by number — sort_order alone interleaves departments.
+  const levelRank = (code: string) => "KPM".indexOf(code[0]?.toUpperCase() ?? "");
   const gradeCodes = [
-    ...new Map(gradeLevels.filter((g) => !departmentId || g.department_id === departmentId).map((g) => [g.code, g.sort_order])).entries(),
-  ]
-    .sort((a, b) => a[1] - b[1])
-    .map(([code]) => code);
+    ...new Set(gradeLevels.filter((g) => !departmentId || g.department_id === departmentId).map((g) => g.code)),
+  ].sort((a, b) => levelRank(a) - levelRank(b) || Number.parseInt(a.slice(1)) - Number.parseInt(b.slice(1)));
   const q = search.trim().toLowerCase();
   const cards = subjects
     .filter((s) => !departmentId || s.department_id === departmentId)
@@ -407,7 +407,7 @@ function DocBrowser({
           ))}
         </div>
       )}
-      <div className="mt-auto py-3">
+      <div className="mt-auto">
         <Pagination page={page} pageCount={pageCount} onChange={setPage} />
       </div>
     </div>
@@ -826,6 +826,7 @@ function LessonRow({
   onOpenTopic: (t: { id: string; name: string }) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [addingTopic, setAddingTopic] = useState(false);
   const updateLesson = useUpdateDocLesson();
   const removeLesson = useDeleteDocLesson();
   const createTopic = useCreateDocTopic();
@@ -850,18 +851,20 @@ function LessonRow({
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm">
       <div className="flex items-center gap-3 p-3">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-bold text-accent">
           {index + 1}
         </span>
-        <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", subjectTint(lesson.id))}>
-          <LibraryIcon className="h-5 w-5" />
+        <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl", subjectTint(lesson.id))}>
+          <LibraryIcon className="h-6 w-6" />
         </div>
         <button type="button" onClick={() => setOpen((o) => !o)} className="min-w-0 flex-1 text-left">
           <div className="truncate text-sm font-bold">{lesson.name}</div>
-          <div className="truncate text-[11px] text-muted-foreground">{lesson.topics.length} เนื้อหาย่อย</div>
+          <div className="truncate text-xs text-muted-foreground">{lesson.topics.length} เนื้อหาย่อย</div>
         </button>
-        <div className="flex shrink-0 items-center gap-1.5 text-muted-foreground">
-          <DocumentTextIcon className="h-4 w-4" />
+        <div className="flex shrink-0 items-center gap-2 text-muted-foreground">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background">
+            <DocumentTextIcon className="h-4 w-4" />
+          </span>
           <div className="text-xs leading-tight">
             <div className="font-bold text-foreground">{lesson.fileCount}</div>
             <div className="text-[10px]">เอกสาร</div>
@@ -887,18 +890,21 @@ function LessonRow({
       </div>
 
       {open && (
-        <div className="space-y-2 border-t border-border p-3">
+        <div className="space-y-2 px-3 pb-3">
           {lesson.topics.length === 0 ? (
             <p className="px-1 text-xs text-muted-foreground">ยังไม่มีเนื้อหาย่อย</p>
           ) : (
-            <ul className="divide-y divide-border rounded-lg border border-border">
-              {lesson.topics.map((t) => (
-                <li key={t.id} className="flex items-center gap-2 px-3 py-2 hover:bg-muted">
+            <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-muted/30">
+              {lesson.topics.map((t, i) => (
+                <li key={t.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted">
+                  <span className="flex h-7 shrink-0 items-center rounded-lg bg-background px-2 text-xs font-medium text-muted-foreground">
+                    {index + 1}.{i + 1}
+                  </span>
                   <button type="button" onClick={() => onOpenTopic(t)} className="min-w-0 flex-1 text-left">
-                    <div className="truncate text-xs font-medium">{t.name}</div>
+                    <div className="truncate text-sm font-semibold">{t.name}</div>
                   </button>
-                  <span className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
-                    <DocumentTextIcon className="h-3 w-3" /> {t.fileCount}
+                  <span className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
+                    <DocumentTextIcon className="h-3.5 w-3.5" /> {t.fileCount} เอกสาร
                   </span>
                   {canEdit && (
                     <>
@@ -908,21 +914,33 @@ function LessonRow({
                       </Button>
                     </>
                   )}
+                  <Button className="active:scale-100" size="icon" variant="ghost" aria-label="เปิดเนื้อหาย่อย" onClick={() => onOpenTopic(t)}>
+                    <ChevronForward className="h-3 w-3" />
+                  </Button>
                 </li>
               ))}
             </ul>
           )}
-          {canEdit && (
-            <NewNameInput
-              placeholder="เพิ่มเนื้อหาย่อย"
-              onAdd={(name) =>
-                createTopic.mutate(
-                  { lesson_id: lesson.id, name, sort_order: lesson.topics.length },
-                  { onError: () => toast("เพิ่มไม่สำเร็จ", "error") },
-                )
-              }
-            />
-          )}
+          {canEdit &&
+            (addingTopic ? (
+              <NewNameInput
+                placeholder="ชื่อเนื้อหาย่อย"
+                onAdd={(name) =>
+                  createTopic.mutate(
+                    { lesson_id: lesson.id, name, sort_order: lesson.topics.length },
+                    { onError: () => toast("เพิ่มไม่สำเร็จ", "error") },
+                  )
+                }
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingTopic(true)}
+                className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted"
+              >
+                <Plus className="h-3.5 w-3.5" /> เพิ่มเนื้อหาย่อย
+              </button>
+            ))}
         </div>
       )}
     </div>
