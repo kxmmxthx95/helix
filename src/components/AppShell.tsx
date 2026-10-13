@@ -42,6 +42,7 @@ import { useToast } from "@/components/Toast";
 import { Avatar, Button, Select } from "@/components/ui";
 import { avatarUrl, useUploadAvatar } from "@/hooks/useAvatar";
 import { useOutboxSync } from "@/hooks/useOutboxSync";
+import { useRoleSubtitle } from "@/hooks/useProfiles";
 import { useSchoolSettings } from "@/hooks/useSettings";
 import { profileFullName } from "@/lib/database.types";
 import {
@@ -51,7 +52,6 @@ import {
   isOrgWide,
   ROLE_LABEL,
   ROLES,
-  roleLabels,
   type Role,
 } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -406,6 +406,7 @@ function AppShellInner() {
   const mobileHeaderEnd = useMobileHeaderSlot();
   const { profile, actualRoles, viewAsRole, setViewAsRole, signOut, refreshProfile } = useAuth();
   const isActualSuperAdmin = actualRoles.includes("super_admin");
+  const roleSubtitle = useRoleSubtitle(profile?.id, profile?.roles ?? []);
   const displayName = profile ? profileFullName(profile) : "Helix";
   const { preference, cycle } = useTheme();
   const { online } = useOutboxSync();
@@ -556,7 +557,7 @@ function AppShellInner() {
     <button type="button" onClick={() => navigate("/profile")} className="min-w-0 text-left tappable">
       <p className="truncate text-xs font-semibold leading-tight">{displayName}</p>
       {profile && (
-        <p className="truncate text-[10px] leading-tight text-muted-foreground">{roleLabels(profile.roles)}</p>
+        <p className="truncate text-[10px] leading-tight text-muted-foreground">{roleSubtitle}</p>
       )}
     </button>
   );
@@ -768,7 +769,7 @@ function AppShellInner() {
                 >
                   <p className="truncate text-sm font-semibold">{displayName}</p>
                   {profile && (
-                    <p className="truncate text-xs text-muted-foreground">{roleLabels(profile.roles)}</p>
+                    <p className="truncate text-xs text-muted-foreground">{roleSubtitle}</p>
                   )}
                 </button>
               </div>

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Department, PositionTitle, Profile } from "@/lib/database.types";
-import type { Role } from "@/lib/roles";
+import { roleLabels, type Role } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 
 export type ProfileFilters = {
@@ -297,4 +297,21 @@ export function useDeleteUser() {
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["profiles"] }),
   });
+}
+
+/** Sidebar subtitle: roles (dept_head shown by its job title instead) + position title names. */
+export function useRoleSubtitle(profileId: string | undefined, roles: Role[]): string {
+  const { data: titles = [] } = usePositionTitles();
+  const { data: ids = [] } = useQuery({
+    queryKey: ["profile_roles", "my_titles", profileId],
+    enabled: !!profileId,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase.from("profile_roles").select("position_title_id").eq("profile_id", profileId!);
+      if (error) throw error;
+      return data.flatMap((r) => (r.position_title_id ? [r.position_title_id] : []));
+    },
+  });
+  const names = ids.map((id) => titles.find((t) => t.id === id)?.name).filter(Boolean);
+  const base = roles.filter((r) => r !== "dept_head");
+  return [...(base.length ? [roleLabels(base)] : []), ...names].join(", ") || roleLabels(roles);
 }

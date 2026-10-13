@@ -20,7 +20,7 @@ import {
   type StudentLeaveStatus,
   type Student,
 } from "@/lib/database.types";
-import { roleLabels } from "@/lib/roles";
+import { useRoleSubtitle } from "@/hooks/useProfiles";
 import { cn } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
 import { bangkokTime } from "@/routes/TimeTracking";
@@ -63,6 +63,7 @@ function greeting() {
 
 export function Dashboard() {
   const { profile, myStudent } = useAuth();
+  const roleSubtitle = useRoleSubtitle(profile?.id, profile?.roles ?? []);
   const isParent = profile?.roles.includes("parent") ?? false;
   const { data: children = [] } = useMyChildren(isParent ? (profile?.id ?? null) : null);
   const { data: schoolSettings } = useSchoolSettings();
@@ -75,7 +76,7 @@ export function Dashboard() {
         <p className="font-heading text-2xl font-semibold">
           {greeting()}{profile && `, ${profileFullName(profile)}`}
         </p>
-        {profile && <p className="text-sm text-muted-foreground">{roleLabels(profile.roles)}</p>}
+        {profile && <p className="text-sm text-muted-foreground">{roleSubtitle}</p>}
       </div>
 
       {showClockWidget && profile && (
