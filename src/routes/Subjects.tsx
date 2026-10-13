@@ -218,7 +218,7 @@ export function Subjects() {
         <div className="flex gap-2">
           {orgWide && pickableDepartments.length > 0 && (
             <Select
-              className="min-w-0 flex-1"
+              className="w-40 shrink-0"
               value={pickedDept}
               onChange={(e) => setPickedDept(e.target.value)}
               aria-label="แผนก"
@@ -231,6 +231,16 @@ export function Subjects() {
               ))}
             </Select>
           )}
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={filters.search}
+              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              placeholder="ค้นหารหัสหรือชื่อวิชา"
+              className="pl-9"
+              type="search"
+            />
+          </div>
           <Button
             variant="outline"
             size="icon"
@@ -261,16 +271,6 @@ export function Subjects() {
               <Plus className="h-3 w-3" />
             </Button>
           )}
-        </div>
-        <div className="relative min-w-0">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            placeholder="ค้นหารหัสหรือชื่อวิชา"
-            className="pl-9"
-            type="search"
-          />
         </div>
       </div>
 
