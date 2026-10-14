@@ -21,6 +21,7 @@ import { Button, Card, EmptyState, Field, Input, Pagination, Select } from "@/co
 import { useMyChildren } from "@/hooks/useAttendance";
 import { usePagination } from "@/hooks/usePagination";
 import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
+import { useSubjectColors } from "@/hooks/useSubjectColors";
 import {
   DOC_ACCEPT,
   type DocLessonNode,
@@ -50,7 +51,6 @@ import { useDepartments } from "@/hooks/useProfiles";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import type { DocFile, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
-import { subjectTint } from "@/lib/subjectTint";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { DocCoverageTab, SUBJECT_TYPES } from "@/routes/DocCoverage";
@@ -204,6 +204,7 @@ function DocBrowser({
   const { data: summary } = useDocSummary();
   const { data: departments = [] } = useDepartments();
   const { data: areas = [] } = useLearningAreas();
+  const colors = useSubjectColors([]);
   const { profile: me } = useAuth();
   // Grade options follow the department: the picked one for org-wide managers, otherwise the viewer's own (none = every department).
   const gradeDeptId = showDepartments ? departmentId : (me?.department_id ?? "");
@@ -405,7 +406,7 @@ function DocBrowser({
               className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm hover:shadow-md"
             >
               <div className="flex min-w-0 items-start gap-3">
-                <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", subjectTint(s.id))}>
+                <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", colors.shade(s.learning_area_id))}>
                   <BookIcon className="h-6 w-6" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -493,6 +494,8 @@ function SubjectDocs({
   const gradeId = fixedGradeLevelId ?? (pickedGradeId || gradeOptions[0]?.id || "");
   const grade = gradeLevels.find((g) => g.id === gradeId) ?? null;
 
+  const colors = useSubjectColors(gradeLevels);
+  const lessonTint = colors.shade(subject.learning_area_id, gradeId);
   const { data: tree = [] } = useDocTree(subject.id, gradeId || null);
   const { data: classroomCount = 0 } = useSubjectClassroomCount(subject.id, gradeId || null);
 
@@ -608,7 +611,7 @@ function SubjectDocs({
       ) : (
         <div className={cn("gap-3", view === "grid" ? "grid items-start md:grid-cols-2" : "flex flex-col")}>
           {lessons.map((l) => (
-            <LessonRow key={l.id} lesson={l} index={tree.indexOf(l)} canEdit={canEdit} onUpload={openUpload} />
+            <LessonRow key={l.id} lesson={l} index={tree.indexOf(l)} tint={lessonTint} canEdit={canEdit} onUpload={openUpload} />
           ))}
         </div>
       )}
@@ -1031,11 +1034,14 @@ function Stat({ icon: Icon, value, label }: { icon: typeof BookIcon; value: numb
 function LessonRow({
   lesson,
   index,
+  tint,
   canEdit,
   onUpload,
 }: {
   lesson: DocLessonNode;
   index: number;
+  /** Colour classes for the icon tile (subject area hue, shaded by this grade). */
+  tint: string;
   canEdit: boolean;
   onUpload: (preset: UploadPreset) => void;
 }) {
@@ -1063,7 +1069,7 @@ function LessonRow({
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-bold text-accent">
           {index + 1}
         </span>
-        <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl", subjectTint(lesson.id))}>
+        <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl", tint)}>
           <LibraryIcon className="h-6 w-6" />
         </div>
         <div className="min-w-0 flex-1 truncate text-sm font-bold">{lesson.name}</div>

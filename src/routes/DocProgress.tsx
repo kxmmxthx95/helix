@@ -26,7 +26,8 @@ import {
   useReviewDocTaskFile,
   useUploadDocTaskFile,
 } from "@/hooks/useDocTasks";
-import { DOC_ACCEPT, docFileSignedUrl, useDocCoverage, useRecentDocFiles, useReviewDocFile, useTeacherPairs } from "@/hooks/useDocuments";
+import { useSubjectColors } from "@/hooks/useSubjectColors";
+import { DOC_ACCEPT, docFileSignedUrl, useAllGradeLevels, useDocCoverage, useRecentDocFiles, useReviewDocFile, useTeacherPairs } from "@/hooks/useDocuments";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments, useProfiles, type ProfileRow } from "@/hooks/useProfiles";
 import { profileFullName, type DocTask, type DocTaskFile, type DocTaskReviewStatus, type DocTaskType } from "@/lib/database.types";
@@ -40,7 +41,6 @@ import {
   type TaskStatus,
 } from "@/lib/docTasks";
 import { isOrgWide } from "@/lib/roles";
-import { subjectTint } from "@/lib/subjectTint";
 import { teacherLessonProgress, type LessonStatus, type TeacherLessonProgress } from "@/lib/teacherDocProgress";
 import { cn } from "@/lib/utils";
 
@@ -302,6 +302,8 @@ function TeacherLessonsSheet({ target, onClose }: { target: { teacher: ProfileRo
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<PairFilter>("all");
   const [sort, setSort] = useState<"code" | "progress">("code");
+  const { data: gradeLevels = [] } = useAllGradeLevels();
+  const colors = useSubjectColors(gradeLevels);
 
   const pairs = target?.p.pairs ?? [];
   const done = (p: (typeof pairs)[number]) => pairStatus(p) === "complete";
@@ -370,7 +372,7 @@ function TeacherLessonsSheet({ target, onClose }: { target: { teacher: ProfileRo
           <ul className="space-y-2">
             {shown.map((pair) => (
               <li key={pair.key} className="flex items-center gap-3 rounded-xl border border-border p-3">
-                <span className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", subjectTint(pair.row?.subjectId ?? pair.key))}>
+                <span className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", colors.shade(pair.row?.learningAreaId, pair.row?.gradeLevelId))}>
                   <BookIcon className="h-6 w-6" />
                 </span>
                 <div className="min-w-0 flex-1 space-y-1 leading-tight">

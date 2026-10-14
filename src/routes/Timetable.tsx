@@ -35,6 +35,7 @@ import {
   usePeriodsForGrade,
 } from "@/hooks/usePeriodDefinitions";
 import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
+import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments, useProfiles, type ProfileRow } from "@/hooks/useProfiles";
 import { useClassroomsByDepartment, useCurrentClassroomEnrollmentsByDepartment } from "@/hooks/useStatusManagement";
@@ -58,6 +59,7 @@ import {
   type TeachingAssignment,
 } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
+import { SUBJECT_TYPE_LABEL } from "@/lib/subjectColor";
 import { canManage, isOrgWide, isSelfScoped } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
@@ -273,10 +275,12 @@ function ClassroomWorkspace({
   teachers: ProfileRow[];
 }) {
   const [pickedId, setPickedId] = useState("");
+  const [showOthers, setShowOthers] = useShowOthers();
+  const { data: deptEntries = [] } = useDepartmentSchedule(departmentId, academicYear, term, showOthers);
   const { data: assignments = [] } = useDepartmentTeachingAssignments(departmentId, academicYear, term);
   const { data: enrollments = [] } = useCurrentClassroomEnrollmentsByDepartment(departmentId);
 
-  const label = (c: Classroom) => `${gradeLevels.find((g) => g.id === c.grade_level_id)?.name ?? "—"}/${c.name}`;
+  const label = (c: Classroom) => classroomLabelOf(c, gradeLevels);
   const sorted = useMemo(
     () =>
       [...classrooms].sort((a, b) => {
@@ -298,6 +302,13 @@ function ClassroomWorkspace({
 
   const mine = assignments.filter((a) => a.classroom_id === room.id);
   const students = studentCount.get(room.id) ?? 0;
+  const roomTeachers = new Set(mine.map((a) => a.teacher_id));
+  // Teachers of this room who are busy teaching another room at the same time.
+  const ghostEntries = showOthers
+    ? deptEntries.filter(
+        (e) => e.teaching_assignment.classroom_id !== room.id && roomTeachers.has(e.teaching_assignment.teacher_id),
+      )
+    : [];
 
   return (
     <div className="grid flex-1 items-start gap-3 lg:grid-cols-[18rem_minmax(0,1fr)]">
@@ -347,6 +358,10 @@ function ClassroomWorkspace({
               label="นักเรียน"
             />
           </div>
+          <label className="flex w-full cursor-pointer items-center justify-end gap-2 border-t border-border pt-2 text-xs text-muted-foreground">
+            <Switch checked={showOthers} onChange={setShowOthers} size="sm" />
+            แสดงคาบครูคนอื่น (ครูของห้องนี้ที่ติดสอนห้องอื่น)
+          </label>
         </div>
 
         <ClassroomTimetable
@@ -359,6 +374,7 @@ function ClassroomWorkspace({
           classrooms={classrooms}
           gradeLevels={gradeLevels}
           teachers={teachers}
+          ghostEntries={ghostEntries}
         />
       </section>
     </div>
@@ -375,9 +391,11 @@ function ClassroomTimetable({
   gradeLevels,
   teachers,
   onBack,
+  ghostEntries,
 }: {
   departmentId: string;
   classroomId: string;
+  ghostEntries?: ScheduleEntryRow[];
   academicYear: number;
   term: number | null;
   mayEdit: boolean;
@@ -389,7 +407,7 @@ function ClassroomTimetable({
   const classroomGradeLevelId = classrooms.find((c) => c.id === classroomId)?.grade_level_id ?? null;
   const classroom = classrooms.find((c) => c.id === classroomId);
   const classroomLabel = classroom
-    ? `${gradeLevels.find((g) => g.id === classroom.grade_level_id)?.name ?? "—"}/${classroom.name}`
+    ? classroomLabelOf(classroom, gradeLevels)
     : "—";
   const { data: defaultPeriods = [], isLoading: loadingDefaultPeriods } = useDepartmentPeriods(departmentId);
   const { data: gradePeriods = [], isLoading: loadingGradePeriods } = usePeriodsForGrade(
@@ -418,6 +436,7 @@ function ClassroomTimetable({
     () => assignments.filter((a) => a.classroom_id === classroomId),
     [assignments, classroomId],
   );
+  const styling = useTimetableStyling(subjects, classrooms, gradeLevels);
 
   return (
     <>
@@ -426,6 +445,8 @@ function ClassroomTimetable({
         periods={periods}
         entries={entries}
         candidates={candidates}
+        styling={styling}
+        ghostEntries={ghostEntries}
         mode="classroom"
         mayEdit={mayEdit}
         isLoading={loadingDefaultPeriods || loadingGradePeriods || loadingEntries}
@@ -437,12 +458,49 @@ function ClassroomTimetable({
         }}
         roomLabel={(id) => {
           const c = classrooms.find((x) => x.id === id);
-          const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.name;
-          return c ? `${g ?? "—"}/${c.name}` : "—";
+          const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.code;
+          return c ? `${g ? gradeShortLabel(g) : "—"}/${c.name}` : "—";
         }}
       />
     </>
   );
+}
+
+/** ม.1/1 — short grade code + room name (the full grade name is too long for cards and lists). */
+function classroomLabelOf(c: Classroom, gradeLevels: GradeLevel[]) {
+  const code = gradeLevels.find((g) => g.id === c.grade_level_id)?.code;
+  return `${code ? gradeShortLabel(code) : "—"}/${c.name}`;
+}
+
+type TimetableStyling = {
+  /** Class string for a subject's card: area hue, grade shade. */
+  color: (subjectId: string, classroomId: string) => string;
+  typeLabel: (subjectId: string) => string;
+  /** Shade class of an area's hue at a grade step, for the legend ramp (area id = any area id). */
+  step: (areaId: string, step: 0 | 1 | 2) => string;
+  /** Areas present among these subjects, for the legend. */
+  legend: (subjectIds: string[]) => { id: string; name: string; dot: string }[];
+};
+
+function useTimetableStyling(
+  subjects: { id: string; learning_area_id: string; subject_type: keyof typeof SUBJECT_TYPE_LABEL }[],
+  classrooms: Classroom[],
+  gradeLevels: GradeLevel[],
+): TimetableStyling {
+  const colors = useSubjectColors(gradeLevels);
+  return useMemo(() => {
+    const byId = new Map(subjects.map((s) => [s.id, s]));
+    return {
+      color: (subjectId, classroomId) =>
+        colors.shade(byId.get(subjectId)?.learning_area_id, classrooms.find((c) => c.id === classroomId)?.grade_level_id),
+      typeLabel: (subjectId) => {
+        const t = byId.get(subjectId)?.subject_type;
+        return t ? SUBJECT_TYPE_LABEL[t] : "";
+      },
+      step: (areaId, step) => colors.shadeAt(areaId, step),
+      legend: (ids) => colors.legend(ids.map((id) => byId.get(id)?.learning_area_id)),
+    };
+  }, [colors, subjects, classrooms]);
 }
 
 type PickerItem = {
@@ -578,6 +636,26 @@ function StatChip({
 
 const SHOW_OTHERS_KEY = "timetable.showOtherTeachers";
 
+/** Per-viewer "show other teachers' periods" switch; storage can be blocked, so every access is guarded. */
+function useShowOthers() {
+  const [on, setOn] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_OTHERS_KEY) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  function set(next: boolean) {
+    setOn(next);
+    try {
+      localStorage.setItem(SHOW_OTHERS_KEY, next ? "1" : "0");
+    } catch {
+      /* preference just won't persist */
+    }
+  }
+  return [on, set] as const;
+}
+
 type TeacherTab = "week" | "subjects" | "hours";
 const TEACHER_TABS: [TeacherTab, string][] = [
   ["week", "ตารางสอนรายสัปดาห์"],
@@ -618,12 +696,13 @@ function TeacherWorkspace({
     includeInactive: true,
   });
 
+  const styling = useTimetableStyling(subjects, classrooms, gradeLevels);
   const subjectById = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
   const areaById = useMemo(() => new Map(learningAreas.map((a) => [a.id, a])), [learningAreas]);
   const classroomLabel = (id: string) => {
     const c = classrooms.find((x) => x.id === id);
-    const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.name;
-    return c ? `${g ?? "—"}/${c.name}` : "—";
+    const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.code;
+    return c ? `${g ? gradeShortLabel(g) : "—"}/${c.name}` : "—";
   };
 
   const summary = useMemo(() => {
@@ -642,30 +721,6 @@ function TeacherWorkspace({
   const teacherId = teacher?.id ?? "";
   const mine = summary.get(teacherId);
   const { data: entries = [] } = useTeacherSchedule(teacherId, academicYear, term);
-
-  // Per-viewer preference; storage can be blocked, so every access is guarded.
-  const [showOthers, setShowOthers] = useState(() => {
-    try {
-      return localStorage.getItem(SHOW_OTHERS_KEY) !== "0";
-    } catch {
-      return true;
-    }
-  });
-  function toggleOthers(on: boolean) {
-    setShowOthers(on);
-    try {
-      localStorage.setItem(SHOW_OTHERS_KEY, on ? "1" : "0");
-    } catch {
-      /* preference just won't persist */
-    }
-  }
-  const { data: deptEntries = [] } = useDepartmentSchedule(departmentId, academicYear, term, showOthers && tab === "week");
-  const myRooms = new Set((mine?.assignments ?? []).map((a) => a.classroom_id));
-  const ghostEntries = showOthers
-    ? deptEntries.filter(
-        (e) => e.teaching_assignment.teacher_id !== teacherId && myRooms.has(e.teaching_assignment.classroom_id),
-      )
-    : [];
 
   const teacherArea = areaById.get(teacher?.learning_area_id ?? "");
   const areaText = (teacherArea?.parent_id ? areaById.get(teacherArea.parent_id) : teacherArea)?.name ?? "";
@@ -741,27 +796,19 @@ function TeacherWorkspace({
               </div>
             </div>
 
-            <div className="flex w-full items-center gap-3 border-b border-border">
-              <div className="flex min-w-0 flex-1" role="tablist">
-                {TEACHER_TABS.map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="tab"
-                    aria-selected={tab === key}
-                    onClick={() => setTab(key)}
-                    className={lineTab(tab === key, true)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {tab === "week" && (
-                <label className="flex shrink-0 cursor-pointer items-center gap-2 pb-1 text-xs text-muted-foreground">
-                  <Switch checked={showOthers} onChange={toggleOthers} size="sm" />
-                  แสดงคาบครูคนอื่น
-                </label>
-              )}
+            <div className="flex w-full border-b border-border" role="tablist">
+              {TEACHER_TABS.map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === key}
+                  onClick={() => setTab(key)}
+                  className={lineTab(tab === key, true)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
             {tab === "week" && (
@@ -774,7 +821,6 @@ function TeacherWorkspace({
                 classrooms={classrooms}
                 gradeLevels={gradeLevels}
                 teachers={teachers}
-                ghostEntries={ghostEntries}
               />
             )}
 
@@ -796,7 +842,7 @@ function TeacherWorkspace({
                       return (
                         <tr key={a.id} className="border-t border-border">
                           <td className="px-3 py-2">
-                            <span className={cn("rounded-md px-1.5 py-0.5 font-semibold", cardTint(a.subject_id))}>
+                            <span className={cn("rounded-md px-1.5 py-0.5 font-semibold", styling.color(a.subject_id, a.classroom_id))}>
                               {subjectById.get(a.subject_id)?.code ?? "—"}
                             </span>
                           </td>
@@ -856,11 +902,9 @@ function TeacherTimetable({
   classrooms,
   gradeLevels,
   teachers,
-  ghostEntries,
 }: {
   departmentId: string;
   teacherId: string;
-  ghostEntries?: ScheduleEntryRow[];
   academicYear: number;
   term: number | null;
   mayEdit: boolean;
@@ -885,6 +929,7 @@ function TeacherTimetable({
     () => assignments.filter((a) => a.teacher_id === teacherId),
     [assignments, teacherId],
   );
+  const styling = useTimetableStyling(subjects, classrooms, gradeLevels);
 
   return (
     <>
@@ -892,7 +937,7 @@ function TeacherTimetable({
         periods={periods}
         entries={entries}
         candidates={candidates}
-        ghostEntries={ghostEntries}
+        styling={styling}
         mode="teacher"
         mayEdit={mayEdit}
         isLoading={loadingPeriods || loadingEntries}
@@ -904,8 +949,8 @@ function TeacherTimetable({
         }}
         roomLabel={(id) => {
           const c = classrooms.find((x) => x.id === id);
-          const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.name;
-          return c ? `${g ?? "—"}/${c.name}` : "—";
+          const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.code;
+          return c ? `${g ? gradeShortLabel(g) : "—"}/${c.name}` : "—";
         }}
       />
     </>
@@ -927,22 +972,6 @@ function BackHeader({ label, onBack }: { label: string; onBack: () => void }) {
   );
 }
 
-const CARD_TINTS = [
-  "bg-sky-100 text-sky-950 dark:bg-sky-500/20 dark:text-sky-100",
-  "bg-emerald-100 text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100",
-  "bg-rose-100 text-rose-950 dark:bg-rose-500/20 dark:text-rose-100",
-  "bg-amber-100 text-amber-950 dark:bg-amber-500/20 dark:text-amber-100",
-  "bg-violet-100 text-violet-950 dark:bg-violet-500/20 dark:text-violet-100",
-  "bg-cyan-100 text-cyan-950 dark:bg-cyan-500/20 dark:text-cyan-100",
-];
-
-/** Same subject always gets the same tint, across cells and teachers. */
-function cardTint(id: string) {
-  let h = 0;
-  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return CARD_TINTS[h % CARD_TINTS.length];
-}
-
 const hhmm = (t: string) => t.slice(0, 5);
 
 /** Breaks share period_no's sequence in the DB but aren't "คาบ" — this is the number users see (teaching periods only). */
@@ -961,6 +990,7 @@ function TimetableGrid({
   subjectName,
   teacherLabel,
   roomLabel,
+  styling,
   ghostEntries = [],
 }: {
   periods: PeriodDefinition[];
@@ -975,6 +1005,7 @@ function TimetableGrid({
   subjectName: (id: string) => string;
   teacherLabel: (id: string) => string;
   roomLabel: (id: string) => string;
+  styling: TimetableStyling;
 }) {
   const del = useDeleteScheduleEntry();
   const move = useMoveScheduleEntry();
@@ -1066,6 +1097,7 @@ function TimetableGrid({
   }
 
   return (
+    <div className="space-y-2">
     <div className="overflow-x-auto rounded-xl border border-border bg-card">
       <table className="w-full min-w-[48rem] table-fixed border-collapse text-xs">
         <thead className="bg-muted text-muted-foreground">
@@ -1166,19 +1198,24 @@ function TimetableGrid({
                                 setOverKey(null);
                               }}
                               className={cn(
-                                "relative rounded-lg px-2 py-1.5 leading-snug",
+                                "relative space-y-0.5 rounded-lg px-3 py-2.5 leading-snug",
                                 mayEdit && "cursor-grab active:cursor-grabbing",
                                 drag?.id === e.id && "opacity-40",
-                                cardTint(subjectId),
+                                styling.color(subjectId, e.teaching_assignment.classroom_id),
                               )}
                             >
-                              <p className="font-semibold">{subjectLabel(subjectId)}</p>
+                              <p className="pr-5 text-sm font-semibold">{subjectLabel(subjectId)}</p>
                               <p className="truncate">{subjectName(subjectId)}</p>
-                              <p className="truncate text-[11px] opacity-70">
-                                {mode === "classroom"
-                                  ? teacherLabel(e.teaching_assignment.teacher_id)
-                                  : roomLabel(e.teaching_assignment.classroom_id)}
-                              </p>
+                              <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px]">
+                                <span className="min-w-0 truncate opacity-70">
+                                  {mode === "classroom"
+                                    ? teacherLabel(e.teaching_assignment.teacher_id)
+                                    : roomLabel(e.teaching_assignment.classroom_id)}
+                                </span>
+                                <span className="shrink-0 rounded-full bg-black/10 px-2 py-0.5 dark:bg-white/15">
+                                  {styling.typeLabel(subjectId)}
+                                </span>
+                              </div>
                               {mayEdit && (
                                 <button
                                   type="button"
@@ -1186,7 +1223,7 @@ function TimetableGrid({
                                   onClick={() => {
                                     if (confirm(`ลบคาบนี้ออกจากตาราง?`)) del.mutate(e.id);
                                   }}
-                                  className="absolute right-1 top-1 opacity-60 hover:text-destructive hover:opacity-100"
+                                  className="absolute right-2 top-2 opacity-60 hover:text-destructive hover:opacity-100"
                                 >
                                   <X className="h-3 w-3" />
                                 </button>
@@ -1234,6 +1271,7 @@ function TimetableGrid({
         periodNo={placing?.periodNo ?? 0}
         periodLabel={placing ? displayNo(placing.periodNo) : 0}
         subjectName={subjectName}
+        styling={styling}
         candidates={candidates}
         entries={entries}
         mode={mode}
@@ -1242,6 +1280,38 @@ function TimetableGrid({
         roomLabel={roomLabel}
         onClose={() => setPlacing(null)}
       />
+    </div>
+    <TimetableLegend styling={styling} subjectIds={[...new Set(entries.map((e) => e.teaching_assignment.subject_id))]} />
+    </div>
+  );
+}
+
+/** Colour key under the grid: the areas in view, the shade ramp for grade, and the subject-type labels. */
+function TimetableLegend({ styling, subjectIds }: { styling: TimetableStyling; subjectIds: string[] }) {
+  const areas = styling.legend(subjectIds);
+  if (areas.length === 0) return null;
+  const sample = areas[0]!.id;
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[11px] text-muted-foreground">
+      <span className="font-medium text-foreground">สีการ์ด</span>
+      {areas.map((a) => (
+        <span key={a.id} className="inline-flex items-center gap-1.5">
+          <span className={cn("h-2.5 w-2.5 rounded-full", a.dot)} />
+          {a.name}
+        </span>
+      ))}
+      <span className="inline-flex items-center gap-1.5">
+        ความเข้ม: ชั้นต่ำ
+        <span className="flex overflow-hidden rounded">
+          {([0, 1, 2] as const).map((step) => (
+            <span key={step} className={cn("h-3 w-5", styling.step(sample, step))} />
+          ))}
+        </span>
+        ชั้นสูง
+      </span>
+      <span>
+        ป้ายบนการ์ด: {Object.values(SUBJECT_TYPE_LABEL).join(" / ")}
+      </span>
     </div>
   );
 }
@@ -1260,6 +1330,7 @@ function PlaceSheet({
   subjectName,
   teacherLabel,
   roomLabel,
+  styling,
   onClose,
 }: {
   open: boolean;
@@ -1274,6 +1345,7 @@ function PlaceSheet({
   subjectName: (id: string) => string;
   teacherLabel: (id: string) => string;
   roomLabel: (id: string) => string;
+  styling: TimetableStyling;
   onClose: () => void;
 }) {
   const toast = useToast();
@@ -1437,11 +1509,13 @@ function PlaceSheet({
                   ) : (
                     <SquareIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
                   )}
-                  <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", cardTint(a.subject_id))}>
+                  <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", styling.color(a.subject_id, a.classroom_id))}>
                     <BookIcon className="h-5 w-5" />
                   </span>
                   <div className="min-w-0 flex-1 font-sarabun leading-tight">
-                    <p className="text-xs text-muted-foreground">{subjectLabel(a.subject_id)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {subjectLabel(a.subject_id)} · {styling.typeLabel(a.subject_id)}
+                    </p>
                     <p className="truncate text-sm font-medium text-foreground">{subjectName(a.subject_id)}</p>
                     <p className="truncate text-xs text-muted-foreground">
                       {mode === "classroom" ? teacherLabel(a.teacher_id) : roomLabel(a.classroom_id)}
