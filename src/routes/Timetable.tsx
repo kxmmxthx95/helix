@@ -110,7 +110,7 @@ export function Timetable() {
 
   if (isStudent) {
     return myClassroom ? (
-      <div className="space-y-4">
+      <div className="space-y-4 pb-8">
         {splitsByTerm && (
           <div className="inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
             {[1, 2].map((t) => (
@@ -147,7 +147,7 @@ export function Timetable() {
   }
 
   return (
-    <div className="page-fill">
+    <div className="page-fill shrink-0 pb-8">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <Select
           className="h-8 w-auto min-w-[10rem] shrink-0"
@@ -300,7 +300,7 @@ function ClassroomWorkspace({
   const students = studentCount.get(room.id) ?? 0;
 
   return (
-    <div className="grid min-h-0 flex-1 items-start gap-3 lg:grid-cols-[18rem_minmax(0,1fr)]">
+    <div className="grid flex-1 items-start gap-3 lg:grid-cols-[18rem_minmax(0,1fr)]">
       <PickerList
         title="ห้องเรียน"
         unit="ห้อง"
@@ -698,7 +698,7 @@ function TeacherWorkspace({
   const maxDay = Math.max(1, ...shownDays.map((x) => x.count));
 
   return (
-    <div className="grid min-h-0 flex-1 items-start gap-3 lg:grid-cols-[18rem_minmax(0,1fr)]">
+    <div className="grid flex-1 items-start gap-3 lg:grid-cols-[18rem_minmax(0,1fr)]">
       <PickerList
         title="ครู"
         unit="คน"
