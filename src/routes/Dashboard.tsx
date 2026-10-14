@@ -80,6 +80,7 @@ export function Dashboard() {
   const isParent = profile?.roles.includes("parent") ?? false;
   const { data: children = [] } = useMyChildren(isParent ? (profile?.id ?? null) : null);
   const { data: schoolSettings } = useSchoolSettings();
+  const students = [...(myStudent ? [myStudent] : []), ...children];
   const showClockWidget =
     !!profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r));
 
@@ -98,48 +99,25 @@ export function Dashboard() {
         </Card>
       )}
 
-      {myStudent && profile && (
-        <Card>
-          <StudentLeaveSection student={myStudent} submittedBy={profile.id} />
-        </Card>
-      )}
-      {children.map(
-        (child) =>
-          profile && (
-            <Card key={child.id}>
-              <StudentLeaveSection student={child} submittedBy={profile.id} />
-            </Card>
-          ),
-      )}
-
-      {myStudent && (
-        <Card>
-          <AssignmentSummarySection student={myStudent} />
-        </Card>
-      )}
-      {children.map((child) => (
-        <Card key={child.id}>
-          <AssignmentSummarySection student={child} />
+      {profile &&
+        students.map((st) => (
+          <Card key={`leave-${st.id}`}>
+            <StudentLeaveSection student={st} submittedBy={profile.id} />
+          </Card>
+        ))}
+      {students.map((st) => (
+        <Card key={`assignments-${st.id}`}>
+          <AssignmentSummarySection student={st} />
         </Card>
       ))}
-      {myStudent && (
-        <Card>
-          <AttendanceSummarySection student={myStudent} />
-        </Card>
-      )}
-      {children.map((child) => (
-        <Card key={child.id}>
-          <AttendanceSummarySection student={child} />
+      {students.map((st) => (
+        <Card key={`attendance-${st.id}`}>
+          <AttendanceSummarySection student={st} />
         </Card>
       ))}
-      {myStudent && (
-        <Card>
-          <BehaviorScoreSection student={myStudent} />
-        </Card>
-      )}
-      {children.map((child) => (
-        <Card key={child.id}>
-          <BehaviorScoreSection student={child} />
+      {students.map((st) => (
+        <Card key={`behavior-${st.id}`}>
+          <BehaviorScoreSection student={st} />
         </Card>
       ))}
     </div>
@@ -151,12 +129,12 @@ const SECTION_TITLE = "font-ui text-xs font-medium text-muted-foreground";
 /** Shown when a query failed and there is no cached data — never render that as "empty" or zero. */
 function LoadError({ onRetry }: { onRetry: () => void }) {
   return (
-    <p role="alert" className="mt-1 text-sm text-destructive">
-      โหลดข้อมูลไม่สำเร็จ ·{" "}
-      <button type="button" className="tappable underline" onClick={onRetry}>
+    <div role="alert" className="mt-1 flex items-center justify-between gap-2">
+      <p className="text-sm text-destructive">โหลดข้อมูลไม่สำเร็จ</p>
+      <Button size="sm" variant="outline" onClick={onRetry}>
         ลองใหม่
-      </button>
-    </p>
+      </Button>
+    </div>
   );
 }
 
@@ -226,7 +204,7 @@ function QuickClockSection({ profileId, departmentId }: { profileId: string; dep
       <div className="mt-2 flex items-center gap-2">
         <Button
           size="sm"
-          disabled={isError && record === undefined ? true : !!record?.clock_in_time || clockIn.isPending}
+          disabled={isLoading || (isError && record === undefined) || !!record?.clock_in_time || clockIn.isPending}
           onClick={onClockIn}
         >
           {clockIn.isPending ? <Spinner className="h-3.5 w-3.5" /> : "เข้างาน"}
@@ -234,7 +212,7 @@ function QuickClockSection({ profileId, departmentId }: { profileId: string; dep
         <Button
           size="sm"
           variant="outline"
-          disabled={!record?.clock_in_time || !!record?.clock_out_time || clockOut.isPending}
+          disabled={isLoading || !record?.clock_in_time || !!record?.clock_out_time || clockOut.isPending}
           onClick={onClockOut}
         >
           {clockOut.isPending ? <Spinner className="h-3.5 w-3.5" /> : "ออกงาน"}
