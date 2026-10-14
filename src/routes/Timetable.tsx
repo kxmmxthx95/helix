@@ -300,6 +300,8 @@ function ClassroomWorkspace({
 
   const room = sorted.find((c) => c.id === pickedId) ?? sorted[0];
   const { data: roomEntries = [] } = useClassroomSchedule(room?.id ?? null, academicYear, term);
+  const { data: defaultPeriods = [] } = useDepartmentPeriods(departmentId);
+  const { data: gradePeriods = [] } = usePeriodsForGrade(departmentId, room?.grade_level_id ?? null);
   if (!room) return <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีห้องเรียนในแผนกนี้" />;
 
   const mine = assignments.filter((a) => a.classroom_id === room.id);
@@ -350,7 +352,7 @@ function ClassroomWorkspace({
             <StatChip
               icon={TimeIcon}
               tint="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20"
-              value={`${roomEntries.length}/${mine.reduce((sum, a) => sum + a.periods_per_week, 0)}`}
+              value={`${roomEntries.length}/${countTeachingSlots(mergePeriods(defaultPeriods, gradePeriods))}`}
               label="คาบที่จัดแล้ว"
             />
             <StatChip
@@ -416,12 +418,7 @@ function ClassroomTimetable({
     departmentId,
     classroomGradeLevelId,
   );
-  // Grade-specific rows (0031) override the department default at the same day+period_no.
-  const periods = useMemo(() => {
-    const map = new Map(defaultPeriods.map((p) => [`${p.day_of_week}-${p.period_no}`, p]));
-    for (const p of gradePeriods) map.set(`${p.day_of_week}-${p.period_no}`, p);
-    return [...map.values()];
-  }, [defaultPeriods, gradePeriods]);
+  const periods = useMemo(() => mergePeriods(defaultPeriods, gradePeriods), [defaultPeriods, gradePeriods]);
   const { data: entries = [], isLoading: loadingEntries } = useClassroomSchedule(classroomId, academicYear, term);
   const { data: assignments = [] } = useDepartmentTeachingAssignments(departmentId, academicYear, term);
   const { data: subjects = [] } = useSubjects({
@@ -731,6 +728,7 @@ function TeacherWorkspace({
   const teacherId = teacher?.id ?? "";
   const mine = summary.get(teacherId);
   const { data: entries = [] } = useTeacherSchedule(teacherId, academicYear, term);
+  const { data: deptPeriods = [] } = useDepartmentPeriods(departmentId);
 
   const teacherArea = areaById.get(teacher?.learning_area_id ?? "");
   const areaText = (teacherArea?.parent_id ? areaById.get(teacherArea.parent_id) : teacherArea)?.name ?? "";
@@ -757,7 +755,7 @@ function TeacherWorkspace({
     {
       icon: TimeIcon,
       tint: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20",
-      value: `${entries.length}/${mine?.periods ?? 0}`,
+      value: `${entries.length}/${countTeachingSlots(deptPeriods)}`,
       label: "คาบที่จัดแล้ว",
     },
     { icon: GraduationCap, tint: "bg-violet-100 text-violet-600 dark:bg-violet-500/20", value: gradeRange, label: "ระดับที่สอน" },
@@ -989,6 +987,15 @@ function BackHeader({ label, onBack }: { label: string; onBack: () => void }) {
 }
 
 const hhmm = (t: string) => t.slice(0, 5);
+
+/** Grade-specific rows (0031) override the department default at the same day+period_no. */
+function mergePeriods(defaults: PeriodDefinition[], grade: PeriodDefinition[]) {
+  const map = new Map(defaults.map((p) => [`${p.day_of_week}-${p.period_no}`, p]));
+  for (const p of grade) map.set(`${p.day_of_week}-${p.period_no}`, p);
+  return [...map.values()];
+}
+
+const countTeachingSlots = (periods: PeriodDefinition[]) => periods.filter((p) => p.period_type === "teaching").length;
 
 /** Breaks share period_no's sequence in the DB but aren't "คาบ" — this is the number users see (teaching periods only). */
 function teachingOrdinal(periods: { day_of_week: number; period_no: number; period_type: PeriodType }[], day: number, periodNo: number) {
