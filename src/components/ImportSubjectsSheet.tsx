@@ -172,8 +172,6 @@ export function ImportSubjectsSheet({
     }
   }
 
-  const preview = ready.slice(0, 5);
-
   return (
     <Sheet
       open={open}
@@ -370,11 +368,11 @@ export function ImportSubjectsSheet({
             {ready.length > 0 ? (
               <>
                 <p className="text-sm text-muted-foreground">
-                  จะนำเข้า {ready.length} วิชา — ตัวอย่าง {preview.length} แถวแรก
+                  จะนำเข้า {ready.length} วิชา
                 </p>
-                <div className="overflow-x-auto rounded-lg border border-border bg-card">
+                <div className="max-h-[50vh] overflow-auto rounded-lg border border-border bg-card">
                   <table className="w-full min-w-[24rem] text-xs">
-                    <thead className="bg-muted text-left text-muted-foreground">
+                    <thead className="sticky top-0 bg-muted text-left text-muted-foreground">
                       <tr>
                         <th className="px-2 py-2 font-medium">รหัส</th>
                         <th className="px-2 py-2 font-medium">ชื่อวิชา</th>
@@ -382,7 +380,7 @@ export function ImportSubjectsSheet({
                       </tr>
                     </thead>
                     <tbody>
-                      {preview.map((r, i) => (
+                      {ready.map((r, i) => (
                         <tr key={i} className="border-t border-border">
                           <td className="px-2 py-2 font-mono">{r.draft.code}</td>
                           <td className="px-2 py-2">{r.draft.name_th}</td>

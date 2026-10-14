@@ -123,10 +123,17 @@ export function useImportSubjects() {
       if (lookupError) throw lookupError;
 
       const taken = new Set(existing.map((r) => r.code));
-      const fresh = drafts.filter(
-        (d): d is SubjectDraft & { subject_type: SubjectType } =>
-          !taken.has(d.code) && !!d.subject_type && !!d.learning_area_id,
-      );
+      // A code repeated inside the file would violate (department_id, code) on insert (409) — keep the first, report the rest.
+      const seen = new Set<string>();
+      const fresh = drafts.filter((d): d is SubjectDraft & { subject_type: SubjectType } => {
+        if (taken.has(d.code) || !d.subject_type || !d.learning_area_id) return false;
+        if (seen.has(d.code)) {
+          taken.add(d.code);
+          return false;
+        }
+        seen.add(d.code);
+        return true;
+      });
 
       if (fresh.length > 0) {
         const { error } = await supabase.from("subjects").insert(fresh);
