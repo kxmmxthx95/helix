@@ -44,6 +44,7 @@ import {
   useClassroomSchedule,
   useCreateScheduleEntry,
   useDeleteScheduleEntry,
+  fetchDepartmentSchedule,
   useDepartmentSchedule,
   useMoveScheduleEntry,
   useTeacherSchedule,
@@ -59,7 +60,7 @@ import {
   type TeachingAssignment,
 } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
-import { SUBJECT_TYPE_LABEL } from "@/lib/subjectColor";
+import { SUBJECT_TYPE_BADGE, SUBJECT_TYPE_LABEL } from "@/lib/subjectColor";
 import { canManage, isOrgWide, isSelfScoped } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
@@ -298,6 +299,7 @@ function ClassroomWorkspace({
   }, [enrollments]);
 
   const room = sorted.find((c) => c.id === pickedId) ?? sorted[0];
+  const { data: roomEntries = [] } = useClassroomSchedule(room?.id ?? null, academicYear, term);
   if (!room) return <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีห้องเรียนในแผนกนี้" />;
 
   const mine = assignments.filter((a) => a.classroom_id === room.id);
@@ -348,8 +350,8 @@ function ClassroomWorkspace({
             <StatChip
               icon={TimeIcon}
               tint="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20"
-              value={mine.reduce((sum, a) => sum + a.periods_per_week, 0)}
-              label="คาบ/สัปดาห์"
+              value={`${roomEntries.length}/${mine.reduce((sum, a) => sum + a.periods_per_week, 0)}`}
+              label="คาบที่จัดแล้ว"
             />
             <StatChip
               icon={Users}
@@ -446,7 +448,12 @@ function ClassroomTimetable({
         entries={entries}
         candidates={candidates}
         styling={styling}
+        scope={{ departmentId, academicYear, term }}
         ghostEntries={ghostEntries}
+        teacherLines={(id) => {
+          const t = teachers.find((x) => x.id === id);
+          return t ? [`${t.prefix ?? ""}${t.first_name}`, t.last_name] : ["—", ""];
+        }}
         mode="classroom"
         mayEdit={mayEdit}
         isLoading={loadingDefaultPeriods || loadingGradePeriods || loadingEntries}
@@ -476,6 +483,8 @@ type TimetableStyling = {
   /** Class string for a subject's card: area hue, grade shade. */
   color: (subjectId: string, classroomId: string) => string;
   typeLabel: (subjectId: string) => string;
+  /** Pill classes for the subject-type badge. */
+  typeBadge: (subjectId: string) => string;
   /** Shade class of an area's hue at a grade step, for the legend ramp (area id = any area id). */
   step: (areaId: string, step: 0 | 1 | 2) => string;
   /** Areas present among these subjects, for the legend. */
@@ -496,6 +505,10 @@ function useTimetableStyling(
       typeLabel: (subjectId) => {
         const t = byId.get(subjectId)?.subject_type;
         return t ? SUBJECT_TYPE_LABEL[t] : "";
+      },
+      typeBadge: (subjectId) => {
+        const t = byId.get(subjectId)?.subject_type;
+        return t ? SUBJECT_TYPE_BADGE[t] : "";
       },
       step: (areaId, step) => colors.shadeAt(areaId, step),
       legend: (ids) => colors.legend(ids.map((id) => byId.get(id)?.learning_area_id)),
@@ -744,7 +757,12 @@ function TeacherWorkspace({
 
   const stats = [
     { icon: CalendarIcon, tint: "bg-sky-100 text-sky-600 dark:bg-sky-500/20", value: mine?.subjects.size ?? 0, label: "รายวิชา" },
-    { icon: TimeIcon, tint: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20", value: mine?.periods ?? 0, label: "คาบ/สัปดาห์" },
+    {
+      icon: TimeIcon,
+      tint: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20",
+      value: `${entries.length}/${mine?.periods ?? 0}`,
+      label: "คาบที่จัดแล้ว",
+    },
     { icon: GraduationCap, tint: "bg-violet-100 text-violet-600 dark:bg-violet-500/20", value: gradeRange, label: "ระดับที่สอน" },
   ];
 
@@ -938,6 +956,7 @@ function TeacherTimetable({
         entries={entries}
         candidates={candidates}
         styling={styling}
+        scope={{ departmentId, academicYear, term }}
         mode="teacher"
         mayEdit={mayEdit}
         isLoading={loadingPeriods || loadingEntries}
@@ -990,7 +1009,9 @@ function TimetableGrid({
   subjectName,
   teacherLabel,
   roomLabel,
+  teacherLines,
   styling,
+  scope,
   ghostEntries = [],
 }: {
   periods: PeriodDefinition[];
@@ -1005,7 +1026,11 @@ function TimetableGrid({
   subjectName: (id: string) => string;
   teacherLabel: (id: string) => string;
   roomLabel: (id: string) => string;
+  /** First name / last name as two lines, for the classroom view where the teacher is the card's last line. */
+  teacherLines?: (id: string) => [string, string];
   styling: TimetableStyling;
+  /** Where these entries live — used to look up what a rejected placement collided with. */
+  scope: { departmentId: string; academicYear: number; term: number | null };
 }) {
   const del = useDeleteScheduleEntry();
   const move = useMoveScheduleEntry();
@@ -1033,6 +1058,43 @@ function TimetableGrid({
     }
     return n;
   };
+
+  /** Thai explanation for a rejected place/move; for a clash, names what already occupies the slot. */
+  async function explainFailure(
+    err: unknown,
+    a: Pick<TeachingAssignment, "teacher_id" | "classroom_id" | "group_id">,
+    day: number,
+    periodNo: number,
+    selfEntryId?: string,
+  ): Promise<string> {
+    const raw = err instanceof Error ? err.message : "";
+    const where = `${DAY_LABEL[day] ?? day} คาบ ${displayNo(periodNo)}`;
+    if (/not teaching/.test(raw)) return `${where} เป็นช่วงพัก ไม่ใช่คาบเรียน`;
+    if (/locked\/archived/.test(raw)) return "ภาคเรียนนี้ถูกล็อกหรือเก็บถาวรแล้ว แก้ตารางไม่ได้";
+    if (/no period_definitions/.test(raw)) return `ยังไม่ได้ตั้งค่าเวลาของ ${where}`;
+    if (!/schedule conflict/.test(raw)) return raw || "ไม่สำเร็จ";
+
+    const all = await fetchDepartmentSchedule(scope.departmentId, scope.academicYear, scope.term).catch(() => []);
+    const lines = all
+      .filter(
+        (e) =>
+          e.id !== selfEntryId &&
+          e.day_of_week === day &&
+          e.period_no === periodNo &&
+          (e.teaching_assignment.teacher_id === a.teacher_id || e.teaching_assignment.classroom_id === a.classroom_id) &&
+          !(a.group_id && e.teaching_assignment.group_id === a.group_id),
+      )
+      .map((e) => {
+        const t = e.teaching_assignment;
+        const why = [t.teacher_id === a.teacher_id && "ครูมีคาบนี้แล้ว", t.classroom_id === a.classroom_id && "ห้องมีคาบนี้แล้ว"]
+          .filter(Boolean)
+          .join(" และ ");
+        return `• ${subjectLabel(t.subject_id)} ${subjectName(t.subject_id)} · ${teacherLabel(t.teacher_id)} · ${roomLabel(t.classroom_id)} (${why})`;
+      });
+    return lines.length
+      ? `ชนกับคาบที่จัดไว้แล้ว — ${where}\n${lines.join("\n")}`
+      : `${where}: ครูหรือห้องมีคาบนี้แล้ว`;
+  }
 
   const periodAt = useMemo(() => {
     const map = new Map<string, PeriodDefinition>();
@@ -1175,9 +1237,15 @@ function TimetableGrid({
                         const id = drag.id;
                         setDrag(null);
                         setOverKey(null);
+                        const moved = entries.find((x) => x.id === id)?.teaching_assignment;
                         move.mutate(
                           { id, day_of_week: day, period_no: periodNo },
-                          { onError: (err) => toast(`ย้ายคาบไม่ได้: ${err.message}`, "error") },
+                          {
+                            onError: (err) =>
+                              void (moved ? explainFailure(err, moved, day, periodNo, id) : Promise.resolve(err.message)).then((msg) =>
+                                toast(`ย้ายคาบไม่ได้ — ${msg}`, "error", { durationMs: 8000 }),
+                              ),
+                          },
                         );
                       }}
                     >
@@ -1206,13 +1274,29 @@ function TimetableGrid({
                             >
                               <p className="pr-5 text-sm font-semibold">{subjectLabel(subjectId)}</p>
                               <p className="truncate">{subjectName(subjectId)}</p>
-                              <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px]">
-                                <span className="min-w-0 truncate opacity-70">
-                                  {mode === "classroom"
-                                    ? teacherLabel(e.teaching_assignment.teacher_id)
-                                    : roomLabel(e.teaching_assignment.classroom_id)}
+                              <div
+                                className={cn(
+                                  "mt-1.5 text-[11px]",
+                                  // Teacher names are long: full width on the last line, badge above them.
+                                  mode === "classroom" ? "flex flex-col-reverse items-start gap-1" : "flex items-center justify-between gap-2",
+                                )}
+                              >
+                                <span className={cn("min-w-0 opacity-70", mode === "classroom" ? "break-words" : "truncate")}>
+                                  {mode === "classroom" ? (
+                                    teacherLines ? (
+                                      teacherLines(e.teaching_assignment.teacher_id).map((line, k) => (
+                                        <span key={k} className="block">
+                                          {line}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      teacherLabel(e.teaching_assignment.teacher_id)
+                                    )
+                                  ) : (
+                                    roomLabel(e.teaching_assignment.classroom_id)
+                                  )}
                                 </span>
-                                <span className="shrink-0 rounded-full bg-black/10 px-2 py-0.5 dark:bg-white/15">
+                                <span className={cn("shrink-0 rounded-full px-2 py-px text-[10px] leading-4", styling.typeBadge(subjectId))}>
                                   {styling.typeLabel(subjectId)}
                                 </span>
                               </div>
@@ -1272,6 +1356,7 @@ function TimetableGrid({
         periodLabel={placing ? displayNo(placing.periodNo) : 0}
         subjectName={subjectName}
         styling={styling}
+        explainFailure={explainFailure}
         candidates={candidates}
         entries={entries}
         mode={mode}
@@ -1309,8 +1394,13 @@ function TimetableLegend({ styling, subjectIds }: { styling: TimetableStyling; s
         </span>
         ชั้นสูง
       </span>
-      <span>
-        ป้ายบนการ์ด: {Object.values(SUBJECT_TYPE_LABEL).join(" / ")}
+      <span className="inline-flex items-center gap-1.5">
+        ป้ายประเภท:
+        {(Object.keys(SUBJECT_TYPE_LABEL) as (keyof typeof SUBJECT_TYPE_LABEL)[]).map((t) => (
+          <span key={t} className={cn("rounded-full px-2 py-px text-[10px] leading-4", SUBJECT_TYPE_BADGE[t])}>
+            {SUBJECT_TYPE_LABEL[t]}
+          </span>
+        ))}
       </span>
     </div>
   );
@@ -1331,6 +1421,7 @@ function PlaceSheet({
   teacherLabel,
   roomLabel,
   styling,
+  explainFailure,
   onClose,
 }: {
   open: boolean;
@@ -1346,6 +1437,12 @@ function PlaceSheet({
   teacherLabel: (id: string) => string;
   roomLabel: (id: string) => string;
   styling: TimetableStyling;
+  explainFailure: (
+    err: unknown,
+    a: Pick<TeachingAssignment, "teacher_id" | "classroom_id" | "group_id">,
+    day: number,
+    periodNo: number,
+  ) => Promise<string>;
   onClose: () => void;
 }) {
   const toast = useToast();
@@ -1395,17 +1492,19 @@ function PlaceSheet({
       ids.map((id) => create.mutateAsync({ teaching_assignment_id: id, day_of_week: day, period_no: periodNo })),
     );
     setPlacing(false);
-    const failed = results.flatMap((r, i) =>
-      r.status === "rejected"
-        ? [`${subjectLabel(candidates.find((a) => a.id === ids[i])!.subject_id)}: ${r.reason instanceof Error ? r.reason.message : "ไม่สำเร็จ"}`]
-        : [],
+    const failed = await Promise.all(
+      results.flatMap((r, i) => {
+        if (r.status !== "rejected") return [];
+        const assignment = candidates.find((x) => x.id === ids[i])!;
+        return [explainFailure(r.reason, assignment, day, periodNo).then((msg) => `${subjectLabel(assignment.subject_id)}: ${msg}`)];
+      }),
     );
     if (failed.length === 0) {
       toast(`วางคาบสำเร็จ ${ids.length} รายวิชา`);
       onClose();
       return;
     }
-    toast(`วางคาบไม่ได้: ${failed.join(" · ")}`, "error");
+    toast(`วางคาบไม่ได้\n${failed.join("\n\n")}`, "error", { durationMs: 8000 });
     // keep only the ones that failed selected so the user can fix and retry
     setSelected(new Set(ids.filter((_, i) => results[i]!.status === "rejected")));
   }
@@ -1513,8 +1612,11 @@ function PlaceSheet({
                     <BookIcon className="h-5 w-5" />
                   </span>
                   <div className="min-w-0 flex-1 font-sarabun leading-tight">
-                    <p className="text-xs text-muted-foreground">
-                      {subjectLabel(a.subject_id)} · {styling.typeLabel(a.subject_id)}
+                    <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      {subjectLabel(a.subject_id)}
+                      <span className={cn("rounded-full px-1.5 py-px text-[10px]", styling.typeBadge(a.subject_id))}>
+                        {styling.typeLabel(a.subject_id)}
+                      </span>
                     </p>
                     <p className="truncate text-sm font-medium text-foreground">{subjectName(a.subject_id)}</p>
                     <p className="truncate text-xs text-muted-foreground">

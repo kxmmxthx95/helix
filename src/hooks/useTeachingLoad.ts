@@ -97,6 +97,22 @@ export function useLinkAssignmentGroup() {
   });
 }
 
+/** Puts every picked assignment into one group: reuses a group_id one of them already has, else mints a new one. */
+export function useLinkAssignments() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (picked: { id: string; group_id: string | null }[]) => {
+      const groupId = picked.find((a) => a.group_id)?.group_id ?? crypto.randomUUID();
+      const { error } = await supabase
+        .from("teaching_assignments")
+        .update({ group_id: groupId })
+        .in("id", picked.map((a) => a.id));
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["teaching_assignments"] }),
+  });
+}
+
 export function useUnlinkAssignmentGroup() {
   const qc = useQueryClient();
   return useMutation({

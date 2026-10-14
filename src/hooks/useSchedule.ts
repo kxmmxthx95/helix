@@ -57,7 +57,26 @@ export function useTeacherSchedule(teacherId: string | null, academicYear: numbe
   });
 }
 
-/** Every placed entry of a department for one year/term — the faint "other teachers" layer. Off until `enabled`. */
+/** Every placed entry of a department for one year/term. Also called directly to explain a conflict with fresh data. */
+export async function fetchDepartmentSchedule(
+  departmentId: string,
+  academicYear: number,
+  term: number | null,
+): Promise<ScheduleEntryRow[]> {
+  let q = supabase
+    .from("schedule_entries")
+    .select(
+      "*, teaching_assignments!inner(teacher_id,subject_id,classroom_id,periods_per_week,group_id,academic_year,term,classroom:classrooms!inner(grade_level:grade_levels!inner(department_id)))",
+    )
+    .eq("teaching_assignments.academic_year", academicYear)
+    .eq("teaching_assignments.classroom.grade_level.department_id", departmentId);
+  q = term === null ? q.is("teaching_assignments.term", null) : q.eq("teaching_assignments.term", term);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []).map(mapRow);
+}
+
+/** The faint "other teachers" layer. Off until `enabled`. */
 export function useDepartmentSchedule(
   departmentId: string | null,
   academicYear: number,
@@ -67,19 +86,7 @@ export function useDepartmentSchedule(
   return useQuery({
     queryKey: ["schedule_entries", "by_department", departmentId, academicYear, term],
     enabled: enabled && !!departmentId,
-    queryFn: async (): Promise<ScheduleEntryRow[]> => {
-      let q = supabase
-        .from("schedule_entries")
-        .select(
-          "*, teaching_assignments!inner(teacher_id,subject_id,classroom_id,periods_per_week,group_id,academic_year,term,classroom:classrooms!inner(grade_level:grade_levels!inner(department_id)))",
-        )
-        .eq("teaching_assignments.academic_year", academicYear)
-        .eq("teaching_assignments.classroom.grade_level.department_id", departmentId!);
-      q = term === null ? q.is("teaching_assignments.term", null) : q.eq("teaching_assignments.term", term);
-      const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []).map(mapRow);
-    },
+    queryFn: () => fetchDepartmentSchedule(departmentId!, academicYear, term),
   });
 }
 

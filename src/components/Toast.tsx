@@ -8,8 +8,10 @@ type ToastItem = { id: number; message: string; variant: ToastVariant };
 
 let nextId = 0;
 const DISMISS_MS = 3000;
+/** Longer messages (e.g. conflict details) can ask for more reading time. */
+type ToastOptions = { durationMs?: number };
 
-const ToastContext = createContext<((message: string, variant?: ToastVariant) => void) | null>(null);
+const ToastContext = createContext<((message: string, variant?: ToastVariant, options?: ToastOptions) => void) | null>(null);
 
 /** Bottom-center stack, auto-dismiss after 3s. Mounted once at the app root. */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -20,10 +22,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toast = useCallback(
-    (message: string, variant: ToastVariant = "success") => {
+    (message: string, variant: ToastVariant = "success", options?: ToastOptions) => {
       const id = nextId++;
       setItems((prev) => [...prev, { id, message, variant }]);
-      window.setTimeout(() => dismiss(id), DISMISS_MS);
+      window.setTimeout(() => dismiss(id), options?.durationMs ?? DISMISS_MS);
     },
     [dismiss],
   );
@@ -44,7 +46,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               exit={{ opacity: 0, y: 8, scale: 0.96 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
               className={cn(
-                "glass pointer-events-auto flex max-w-sm items-center gap-2 rounded-xl border px-3 py-2 text-xs shadow-lg",
+                "glass pointer-events-auto flex max-w-sm items-start gap-2 rounded-xl border px-3 py-2 text-xs shadow-lg",
                 t.variant === "success" ? "border-success/30" : "border-destructive/30",
               )}
             >
@@ -53,7 +55,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               ) : (
                 <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
               )}
-              <span>{t.message}</span>
+              <span className="whitespace-pre-line">{t.message}</span>
             </motion.div>
           ))}
         </AnimatePresence>

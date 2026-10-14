@@ -3,8 +3,13 @@ import { useAuth } from "@/auth/AuthProvider";
 import {
   BookIcon,
   CalendarIcon,
+  CheckboxIcon,
+  ChevronForward,
+  LinkIcon,
   Plus,
   Search,
+  SquareIcon,
+  UnlinkIcon,
   Users,
   X,
 } from "@/components/icons";
@@ -24,6 +29,7 @@ import {
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useActiveAcademicYear, useCurrentTerm } from "@/hooks/useAcademicTerms";
 import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
+import { useSubjectColors } from "@/hooks/useSubjectColors";
 import {
   useCurriculumSubjectsAtGrade,
   useGradeLevels,
@@ -39,11 +45,11 @@ import {
   useCreateTeachingAssignment,
   useDeleteTeachingAssignment,
   useDepartmentTeachingAssignments,
-  useLinkAssignmentGroup,
+  useLinkAssignments,
   useUnlinkAssignmentGroup,
   useUpdateTeachingAssignmentPeriods,
 } from "@/hooks/useTeachingLoad";
-import { profileFullName, type TeachingAssignment } from "@/lib/database.types";
+import { profileFullName, type Classroom, type GradeLevel, type Subject, type TeachingAssignment } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -346,7 +352,7 @@ function TeachingLoadBoard({
           </div>
         </div>
 
-        <ul className="table-panel-scroll space-y-1 p-2">
+        <ul className="table-panel-scroll scrollbar-hidden space-y-1 p-2">
           {visibleTeachers.map((t) => {
             const active = selectedTeacherId === t.id;
             const status = loadStatus(
@@ -361,10 +367,8 @@ function TeachingLoadBoard({
                   onClick={() => onSelectTeacher(t.id)}
                   aria-current={active}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-xl border-l-4 px-3 py-2.5 text-left transition-colors",
-                    active
-                      ? "border-accent bg-accent/10"
-                      : "border-transparent hover:bg-muted",
+                    "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
+                    active ? "bg-accent/10" : "hover:bg-muted",
                   )}
                 >
                   <Avatar
@@ -422,7 +426,7 @@ function TeachingLoadBoard({
       </div>
 
       {selectedTeacher ? (
-        <div className="flex min-h-0 flex-col gap-4 overflow-auto">
+        <div className="flex min-h-0 flex-col gap-4 scrollbar-hidden overflow-auto">
           <Card className="shrink-0 space-y-4">
             <div className="flex flex-wrap items-center gap-4">
               <Avatar
@@ -493,7 +497,7 @@ function TeachingLoadBoard({
                 />
               </div>
             ) : (
-              <div className="table-panel-scroll">
+              <div className="table-panel-scroll scrollbar-hidden">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-muted text-left text-xs text-muted-foreground">
                     <tr>
@@ -707,20 +711,27 @@ function AssignmentRow({
           <div className="flex shrink-0 items-center justify-end gap-1.5">
             {assignment.group_id ? (
               <Button
-                variant="outline"
-                size="sm"
-                onClick={() => unlink.mutate(assignment.id)}
+                variant="ghost"
+                size="icon"
+                aria-label="ยกเลิกผูกกลุ่ม"
+                title="ยกเลิกผูกกลุ่ม"
+                className="text-accent"
+                disabled={unlink.isPending}
+                onClick={() => {
+                  if (confirm("ยกเลิกการผูกกลุ่มของรายการนี้?")) unlink.mutate(assignment.id);
+                }}
               >
-                ยกเลิกผูก
+                <UnlinkIcon className="h-3.5 w-3.5" />
               </Button>
             ) : (
               <Button
                 variant="ghost"
                 size="icon"
                 aria-label="ผูกกลุ่ม"
+                title="ผูกกลุ่ม (เรียนรวม/แบ่งคาบ)"
                 onClick={() => setLinking(true)}
               >
-                <Users className="h-3.5 w-3.5" />
+                <LinkIcon className="h-3.5 w-3.5" />
               </Button>
             )}
             <Button
@@ -735,8 +746,11 @@ function AssignmentRow({
           <GroupLinkSheet
             open={linking}
             assignment={assignment}
-            candidates={allAssignments.filter((a) => a.id !== assignment.id)}
-            label={label}
+            assignments={allAssignments}
+            teachers={teachers}
+            subjects={subjects}
+            classrooms={classrooms}
+            gradeLevels={gradeLevels}
             onClose={() => setLinking(false)}
           />
         </td>
@@ -745,21 +759,129 @@ function AssignmentRow({
   );
 }
 
-/** Picks another assignment to tag with a shared group_id — เรียนรวม (same teacher, same slot, different classroom) or แบ่งคาบ (same classroom, different subject/teacher). See migration 0019. */
+type LinkFilter = "all" | "open" | "linked";
+
+/**
+ * Picks the assignments that happen at the same time and tags them with one shared group_id —
+ * เรียนรวม (same teacher, same slot, different classroom) or แบ่งคาบ (same classroom, different subject/teacher),
+ * so the schedule check doesn't count them as a clash. See migration 0019. The assignment it was opened from starts selected.
+ */
 function GroupLinkSheet({
   open,
   assignment,
-  candidates,
-  label,
+  assignments,
+  teachers,
+  subjects,
+  classrooms,
+  gradeLevels,
   onClose,
 }: {
   open: boolean;
   assignment: TeachingAssignment;
-  candidates: TeachingAssignment[];
-  label: (a: TeachingAssignment) => string;
+  assignments: TeachingAssignment[];
+  teachers: ProfileRow[];
+  subjects: Subject[];
+  classrooms: Classroom[];
+  gradeLevels: GradeLevel[];
   onClose: () => void;
 }) {
-  const link = useLinkAssignmentGroup();
+  const link = useLinkAssignments();
+  const toast = useToast();
+  const colors = useSubjectColors(gradeLevels);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<LinkFilter>("all");
+  const [sort, setSort] = useState<"teacher" | "code">("teacher");
+  const [selected, setSelected] = useState<Set<string>>(new Set([assignment.id]));
+  const [expanded, setExpanded] = useState<Set<string>>(new Set()); // teachers start collapsed
+
+  useEffect(() => {
+    if (!open) return;
+    setSearch("");
+    setFilter("all");
+    setSelected(new Set([assignment.id]));
+    setExpanded(new Set());
+  }, [open, assignment.id]);
+
+  const subjectOf = (a: TeachingAssignment) => subjects.find((s) => s.id === a.subject_id);
+  const roomOf = (a: TeachingAssignment) => {
+    const c = classrooms.find((x) => x.id === a.classroom_id);
+    const g = gradeLevels.find((x) => x.id === c?.grade_level_id);
+    return { c, label: c ? `${g ? gradeShortLabel(g.code) : "—"}/${c.name}` : "—" };
+  };
+  const teacherName = (id: string) => {
+    const t = teachers.find((x) => x.id === id);
+    return t ? profileFullName(t) : "—";
+  };
+
+  const linkedCount = assignments.filter((a) => a.group_id).length;
+  const tabs: [LinkFilter, string, number][] = [
+    ["all", "ทั้งหมด", assignments.length],
+    ["open", "ยังไม่ผูกกลุ่ม", assignments.length - linkedCount],
+    ["linked", "ผูกกลุ่มแล้ว", linkedCount],
+  ];
+
+  const groups = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const byTeacher = new Map<string, TeachingAssignment[]>();
+    for (const a of assignments) {
+      if (filter === "open" && a.group_id) continue;
+      if (filter === "linked" && !a.group_id) continue;
+      const s = subjects.find((x) => x.id === a.subject_id);
+      const c = classrooms.find((x) => x.id === a.classroom_id);
+      const g = gradeLevels.find((x) => x.id === c?.grade_level_id);
+      const t = teachers.find((x) => x.id === a.teacher_id);
+      const hay = `${t ? profileFullName(t) : ""} ${s?.code ?? ""} ${s?.name_th ?? ""} ${g ? gradeShortLabel(g.code) : ""}/${c?.name ?? ""}`.toLowerCase();
+      if (q && !hay.includes(q)) continue;
+      byTeacher.set(a.teacher_id, [...(byTeacher.get(a.teacher_id) ?? []), a]);
+    }
+    const code = (a: TeachingAssignment) => subjects.find((s) => s.id === a.subject_id)?.code ?? "";
+    return [...byTeacher.entries()]
+      .map(([teacherId, list]) => ({
+        teacherId,
+        items: [...list].sort((a, b) => code(a).localeCompare(code(b), "th", { numeric: true })),
+      }))
+      .sort((a, b) =>
+        sort === "code"
+          ? code(a.items[0]!).localeCompare(code(b.items[0]!), "th", { numeric: true })
+          : teacherName(a.teacherId).localeCompare(teacherName(b.teacherId), "th"),
+      );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignments, subjects, classrooms, gradeLevels, teachers, search, filter, sort]);
+
+  const visibleIds = groups.flatMap((g) => g.items.map((a) => a.id));
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
+
+  function toggle(ids: string[], on: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) on ? next.add(id) : next.delete(id);
+      return next;
+    });
+  }
+
+  function submit() {
+    const picked = assignments.filter((a) => selected.has(a.id));
+    if (picked.length < 2) return;
+    link.mutate(picked, {
+      onSuccess: () => {
+        toast(`ผูกกลุ่ม ${picked.length} รายการแล้ว`);
+        onClose();
+      },
+      onError: () => toast("ผูกกลุ่มไม่สำเร็จ", "error"),
+    });
+  }
+
+  const statusChip = (linked: boolean) => (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-medium",
+        linked ? "bg-success/15 text-success" : "bg-warning/15 text-warning",
+      )}
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {linked ? "ผูกกลุ่มแล้ว" : "ยังไม่ผูก"}
+    </span>
+  );
 
   return (
     <Sheet
@@ -767,35 +889,149 @@ function GroupLinkSheet({
       onOpenChange={(o) => !o && onClose()}
       title="ผูกกลุ่ม (เรียนรวม/แบ่งคาบ)"
       description="เลือกภาระงานสอนที่เกิดขึ้นพร้อมกัน — จะไม่ถูกนับว่าครู/ห้องชนกันในตารางสอน"
-    >
-      <ul className="divide-y divide-border text-sm">
-        {candidates.map((c) => (
-          <li key={c.id}>
-            <button
-              type="button"
-              onClick={() =>
-                link.mutate(
-                  { assignmentId: assignment.id, targetId: c.id },
-                  { onSuccess: onClose },
-                )
-              }
-              className="w-full py-2 text-left hover:text-accent"
-            >
-              {label(c)}
-              {c.group_id && (
-                <span className="ml-1 text-xs text-muted-foreground">
-                  (อยู่ในกลุ่มแล้ว)
-                </span>
-              )}
+      footer={
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground">เลือกแล้ว {selected.size} รายการ</p>
+          {selected.size > 0 && (
+            <button type="button" onClick={() => setSelected(new Set())} className="text-xs text-accent hover:underline">
+              ล้างการเลือก
             </button>
-          </li>
-        ))}
-        {candidates.length === 0 && (
-          <li className="py-4 text-center text-sm text-muted-foreground">
-            ไม่มีภาระงานสอนอื่นให้ผูก
-          </li>
-        )}
-      </ul>
+          )}
+          <div className="ml-auto flex gap-2">
+            <Button variant="outline" onClick={onClose}>
+              ยกเลิก
+            </Button>
+            <Button onClick={submit} disabled={selected.size < 2 || link.isPending}>
+              {link.isPending ? <Spinner className="h-3 w-3" /> : "ผูกกลุ่มที่เลือก"}
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหาชื่อครู หรือรหัสวิชา หรือห้องเรียน..."
+            aria-label="ค้นหา"
+          />
+        </div>
+
+        <div className="scrollbar-hidden -mx-1 flex gap-2 overflow-x-auto px-1 py-1">
+          {tabs.map(([key, label, n]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key)}
+              className={cn(
+                "shrink-0 rounded-full border px-3.5 py-1.5 text-xs transition-colors",
+                filter === key ? "border-accent bg-accent/10 font-medium text-accent" : "border-transparent bg-muted text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label} ({n})
+            </button>
+          ))}
+        </div>
+        <Select className="w-full" value={sort} onChange={(e) => setSort(e.target.value as "teacher" | "code")} aria-label="เรียงลำดับ">
+          <option value="teacher">เรียงตามครู</option>
+          <option value="code">เรียงตามรหัสวิชา</option>
+        </Select>
+
+        <div className="flex items-center justify-between border-y border-border py-2">
+          <button
+            type="button"
+            onClick={() => toggle(visibleIds, !allVisibleSelected)}
+            className="flex items-center gap-2 text-xs"
+            aria-pressed={allVisibleSelected}
+          >
+            {allVisibleSelected ? <CheckboxIcon className="h-5 w-5 text-accent" /> : <SquareIcon className="h-5 w-5 text-muted-foreground" />}
+            เลือกทั้งหมด
+          </button>
+          <span className="text-xs text-muted-foreground">เลือกแล้ว {selected.size} รายการ</span>
+        </div>
+
+        <div className="space-y-2">
+          {groups.map(({ teacherId, items }) => {
+            const teacher = teachers.find((t) => t.id === teacherId);
+            const isOpen = expanded.has(teacherId);
+            const unlinked = items.filter((a) => !a.group_id).length;
+            return (
+              <section key={teacherId} className="overflow-hidden rounded-xl border border-border">
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  onClick={() =>
+                    setExpanded((prev) => {
+                      const next = new Set(prev);
+                      if (!next.delete(teacherId)) next.add(teacherId);
+                      return next;
+                    })
+                  }
+                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
+                >
+                  <ChevronForward className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", isOpen && "rotate-90")} />
+                  <Avatar name={teacherName(teacherId)} src={teacher ? avatarUrl(teacher) : null} className="h-10 w-10 text-xs" />
+                  <div className="min-w-0 flex-1 leading-tight">
+                    <p className="truncate text-sm font-semibold">{teacherName(teacherId)}</p>
+                    <p className="text-xs text-muted-foreground">{items.length} รายการ</p>
+                  </div>
+                  {unlinked > 0 ? (
+                    <span className="shrink-0 rounded-full bg-warning/15 px-2.5 py-1 text-[11px] font-medium text-warning">ยังไม่ผูก {unlinked}</span>
+                  ) : (
+                    statusChip(true)
+                  )}
+                </button>
+
+                {isOpen && (
+                  <ul className="divide-y divide-border border-t border-border">
+                    {items.map((a) => {
+                      const s = subjectOf(a);
+                      const checked = selected.has(a.id);
+                      const room = roomOf(a);
+                      return (
+                        <li key={a.id}>
+                          <button
+                            type="button"
+                            aria-pressed={checked}
+                            onClick={() => toggle([a.id], !checked)}
+                            className={cn("flex w-full items-center gap-3 px-3 py-2 text-left", checked && "bg-accent/5")}
+                          >
+                            {checked ? (
+                              <CheckboxIcon className="h-5 w-5 shrink-0 text-accent" />
+                            ) : (
+                              <SquareIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
+                            )}
+                            <span
+                              className={cn(
+                                "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                                colors.shade(s?.learning_area_id, room.c?.grade_level_id),
+                              )}
+                            >
+                              <BookIcon className="h-5 w-5" />
+                            </span>
+                            <div className="min-w-0 flex-1 leading-tight">
+                              <p className="truncate text-sm font-medium">
+                                {s?.code ?? "—"} {s?.name_th ?? ""}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{room.label}</p>
+                            </div>
+                            {statusChip(!!a.group_id)}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
+          {groups.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">ไม่พบภาระงานสอนที่ตรงเงื่อนไข</p>}
+        </div>
+      </div>
     </Sheet>
   );
 }

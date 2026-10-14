@@ -89,6 +89,13 @@ export const SUBJECT_TYPE_LABEL: Record<SubjectType, string> = {
   activity: "กิจกรรม",
 };
 
+/** Solid pills so they stand out from the pastel area hue behind them; colours chosen to avoid the area hues. */
+export const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
+  basic: "bg-slate-700 text-white dark:bg-slate-500",
+  additional: "bg-indigo-600 text-white dark:bg-indigo-500",
+  activity: "bg-lime-600 text-white dark:bg-lime-600",
+};
+
 export function areaHue(areaId: string | null | undefined, areaById: Map<string, LearningArea>): AreaHue {
   const area = areaId ? areaById.get(areaId) : undefined;
   if (!area) return "slate";
