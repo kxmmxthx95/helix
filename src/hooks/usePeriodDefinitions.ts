@@ -107,3 +107,54 @@ export function useGeneratePeriods() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ["period_definitions"] }),
   });
 }
+
+export type ScheduledSlot = { id: string; day_of_week: number; period_no: number; grade_level_id: string };
+
+/** Every placed schedule entry of a department for one year (all terms), reduced to day+period+grade — used to check a period-structure change before saving it. */
+export function useDepartmentScheduledSlots(departmentId: string | null, academicYear: number) {
+  return useQuery({
+    queryKey: ["schedule_entries", "slots_by_department", departmentId, academicYear],
+    enabled: !!departmentId,
+    queryFn: async (): Promise<ScheduledSlot[]> => {
+      const { data, error } = await supabase
+        .from("schedule_entries")
+        .select(
+          "id, day_of_week, period_no, teaching_assignments!inner(academic_year, classroom:classrooms!inner(grade_level_id, grade_level:grade_levels!inner(department_id)))",
+        )
+        .eq("teaching_assignments.academic_year", academicYear)
+        .eq("teaching_assignments.classroom.grade_level.department_id", departmentId!);
+      if (error) throw error;
+      return (data ?? []).map((r) => {
+        const row = r as unknown as {
+          id: string;
+          day_of_week: number;
+          period_no: number;
+          teaching_assignments: { classroom: { grade_level_id: string } };
+        };
+        return {
+          id: row.id,
+          day_of_week: row.day_of_week,
+          period_no: row.period_no,
+          grade_level_id: row.teaching_assignments.classroom.grade_level_id,
+        };
+      });
+    },
+  });
+}
+
+/** Grades that have their own period rows (everyone else falls back to the department default). */
+export function useGradesWithPeriodOverride(departmentId: string | null) {
+  return useQuery({
+    queryKey: ["period_definitions", departmentId, "override_grades"],
+    enabled: !!departmentId,
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await supabase
+        .from("period_definitions")
+        .select("grade_level_id")
+        .eq("department_id", departmentId!)
+        .not("grade_level_id", "is", null);
+      if (error) throw error;
+      return new Set((data ?? []).map((r) => r.grade_level_id as string));
+    },
+  });
+}

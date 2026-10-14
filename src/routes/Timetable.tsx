@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import {
+  BookIcon,
   CalendarIcon,
   ChevronBack,
   ChevronForward,
+  CheckmarkCircleIcon,
   GraduationCap,
+  InfoIcon,
+  PencilIcon,
   Plus,
   RestaurantIcon,
   Search,
   SettingsIcon,
   TimeIcon,
   TimetableIcon,
+  TrashIcon,
+  Users,
   X,
 } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
@@ -20,17 +26,16 @@ import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useMyClassroom } from "@/hooks/useAttendance";
 import {
-  useDeletePeriodDefinition,
   useDepartmentPeriods,
+  useDepartmentScheduledSlots,
   useGeneratePeriods,
+  useGradesWithPeriodOverride,
   usePeriodsForGrade,
-  useSavePeriodDefinition,
-  type PeriodDefinitionDraft,
 } from "@/hooks/usePeriodDefinitions";
 import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments, useProfiles, type ProfileRow } from "@/hooks/useProfiles";
-import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
+import { useClassroomsByDepartment, useCurrentClassroomEnrollmentsByDepartment } from "@/hooks/useStatusManagement";
 import { useDepartmentTeachingAssignments } from "@/hooks/useTeachingLoad";
 import {
   useClassroomSchedule,
@@ -39,7 +44,7 @@ import {
   useTeacherSchedule,
   type ScheduleEntryRow,
 } from "@/hooks/useSchedule";
-import { generatePeriods, type PeriodBreakConfig } from "@/lib/periodGenerator";
+import { generatePeriods } from "@/lib/periodGenerator";
 import {
   profileFullName,
   type Classroom,
@@ -73,7 +78,6 @@ export function Timetable() {
   const [pickedDept, setPickedDept] = useState("");
   const [term, setTerm] = useState<1 | 2>(1);
   const [view, setView] = useState<View | "">("");
-  const [classroomId, setClassroomId] = useState("");
   const [periodSettingsOpen, setPeriodSettingsOpen] = useState(false);
 
   const departmentId = orgWide ? pickedDept : (me?.department_id ?? "");
@@ -93,7 +97,6 @@ export function Timetable() {
 
   useEffect(() => {
     if (isStudent) return;
-    setClassroomId("");
   }, [departmentId, isStudent]);
 
   if (!me) return null;
@@ -144,7 +147,6 @@ export function Timetable() {
           value={view}
           onChange={(e) => {
             setView(e.target.value as View);
-            setClassroomId("");
           }}
           aria-label="เลือกตาราง"
           placeholder="เลือกตาราง"
@@ -197,13 +199,14 @@ export function Timetable() {
         )}
       </div>
 
-      <Sheet
-        open={periodSettingsOpen}
-        onOpenChange={setPeriodSettingsOpen}
-        title="ตั้งค่าคาบเวลา"
-      >
-        {departmentId && <PeriodsTab departmentId={departmentId} />}
-      </Sheet>
+      {departmentId && (
+        <PeriodSettingsSheet
+          open={periodSettingsOpen}
+          onOpenChange={setPeriodSettingsOpen}
+          departmentId={departmentId}
+          academicYear={academicYear}
+        />
+      )}
 
       {!departmentId ? (
         <div className="flex flex-1 items-center justify-center">
@@ -215,35 +218,17 @@ export function Timetable() {
         </div>
       ) : (
         <>
-          {view === "classroom" &&
-            (classroomId ? (
-              <ClassroomTimetable
-                departmentId={departmentId}
-                classroomId={classroomId}
-                academicYear={academicYear}
-                term={scheduleTerm}
-                mayEdit={mayEdit}
-                classrooms={classrooms}
-                gradeLevels={gradeLevels}
-                teachers={teachers}
-                onBack={() => setClassroomId("")}
-              />
-            ) : (
-              <ScheduleList
-                items={[...classrooms]
-                  .sort((a, b) => {
-                    const gradeOrder =
-                      (gradeLevels.findIndex((g) => g.id === a.grade_level_id) ?? -1) -
-                      (gradeLevels.findIndex((g) => g.id === b.grade_level_id) ?? -1);
-                    return gradeOrder !== 0 ? gradeOrder : a.name.localeCompare(b.name, undefined, { numeric: true });
-                  })
-                  .map((c) => ({
-                    id: c.id,
-                    label: `${gradeLevels.find((g) => g.id === c.grade_level_id)?.name ?? "—"}/${c.name}`,
-                  }))}
-                onSelect={setClassroomId}
-              />
-            ))}
+          {view === "classroom" && (
+            <ClassroomWorkspace
+              departmentId={departmentId}
+              academicYear={academicYear}
+              term={scheduleTerm}
+              mayEdit={mayEdit}
+              classrooms={classrooms}
+              gradeLevels={gradeLevels}
+              teachers={teachers}
+            />
+          )}
 
           {view === "teacher" && (
             <TeacherWorkspace
@@ -258,6 +243,117 @@ export function Timetable() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/** Master-detail: classroom list on the left, the picked room's schedule on the right. */
+function ClassroomWorkspace({
+  departmentId,
+  academicYear,
+  term,
+  mayEdit,
+  classrooms,
+  gradeLevels,
+  teachers,
+}: {
+  departmentId: string;
+  academicYear: number;
+  term: number | null;
+  mayEdit: boolean;
+  classrooms: Classroom[];
+  gradeLevels: GradeLevel[];
+  teachers: ProfileRow[];
+}) {
+  const [pickedId, setPickedId] = useState("");
+  const { data: assignments = [] } = useDepartmentTeachingAssignments(departmentId, academicYear, term);
+  const { data: enrollments = [] } = useCurrentClassroomEnrollmentsByDepartment(departmentId);
+
+  const label = (c: Classroom) => `${gradeLevels.find((g) => g.id === c.grade_level_id)?.name ?? "—"}/${c.name}`;
+  const sorted = useMemo(
+    () =>
+      [...classrooms].sort((a, b) => {
+        const byGrade =
+          gradeLevels.findIndex((g) => g.id === a.grade_level_id) -
+          gradeLevels.findIndex((g) => g.id === b.grade_level_id);
+        return byGrade !== 0 ? byGrade : a.name.localeCompare(b.name, undefined, { numeric: true });
+      }),
+    [classrooms, gradeLevels],
+  );
+  const studentCount = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of enrollments) map.set(e.classroom_id, (map.get(e.classroom_id) ?? 0) + 1);
+    return map;
+  }, [enrollments]);
+
+  const room = sorted.find((c) => c.id === pickedId) ?? sorted[0];
+  if (!room) return <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีห้องเรียนในแผนกนี้" />;
+
+  const mine = assignments.filter((a) => a.classroom_id === room.id);
+  const students = studentCount.get(room.id) ?? 0;
+
+  return (
+    <div className="grid min-h-0 flex-1 items-start gap-3 lg:grid-cols-[18rem_minmax(0,1fr)]">
+      <PickerList
+        title="ห้องเรียน"
+        unit="ห้อง"
+        searchPlaceholder="ค้นหาห้องเรียน..."
+        selectedId={room.id}
+        onSelect={setPickedId}
+        items={sorted.map((c) => ({
+          id: c.id,
+          name: label(c),
+          subtitle: `นักเรียน ${studentCount.get(c.id) ?? 0} คน`,
+          subjects: new Set(assignments.filter((a) => a.classroom_id === c.id).map((a) => a.subject_id)).size,
+          search: label(c),
+        }))}
+      />
+
+      <section className="min-w-0 space-y-3">
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent/15 text-accent">
+            <Users className="h-6 w-6" />
+          </span>
+          <div className="min-w-0 flex-1 font-sarabun">
+            <p className="truncate text-base font-semibold text-foreground">{label(room)}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              นักเรียน {students} คน{term ? ` | ภาคเรียนที่ ${term}` : ""} | ปีการศึกษา {academicYear}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <StatChip
+              icon={BookIcon}
+              tint="bg-sky-100 text-sky-600 dark:bg-sky-500/20"
+              value={new Set(mine.map((a) => a.subject_id)).size}
+              label="รายวิชา"
+            />
+            <StatChip
+              icon={TimeIcon}
+              tint="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20"
+              value={mine.reduce((sum, a) => sum + a.periods_per_week, 0)}
+              label="คาบ/สัปดาห์"
+            />
+            <StatChip
+              icon={Users}
+              tint="bg-violet-100 text-violet-600 dark:bg-violet-500/20"
+              value={students}
+              label="นักเรียน"
+            />
+          </div>
+        </div>
+
+        <ClassroomTimetable
+          key={room.id}
+          departmentId={departmentId}
+          classroomId={room.id}
+          academicYear={academicYear}
+          term={term}
+          mayEdit={mayEdit}
+          classrooms={classrooms}
+          gradeLevels={gradeLevels}
+          teachers={teachers}
+        />
+      </section>
     </div>
   );
 }
@@ -342,6 +438,127 @@ function ClassroomTimetable({
   );
 }
 
+type PickerItem = {
+  id: string;
+  name: string;
+  subtitle: string;
+  /** Subjects taught / scheduled — shown as the pill and used for the second sort. */
+  subjects: number;
+  search: string;
+  avatar?: React.ReactNode;
+};
+
+/** Search + sort + count list shared by the teacher and classroom pickers. */
+function PickerList({
+  items,
+  selectedId,
+  onSelect,
+  searchPlaceholder,
+  title,
+  unit,
+}: {
+  items: PickerItem[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  searchPlaceholder: string;
+  title: string;
+  unit: string;
+}) {
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<"name" | "subjects">("name");
+
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = q ? items.filter((i) => i.search.toLowerCase().includes(q)) : items;
+    return sort === "subjects"
+      ? [...list].sort((a, b) => b.subjects - a.subjects || a.name.localeCompare(b.name, "th", { numeric: true }))
+      : [...list].sort((a, b) => a.name.localeCompare(b.name, "th", { numeric: true }));
+  }, [items, search, sort]);
+
+  return (
+    <aside className="flex max-h-[28rem] min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card lg:sticky lg:top-0 lg:max-h-[calc(100dvh-10rem)]">
+      <div className="shrink-0 space-y-3 border-b border-border p-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={searchPlaceholder}
+            aria-label={searchPlaceholder}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            {title}ทั้งหมด {items.length} {unit}
+          </p>
+          <Select
+            className="h-8 w-auto min-w-[8.5rem] text-xs"
+            value={sort}
+            onChange={(e) => setSort(e.target.value as "name" | "subjects")}
+            aria-label="เรียงลำดับ"
+          >
+            <option value="name">เรียงตาม ชื่อ A-Z</option>
+            <option value="subjects">เรียงตาม รายวิชา</option>
+          </Select>
+        </div>
+      </div>
+      <ul className="scrollbar-hidden min-h-0 flex-1 space-y-1 overflow-y-auto p-1.5">
+        {shown.map((i) => (
+          <li key={i.id}>
+            <button
+              type="button"
+              onClick={() => onSelect(i.id)}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
+                i.id === selectedId ? "bg-muted" : "hover:bg-muted/60",
+              )}
+            >
+              {i.avatar}
+              <div className="min-w-0 flex-1 font-sarabun leading-tight">
+                <p className="truncate text-sm font-medium text-foreground">{i.name}</p>
+                <p className="truncate text-xs text-muted-foreground">{i.subtitle}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+                {i.subjects} รายวิชา
+              </span>
+            </button>
+          </li>
+        ))}
+        {shown.length === 0 && <li className="py-6 text-center text-xs text-muted-foreground">ไม่พบรายการที่ค้นหา</li>}
+      </ul>
+      <p className="shrink-0 border-t border-border px-4 py-3 text-xs text-muted-foreground">
+        แสดง {shown.length} จาก {items.length} {unit}
+      </p>
+    </aside>
+  );
+}
+
+function StatChip({
+  icon: Icon,
+  tint,
+  value,
+  label,
+}: {
+  icon: (props: { className?: string }) => React.JSX.Element;
+  tint: string;
+  value: string | number;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
+      <span className={cn("flex h-9 w-9 items-center justify-center rounded-full", tint)}>
+        <Icon className="h-4 w-4" />
+      </span>
+      <div className="leading-tight">
+        <p className="text-base font-semibold text-foreground">{value}</p>
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  );
+}
+
 type TeacherTab = "week" | "subjects" | "hours";
 const TEACHER_TABS: [TeacherTab, string][] = [
   ["week", "ตารางสอนรายสัปดาห์"],
@@ -367,7 +584,6 @@ function TeacherWorkspace({
   gradeLevels: GradeLevel[];
   teachers: ProfileRow[];
 }) {
-  const [search, setSearch] = useState("");
   const [pickedId, setPickedId] = useState("");
   const [tab, setTab] = useState<TeacherTab>("week");
 
@@ -403,15 +619,7 @@ function TeacherWorkspace({
     return map;
   }, [assignments]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return teachers;
-    return teachers.filter((t) =>
-      [profileFullName(t), t.first_name, t.last_name, t.teacher_code].some((v) => v?.toLowerCase().includes(q)),
-    );
-  }, [teachers, search]);
-
-  const teacher = teachers.find((t) => t.id === pickedId) ?? filtered[0];
+  const teacher = teachers.find((t) => t.id === pickedId) ?? teachers[0];
   const teacherId = teacher?.id ?? "";
   const mine = summary.get(teacherId);
   const { data: entries = [] } = useTeacherSchedule(teacherId, academicYear, term);
@@ -446,47 +654,30 @@ function TeacherWorkspace({
 
   return (
     <div className="grid min-h-0 flex-1 items-start gap-3 lg:grid-cols-[18rem_minmax(0,1fr)]">
-      <aside className="flex max-h-72 min-h-0 flex-col gap-2 rounded-xl border border-border bg-card p-2 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-10rem)]">
-        <div className="relative shrink-0">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            className="pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาชื่อครู หรือรหัสครู..."
-            aria-label="ค้นหาครู"
-          />
-        </div>
-        <ul className="scrollbar-hidden min-h-0 flex-1 space-y-1 overflow-y-auto">
-          {filtered.map((t) => {
-            const sum = summary.get(t.id);
-            const active = t.id === teacherId;
-            return (
-              <li key={t.id}>
-                <button
-                  type="button"
-                  onClick={() => setPickedId(t.id)}
-                  className={cn(
-                    "flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-colors",
-                    active ? "border-accent/40 bg-accent/10" : "border-transparent hover:bg-muted",
-                  )}
-                >
-                  <Avatar name={`${t.first_name} ${t.last_name}`} src={avatarUrl(t)} className="h-9 w-9 text-[11px]" />
-                  <div className="min-w-0 flex-1 font-sarabun leading-tight">
-                    <p className="truncate text-xs font-medium text-foreground">{profileFullName(t)}</p>
-                    <p className="truncate text-[11px] text-muted-foreground">
-                      {sum ? `${sum.subjects.size} รายวิชา | รวม ${sum.periods} คาบ/สัปดาห์` : "ยังไม่มีภาระงานสอน"}
-                    </p>
-                  </div>
-                  <ChevronForward className="h-3 w-3 shrink-0 text-muted-foreground" />
-                </button>
-              </li>
-            );
-          })}
-          {filtered.length === 0 && <li className="py-6 text-center text-xs text-muted-foreground">ไม่พบครูที่ค้นหา</li>}
-        </ul>
-      </aside>
+      <PickerList
+        title="ครู"
+        unit="คน"
+        searchPlaceholder="ค้นหาชื่อครู..."
+        selectedId={teacherId}
+        onSelect={setPickedId}
+        items={teachers.map((t) => {
+          const area = areaById.get(t.learning_area_id ?? "");
+          return {
+            id: t.id,
+            name: profileFullName(t),
+            subtitle: (area?.parent_id ? areaById.get(area.parent_id) : area)?.name ?? "—",
+            subjects: summary.get(t.id)?.subjects.size ?? 0,
+            search: [profileFullName(t), t.teacher_code ?? ""].join(" "),
+            avatar: (
+              <Avatar
+                name={`${t.first_name} ${t.last_name}`}
+                src={avatarUrl(t)}
+                className="h-11 w-11 text-xs ring-2 ring-sky-200 dark:ring-sky-500/40"
+              />
+            ),
+          };
+        })}
+      />
 
       <section className="min-w-0 space-y-3">
         {teacher && (
@@ -499,15 +690,7 @@ function TeacherWorkspace({
               </div>
               <div className="flex flex-wrap gap-2">
                 {stats.map((st) => (
-                  <div key={st.label} className="flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
-                    <span className={cn("flex h-9 w-9 items-center justify-center rounded-full", st.tint)}>
-                      <st.icon className="h-4 w-4" />
-                    </span>
-                    <div className="leading-tight">
-                      <p className="text-base font-semibold text-foreground">{st.value}</p>
-                      <p className="text-[11px] text-muted-foreground">{st.label}</p>
-                    </div>
-                  </div>
+                  <StatChip key={st.label} {...st} />
                 ))}
               </div>
             </div>
@@ -683,62 +866,6 @@ function BackHeader({ label, onBack }: { label: string; onBack: () => void }) {
         {label}
       </button>
     </div>
-  );
-}
-
-function ScheduleList({
-  items,
-  onSelect,
-}: {
-  items: (
-    | { id: string; label: string }
-    | {
-        id: string;
-        prefix: string | null;
-        firstName: string;
-        lastName: string;
-        avatarSrc: string | null;
-      }
-  )[];
-  onSelect: (id: string) => void;
-}) {
-  if (items.length === 0) {
-    return <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีรายการในแผนกนี้" />;
-  }
-  return (
-    <ul className="divide-y divide-border overflow-y-auto rounded-lg border border-border bg-card text-xs">
-      {items.map((item) => {
-        const isPerson = "firstName" in item;
-        return (
-          <li key={item.id}>
-            <button
-              type="button"
-              onClick={() => onSelect(item.id)}
-              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted"
-            >
-              <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                {isPerson ? (
-                  <>
-                    <Avatar
-                      name={`${item.firstName} ${item.lastName}`}
-                      src={item.avatarSrc}
-                      className="h-7 w-7 shrink-0 text-[10px]"
-                    />
-                    <div className="min-w-0 font-sarabun leading-tight text-foreground">
-                      <p className="truncate font-medium">{`${item.prefix ?? ""}${item.firstName}`}</p>
-                      <p className="truncate font-medium">{item.lastName}</p>
-                    </div>
-                  </>
-                ) : (
-                  <span className="min-w-0 truncate font-sarabun">{item.label}</span>
-                )}
-              </div>
-              <ChevronForward className="h-3 w-3 shrink-0 text-muted-foreground" />
-            </button>
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 
@@ -1058,523 +1185,630 @@ function PlaceSheet({
   );
 }
 
-const PERIOD_TYPE_LABEL: Record<PeriodType, string> = {
-  teaching: "คาบสอน",
-  break: "พัก/กิจกรรม",
-};
+type DraftRow = { type: PeriodType; label: string; start: string; end: string };
 
-/** grade_level_id null = ทั้งแผนก (default) — ระดับชั้นไหนไม่ตั้งเองก็ fallback มาใช้ค่านี้ (migration 0031). */
-function PeriodsTab({ departmentId }: { departmentId: string }) {
+const toMin = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+};
+const toHHMM = (mins: number) =>
+  `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+
+function formatDuration(mins: number) {
+  if (mins <= 0) return "—";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return [h ? `${h} ชั่วโมง` : "", m ? `${m} นาที` : ""].filter(Boolean).join(" ");
+}
+
+/** period_definitions are per day; the editor works on one day's template and writes it to every day of the scope. */
+function templateFrom(periods: PeriodDefinition[]): { rows: DraftRow[]; days: number[]; uniform: boolean } {
+  const days = [...new Set(periods.map((p) => p.day_of_week))].sort((a, b) => a - b);
+  const rowsOf = (d: number): DraftRow[] =>
+    periods
+      .filter((p) => p.day_of_week === d)
+      .sort((a, b) => a.period_no - b.period_no)
+      .map((p) => ({ type: p.period_type, label: p.label, start: p.start_time.slice(0, 5), end: p.end_time.slice(0, 5) }));
+  const rows = days.length ? rowsOf(days[0]!) : [];
+  const key = JSON.stringify(rows);
+  return { rows, days, uniform: days.every((d) => JSON.stringify(rowsOf(d)) === key) };
+}
+
+const DEFAULT_ROWS: DraftRow[] = generatePeriods({
+  startTime: "08:30",
+  periodsPerDay: 7,
+  minutesPerPeriod: 60,
+  lunch: { enabled: true, afterPeriod: 3, minutes: 90, label: "พักกลางวัน" },
+  days: [1],
+}).map((r) => ({ type: r.period_type, label: r.label, start: r.start_time, end: r.end_time }));
+
+const ALL_DAYS = [1, 2, 3, 4, 5, 6];
+const WEEKDAYS = [1, 2, 3, 4, 5];
+
+function PeriodSettingsSheet({
+  open,
+  onOpenChange,
+  departmentId,
+  academicYear,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  departmentId: string;
+  academicYear: number;
+}) {
+  const toast = useToast();
+  const generate = useGeneratePeriods();
   const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
   const [gradeTab, setGradeTab] = useState<string | null>(null);
+  const [mode, setMode] = useState<"custom" | "inherit">("custom");
+  const [rows, setRows] = useState<DraftRow[]>(DEFAULT_ROWS);
+  const [breaksOpen, setBreaksOpen] = useState(false);
+  const [days, setDays] = useState<number[]>(WEEKDAYS);
+
+  const defaultQuery = useDepartmentPeriods(departmentId);
+  const gradeQuery = usePeriodsForGrade(gradeTab ? departmentId : null, gradeTab);
+  const scoped = gradeTab === null ? defaultQuery : gradeQuery;
+  const scopePeriods = scoped.data ?? [];
+  const scopeTpl = useMemo(() => templateFrom(scopePeriods), [scopePeriods]);
+  const defaultTpl = useMemo(() => templateFrom(defaultQuery.data ?? []), [defaultQuery.data]);
+  const hasOverride = scopePeriods.length > 0;
+  const slotsQuery = useDepartmentScheduledSlots(departmentId, academicYear);
+  const overrideGrades = useGradesWithPeriodOverride(departmentId).data;
 
   useEffect(() => {
     setGradeTab(null);
   }, [departmentId]);
 
-  return (
-    <div className="space-y-3">
-      <div className="flex w-full gap-0 border-b border-border" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={gradeTab === null}
-          onClick={() => setGradeTab(null)}
-          className={lineTab(gradeTab === null, true)}
-        >
-          <span className="truncate">ทั้งแผนก (default)</span>
-        </button>
-        {gradeLevels.map((g) => (
-          <button
-            key={g.id}
-            type="button"
-            role="tab"
-            aria-selected={gradeTab === g.id}
-            onClick={() => setGradeTab(g.id)}
-            className={lineTab(gradeTab === g.id, true)}
-          >
-            <span className="truncate">{g.name}</span>
-          </button>
-        ))}
-      </div>
-      <PeriodDefinitionsCard
-        key={`periods-${departmentId}-${gradeTab ?? "default"}`}
-        departmentId={departmentId}
-        gradeLevelId={gradeTab}
-      />
-    </div>
-  );
-}
-
-function PeriodDefinitionsCard({
-  departmentId,
-  gradeLevelId,
-}: {
-  departmentId: string;
-  gradeLevelId: string | null;
-}) {
-  const defaultPeriods = useDepartmentPeriods(gradeLevelId === null ? departmentId : null);
-  const gradePeriods = usePeriodsForGrade(gradeLevelId !== null ? departmentId : null, gradeLevelId);
-  const { data: periods = [], isLoading } = gradeLevelId === null ? defaultPeriods : gradePeriods;
-  const [editing, setEditing] = useState<PeriodDefinition | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [quickSetup, setQuickSetup] = useState(false);
-
-  const days = [...new Set(periods.map((p) => p.day_of_week))].sort((a, b) => a - b);
-  const maxPeriodNo = periods.reduce((m, p) => Math.max(m, p.period_no), 0);
-  const periodAt = new Map(periods.map((p) => [`${p.day_of_week}-${p.period_no}`, p]));
-
-  const sheets = (
-    <>
-      <PeriodSheet
-        mode="edit"
-        period={editing}
-        open={editing !== null}
-        departmentId={departmentId}
-        gradeLevelId={gradeLevelId}
-        onClose={() => setEditing(null)}
-      />
-      <PeriodSheet
-        mode="create"
-        period={null}
-        open={creating}
-        departmentId={departmentId}
-        gradeLevelId={gradeLevelId}
-        onClose={() => setCreating(false)}
-      />
-      <QuickSetupSheet
-        open={quickSetup}
-        departmentId={departmentId}
-        gradeLevelId={gradeLevelId}
-        onClose={() => setQuickSetup(false)}
-      />
-    </>
-  );
-
-  const actions = (
-    <div className="flex justify-end gap-2">
-      <Button size="sm" variant="outline" onClick={() => setQuickSetup(true)}>
-        ตั้งค่าด่วน
-      </Button>
-      <Button size="sm" onClick={() => setCreating(true)}>
-        <Plus className="h-3.5 w-3.5" />
-        เพิ่มคาบ
-      </Button>
-    </div>
-  );
-
-  if (isLoading) {
-    return (
-      <div className="space-y-3" role="status" aria-label="กำลังโหลด">
-        <div className="flex justify-end gap-2">
-          <Skeleton className="h-8 w-24" />
-          <Skeleton className="h-8 w-24" />
-        </div>
-        <div className="space-y-1.5">
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-10 w-full" />
-          ))}
-        </div>
-      </div>
-    );
+  /** Seed the editor: this scope's rows, else the department default, else a stock day. */
+  function reset() {
+    const seed = hasOverride ? scopeTpl.rows : defaultTpl.rows.length ? defaultTpl.rows : DEFAULT_ROWS;
+    setRows(seed.map((r) => ({ ...r })));
+    setMode(gradeTab !== null && !hasOverride ? "inherit" : "custom");
+    const seedDays = hasOverride ? scopeTpl.days : defaultTpl.days;
+    setDays(seedDays.length ? seedDays : WEEKDAYS);
   }
-
-  if (periods.length === 0) {
-    return (
-      <>
-        <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีคาบเวลา" action={actions} />
-        {sheets}
-      </>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {actions}
-
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
-        <table className="w-full min-w-[40rem] table-fixed text-xs">
-          <thead className="bg-muted text-left text-xs text-muted-foreground">
-            <tr>
-              <th className="w-12 px-2 py-2 font-medium">คาบ</th>
-              {days.map((d) => (
-                <th key={d} className="px-2 py-2 font-medium">
-                  {DAY_LABEL[d] ?? d}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: maxPeriodNo }, (_, i) => i + 1).map((periodNo) => (
-              <tr key={periodNo} className="border-t border-border align-top">
-                <td className="px-2 py-2 text-center text-muted-foreground">{periodNo}</td>
-                {days.map((day) => {
-                  const p = periodAt.get(`${day}-${periodNo}`);
-                  if (!p) return <td key={day} className="px-1 py-1" />;
-                  return (
-                    <td key={day} className="px-1 py-1">
-                      <button
-                        type="button"
-                        onClick={() => setEditing(p)}
-                        className={cn(
-                          "tappable w-full rounded px-1.5 py-1.5 text-left",
-                          p.period_type === "teaching" ? "bg-muted hover:bg-muted/70" : "bg-warning/15 hover:bg-warning/25",
-                        )}
-                      >
-                        {p.period_type === "break" && <p className="truncate font-medium text-warning">{p.label}</p>}
-                        <p className="text-[10px] text-muted-foreground">
-                          {p.start_time.slice(0, 5)}–{p.end_time.slice(0, 5)}
-                        </p>
-                      </button>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {sheets}
-    </div>
-  );
-}
-
-function PeriodSheet({
-  mode,
-  period,
-  open,
-  departmentId,
-  gradeLevelId,
-  onClose,
-}: {
-  mode: "create" | "edit";
-  period: PeriodDefinition | null;
-  open: boolean;
-  departmentId: string;
-  gradeLevelId: string | null;
-  onClose: () => void;
-}) {
-  const toast = useToast();
-  const save = useSavePeriodDefinition();
-  const del = useDeletePeriodDefinition();
-
-  const blank = (): PeriodDefinitionDraft => ({
-    department_id: departmentId,
-    grade_level_id: gradeLevelId,
-    day_of_week: 1,
-    period_no: 1,
-    period_type: "teaching",
-    label: "",
-    start_time: "08:30",
-    end_time: "09:20",
-  });
-
-  const [draft, setDraft] = useState<PeriodDefinitionDraft>(blank);
 
   useEffect(() => {
-    if (!open) return;
-    setDraft(
-      period
-        ? {
-            department_id: period.department_id,
-            grade_level_id: period.grade_level_id,
-            day_of_week: period.day_of_week,
-            period_no: period.period_no,
-            period_type: period.period_type,
-            label: period.label,
-            start_time: period.start_time.slice(0, 5),
-            end_time: period.end_time.slice(0, 5),
-          }
-        : blank(),
-    );
+    if (open && !scoped.isLoading && !defaultQuery.isLoading) reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, period]);
+  }, [open, gradeTab, scoped.isLoading, scoped.dataUpdatedAt, defaultQuery.dataUpdatedAt]);
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!draft.label.trim()) return;
-    save.mutate(
-      { id: period?.id, ...draft },
-      {
-        onSuccess: () => {
-          toast("บันทึกสำเร็จ");
-          onClose();
-        },
-      },
+  const teaching = rows.filter((r) => r.type === "teaching");
+  const breaks = rows.filter((r) => r.type === "break");
+  const breakAfter = new Map<number, number>();
+  rows.forEach((r, i) => {
+    if (r.type === "break") breakAfter.set(i, rows.slice(0, i).filter((x) => x.type === "teaching").length);
+  });
+  const sum = (list: DraftRow[]) => list.reduce((t, r) => t + Math.max(0, toMin(r.end) - toMin(r.start)), 0);
+  const first = rows[0];
+  const last = rows[rows.length - 1];
+
+  const error = (() => {
+    if (rows.length === 0) return "ต้องมีอย่างน้อย 1 คาบ";
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i]!;
+      if (toMin(r.end) <= toMin(r.start)) return `คาบที่ ${i + 1}: เวลาสิ้นสุดต้องหลังเวลาเริ่ม`;
+      if (i > 0 && toMin(r.start) < toMin(rows[i - 1]!.end)) return `คาบที่ ${i + 1}: เวลาเริ่มทับซ้อนกับคาบก่อนหน้า`;
+      if (r.type === "break" && !r.label.trim()) return `คาบที่ ${i + 1}: กรุณาตั้งชื่อช่วงพัก`;
+    }
+    return "";
+  })();
+
+  function patch(i: number, change: Partial<DraftRow>) {
+    setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...change } : r)));
+  }
+
+  /** Move every row from index i on by delta minutes. */
+  function shiftFrom(list: DraftRow[], i: number, delta: number) {
+    return list.map((r, idx) =>
+      idx < i ? r : { ...r, start: toHHMM(toMin(r.start) + delta), end: toHHMM(toMin(r.end) + delta) },
     );
   }
 
-  return (
-    <Sheet
-      open={open}
-      onOpenChange={(o) => !o && onClose()}
-      title={mode === "create" ? "เพิ่มคาบเวลา" : "แก้ไขคาบเวลา"}
-      footer={
-        period ? (
-          <Button
-            variant="outline"
-            className="w-full text-destructive"
-            onClick={() => del.mutate(period.id, { onSuccess: onClose })}
-          >
-            ลบคาบเวลา
-          </Button>
-        ) : undefined
+  function appendTeaching() {
+    setRows((prev) => {
+      const lastRow = prev[prev.length - 1];
+      const lastTeaching = [...prev].reverse().find((r) => r.type === "teaching");
+      const minutes = lastTeaching ? toMin(lastTeaching.end) - toMin(lastTeaching.start) : 50;
+      const start = lastRow ? toMin(lastRow.end) : toMin("08:30");
+      return [...prev, { type: "teaching", label: "", start: toHHMM(start), end: toHHMM(start + minutes) }];
+    });
+  }
+
+  function setCount(n: number) {
+    const target = Math.min(12, Math.max(1, n));
+    if (target > teaching.length) {
+      for (let i = teaching.length; i < target; i++) appendTeaching();
+    } else if (target < teaching.length) {
+      let remove = teaching.length - target;
+      setRows((prev) => {
+        const next = [...prev];
+        for (let i = next.length - 1; i >= 0 && remove > 0; i--) {
+          if (next[i]!.type === "teaching") {
+            next.splice(i, 1);
+            remove--;
+          }
+        }
+        return next;
+      });
+    }
+  }
+
+  /** Insert a break right after the n-th teaching period (after any break already there), pushing later rows down. */
+  function insertBreak(afterTeaching: number, minutes: number, label: string) {
+    setRows((prev) => {
+      let seen = 0;
+      let at = 0;
+      for (let i = 0; i < prev.length; i++) {
+        if (prev[i]!.type === "teaching" && ++seen === afterTeaching) {
+          at = i + 1;
+          while (prev[at]?.type === "break") at++;
+          break;
+        }
+        at = i + 1;
       }
-    >
-      <form onSubmit={submit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="วัน">
-            <Select
-              value={draft.day_of_week}
-              onChange={(e) => setDraft({ ...draft, day_of_week: Number(e.target.value) })}
-            >
-              {Object.entries(DAY_LABEL).map(([d, label]) => (
-                <option key={d} value={d}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="คาบที่">
-            <Input
-              type="number"
-              min={1}
-              value={draft.period_no}
-              onChange={(e) => setDraft({ ...draft, period_no: Number(e.target.value) })}
-              required
-            />
-          </Field>
-        </div>
+      const start = at > 0 ? prev[at - 1]!.end : "12:00";
+      const next = shiftFrom(prev, at, minutes);
+      next.splice(at, 0, { type: "break", label, start, end: toHHMM(toMin(start) + minutes) });
+      return next;
+    });
+  }
 
-        <Field label="ประเภท">
-          <Select
-            value={draft.period_type}
-            onChange={(e) => setDraft({ ...draft, period_type: e.target.value as PeriodType })}
-          >
-            {(Object.keys(PERIOD_TYPE_LABEL) as PeriodType[]).map((t) => (
-              <option key={t} value={t}>
-                {PERIOD_TYPE_LABEL[t]}
-              </option>
-            ))}
-          </Select>
-        </Field>
+  function removeBreak(i: number) {
+    setRows((prev) => {
+      const r = prev[i]!;
+      return shiftFrom(prev.filter((_, idx) => idx !== i), i, -(toMin(r.end) - toMin(r.start)));
+    });
+  }
 
-        <Field label="ชื่อคาบ">
-          <Input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} required />
-        </Field>
+  function setBreakMinutes(i: number, minutes: number) {
+    setRows((prev) => {
+      const r = prev[i]!;
+      const delta = Math.max(1, minutes) - (toMin(r.end) - toMin(r.start));
+      return shiftFrom(prev, i, delta).map((row, idx) => (idx === i ? { ...row, start: r.start } : row));
+    });
+  }
 
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="เวลาเริ่ม">
-            <Input
-              type="time"
-              value={draft.start_time}
-              onChange={(e) => setDraft({ ...draft, start_time: e.target.value })}
-              required
-            />
-          </Field>
-          <Field label="เวลาสิ้นสุด">
-            <Input
-              type="time"
-              value={draft.end_time}
-              onChange={(e) => setDraft({ ...draft, end_time: e.target.value })}
-              required
-            />
-          </Field>
-        </div>
+  function moveBreak(i: number, afterTeaching: number) {
+    const r = rows[i]!;
+    const minutes = toMin(r.end) - toMin(r.start);
+    const label = r.label;
+    setRows((prev) => shiftFrom(prev.filter((_, idx) => idx !== i), i, -minutes));
+    insertBreak(afterTeaching, minutes, label);
+  }
 
-        <Button type="submit" className="w-full" disabled={!draft.label.trim() || save.isPending}>
-          {save.isPending ? <Spinner className="h-3 w-3" /> : mode === "create" ? "เพิ่ม" : "บันทึก"}
-        </Button>
-      </form>
-    </Sheet>
-  );
-}
+  function toggleLunch(on: boolean) {
+    if (on) insertBreak(Math.min(4, teaching.length), 60, "พักกลางวัน");
+    else for (let i = rows.length - 1; i >= 0; i--) if (rows[i]!.type === "break") removeBreak(i);
+  }
 
-const DEFAULT_DAYS = [1, 2, 3, 4, 5];
-
-/** Bulk-generate a day's period grid from a few parameters instead of adding rows one at a time. */
-function QuickSetupSheet({
-  open,
-  departmentId,
-  gradeLevelId,
-  onClose,
-}: {
-  open: boolean;
-  departmentId: string;
-  gradeLevelId: string | null;
-  onClose: () => void;
-}) {
-  const toast = useToast();
-  const generate = useGeneratePeriods();
-
-  const [startTime, setStartTime] = useState("08:30");
-  const [periodsPerDay, setPeriodsPerDay] = useState(8);
-  const [minutesPerPeriod, setMinutesPerPeriod] = useState(50);
-  const [days, setDays] = useState<number[]>(DEFAULT_DAYS);
-  const [recess, setRecess] = useState<PeriodBreakConfig>({
-    enabled: false,
-    afterPeriod: 2,
-    minutes: 15,
-    label: "พักเบรก",
-  });
-  const [lunch, setLunch] = useState<PeriodBreakConfig>({
-    enabled: true,
-    afterPeriod: 4,
-    minutes: 60,
-    label: "พักกลางวัน",
-  });
+  function addBreak() {
+    const taken = new Set(breakAfter.values());
+    const slot = Array.from({ length: teaching.length }, (_, k) => k + 1).find((n) => !taken.has(n)) ?? teaching.length;
+    insertBreak(slot, 15, "พักเบรก");
+  }
 
   function toggleDay(d: number) {
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort()));
   }
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (days.length === 0) return;
-    const rows = generatePeriods({
-      startTime,
-      periodsPerDay,
-      minutesPerPeriod,
-      recess,
-      lunch,
-      days,
-    });
-    const dayNames = days.map((d) => DAY_LABEL[d]).join(", ");
-    if (!confirm(`จะลบคาบเดิมของ${gradeLevelId ? "ระดับชั้นนี้" : "ทั้งแผนก"}ในวัน ${dayNames} แล้วสร้างใหม่ ${rows.length} รายการ ยืนยัน?`)) {
-      return;
+  const inheriting = gradeTab !== null && mode === "inherit";
+
+  /** Placed schedule entries this save would strand (block) or retime (notice). Scope = rooms that actually use this table. */
+  const impact = useMemo(() => {
+    const blocked = new Map<string, number>();
+    let retimed = 0;
+    if (inheriting && !hasOverride) return { blocked, retimed };
+    const newRows = inheriting ? defaultTpl.rows : rows;
+    const newDays = inheriting ? defaultTpl.days : days;
+    const oldPeriods = gradeTab && hasOverride ? scopePeriods : (defaultQuery.data ?? []);
+    const slots = (slotsQuery.data ?? [])
+      .filter((sl) => (gradeTab ? sl.grade_level_id === gradeTab : !overrideGrades?.has(sl.grade_level_id)))
+      .sort((a, b) => a.day_of_week - b.day_of_week || a.period_no - b.period_no);
+    for (const sl of slots) {
+      const next = newDays.includes(sl.day_of_week) ? newRows[sl.period_no - 1] : undefined;
+      if (!next || next.type !== "teaching") {
+        const key = `${DAY_LABEL[sl.day_of_week]} คาบ ${sl.period_no}`;
+        blocked.set(key, (blocked.get(key) ?? 0) + 1);
+        continue;
+      }
+      const old = oldPeriods.find((p) => p.day_of_week === sl.day_of_week && p.period_no === sl.period_no);
+      if (old && (old.start_time.slice(0, 5) !== next.start || old.end_time.slice(0, 5) !== next.end)) retimed++;
     }
+    return { blocked, retimed };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slotsQuery.data, overrideGrades, rows, days, mode, gradeTab, hasOverride, scopePeriods, defaultQuery.data, defaultTpl]);
+  const blockedCount = [...impact.blocked.values()].reduce((a, b) => a + b, 0);
+
+  function save() {
+    if (blockedCount > 0) return;
+    if (inheriting && !hasOverride) return onOpenChange(false);
+    if (!inheriting && days.length === 0) return;
+    if (!inheriting && !scopeTpl.uniform && !confirm("แต่ละวันมีเวลาต่างกัน การบันทึกจะใช้ตารางนี้กับทุกวัน ยืนยัน?")) return;
+    // Rows only for the chosen days, but clear every day this scope had before — unticking a day removes it.
+    const clearDays = inheriting ? ALL_DAYS : [...new Set([...days, ...scopeTpl.days])];
+    const newRows = inheriting
+      ? []
+      : days.flatMap((day) =>
+          rows.map((r, i) => ({
+            department_id: departmentId,
+            grade_level_id: gradeTab,
+            day_of_week: day,
+            period_no: i + 1,
+            period_type: r.type,
+            label: r.type === "break" ? r.label.trim() : "",
+            start_time: r.start,
+            end_time: r.end,
+          })),
+        );
     generate.mutate(
-      {
-        departmentId,
-        gradeLevelId,
-        days,
-        rows: rows.map((r) => ({ ...r, department_id: departmentId, grade_level_id: gradeLevelId })),
-      },
+      { departmentId, gradeLevelId: gradeTab, days: clearDays, rows: newRows },
       {
         onSuccess: () => {
-          toast(`สร้างตารางคาบสำเร็จ (${rows.length} รายการ)`);
-          onClose();
+          toast("บันทึกสำเร็จ");
+          onOpenChange(false);
         },
-        onError: (err) => toast(err instanceof Error ? err.message : "สร้างตารางไม่สำเร็จ", "error"),
+        onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
       },
     );
   }
 
+  const editable = mode === "custom";
+  const modes: { key: "custom" | "inherit"; icon: typeof PencilIcon; title: string; hint: string; disabled?: boolean }[] = [
+    { key: "custom", icon: PencilIcon, title: "กำหนดเวลาเอง", hint: "ระบุเวลาเริ่ม - สิ้นสุดของแต่ละคาบ" },
+    {
+      key: "inherit",
+      icon: SettingsIcon,
+      title: "ใช้ค่าของทั้งแผนก",
+      hint: gradeTab === null ? "เลือกได้เฉพาะระดับชั้น" : "ใช้ตารางเวลาเริ่มต้นของแผนก",
+      disabled: gradeTab === null,
+    },
+  ];
+
   return (
     <Sheet
       open={open}
-      onOpenChange={(o) => !o && onClose()}
-      title="ตั้งค่าตารางคาบด่วน"
+      onOpenChange={onOpenChange}
+      title="ตั้งค่าคาบเวลา"
+      description="กำหนดเวลาเริ่ม-สิ้นสุดของแต่ละคาบและช่วงพักในตารางเรียน"
+      wide
       footer={
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             ยกเลิก
           </Button>
-          <Button type="submit" form="quick-setup-periods" className="flex-1" disabled={days.length === 0 || generate.isPending}>
-            {generate.isPending ? <Spinner className="h-3 w-3" /> : "สร้างตาราง"}
+          <Button onClick={save} disabled={(editable && (!!error || days.length === 0)) || blockedCount > 0 || slotsQuery.isLoading || slotsQuery.isError || generate.isPending}>
+            {generate.isPending ? <Spinner className="h-3 w-3" /> : (
+              <>
+                <CheckmarkCircleIcon className="h-3.5 w-3.5" />
+                บันทึกการตั้งค่า
+              </>
+            )}
           </Button>
         </div>
       }
     >
-      <form id="quick-setup-periods" className="space-y-4" onSubmit={submit}>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="เวลาเริ่มคาบแรก">
-            <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} required />
-          </Field>
-          <Field label="จำนวนคาบต่อวัน (ไม่รวมพัก)">
-            <Input
-              type="number"
-              min={1}
-              value={periodsPerDay}
-              onChange={(e) => setPeriodsPerDay(Number(e.target.value))}
-              required
-            />
-          </Field>
-        </div>
-
-        <Field label="นาทีต่อคาบ">
-          <Input
-            type="number"
-            min={1}
-            value={minutesPerPeriod}
-            onChange={(e) => setMinutesPerPeriod(Number(e.target.value))}
-            required
-          />
-        </Field>
-
-        <Field label="วันที่ใช้ตารางนี้">
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(DAY_LABEL).map(([d, label]) => (
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold">ใช้กับ</p>
+          <div className="scrollbar-hidden -mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="tablist">
+            {[{ id: null as string | null, name: "ทั้งแผนก" }, ...gradeLevels].map((g) => (
               <button
-                key={d}
+                key={g.id ?? "default"}
                 type="button"
-                onClick={() => toggleDay(Number(d))}
+                role="tab"
+                aria-selected={gradeTab === g.id}
+                onClick={() => setGradeTab(g.id)}
                 className={cn(
-                  "tappable rounded-full border px-3 py-1 text-xs",
-                  days.includes(Number(d))
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-border text-muted-foreground",
+                  "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs transition-colors",
+                  gradeTab === g.id
+                    ? "border-accent bg-accent/10 font-medium text-accent"
+                    : "border-transparent bg-muted text-muted-foreground hover:text-foreground",
                 )}
               >
-                {label}
+                {g.id === null && <Users className="h-3.5 w-3.5" />}
+                {g.name}
               </button>
             ))}
           </div>
-        </Field>
-
-        <BreakConfigFields title="พักระหว่างเรียน" value={recess} onChange={setRecess} periodsPerDay={periodsPerDay} />
-        <BreakConfigFields title="พักรับประทานอาหารกลางวัน" value={lunch} onChange={setLunch} periodsPerDay={periodsPerDay} />
-      </form>
-    </Sheet>
-  );
-}
-
-function BreakConfigFields({
-  title,
-  value,
-  onChange,
-  periodsPerDay,
-}: {
-  title: string;
-  value: PeriodBreakConfig;
-  onChange: (v: PeriodBreakConfig) => void;
-  periodsPerDay: number;
-}) {
-  return (
-    <div className="space-y-2 rounded-lg border border-border p-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium">{title}</p>
-        <Switch checked={value.enabled} onChange={(enabled) => onChange({ ...value, enabled })} size="sm" />
-      </div>
-      {value.enabled && (
-        <div className="grid grid-cols-3 gap-2">
-          <Field label="หลังคาบที่">
-            <Select
-              value={value.afterPeriod}
-              onChange={(e) => onChange({ ...value, afterPeriod: Number(e.target.value) })}
-            >
-              {Array.from({ length: periodsPerDay }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="นาที">
-            <Input
-              type="number"
-              min={1}
-              value={value.minutes}
-              onChange={(e) => onChange({ ...value, minutes: Number(e.target.value) })}
-            />
-          </Field>
-          <Field label="ชื่อ">
-            <Input value={value.label} onChange={(e) => onChange({ ...value, label: e.target.value })} />
-          </Field>
         </div>
-      )}
-    </div>
+
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">รูปแบบการตั้งค่า</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {modes.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                disabled={m.disabled}
+                onClick={() => setMode(m.key)}
+                className={cn(
+                  "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                  mode === m.key ? "border-accent bg-accent/5" : "border-border hover:bg-muted/50",
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+                    mode === m.key ? "border-accent" : "border-muted-foreground/40",
+                  )}
+                >
+                  {mode === m.key && <span className="h-2 w-2 rounded-full bg-accent" />}
+                </span>
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 text-sm font-medium">
+                    <m.icon className="h-3.5 w-3.5" />
+                    {m.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{m.hint}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {editable && (
+          <div className="space-y-1.5">
+            <p className="text-sm font-semibold">วันที่ใช้ตารางนี้</p>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(DAY_LABEL).map(([d, label]) => (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={days.includes(Number(d))}
+                  onClick={() => toggleDay(Number(d))}
+                  className={cn(
+                    "rounded-full border px-3.5 py-1.5 text-xs transition-colors",
+                    days.includes(Number(d))
+                      ? "border-accent bg-accent/10 font-medium text-accent"
+                      : "border-border text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {days.length === 0 && <p className="text-xs text-destructive">เลือกอย่างน้อย 1 วัน</p>}
+          </div>
+        )}
+
+        <div className="flex items-start gap-2 rounded-xl bg-accent/10 px-3 py-2.5 text-xs text-muted-foreground">
+          <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
+          <p>
+            {editable
+              ? `ตารางนี้จะใช้กับวันที่เลือกและมีผลกับตารางเรียนของ${gradeTab ? "ระดับชั้นที่เลือก" : "ทั้งแผนก"}`
+              : "ระดับชั้นนี้จะใช้ตารางเวลาของทั้งแผนก — บันทึกเพื่อลบตารางเฉพาะระดับชั้นที่เคยตั้งไว้"}
+          </p>
+        </div>
+
+        {blockedCount > 0 && (
+          <div className="space-y-1 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
+            <p className="font-medium">
+              บันทึกไม่ได้ — มี {blockedCount} รายการในตารางสอนที่จะอยู่ในคาบที่ไม่ใช่คาบสอน
+            </p>
+            <p>{[...impact.blocked].map(([k, n]) => `${k} (${n})`).join(", ")}</p>
+            <p className="text-destructive/80">ย้ายหรือลบรายการเหล่านี้ในตารางเรียนก่อน แล้วกลับมาบันทึกอีกครั้ง</p>
+          </div>
+        )}
+        {blockedCount === 0 && impact.retimed > 0 && (
+          <p className="flex items-start gap-2 rounded-xl bg-warning/15 px-3 py-2 text-xs text-warning">
+            <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            มี {impact.retimed} รายการในตารางสอนที่เวลาจะเปลี่ยน
+          </p>
+        )}
+
+        {slotsQuery.isError && (
+          <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            ตรวจสอบตารางสอนที่จัดไว้ไม่ได้ จึงบันทึกไม่ได้ในตอนนี้ ลองเปิดใหม่อีกครั้ง
+          </p>
+        )}
+        {editable && scoped.isLoading && (
+          <div className="space-y-1.5" role="status" aria-label="กำลังโหลด">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        )}
+
+        {editable && !scoped.isLoading && (
+          <>
+            {!scopeTpl.uniform && (
+              <p className="rounded-xl bg-warning/15 px-3 py-2 text-xs text-warning">
+                แต่ละวันมีเวลาต่างกัน — ตารางด้านล่างเป็นของวัน{DAY_LABEL[scopeTpl.days[0]!]} การบันทึกจะใช้กับทุกวัน
+              </p>
+            )}
+
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div className="space-y-1.5">
+                <p className="text-sm font-semibold">จำนวนคาบเรียน</p>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="icon" aria-label="ลดจำนวนคาบ" onClick={() => setCount(teaching.length - 1)} disabled={teaching.length <= 1}>
+                    −
+                  </Button>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={12}
+                    className="h-9 w-16 text-center"
+                    value={teaching.length}
+                    onChange={(e) => setCount(Number(e.target.value))}
+                    aria-label="จำนวนคาบเรียน"
+                  />
+                  <Button variant="outline" size="icon" aria-label="เพิ่มจำนวนคาบ" onClick={() => setCount(teaching.length + 1)} disabled={teaching.length >= 12}>
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                  <span className="text-[11px] text-muted-foreground">รองรับได้ตั้งแต่ 1 - 12 คาบ</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-sm font-semibold">ช่วงพัก</p>
+                <div className="flex items-center gap-3">
+                  <Switch checked={breaks.length > 0} onChange={toggleLunch} />
+                  <span className="text-xs text-muted-foreground">เปิดใช้งานช่วงพักกลางวัน</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-expanded={breaksOpen}
+                    onClick={() => setBreaksOpen((v) => !v)}
+                  >
+                    <SettingsIcon className="h-3.5 w-3.5" />
+                    ตั้งค่าขั้นสูง
+                    <ChevronForward className={cn("h-3 w-3 transition-transform", breaksOpen ? "rotate-90" : "")} />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {breaksOpen && (
+              <div className="space-y-2 rounded-xl border border-border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">ช่วงพักทั้งหมด</p>
+                  <Button size="sm" variant="outline" onClick={addBreak} disabled={teaching.length === 0}>
+                    <Plus className="h-3.5 w-3.5" />
+                    เพิ่มช่วงพัก
+                  </Button>
+                </div>
+                {breaks.length === 0 && <p className="py-2 text-xs text-muted-foreground">ยังไม่มีช่วงพัก</p>}
+                {[...breakAfter.keys()].map((i) => {
+                  const r = rows[i]!;
+                  return (
+                    <div key={i} className="grid grid-cols-[minmax(0,1fr)_5.5rem_5rem_auto] items-end gap-2">
+                      <Field label="ชื่อ">
+                        <Input value={r.label} onChange={(e) => patch(i, { label: e.target.value })} />
+                      </Field>
+                      <Field label="หลังคาบที่">
+                        <Select value={breakAfter.get(i)} onChange={(e) => moveBreak(i, Number(e.target.value))}>
+                          {Array.from({ length: teaching.length }, (_, k) => k + 1).map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                      <Field label="นาที">
+                        <Input
+                          type="number"
+                          min={1}
+                          value={toMin(r.end) - toMin(r.start)}
+                          onChange={(e) => setBreakMinutes(i, Number(e.target.value) || 1)}
+                        />
+                      </Field>
+                      <Button variant="ghost" size="icon" aria-label="ลบช่วงพัก" onClick={() => removeBreak(i)}>
+                        <TrashIcon className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="overflow-x-auto rounded-xl border border-border bg-card">
+              <table className="w-full min-w-[38rem] border-collapse text-xs">
+                <thead className="bg-muted text-muted-foreground">
+                  <tr>
+                    <th className="w-12 px-2 py-2.5 text-center font-medium">คาบ</th>
+                    <th className="px-2 py-2.5 text-left font-medium">ประเภท</th>
+                    <th className="px-2 py-2.5 text-left font-medium">เวลาเริ่ม</th>
+                    <th className="px-2 py-2.5 text-left font-medium">เวลาสิ้นสุด</th>
+                    <th className="px-2 py-2.5 text-center font-medium">ระยะเวลา</th>
+                    <th className="w-14 px-2 py-2.5 text-center font-medium">ลบ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => {
+                    const isBreak = r.type === "break";
+                    return (
+                      <tr key={i} className={cn("border-t border-border", isBreak && "bg-warning/10")}>
+                        <td className="px-2 py-2 text-center text-sm font-semibold">{i + 1}</td>
+                        <td className="px-2 py-2">
+                          <div className="flex items-center gap-2">
+                            {isBreak ? (
+                              <RestaurantIcon className="h-4 w-4 shrink-0 text-warning" />
+                            ) : (
+                              <GraduationCap className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            )}
+                            {isBreak ? (
+                              <Input
+                                className="h-8 min-w-[6rem]"
+                                value={r.label}
+                                onChange={(e) => patch(i, { label: e.target.value })}
+                                aria-label="ชื่อช่วงพัก"
+                              />
+                            ) : (
+                              <span>คาบเรียน</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-2 py-2">
+                          <Input type="time" className="h-8" value={r.start} onChange={(e) => patch(i, { start: e.target.value })} aria-label={`เวลาเริ่มคาบ ${i + 1}`} />
+                        </td>
+                        <td className="px-2 py-2">
+                          <Input type="time" className="h-8" value={r.end} onChange={(e) => patch(i, { end: e.target.value })} aria-label={`เวลาสิ้นสุดคาบ ${i + 1}`} />
+                        </td>
+                        <td className={cn("px-2 py-2 text-center", isBreak && "text-warning")}>
+                          {formatDuration(toMin(r.end) - toMin(r.start))}
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`ลบคาบ ${i + 1}`}
+                            onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}
+                          >
+                            <TrashIcon className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {error && <p className="text-xs text-destructive">{error}</p>}
+
+
+            <div className="flex flex-wrap justify-between gap-2">
+              <Button variant="outline" size="sm" onClick={appendTeaching} disabled={teaching.length >= 12}>
+                <Plus className="h-3.5 w-3.5" />
+                เพิ่มคาบเรียน
+              </Button>
+              <Button variant="outline" size="sm" onClick={reset}>
+                รีเซ็ตเป็นค่าเริ่มต้น
+              </Button>
+            </div>
+
+            <div className="space-y-2 rounded-xl border border-success/30 bg-success/10 p-3">
+              <p className="flex items-center gap-2 text-sm font-semibold text-success">
+                <CheckmarkCircleIcon className="h-4 w-4" />
+                สรุปเวลาเรียน
+              </p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <StatChip
+                  icon={GraduationCap}
+                  tint="bg-sky-100 text-sky-600 dark:bg-sky-500/20"
+                  value={formatDuration(sum(teaching))}
+                  label={`เวลาเรียนรวม · ${teaching.length} คาบเรียน (ไม่รวมพัก)`}
+                />
+                <StatChip
+                  icon={RestaurantIcon}
+                  tint="bg-orange-100 text-orange-600 dark:bg-orange-500/20"
+                  value={formatDuration(sum(breaks))}
+                  label={`เวลาพักรวม · ${breaks.length} ช่วงพัก`}
+                />
+                <StatChip
+                  icon={TimeIcon}
+                  tint="bg-violet-100 text-violet-600 dark:bg-violet-500/20"
+                  value={first && last ? formatDuration(toMin(last.end) - toMin(first.start)) : "—"}
+                  label={first && last ? `เวลาทั้งหมดต่อวัน · ${first.start} - ${last.end}` : "เวลาทั้งหมดต่อวัน"}
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+    </Sheet>
   );
 }
 
