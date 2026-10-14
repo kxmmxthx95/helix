@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-14T00:00:00Z",
+  "title": "Design System: Helix",
+  "extensions": {
+    "colorMeta": {
+      "signal-blue": { "role": "secondary", "displayName": "Signal Blue", "canonical": "hsl(212 100% 52%)", "tonalRamp": ["#001a40", "#003580", "#0050bf", "#0a7cff", "#4d9fff", "#80bbff", "#b3d7ff", "#e6f1ff"] },
+      "ink-night": { "role": "neutral", "displayName": "Ink Night", "canonical": "hsl(0 0% 8%)" },
+      "ink-card": { "role": "neutral", "displayName": "Ink Card", "canonical": "hsl(0 0% 4%)" },
+      "ink-raised": { "role": "neutral", "displayName": "Ink Raised", "canonical": "hsl(0 0% 10%)" },
+      "hairline-night": { "role": "neutral", "displayName": "Hairline Night", "canonical": "hsl(0 0% 16%)" },
+      "paper-text": { "role": "primary", "displayName": "Paper Text", "canonical": "hsl(0 0% 93%)" },
+      "paper-muted": { "role": "neutral", "displayName": "Paper Muted", "canonical": "hsl(0 0% 63%)" },
+      "alarm-red": { "role": "status", "displayName": "Alarm Red", "canonical": "hsl(0 91% 55%)" },
+      "ok-green": { "role": "status", "displayName": "Ok Green", "canonical": "hsl(130 45% 52%)" },
+      "caution-amber": { "role": "status", "displayName": "Caution Amber", "canonical": "hsl(38 91% 60%)" },
+      "game-pink": { "role": "game", "displayName": "Game Pink", "canonical": "hsl(330 85% 55%)" }
+    },
+    "typographyMeta": {
+      "heading": { "displayName": "Heading", "purpose": "Section and empty-state titles." },
+      "body": { "displayName": "Body", "purpose": "Descriptions and table text." },
+      "label": { "displayName": "Label", "purpose": "Buttons, fields, sidebar items." },
+      "caption": { "displayName": "Caption", "purpose": "Role subtitles and compact buttons." }
+    },
+    "shadows": [
+      { "name": "float-glass", "value": "0 10px 40px rgb(0 0 0 / 0.45), inset 0 1px 0 rgb(255 255 255 / 0.12)", "purpose": "Floating frosted chrome." },
+      { "name": "drawer", "value": "0 20px 50px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.3)", "purpose": "Side drawers with solid card fill." },
+      { "name": "glass-panel", "value": "0 8px 32px rgb(0 0 0 / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.22)", "purpose": "Login and focal overlays." },
+      { "name": "game-press", "value": "0 3px 0 hsl(var(--border))", "purpose": "Student portal cards only." }
+    ],
+    "motion": [
+      { "name": "press", "value": "transform 100ms, scale 0.95 on :active", "purpose": "Every tappable surface sinks under the finger." },
+      { "name": "fade-in", "value": "200ms ease-out", "purpose": "Content entering." },
+      { "name": "shimmer", "value": "1.5s ease-in-out infinite", "purpose": "Skeleton loading." }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Default filled action; light on dark.",
+      "html": "<button class=\"ds-btn\">บันทึก</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 10px;border:0;border-radius:8px;background:#ededed;color:#0a0a0a;font:500 12px 'Sukhumvit Set',Prompt,'Noto Sans Thai',system-ui,sans-serif;cursor:pointer;transition:opacity .15s,transform .1s}.ds-btn:hover{opacity:.9}.ds-btn:active{transform:scale(.95)}.ds-btn:focus-visible{outline:2px solid #0a7cff;outline-offset:2px}"
+    },
+    {
+      "name": "Accent Button",
+      "kind": "button",
+      "refersTo": "button-accent",
+      "description": "The single main action of a screen.",
+      "html": "<button class=\"ds-btn-accent\">ยืนยัน</button>",
+      "css": ".ds-btn-accent{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 10px;border:0;border-radius:8px;background:#0a7cff;color:#fff;font:500 12px 'Sukhumvit Set',Prompt,'Noto Sans Thai',system-ui,sans-serif;cursor:pointer;transition:opacity .15s,transform .1s}.ds-btn-accent:hover{opacity:.9}.ds-btn-accent:active{transform:scale(.95)}.ds-btn-accent:focus-visible{outline:2px solid #0a7cff;outline-offset:2px}"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action.",
+      "html": "<button class=\"ds-btn-outline\">ยกเลิก</button>",
+      "css": ".ds-btn-outline{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 10px;border:1px solid #292929;border-radius:8px;background:transparent;color:#ededed;font:500 12px 'Sukhumvit Set',Prompt,'Noto Sans Thai',system-ui,sans-serif;cursor:pointer;transition:background .15s,transform .1s}.ds-btn-outline:hover{background:#1a1a1a}.ds-btn-outline:active{transform:scale(.95)}.ds-btn-outline:focus-visible{outline:2px solid #0a7cff;outline-offset:2px}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "32px field with hairline; border turns blue on focus.",
+      "html": "<input class=\"ds-input\" placeholder=\"ค้นหา\" />",
+      "css": ".ds-input{height:32px;width:220px;padding:0 10px;border:1px solid #292929;border-radius:8px;background:#141414;color:#ededed;font:500 12px 'Sukhumvit Set',Prompt,'Noto Sans Thai',system-ui,sans-serif;outline:none;transition:border-color .15s}.ds-input::placeholder{color:#a1a1a1}.ds-input:focus-visible{border-color:#0a7cff}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Glass-filled container with hairline.",
+      "html": "<div class=\"ds-card\"><strong>ภาพรวมวันนี้</strong><p>มาเรียน 482 คน</p></div>",
+      "css": ".ds-card{padding:16px;border:1px solid #292929;border-radius:12px;background:rgb(10 10 10 / .72);color:#ededed;font:400 13px/1.4 Inter,Sarabun,system-ui,sans-serif;backdrop-filter:blur(16px) saturate(180%)}.ds-card strong{font-weight:700;font-size:15px;letter-spacing:-.01em}.ds-card p{margin:4px 0 0;color:#a1a1a1}"
+    },
+    {
+      "name": "Empty State",
+      "kind": "custom",
+      "description": "Centered icon tile, title, muted description.",
+      "html": "<div class=\"ds-empty\"><div class=\"ds-empty-icon\">∅</div><div class=\"ds-empty-title\">ยังไม่มีข้อมูล</div><div class=\"ds-empty-desc\">เพิ่มรายการแรกเพื่อเริ่มต้นใช้งาน</div></div>",
+      "css": ".ds-empty{display:flex;flex-direction:column;align-items:center;padding:32px 0;text-align:center;color:#ededed;font-family:Inter,'Noto Sans Thai',system-ui,sans-serif}.ds-empty-icon{display:flex;align-items:center;justify-content:center;width:44px;height:44px;margin-bottom:16px;border:1px solid #292929;border-radius:12px;background:#0a0a0a}.ds-empty-title{font-size:15px;font-weight:700;letter-spacing:-.01em}.ds-empty-desc{margin-top:4px;max-width:20rem;font-size:13px;line-height:1.4;color:#a1a1a1}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Night Registry",
+    "overview": "Helix back-office reads like a registry kept after hours: dark, exact, and unhurried. Every surface is built so a routine task finishes before attention drifts. The shell is off-black, content sits on near-black cards separated by 1px hairlines, and a single electric blue marks what can be acted on.",
+    "keyCharacteristics": [
+      "Off-black shell (#141414), near-black cards (#0a0a0a), 1px hairlines. No pure #000 shell.",
+      "One accent: signal blue (#0a7cff dark / #0072f5 light). Everything else is neutral.",
+      "Glass only on floating chrome: cards on glass, bottom nav, sheets, drawers.",
+      "Thai-first type stack with correct line height for vowel and tone marks.",
+      "Press feedback everywhere: tappable surfaces scale to 95% on active.",
+      "Light theme exists and mirrors the dark tokens; dark is the default for staff."
+    ],
+    "rules": [
+      { "name": "The One Blue Rule", "body": "Blue is the only accent in staff screens. If a second hue is needed for meaning, it is a status color, never decoration.", "section": "colors" },
+      { "name": "The Subject Hue Exception", "body": "Subject chips and timetable cards use a per-learning-area hue with three grade shades. This is a data encoding, not a palette; it stays out of chrome.", "section": "colors" },
+      { "name": "The 16px Input Rule", "body": "Inputs are 16px on phones to stop iOS zoom, and drop to 14px at 768px and above.", "section": "typography" },
+      { "name": "The Thai Leading Rule", "body": "Never set line-height below 1.25 on Thai text; tone marks and upper vowels clip.", "section": "typography" },
+      { "name": "The Float-Only Rule", "body": "Blur and heavy shadow mark things above the page. Tables, lists, and in-page panels do not get them.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep staff screens dark by default with the off-black shell (#141414), never pure #000.",
+      "Do use signal blue for focus and the single main action only.",
+      "Do put glass on floating chrome only.",
+      "Do keep Thai text at line-height 1.25 or more.",
+      "Do keep tappable surfaces pressable with the 95% scale response.",
+      "Do keep the student portal a separate `.theme-game` skin."
+    ],
+    "donts": [
+      "Don't put gradient text or decorative gradients on staff chrome.",
+      "Don't add a second accent hue to the back-office.",
+      "Don't apply blur or heavy shadow to tables and in-page panels.",
+      "Don't shrink 16px mobile inputs below 16px.",
+      "Don't reuse the game skin's pink, thick borders, or press shadow in staff screens.",
+      "Don't use the Overcooked-style hard-shadow comic look; it was tried and discarded for the student portal."
+    ]
+  }
+}
