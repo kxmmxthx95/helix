@@ -33,7 +33,7 @@ import {
   type KgAssessmentTopicDraft,
   type LearningUnitDraft,
 } from "@/hooks/useCurriculumStructure";
-import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
+import { useActiveAcademicYear, useCurrentTerm } from "@/hooks/useAcademicTerms";
 import type {
   CurriculumSubject,
   DevelopmentDomain,
@@ -554,7 +554,9 @@ function SubjectPanel({
   mayEdit: boolean;
 }) {
   const splitsByTerm = departmentCode === "SEC";
-  const [term, setTerm] = useState<1 | 2>(1);
+  const { data: currentTerm } = useCurrentTerm(departmentId || null);
+  const [pickedTerm, setTerm] = useState<1 | 2 | null>(null);
+  const term = pickedTerm ?? currentTerm?.term ?? 1;
   const [adding, setAdding] = useState(false);
   const [copying, setCopying] = useState(false);
   const [renaming, setRenaming] = useState(false);

@@ -89,7 +89,7 @@ function PeriodCheckInPanel({
   const { data: departments = [] } = useDepartments();
   const department = departments.find((d) => d.id === departmentId);
   const splitsByTerm = department?.code === "SEC";
-  const { data: activeYear } = useActiveAcademicYear(departmentId || null);
+  const { data: activeYear } = useActiveAcademicYear(departmentId || null, { includeUpcoming: false });
   const academicYear = activeYear ?? currentAcademicYear();
   const { data: activeTerm } = useActiveTerm(departmentId || null);
   const term: 1 | 2 = activeTerm?.term_type === "term2" ? 2 : 1;

@@ -24,7 +24,7 @@ import {
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, EmptyState, Field, Input, Select, Skeleton, Spinner, Switch, Avatar } from "@/components/ui";
-import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
+import { useActiveAcademicYear, useCurrentTerm } from "@/hooks/useAcademicTerms";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useMyClassroom } from "@/hooks/useAttendance";
 import {
@@ -80,11 +80,13 @@ export function Timetable() {
   const isStudent = me ? isSelfScoped(me.roles) : false;
 
   const [pickedDept, setPickedDept] = useState("");
-  const [term, setTerm] = useState<1 | 2>(1);
   const [view, setView] = useState<View | "">("");
   const [periodSettingsOpen, setPeriodSettingsOpen] = useState(false);
 
   const departmentId = orgWide ? pickedDept : (me?.department_id ?? "");
+  const { data: currentTerm } = useCurrentTerm(departmentId || null);
+  const [pickedTerm, setTerm] = useState<1 | 2 | null>(null);
+  const term = pickedTerm ?? currentTerm?.term ?? 1;
   const department = departments.find((d) => d.id === departmentId);
   const splitsByTerm = department?.code === "SEC";
 

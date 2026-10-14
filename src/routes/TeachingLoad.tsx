@@ -22,7 +22,7 @@ import {
   Spinner,
 } from "@/components/ui";
 import { avatarUrl } from "@/hooks/useAvatar";
-import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
+import { useActiveAcademicYear, useCurrentTerm } from "@/hooks/useAcademicTerms";
 import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
 import {
   useCurriculumSubjectsAtGrade,
@@ -65,10 +65,12 @@ export function TeachingLoad() {
   const mayEdit = me ? canManage(me.roles) : false;
 
   const [pickedDept, setPickedDept] = useState("");
-  const [term, setTerm] = useState<1 | 2>(1);
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
 
   const departmentId = orgWide ? pickedDept : (me?.department_id ?? "");
+  const { data: currentTerm } = useCurrentTerm(departmentId || null);
+  const [pickedTerm, setTerm] = useState<1 | 2 | null>(null);
+  const term = pickedTerm ?? currentTerm?.term ?? 1;
   const department = departments.find((d) => d.id === departmentId);
   const splitsByTerm = department?.code === "SEC";
 

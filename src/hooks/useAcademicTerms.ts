@@ -6,43 +6,64 @@ import { supabase } from "@/lib/supabase";
 // Per department — status='locked'/'archived' freezes writes on
 // teaching_assignments/student_classroom_enrollments (see migration 0018).
 
+const termsQuery = (departmentId: string | null) => ({
+  queryKey: ["academic_terms", departmentId] as const,
+  enabled: !!departmentId,
+  queryFn: async (): Promise<AcademicTerm[]> => {
+    const { data, error } = await supabase
+      .from("academic_terms")
+      .select("*")
+      .eq("department_id", departmentId!)
+      .order("academic_year", { ascending: false })
+      .order("term_type");
+    if (error) throw error;
+    return data;
+  },
+});
+
 export function useAcademicTerms(departmentId: string | null) {
+  return useQuery(termsQuery(departmentId));
+}
+
+export type CurrentTerm = { academicYear: number; term: 1 | 2 };
+
+const TERM_ORDER: Record<AcademicTerm["term_type"], number> = { term1: 1, term2: 2, summer: 3 };
+const byTime = (a: AcademicTerm, b: AcademicTerm) =>
+  a.academic_year - b.academic_year || TERM_ORDER[a.term_type] - TERM_ORDER[b.term_type];
+
+/**
+ * The term a page should open on: the active one, else the nearest upcoming,
+ * else (so there is still something real to show) the most recent term of any
+ * status. `includeUpcoming: false` keeps only the active term — for daily work
+ * like attendance that must not jump ahead. Summer counts as ภาคเรียน 2.
+ */
+function pickCurrentTerm(terms: AcademicTerm[], includeUpcoming: boolean): CurrentTerm | null {
+  const sorted = [...terms].sort(byTime);
+  const row =
+    sorted.find((t) => t.status === "active") ??
+    (includeUpcoming ? (sorted.find((t) => t.status === "upcoming") ?? sorted[sorted.length - 1]) : undefined);
+  return row ? { academicYear: row.academic_year, term: row.term_type === "term1" ? 1 : 2 } : null;
+}
+
+export function useCurrentTerm(departmentId: string | null, opts?: { includeUpcoming?: boolean }) {
+  const includeUpcoming = opts?.includeUpcoming ?? true;
   return useQuery({
-    queryKey: ["academic_terms", departmentId],
-    enabled: !!departmentId,
-    queryFn: async (): Promise<AcademicTerm[]> => {
-      const { data, error } = await supabase
-        .from("academic_terms")
-        .select("*")
-        .eq("department_id", departmentId!)
-        .order("academic_year", { ascending: false })
-        .order("term_type");
-      if (error) throw error;
-      return data;
-    },
+    ...termsQuery(departmentId),
+    select: (terms) => pickCurrentTerm(terms, includeUpcoming),
   });
 }
 
 /**
- * The department's current academic year, derived from its ACTIVE term
- * (at most one, enforced by academic_terms_one_active — see 0018). Falls
- * back to the calendar year while no term has been marked active yet
- * (e.g. right after the department is created).
+ * The department's current academic year — see pickCurrentTerm for how the
+ * term is chosen. Falls back to the calendar year while the department has no
+ * terms at all (e.g. right after it is created).
  */
-export function useActiveAcademicYear(departmentId: string | null) {
+export function useActiveAcademicYear(departmentId: string | null, opts?: { includeUpcoming?: boolean }) {
+  const includeUpcoming = opts?.includeUpcoming ?? true;
   return useQuery({
-    queryKey: ["academic_terms", "active_year", departmentId],
-    enabled: !!departmentId,
-    queryFn: async (): Promise<number> => {
-      const { data, error } = await supabase
-        .from("academic_terms")
-        .select("academic_year")
-        .eq("department_id", departmentId!)
-        .eq("status", "active")
-        .maybeSingle();
-      if (error) throw error;
-      return data?.academic_year ?? new Date().getFullYear() + 543;
-    },
+    ...termsQuery(departmentId),
+    select: (terms): number =>
+      pickCurrentTerm(terms, includeUpcoming)?.academicYear ?? new Date().getFullYear() + 543,
   });
 }
 
