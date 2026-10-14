@@ -9,6 +9,7 @@ import {
   X,
 } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
+import { useToast } from "@/components/Toast";
 import {
   Avatar,
   Button,
@@ -40,6 +41,7 @@ import {
   useDepartmentTeachingAssignments,
   useLinkAssignmentGroup,
   useUnlinkAssignmentGroup,
+  useUpdateTeachingAssignmentPeriods,
 } from "@/hooks/useTeachingLoad";
 import { profileFullName, type TeachingAssignment } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
@@ -617,7 +619,29 @@ function AssignmentRow({
   const { data: classrooms = [] } = useClassroomsByDepartment(departmentId);
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
   const unlink = useUnlinkAssignmentGroup();
+  const updatePeriods = useUpdateTeachingAssignmentPeriods();
+  const toast = useToast();
   const [linking, setLinking] = useState(false);
+  const [periodsDraft, setPeriodsDraft] = useState(String(assignment.periods_per_week));
+
+  useEffect(() => setPeriodsDraft(String(assignment.periods_per_week)), [assignment.periods_per_week]);
+
+  function commitPeriods() {
+    const n = Number(periodsDraft);
+    if (!Number.isInteger(n) || n < 0 || n === assignment.periods_per_week) {
+      setPeriodsDraft(String(assignment.periods_per_week));
+      return;
+    }
+    updatePeriods.mutate(
+      { id: assignment.id, periods_per_week: n },
+      {
+        onError: (err) => {
+          setPeriodsDraft(String(assignment.periods_per_week));
+          toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error");
+        },
+      },
+    );
+  }
 
   const subject = subjects.find((s) => s.id === assignment.subject_id);
   const classroom = classrooms.find((c) => c.id === assignment.classroom_id);
@@ -659,7 +683,23 @@ function AssignmentRow({
       <td className="px-3 py-2.5">
         {classroom ? `${gradeLabel ?? "—"}/${classroom.name}` : "—"}
       </td>
-      <td className="px-3 py-2.5 text-center">{assignment.periods_per_week}</td>
+      <td className="px-3 py-2.5 text-center">
+        {mayEdit ? (
+          <Input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            className="mx-auto h-8 w-16 text-center"
+            value={periodsDraft}
+            onChange={(e) => setPeriodsDraft(e.target.value)}
+            onBlur={commitPeriods}
+            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+            aria-label="คาบ/สัปดาห์"
+          />
+        ) : (
+          assignment.periods_per_week
+        )}
+      </td>
       {mayEdit && (
         <td className="px-3 py-2.5">
           <div className="flex shrink-0 items-center justify-end gap-1.5">

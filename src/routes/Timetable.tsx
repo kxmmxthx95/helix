@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { ChevronBack, ChevronForward, Plus, SettingsIcon, TimetableIcon, X } from "@/components/icons";
+import {
+  CalendarIcon,
+  ChevronBack,
+  ChevronForward,
+  GraduationCap,
+  Plus,
+  RestaurantIcon,
+  Search,
+  SettingsIcon,
+  TimeIcon,
+  TimetableIcon,
+  X,
+} from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, EmptyState, Field, Input, Select, Skeleton, Spinner, Switch, Avatar } from "@/components/ui";
@@ -15,7 +27,7 @@ import {
   useSavePeriodDefinition,
   type PeriodDefinitionDraft,
 } from "@/hooks/usePeriodDefinitions";
-import { useSubjects } from "@/hooks/useCurriculum";
+import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments, useProfiles, type ProfileRow } from "@/hooks/useProfiles";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
@@ -62,7 +74,6 @@ export function Timetable() {
   const [term, setTerm] = useState<1 | 2>(1);
   const [view, setView] = useState<View | "">("");
   const [classroomId, setClassroomId] = useState("");
-  const [teacherId, setTeacherId] = useState("");
   const [periodSettingsOpen, setPeriodSettingsOpen] = useState(false);
 
   const departmentId = orgWide ? pickedDept : (me?.department_id ?? "");
@@ -83,7 +94,6 @@ export function Timetable() {
   useEffect(() => {
     if (isStudent) return;
     setClassroomId("");
-    setTeacherId("");
   }, [departmentId, isStudent]);
 
   if (!me) return null;
@@ -135,7 +145,6 @@ export function Timetable() {
           onChange={(e) => {
             setView(e.target.value as View);
             setClassroomId("");
-            setTeacherId("");
           }}
           aria-label="เลือกตาราง"
           placeholder="เลือกตาราง"
@@ -236,31 +245,17 @@ export function Timetable() {
               />
             ))}
 
-          {view === "teacher" &&
-            (teacherId ? (
-              <TeacherTimetable
-                departmentId={departmentId}
-                teacherId={teacherId}
-                academicYear={academicYear}
-                term={scheduleTerm}
-                mayEdit={mayEdit}
-                classrooms={classrooms}
-                gradeLevels={gradeLevels}
-                teachers={teachers}
-                onBack={() => setTeacherId("")}
-              />
-            ) : (
-              <ScheduleList
-                items={teachers.map((t) => ({
-                  id: t.id,
-                  prefix: t.prefix,
-                  firstName: t.first_name,
-                  lastName: t.last_name,
-                  avatarSrc: avatarUrl(t),
-                }))}
-                onSelect={setTeacherId}
-              />
-            ))}
+          {view === "teacher" && (
+            <TeacherWorkspace
+              departmentId={departmentId}
+              academicYear={academicYear}
+              term={scheduleTerm}
+              mayEdit={mayEdit}
+              classrooms={classrooms}
+              gradeLevels={gradeLevels}
+              teachers={teachers}
+            />
+          )}
         </>
       )}
     </div>
@@ -332,6 +327,7 @@ function ClassroomTimetable({
         mayEdit={mayEdit}
         isLoading={loadingDefaultPeriods || loadingGradePeriods || loadingEntries}
         subjectLabel={(id) => subjects.find((s) => s.id === id)?.code ?? "—"}
+        subjectName={(id) => subjects.find((s) => s.id === id)?.name_th ?? ""}
         teacherLabel={(id) => {
           const t = teachers.find((x) => x.id === id);
           return t ? profileFullName(t) : "—";
@@ -346,6 +342,273 @@ function ClassroomTimetable({
   );
 }
 
+type TeacherTab = "week" | "subjects" | "hours";
+const TEACHER_TABS: [TeacherTab, string][] = [
+  ["week", "ตารางสอนรายสัปดาห์"],
+  ["subjects", "รายวิชาที่สอน"],
+  ["hours", "สรุปชั่วโมง"],
+];
+
+/** Master-detail: teacher list on the left, the picked teacher's schedule on the right. */
+function TeacherWorkspace({
+  departmentId,
+  academicYear,
+  term,
+  mayEdit,
+  classrooms,
+  gradeLevels,
+  teachers,
+}: {
+  departmentId: string;
+  academicYear: number;
+  term: number | null;
+  mayEdit: boolean;
+  classrooms: Classroom[];
+  gradeLevels: GradeLevel[];
+  teachers: ProfileRow[];
+}) {
+  const [search, setSearch] = useState("");
+  const [pickedId, setPickedId] = useState("");
+  const [tab, setTab] = useState<TeacherTab>("week");
+
+  const { data: assignments = [] } = useDepartmentTeachingAssignments(departmentId, academicYear, term);
+  const { data: learningAreas = [] } = useLearningAreas();
+  const { data: subjects = [] } = useSubjects({
+    search: "",
+    departmentId,
+    learningAreaId: "",
+    gradeLevelId: "",
+    term: "",
+    subjectType: "",
+    includeInactive: true,
+  });
+
+  const subjectById = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
+  const areaById = useMemo(() => new Map(learningAreas.map((a) => [a.id, a])), [learningAreas]);
+  const classroomLabel = (id: string) => {
+    const c = classrooms.find((x) => x.id === id);
+    const g = gradeLevels.find((x) => x.id === c?.grade_level_id)?.name;
+    return c ? `${g ?? "—"}/${c.name}` : "—";
+  };
+
+  const summary = useMemo(() => {
+    const map = new Map<string, { subjects: Set<string>; periods: number; assignments: TeachingAssignment[] }>();
+    for (const a of assignments) {
+      const cur = map.get(a.teacher_id) ?? { subjects: new Set<string>(), periods: 0, assignments: [] };
+      cur.subjects.add(a.subject_id);
+      cur.periods += a.periods_per_week;
+      cur.assignments.push(a);
+      map.set(a.teacher_id, cur);
+    }
+    return map;
+  }, [assignments]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return teachers;
+    return teachers.filter((t) =>
+      [profileFullName(t), t.first_name, t.last_name, t.teacher_code].some((v) => v?.toLowerCase().includes(q)),
+    );
+  }, [teachers, search]);
+
+  const teacher = teachers.find((t) => t.id === pickedId) ?? filtered[0];
+  const teacherId = teacher?.id ?? "";
+  const mine = summary.get(teacherId);
+  const { data: entries = [] } = useTeacherSchedule(teacherId, academicYear, term);
+
+  const teacherArea = areaById.get(teacher?.learning_area_id ?? "");
+  const areaText = (teacherArea?.parent_id ? areaById.get(teacherArea.parent_id) : teacherArea)?.name ?? "";
+
+  const gradeRange = (() => {
+    const idx = [...new Set((mine?.assignments ?? []).map((a) => classrooms.find((c) => c.id === a.classroom_id)?.grade_level_id))]
+      .map((id) => gradeLevels.findIndex((g) => g.id === id))
+      .filter((i) => i >= 0)
+      .sort((a, b) => a - b);
+    if (idx.length === 0) return "—";
+    const lo = gradeLevels[idx[0]!]!.name;
+    const hi = gradeLevels[idx[idx.length - 1]!]!.name;
+    return lo === hi ? lo : `${lo} – ${hi}`;
+  })();
+
+  if (teachers.length === 0) {
+    return <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีครูในแผนกนี้" />;
+  }
+
+  const stats = [
+    { icon: CalendarIcon, tint: "bg-sky-100 text-sky-600 dark:bg-sky-500/20", value: mine?.subjects.size ?? 0, label: "รายวิชา" },
+    { icon: TimeIcon, tint: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20", value: mine?.periods ?? 0, label: "คาบ/สัปดาห์" },
+    { icon: GraduationCap, tint: "bg-violet-100 text-violet-600 dark:bg-violet-500/20", value: gradeRange, label: "ระดับที่สอน" },
+  ];
+
+  const perDay = [1, 2, 3, 4, 5, 6].map((d) => ({ day: d, count: entries.filter((e) => e.day_of_week === d).length }));
+  const shownDays = perDay.filter((x) => x.day <= 5 || x.count > 0);
+  const maxDay = Math.max(1, ...shownDays.map((x) => x.count));
+
+  return (
+    <div className="grid min-h-0 flex-1 items-start gap-3 lg:grid-cols-[18rem_minmax(0,1fr)]">
+      <aside className="flex max-h-72 min-h-0 flex-col gap-2 rounded-xl border border-border bg-card p-2 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-10rem)]">
+        <div className="relative shrink-0">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหาชื่อครู หรือรหัสครู..."
+            aria-label="ค้นหาครู"
+          />
+        </div>
+        <ul className="scrollbar-hidden min-h-0 flex-1 space-y-1 overflow-y-auto">
+          {filtered.map((t) => {
+            const sum = summary.get(t.id);
+            const active = t.id === teacherId;
+            return (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  onClick={() => setPickedId(t.id)}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-colors",
+                    active ? "border-accent/40 bg-accent/10" : "border-transparent hover:bg-muted",
+                  )}
+                >
+                  <Avatar name={`${t.first_name} ${t.last_name}`} src={avatarUrl(t)} className="h-9 w-9 text-[11px]" />
+                  <div className="min-w-0 flex-1 font-sarabun leading-tight">
+                    <p className="truncate text-xs font-medium text-foreground">{profileFullName(t)}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      {sum ? `${sum.subjects.size} รายวิชา | รวม ${sum.periods} คาบ/สัปดาห์` : "ยังไม่มีภาระงานสอน"}
+                    </p>
+                  </div>
+                  <ChevronForward className="h-3 w-3 shrink-0 text-muted-foreground" />
+                </button>
+              </li>
+            );
+          })}
+          {filtered.length === 0 && <li className="py-6 text-center text-xs text-muted-foreground">ไม่พบครูที่ค้นหา</li>}
+        </ul>
+      </aside>
+
+      <section className="min-w-0 space-y-3">
+        {teacher && (
+          <>
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3">
+              <Avatar name={`${teacher.first_name} ${teacher.last_name}`} src={avatarUrl(teacher)} className="h-14 w-14 text-base" />
+              <div className="min-w-0 flex-1 font-sarabun">
+                <p className="truncate text-base font-semibold text-foreground">{profileFullName(teacher)}</p>
+                <p className="truncate text-xs text-muted-foreground">{areaText ? `กลุ่มสาระการเรียนรู้ ${areaText}` : "ยังไม่ระบุกลุ่มสาระ"}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {stats.map((st) => (
+                  <div key={st.label} className="flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
+                    <span className={cn("flex h-9 w-9 items-center justify-center rounded-full", st.tint)}>
+                      <st.icon className="h-4 w-4" />
+                    </span>
+                    <div className="leading-tight">
+                      <p className="text-base font-semibold text-foreground">{st.value}</p>
+                      <p className="text-[11px] text-muted-foreground">{st.label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex w-full border-b border-border" role="tablist">
+              {TEACHER_TABS.map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === key}
+                  onClick={() => setTab(key)}
+                  className={lineTab(tab === key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {tab === "week" && (
+              <TeacherTimetable
+                departmentId={departmentId}
+                teacherId={teacherId}
+                academicYear={academicYear}
+                term={term}
+                mayEdit={mayEdit}
+                classrooms={classrooms}
+                gradeLevels={gradeLevels}
+                teachers={teachers}
+              />
+            )}
+
+            {tab === "subjects" && (
+              <div className="overflow-x-auto rounded-xl border border-border bg-card">
+                <table className="w-full min-w-[32rem] text-xs">
+                  <thead className="bg-muted text-left text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">รหัส</th>
+                      <th className="px-3 py-2 font-medium">วิชา</th>
+                      <th className="px-3 py-2 font-medium">ห้อง</th>
+                      <th className="px-3 py-2 text-right font-medium">คาบ/สัปดาห์</th>
+                      <th className="px-3 py-2 text-right font-medium">จัดในตารางแล้ว</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(mine?.assignments ?? []).map((a) => {
+                      const placed = entries.filter((e) => e.teaching_assignment_id === a.id).length;
+                      return (
+                        <tr key={a.id} className="border-t border-border">
+                          <td className="px-3 py-2">
+                            <span className={cn("rounded-md px-1.5 py-0.5 font-semibold", cardTint(a.subject_id))}>
+                              {subjectById.get(a.subject_id)?.code ?? "—"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">{subjectById.get(a.subject_id)?.name_th ?? "—"}</td>
+                          <td className="px-3 py-2">{classroomLabel(a.classroom_id)}</td>
+                          <td className="px-3 py-2 text-right">{a.periods_per_week}</td>
+                          <td className={cn("px-3 py-2 text-right", placed < a.periods_per_week && "text-warning")}>
+                            {placed}/{a.periods_per_week}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {(mine?.assignments.length ?? 0) === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
+                          ยังไม่มีภาระงานสอน
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {tab === "hours" && (
+              <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+                <p className="text-sm text-muted-foreground">
+                  จัดลงตารางแล้ว <span className="font-semibold text-foreground">{entries.length}</span> จาก{" "}
+                  <span className="font-semibold text-foreground">{mine?.periods ?? 0}</span> คาบ/สัปดาห์
+                </p>
+                <ul className="space-y-2">
+                  {shownDays.map(({ day, count }) => (
+                    <li key={day} className="flex items-center gap-3 text-xs">
+                      <span className="w-16 shrink-0 text-muted-foreground">{DAY_LABEL[day]}</span>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-accent" style={{ width: `${(count / maxDay) * 100}%` }} />
+                      </div>
+                      <span className="w-12 shrink-0 text-right">{count} คาบ</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function TeacherTimetable({
   departmentId,
   teacherId,
@@ -355,7 +618,6 @@ function TeacherTimetable({
   classrooms,
   gradeLevels,
   teachers,
-  onBack,
 }: {
   departmentId: string;
   teacherId: string;
@@ -365,12 +627,7 @@ function TeacherTimetable({
   classrooms: Classroom[];
   gradeLevels: GradeLevel[];
   teachers: ProfileRow[];
-  onBack: () => void;
 }) {
-  const teacherLabelText = (() => {
-    const t = teachers.find((x) => x.id === teacherId);
-    return t ? profileFullName(t) : "—";
-  })();
   const { data: periods = [], isLoading: loadingPeriods } = useDepartmentPeriods(departmentId);
   const { data: entries = [], isLoading: loadingEntries } = useTeacherSchedule(teacherId, academicYear, term);
   const { data: assignments = [] } = useDepartmentTeachingAssignments(departmentId, academicYear, term);
@@ -391,7 +648,6 @@ function TeacherTimetable({
 
   return (
     <>
-      <BackHeader label={teacherLabelText} onBack={onBack} />
       <TimetableGrid
         periods={periods}
         entries={entries}
@@ -400,6 +656,7 @@ function TeacherTimetable({
         mayEdit={mayEdit}
         isLoading={loadingPeriods || loadingEntries}
         subjectLabel={(id) => subjects.find((s) => s.id === id)?.code ?? "—"}
+        subjectName={(id) => subjects.find((s) => s.id === id)?.name_th ?? ""}
         teacherLabel={(id) => {
           const t = teachers.find((x) => x.id === id);
           return t ? profileFullName(t) : "—";
@@ -485,6 +742,24 @@ function ScheduleList({
   );
 }
 
+const CARD_TINTS = [
+  "bg-sky-100 text-sky-950 dark:bg-sky-500/20 dark:text-sky-100",
+  "bg-emerald-100 text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100",
+  "bg-rose-100 text-rose-950 dark:bg-rose-500/20 dark:text-rose-100",
+  "bg-amber-100 text-amber-950 dark:bg-amber-500/20 dark:text-amber-100",
+  "bg-violet-100 text-violet-950 dark:bg-violet-500/20 dark:text-violet-100",
+  "bg-cyan-100 text-cyan-950 dark:bg-cyan-500/20 dark:text-cyan-100",
+];
+
+/** Same subject always gets the same tint, across cells and teachers. */
+function cardTint(id: string) {
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return CARD_TINTS[h % CARD_TINTS.length];
+}
+
+const hhmm = (t: string) => t.slice(0, 5);
+
 function TimetableGrid({
   periods,
   entries,
@@ -493,6 +768,7 @@ function TimetableGrid({
   mayEdit,
   isLoading,
   subjectLabel,
+  subjectName,
   teacherLabel,
   roomLabel,
 }: {
@@ -503,6 +779,7 @@ function TimetableGrid({
   mayEdit: boolean;
   isLoading: boolean;
   subjectLabel: (id: string) => string;
+  subjectName: (id: string) => string;
   teacherLabel: (id: string) => string;
   roomLabel: (id: string) => string;
 }) {
@@ -526,12 +803,6 @@ function TimetableGrid({
     }
     return map;
   }, [entries]);
-
-  function entryLabel(e: ScheduleEntryRow) {
-    return mode === "classroom"
-      ? `${subjectLabel(e.teaching_assignment.subject_id)} · ${teacherLabel(e.teaching_assignment.teacher_id)}`
-      : `${subjectLabel(e.teaching_assignment.subject_id)} · ${roomLabel(e.teaching_assignment.classroom_id)}`;
-  }
 
   if (isLoading) {
     const skeletonDays = [1, 2, 3, 4, 5];
@@ -581,75 +852,115 @@ function TimetableGrid({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-card">
-      <table className="w-full min-w-[40rem] table-fixed text-xs">
-        <thead className="bg-muted text-left text-xs text-muted-foreground">
+    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      <table className="w-full min-w-[48rem] table-fixed border-collapse text-xs">
+        <thead className="bg-muted text-muted-foreground">
           <tr>
-            <th className="w-12 px-2 py-2 font-medium">คาบ</th>
+            <th className="w-28 px-2 py-3 text-center font-medium">คาบ / เวลา</th>
             {days.map((d) => (
-              <th key={d} className="px-2 py-2 text-center font-medium">
+              <th key={d} className="border-l border-border px-2 py-3 text-center font-medium">
                 {DAY_LABEL[d] ?? d}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {Array.from({ length: maxPeriodNo }, (_, i) => i + 1).map((periodNo) => (
-            <tr key={periodNo} className="border-t border-border align-top">
-              <td className="px-2 py-2 text-center text-muted-foreground">{periodNo}</td>
-              {days.map((day) => {
-                const pd = periodAt.get(`${day}-${periodNo}`);
-                const cellEntries = entriesAt.get(`${day}-${periodNo}`) ?? [];
+          {Array.from({ length: maxPeriodNo }, (_, i) => i + 1).map((periodNo) => {
+            const slots = days.map((d) => periodAt.get(`${d}-${periodNo}`));
+            const first = slots.find(Boolean);
+            const allBreak = slots.every((pd) => !pd || pd.period_type === "break");
 
-                if (!pd) return <td key={day} className="px-1 py-1" />;
+            if (first && allBreak) {
+              return (
+                <tr key={periodNo} className="border-t border-border bg-muted/60">
+                  <td colSpan={days.length + 1} className="px-2 py-2 text-center text-muted-foreground">
+                    <span className="inline-flex items-center gap-2">
+                      <RestaurantIcon className="h-3.5 w-3.5" />
+                      {first.label} {hhmm(first.start_time)} – {hhmm(first.end_time)}
+                    </span>
+                  </td>
+                </tr>
+              );
+            }
 
-                if (pd.period_type === "break") {
+            return (
+              <tr key={periodNo} className="border-t border-border align-top">
+                <td className="bg-muted/40 px-2 py-2 text-center">
+                  <p className="text-base font-semibold text-foreground">{periodNo}</p>
+                  {first && (
+                    <p className="text-[11px] text-muted-foreground">
+                      {hhmm(first.start_time)} – {hhmm(first.end_time)}
+                    </p>
+                  )}
+                </td>
+                {days.map((day, i) => {
+                  const pd = slots[i];
+                  const cellEntries = entriesAt.get(`${day}-${periodNo}`) ?? [];
+
+                  if (!pd) return <td key={day} className="border-l border-border p-1" />;
+
+                  if (pd.period_type === "break") {
+                    return (
+                      <td key={day} className="border-l border-border p-1">
+                        <div className="rounded-lg bg-muted px-1.5 py-3 text-center text-muted-foreground">
+                          {pd.label}
+                        </div>
+                      </td>
+                    );
+                  }
+
                   return (
-                    <td key={day} className="px-1 py-1">
-                      <div className="rounded bg-muted px-1.5 py-1.5 text-center text-muted-foreground">
-                        {pd.label}
+                    <td key={day} className="border-l border-border p-1">
+                      <div className="space-y-1">
+                        {cellEntries.map((e) => {
+                          const subjectId = e.teaching_assignment.subject_id;
+                          return (
+                            <div
+                              key={e.id}
+                              className={cn("relative rounded-lg px-2 py-1.5 leading-snug", cardTint(subjectId))}
+                            >
+                              <p className="font-semibold">{subjectLabel(subjectId)}</p>
+                              <p className="truncate">{subjectName(subjectId)}</p>
+                              <p className="truncate text-[11px] opacity-70">
+                                {mode === "classroom"
+                                  ? teacherLabel(e.teaching_assignment.teacher_id)
+                                  : roomLabel(e.teaching_assignment.classroom_id)}
+                              </p>
+                              {mayEdit && (
+                                <button
+                                  type="button"
+                                  aria-label="ลบคาบนี้"
+                                  onClick={() => {
+                                    if (confirm(`ลบคาบนี้ออกจากตาราง?`)) del.mutate(e.id);
+                                  }}
+                                  className="absolute right-1 top-1 opacity-60 hover:text-destructive hover:opacity-100"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {mayEdit ? (
+                          <button
+                            type="button"
+                            onClick={() => setPlacing({ day, periodNo })}
+                            className="flex w-full items-center justify-center rounded-lg border border-dashed border-border py-1 text-muted-foreground hover:bg-muted"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        ) : (
+                          cellEntries.length === 0 && (
+                            <p className="py-4 text-center text-muted-foreground">—</p>
+                          )
+                        )}
                       </div>
                     </td>
                   );
-                }
-
-                return (
-                  <td key={day} className="px-1 py-1">
-                    <div className="space-y-1">
-                      {cellEntries.map((e) => (
-                        <div
-                          key={e.id}
-                          className="flex items-center justify-between gap-1 rounded bg-accent/15 px-1.5 py-1"
-                        >
-                          <span className="min-w-0 truncate">{entryLabel(e)}</span>
-                          {mayEdit && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (confirm(`ลบคาบนี้ออกจากตาราง?`)) del.mutate(e.id);
-                              }}
-                              className="shrink-0 text-muted-foreground hover:text-destructive"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      {mayEdit && (
-                        <button
-                          type="button"
-                          onClick={() => setPlacing({ day, periodNo })}
-                          className="flex w-full items-center justify-center rounded border border-dashed border-border py-1 text-muted-foreground hover:bg-muted"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
