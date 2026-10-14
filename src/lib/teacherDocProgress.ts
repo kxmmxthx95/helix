@@ -11,6 +11,8 @@ export type PairProgress = {
   uploaded: number;
   files: number;
   percent: number | null;
+  /** Latest lesson edit or file upload (ISO), null when there are no เนื้อหาหลัก. */
+  lastAt: string | null;
 };
 
 export type TeacherLessonProgress = {
@@ -18,6 +20,7 @@ export type TeacherLessonProgress = {
   uploaded: number;
   missing: number;
   files: number;
+  lastAt: string | null;
   /** null when there is nothing to measure against. */
   percent: number | null;
   status: LessonStatus;
@@ -31,7 +34,7 @@ export function pairProgress(key: string, row: CoverageRow | undefined): PairPro
   const lessons = row?.lessons ?? [];
   const total = row && row.lessonTarget > 0 ? row.lessonTarget : lessons.length;
   const uploaded = Math.min(total, lessons.filter((l) => l.okFileCount > 0).length);
-  return { key, row, total, uploaded, files: lessons.reduce((n, l) => n + l.okFileCount, 0), percent: pct(uploaded, total) };
+  return { key, row, total, uploaded, files: lessons.reduce((n, l) => n + l.okFileCount, 0), percent: pct(uploaded, total), lastAt: lessons.map((l) => l.lastAt).sort().at(-1) ?? null };
 }
 
 /** Rolls a teacher's subject x grade pairs up by summing uploaded and total (weighted by เนื้อหา, not an average of percents). */
@@ -44,6 +47,7 @@ export function teacherLessonProgress(pairKeys: Iterable<string>, rows: Map<stri
     uploaded,
     missing: total - uploaded,
     files: pairs.reduce((n, p) => n + p.files, 0),
+    lastAt: pairs.map((p) => p.lastAt ?? "").sort().at(-1) || null,
     percent: pct(uploaded, total),
     status: !total ? "nodata" : uploaded >= total ? "complete" : uploaded === 0 ? "none" : "partial",
     pairs,

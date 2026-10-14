@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { CoverageLesson, CoverageRow } from "@/hooks/useDocuments";
 import { teacherLessonProgress } from "@/lib/teacherDocProgress";
 
-const lesson = (okFileCount: number): CoverageLesson => ({
-  id: String(Math.random()), name: "บท", createdBy: null, sortOrder: 0, topicCount: 0, fileCount: okFileCount, okFileCount, lastAt: "2026-10-01T00:00:00Z", lastBy: null,
+const lesson = (okFileCount: number, lastAt = "2026-10-01T00:00:00Z"): CoverageLesson => ({
+  id: String(Math.random()), name: "บท", createdBy: null, sortOrder: 0, topicCount: 0, fileCount: okFileCount, okFileCount, lastAt, lastBy: null,
 });
 const row = (key: string, lessonTarget: number, lessons: CoverageLesson[]): CoverageRow => ({
   key, subjectId: "s", code: "x", nameTh: "x", departmentId: "d", learningAreaId: "l", subjectType: "basic", gradeLevelId: "g", gradeName: "ม.1", gradeSort: 1, lessonTarget, topicTarget: 0, lessons,
@@ -35,5 +35,10 @@ describe("teacherLessonProgress", () => {
   it("sums across pairs (weighted, not an average of percents)", () => {
     const r = rows(row("a", 0, [lesson(1)]), row("b", 9, [lesson(0), lesson(0), lesson(0)]));
     expect(teacherLessonProgress(["a", "b"], r)).toMatchObject({ total: 10, uploaded: 1, percent: 10 });
+  });
+  it("lastAt is the latest save across all pairs, null when there is nothing", () => {
+    const r = rows(row("a", 0, [lesson(1, "2026-10-02T00:00:00Z")]), row("b", 0, [lesson(1, "2026-10-09T05:00:00Z"), lesson(0, "2026-10-03T00:00:00Z")]));
+    expect(teacherLessonProgress(["a", "b"], r).lastAt).toBe("2026-10-09T05:00:00Z");
+    expect(teacherLessonProgress([], rows()).lastAt).toBeNull();
   });
 });

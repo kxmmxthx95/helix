@@ -208,9 +208,7 @@ export function DocProgressTab() {
                   <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
                   <th className="px-3 py-2 text-center font-medium">ทั้งหมด</th>
                   <th className="px-3 py-2 text-center font-medium">อัปโหลดแล้ว</th>
-                  <th className="px-3 py-2 text-center font-medium">ยังไม่มีไฟล์</th>
-                  <th className="px-3 py-2 font-medium">ความคืบหน้า</th>
-                  <th className="px-3 py-2 font-medium">สถานะ</th>
+                  <th className="px-3 py-2 font-medium">วันเวลาบันทึกล่าสุด</th>
                 </tr>
               </thead>
               <tbody>
@@ -228,9 +226,7 @@ export function DocProgressTab() {
                     <td className="px-3 py-3">{areaName.get(teacher.learning_area_id ?? "") ?? "—"}</td>
                     <td className="px-3 py-3 text-center">{p.total}</td>
                     <td className="px-3 py-3 text-center">{p.uploaded}</td>
-                    <td className={cn("px-3 py-3 text-center", p.missing > 0 && "text-destructive")}>{p.missing}</td>
-                    <td className="px-3 py-3"><LessonProgressBar status={p.status} percent={p.percent} /></td>
-                    <td className="px-3 py-3"><LessonStatusChip status={p.status} /></td>
+                    <td className="whitespace-nowrap px-3 py-3">{p.lastAt ? thDateTime(p.lastAt) : "—"}</td>
                   </tr>
                 ))}
               </tbody>
