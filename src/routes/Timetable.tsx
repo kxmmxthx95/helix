@@ -479,6 +479,8 @@ function classroomLabelOf(c: Classroom, gradeLevels: GradeLevel[]) {
 type TimetableStyling = {
   /** Class string for a subject's card: area hue, grade shade. */
   color: (subjectId: string, classroomId: string) => string;
+  /** Same hue and shade as `color`, as a gradient — for the timetable grid cards. */
+  gradient: (subjectId: string, classroomId: string) => string;
   typeLabel: (subjectId: string) => string;
   /** Pill classes for the subject-type badge. */
   typeBadge: (subjectId: string) => string;
@@ -499,6 +501,8 @@ function useTimetableStyling(
     return {
       color: (subjectId, classroomId) =>
         colors.shade(byId.get(subjectId)?.learning_area_id, classrooms.find((c) => c.id === classroomId)?.grade_level_id),
+      gradient: (subjectId, classroomId) =>
+        colors.gradient(byId.get(subjectId)?.learning_area_id, classrooms.find((c) => c.id === classroomId)?.grade_level_id),
       typeLabel: (subjectId) => {
         const t = byId.get(subjectId)?.subject_type;
         return t ? SUBJECT_TYPE_LABEL[t] : "";
@@ -1273,7 +1277,7 @@ function TimetableGrid({
                                 "relative space-y-0.5 rounded-lg px-3 py-2.5 leading-snug",
                                 mayEdit && "cursor-grab active:cursor-grabbing",
                                 drag?.id === e.id && "opacity-40",
-                                styling.color(subjectId, e.teaching_assignment.classroom_id),
+                                styling.gradient(subjectId, e.teaching_assignment.classroom_id),
                               )}
                             >
                               <p className="pr-5 text-sm font-semibold">{subjectLabel(subjectId)}</p>

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useLearningAreas } from "@/hooks/useCurriculum";
 import type { GradeLevel } from "@/lib/database.types";
-import { areaDot, areaHue, gradeStep, subjectShade, topArea, type GradeStep } from "@/lib/subjectColor";
+import { areaDot, areaHue, gradeStep, subjectGradient, subjectShade, topArea, type GradeStep } from "@/lib/subjectColor";
 
 /**
  * Colours for subjects: hue from the กลุ่มสาระ, shade from the grade level (when a grade is known).
@@ -15,6 +15,8 @@ export function useSubjectColors(gradeLevels: GradeLevel[]) {
     () => ({
       shade: (areaId: string | null | undefined, gradeLevelId?: string | null) =>
         subjectShade(areaHue(areaId, areaById), gradeLevelId ? gradeStep(gradeLevelId, gradeLevels) : 1),
+      gradient: (areaId: string | null | undefined, gradeLevelId?: string | null) =>
+        subjectGradient(areaHue(areaId, areaById), gradeLevelId ? gradeStep(gradeLevelId, gradeLevels) : 1),
       /** Shade of an area's hue at an explicit grade step (legend ramp). */
       shadeAt: (areaId: string, step: GradeStep) => subjectShade(areaHue(areaId, areaById), step),
       /** One chip per distinct top-level area among `areaIds` — the legend. */

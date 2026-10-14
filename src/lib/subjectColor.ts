@@ -69,6 +69,55 @@ const SHADES: Record<AreaHue, [string, string, string]> = {
   ],
 };
 
+/** Same hue/step as SHADES, as a soft diagonal gradient (one shade deeper) — timetable cards. */
+const GRADIENTS: Record<AreaHue, [string, string, string]> = {
+  rose: [
+    "bg-gradient-to-br from-rose-100 to-rose-200 text-rose-900 dark:from-rose-500/15 dark:to-rose-500/30 dark:text-rose-100",
+    "bg-gradient-to-br from-rose-200 to-rose-300 text-rose-950 dark:from-rose-500/30 dark:to-rose-500/45 dark:text-rose-100",
+    "bg-gradient-to-br from-rose-300 to-rose-400 text-rose-950 dark:from-rose-500/45 dark:to-rose-500/60 dark:text-rose-50",
+  ],
+  blue: [
+    "bg-gradient-to-br from-blue-100 to-blue-200 text-blue-900 dark:from-blue-500/15 dark:to-blue-500/30 dark:text-blue-100",
+    "bg-gradient-to-br from-blue-200 to-blue-300 text-blue-950 dark:from-blue-500/30 dark:to-blue-500/45 dark:text-blue-100",
+    "bg-gradient-to-br from-blue-300 to-blue-400 text-blue-950 dark:from-blue-500/45 dark:to-blue-500/60 dark:text-blue-50",
+  ],
+  emerald: [
+    "bg-gradient-to-br from-emerald-100 to-emerald-200 text-emerald-900 dark:from-emerald-500/15 dark:to-emerald-500/30 dark:text-emerald-100",
+    "bg-gradient-to-br from-emerald-200 to-emerald-300 text-emerald-950 dark:from-emerald-500/30 dark:to-emerald-500/45 dark:text-emerald-100",
+    "bg-gradient-to-br from-emerald-300 to-emerald-400 text-emerald-950 dark:from-emerald-500/45 dark:to-emerald-500/60 dark:text-emerald-50",
+  ],
+  amber: [
+    "bg-gradient-to-br from-amber-100 to-amber-200 text-amber-900 dark:from-amber-500/15 dark:to-amber-500/30 dark:text-amber-100",
+    "bg-gradient-to-br from-amber-200 to-amber-300 text-amber-950 dark:from-amber-500/30 dark:to-amber-500/45 dark:text-amber-100",
+    "bg-gradient-to-br from-amber-300 to-amber-400 text-amber-950 dark:from-amber-500/45 dark:to-amber-500/60 dark:text-amber-50",
+  ],
+  orange: [
+    "bg-gradient-to-br from-orange-100 to-orange-200 text-orange-900 dark:from-orange-500/15 dark:to-orange-500/30 dark:text-orange-100",
+    "bg-gradient-to-br from-orange-200 to-orange-300 text-orange-950 dark:from-orange-500/30 dark:to-orange-500/45 dark:text-orange-100",
+    "bg-gradient-to-br from-orange-300 to-orange-400 text-orange-950 dark:from-orange-500/45 dark:to-orange-500/60 dark:text-orange-50",
+  ],
+  violet: [
+    "bg-gradient-to-br from-violet-100 to-violet-200 text-violet-900 dark:from-violet-500/15 dark:to-violet-500/30 dark:text-violet-100",
+    "bg-gradient-to-br from-violet-200 to-violet-300 text-violet-950 dark:from-violet-500/30 dark:to-violet-500/45 dark:text-violet-100",
+    "bg-gradient-to-br from-violet-300 to-violet-400 text-violet-950 dark:from-violet-500/45 dark:to-violet-500/60 dark:text-violet-50",
+  ],
+  cyan: [
+    "bg-gradient-to-br from-cyan-100 to-cyan-200 text-cyan-900 dark:from-cyan-500/15 dark:to-cyan-500/30 dark:text-cyan-100",
+    "bg-gradient-to-br from-cyan-200 to-cyan-300 text-cyan-950 dark:from-cyan-500/30 dark:to-cyan-500/45 dark:text-cyan-100",
+    "bg-gradient-to-br from-cyan-300 to-cyan-400 text-cyan-950 dark:from-cyan-500/45 dark:to-cyan-500/60 dark:text-cyan-50",
+  ],
+  pink: [
+    "bg-gradient-to-br from-pink-100 to-pink-200 text-pink-900 dark:from-pink-500/15 dark:to-pink-500/30 dark:text-pink-100",
+    "bg-gradient-to-br from-pink-200 to-pink-300 text-pink-950 dark:from-pink-500/30 dark:to-pink-500/45 dark:text-pink-100",
+    "bg-gradient-to-br from-pink-300 to-pink-400 text-pink-950 dark:from-pink-500/45 dark:to-pink-500/60 dark:text-pink-50",
+  ],
+  slate: [
+    "bg-gradient-to-br from-slate-100 to-slate-200 text-slate-900 dark:from-slate-500/15 dark:to-slate-500/30 dark:text-slate-100",
+    "bg-gradient-to-br from-slate-200 to-slate-300 text-slate-950 dark:from-slate-500/30 dark:to-slate-500/45 dark:text-slate-100",
+    "bg-gradient-to-br from-slate-300 to-slate-400 text-slate-950 dark:from-slate-500/45 dark:to-slate-500/60 dark:text-slate-50",
+  ],
+};
+
 const DOTS: Record<AreaHue, string> = {
   rose: "bg-rose-400",
   blue: "bg-blue-400",
@@ -124,4 +173,5 @@ export function gradeStep(gradeLevelId: string | null | undefined, gradeLevels: 
 }
 
 export const subjectShade = (hue: AreaHue, step: GradeStep = 1) => SHADES[hue][step];
+export const subjectGradient = (hue: AreaHue, step: GradeStep = 1) => GRADIENTS[hue][step];
 export const areaDot = (hue: AreaHue) => DOTS[hue];
