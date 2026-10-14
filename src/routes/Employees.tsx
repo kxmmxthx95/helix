@@ -295,8 +295,12 @@ function EmployeeDetailSheet({
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("position");
-  const mayManageHr = canManageHr(me.roles);
   const isSelf = row?.id === me.id;
+  // ponytail: dept_director is also blocked by the DB from director/super_admin/dept_director targets (can_manage_hr_of, 0082) —
+  // not mirrored here since target roles aren't on the row; such an edit just fails with a toast.
+  const mayManageHr =
+    canManageHr(me.roles) ||
+    (me.roles.includes("dept_director") && !isSelf && !!row?.department_id && row.department_id === me.department_id);
   const canSeeSensitive = isSelf || mayManageHr;
   // Attendance is day-to-day ops data (same access level as time_clock_records
   // itself — self or canManage()), not confidential HR data like

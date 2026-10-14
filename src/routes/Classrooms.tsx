@@ -17,7 +17,7 @@ import {
   useRemoveHomeroomTeacher,
 } from "@/hooks/useStatusManagement";
 import { gradeShortLabel } from "@/lib/gradeLevels";
-import { isOrgWide } from "@/lib/roles";
+import { isDeptHead, isOrgWide } from "@/lib/roles";
 import type { Classroom, Student } from "@/lib/database.types";
 import { EditStudentSheet } from "@/routes/Roster";
 import { HomeroomSheet } from "@/routes/StatusManagement";
@@ -28,7 +28,7 @@ export function Classrooms() {
   if (!me) return null;
 
   const orgWide = isOrgWide(me.roles);
-  const isHomeroomTeacherOnly = !orgWide && !me.roles.includes("dept_head");
+  const isHomeroomTeacherOnly = !orgWide && !isDeptHead(me.roles);
 
   const { data: departments = [] } = useDepartments();
   const [pickedDept, setPickedDept] = useState("");

@@ -27,7 +27,7 @@ import {
 } from "@/hooks/useDutyRoster";
 import { useDepartments, useProfiles } from "@/hooks/useProfiles";
 import { profileFullName, type DutyPoint, type DutyTransferRequest, type DutyTransferStatus } from "@/lib/database.types";
-import { canManage, isEmployeeRole, isOrgWide } from "@/lib/roles";
+import { canManage, isDeptHead, isEmployeeRole, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -147,7 +147,7 @@ export function DutyRoster() {
   if (!profile) return null;
   const mayManage = canManage(profile.roles);
   const orgWide = isOrgWide(profile.roles);
-  const canDept = orgWide || profile.roles.includes("dept_head");
+  const canDept = orgWide || isDeptHead(profile.roles);
 
   return (
     <div className="page-fill">

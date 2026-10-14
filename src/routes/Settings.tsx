@@ -61,7 +61,7 @@ import {
   type SalaryGradeDraft,
 } from "@/hooks/useEmployees";
 import type { AcademicTerm, LeaveType, SalaryGrade, TermStatus, TermType } from "@/lib/database.types";
-import { canManageHr, isOrgWide, ROLE_LABEL, ROLES, type Role } from "@/lib/roles";
+import { canManageHr, isDeptHead, isOrgWide, ROLE_LABEL, ROLES, type Role } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const TERM_TYPE_LABEL: Record<TermType, string> = {
@@ -86,6 +86,7 @@ const ROLE_ICON: Partial<Record<Role, { icon: IconComponent; tint: string }>> = 
   super_admin: { icon: RibbonIcon, tint: "bg-pink-100 text-pink-600 dark:bg-pink-500/15 dark:text-pink-300" },
   director: { icon: ShieldIcon, tint: "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300" },
   staff: { icon: BriefcaseIcon, tint: "bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300" },
+  dept_director: { icon: Users, tint: "bg-teal-100 text-teal-600 dark:bg-teal-500/15 dark:text-teal-300" },
   dept_head: { icon: Users, tint: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300" },
   teacher: { icon: ProfileIcon, tint: "bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-300" },
 };
@@ -1561,8 +1562,8 @@ export function Settings() {
   const { profile } = useAuth();
   const { data: departments = [] } = useDepartments();
   const orgWide = profile ? isOrgWide(profile.roles) : false;
-  const isDeptHead = profile ? profile.roles.includes("dept_head") : false;
-  const canDept = orgWide || isDeptHead;
+  const deptHead = profile ? isDeptHead(profile.roles) : false;
+  const canDept = orgWide || deptHead;
   const [pickedDept, setPickedDept] = useState("");
   const [tab, setTab] = useState<SettingsTab>(orgWide ? "school" : "department");
   const [creatingTerm, setCreatingTerm] = useState(false);
@@ -1614,7 +1615,7 @@ export function Settings() {
     </Select>
   );
 
-  if (!orgWide && !isDeptHead) {
+  if (!orgWide && !deptHead) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์ตั้งค่าระบบ</Card>;
   }
 

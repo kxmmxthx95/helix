@@ -45,4 +45,14 @@ describe("diffProfileRoles", () => {
     expect(toDeleteIds).toEqual(["r1"]);
     expect(toInsert).toEqual([{ role: "student", position_title_id: null }]);
   });
+
+  it("keeps dept_director + teacher together, and a dept_head title untouched", () => {
+    const existing = [
+      { id: "r1", role: "teacher" as const, position_title_id: null },
+      { id: "r2", role: "dept_head" as const, position_title_id: "academic" },
+    ];
+    const { toDeleteIds, toInsert } = diffProfileRoles(existing, ["teacher", "dept_director"], ["academic"]);
+    expect(toDeleteIds).toEqual([]);
+    expect(toInsert).toEqual([{ role: "dept_director", position_title_id: null }]);
+  });
 });

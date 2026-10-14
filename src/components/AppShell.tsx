@@ -49,6 +49,7 @@ import {
   canManage,
   canManageAcademic,
   canManageUsers,
+  isDeptHead,
   isOrgWide,
   ROLE_LABEL,
   ROLES,
@@ -416,7 +417,7 @@ function AppShellInner() {
   const uploadAvatar = useUploadAvatar();
   const avatarFileRef = useRef<HTMLInputElement>(null);
   const avatarSrc = profile ? avatarUrl(profile) : null;
-  const maySeeSettings = !!profile && (isOrgWide(profile.roles) || profile.roles.includes("dept_head"));
+  const maySeeSettings = !!profile && (isOrgWide(profile.roles) || isDeptHead(profile.roles));
   const { data: schoolSettings } = useSchoolSettings();
   // Student homepage is deliberately blank (see Dashboard.tsx) — no title text, no header divider there.
   const isStudentHome = !!profile && profile.roles.includes("student") && location.pathname === "/";

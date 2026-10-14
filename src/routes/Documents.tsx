@@ -90,7 +90,7 @@ function TeacherDocuments() {
 
   // งานเอกสาร tabs: reviewers (super_admin / director / dept_head) track progress, teachers answer their tasks.
   const tabs = [
-    ...(me!.roles.some((r) => r === "super_admin" || r === "director" || r === "dept_head")
+    ...(me!.roles.some((r) => r === "super_admin" || r === "director" || r === "dept_head" || r === "dept_director")
       ? [
           { id: "progress", label: "ภาพรวม", icon: BarChartIcon },
           { id: "review", label: "ตรวจเอกสาร", icon: CheckmarkCircleIcon },

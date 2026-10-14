@@ -48,7 +48,7 @@ describe("resolveUserRow", () => {
         ...base,
         first_name: "ก",
         last_name: "ข",
-        roles: "ครูผู้สอน/ผู้บริหารแผนก",
+        roles: "ครูผู้สอน/หัวหน้างาน",
         position_titles: "หัวหน้าฝ่ายวิชาการ",
         department_code: "PRI",
       },

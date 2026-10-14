@@ -42,7 +42,7 @@ import type {
   Subject,
   SubjectType,
 } from "@/lib/database.types";
-import { canManage, isOrgWide } from "@/lib/roles";
+import { canManage, isDeptHead, isOrgWide } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { gradesInEntryPath } from "@/lib/gradeLevels";
@@ -120,7 +120,7 @@ export function Curriculum() {
     }
   }
 
-  if (!me || (!orgWide && !me.roles.includes("dept_head"))) {
+  if (!me || (!orgWide && !isDeptHead(me.roles))) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์ดูโครงสร้างหลักสูตร</Card>;
   }
 

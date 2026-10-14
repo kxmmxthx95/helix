@@ -21,7 +21,7 @@ import { useDepartments } from "@/hooks/useProfiles";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
 import { useStudents } from "@/hooks/useStudents";
 import type { Student, StudentCohortEnrollment, SubjectType } from "@/lib/database.types";
-import { canManage, isOrgWide } from "@/lib/roles";
+import { canManage, isDeptHead, isOrgWide } from "@/lib/roles";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { cn } from "@/lib/utils";
 
@@ -98,7 +98,7 @@ export function Enrollment() {
     setEnrollAllOpen(false);
   }, [pickedCohort]);
 
-  if (!me || (!orgWide && !me.roles.includes("dept_head"))) {
+  if (!me || (!orgWide && !isDeptHead(me.roles))) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์ลงทะเบียนนักเรียน</Card>;
   }
 

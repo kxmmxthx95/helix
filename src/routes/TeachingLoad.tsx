@@ -51,7 +51,7 @@ import {
 } from "@/hooks/useTeachingLoad";
 import { profileFullName, type Classroom, type GradeLevel, type Subject, type TeachingAssignment } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
-import { canManage, isOrgWide } from "@/lib/roles";
+import { canManage, isDeptHead, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const AREA_TONES = [
@@ -84,7 +84,7 @@ export function TeachingLoad() {
   const academicYear = activeYear ?? new Date().getFullYear() + 543;
   const { data: deptSettings } = useDepartmentSettings(departmentId || null);
 
-  if (!me || (!orgWide && !me.roles.includes("dept_head"))) {
+  if (!me || (!orgWide && !isDeptHead(me.roles))) {
     return (
       <Card className="text-sm text-muted-foreground">
         ไม่มีสิทธิ์เข้าถึงเมนูนี้

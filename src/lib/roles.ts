@@ -11,6 +11,7 @@ export const ROLES = [
   "super_admin",
   "director",
   "staff",
+  "dept_director",
   "dept_head",
   "teacher",
   "student",
@@ -23,13 +24,14 @@ export const ROLE_LABEL: Record<Role, string> = {
   super_admin: "ผู้ดูแลระบบสูงสุด",
   director: "ผู้บริหารสูงสุด",
   staff: "ธุรการ",
-  dept_head: "ผู้บริหารแผนก",
+  dept_director: "ผู้บริหารแผนก",
+  dept_head: "หัวหน้างาน",
   teacher: "ครูผู้สอน",
   student: "นักเรียน",
   parent: "ผู้ปกครอง",
 };
 
-/** "หัวหน้าฝ่ายวิชาการ" etc. — a dept_head instance's job title, not a role. */
+/** "หัวหน้าฝ่ายวิชาการ" etc. — a dept_head (หัวหน้างาน) instance's job title, not a role. */
 export const roleLabels = (roles: Role[]): string =>
   roles.length ? roles.map((r) => ROLE_LABEL[r]).join(", ") : "—";
 
@@ -38,15 +40,18 @@ export const PREFIXES = ["นาย", "นาง", "นางสาว", "ดร
 export const STUDENT_PREFIXES = ["เด็กชาย", "เด็กหญิง", "นาย", "นางสาว"];
 
 const ORG_WIDE: readonly Role[] = ["super_admin", "director", "staff"];
-const MANAGERS: readonly Role[] = ["super_admin", "director", "staff", "dept_head"];
+const MANAGERS: readonly Role[] = ["super_admin", "director", "staff", "dept_head", "dept_director"];
 /** Roles an "employee" HR record applies to — everyone with a job in the school except super_admin (a system account), students, and parents. See migration 0061. */
-export const EMPLOYEE_ROLES: readonly Role[] = ["staff", "teacher", "dept_head", "director"];
+export const EMPLOYEE_ROLES: readonly Role[] = ["staff", "teacher", "dept_head", "dept_director", "director"];
 /** May manage sensitive HR data (salary, contract, status, document) — narrower than ORG_WIDE, which also includes staff/ธุรการ. Mirrors can_manage_hr() in migration 0061. */
 const HR_MANAGERS: readonly Role[] = ["super_admin", "director"];
 /** Same as MANAGERS minus staff (ธุรการ) — lesson-plan content/oversight isn't roster admin work. See migration 0020. */
-const ACADEMIC_MANAGERS: readonly Role[] = ["super_admin", "director", "dept_head"];
+const ACADEMIC_MANAGERS: readonly Role[] = ["super_admin", "director", "dept_head", "dept_director"];
 /** Roles whose actions land in audit_logs — students and parents are excluded. */
-const AUDITED: readonly Role[] = ["super_admin", "director", "dept_head", "teacher", "staff"];
+const AUDITED: readonly Role[] = ["super_admin", "director", "dept_head", "dept_director", "teacher", "staff"];
+
+/** Department-scoped head of either kind: หัวหน้างาน (dept_head) or ผู้บริหารแผนก (dept_director). Mirrors is_dept_head() in migration 0082. */
+export const isDeptHead = (roles: Role[]) => roles.includes("dept_head") || roles.includes("dept_director");
 
 /** Sees every department, not just their own. */
 export const isOrgWide = (roles: Role[]) => roles.some((r) => ORG_WIDE.includes(r));

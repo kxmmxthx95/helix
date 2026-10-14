@@ -58,6 +58,13 @@ const EMPTY: ProfileFilters = { search: "", departmentId: "", role: "", active: 
 
 /** Roles pickable directly — dept_head comes from position_titles instead. */
 const BASE_ROLES = ROLES.filter((r) => r !== "dept_head");
+/** นักเรียน/ผู้ปกครอง are self-scoped accounts — never combined with staff roles or each other. */
+const SELF_ONLY: readonly Role[] = ["student", "parent"];
+const roleCombinable = (held: Role[], next: Role) =>
+  held.length === 0 || (!SELF_ONLY.includes(next) && !held.some((r) => SELF_ONLY.includes(r)));
+/** One role drives the default-password rule: the most restrictive held. */
+const primaryRole = (roles: Role[]): Role | "" =>
+  roles.includes("super_admin") ? "super_admin" : roles.includes("parent") ? "parent" : (roles[0] ?? "");
 
 export function Users() {
   const { profile: me } = useAuth();
@@ -485,38 +492,65 @@ export function Users() {
  * to the old button grid.
  */
 function RolePicker({
-  role,
+  roles,
   positionTitleIds,
   positionTitles,
-  onRoleChange,
+  onAddRole,
+  onRemoveRole,
   onAddTitle,
   onRemoveTitle,
   roleError,
 }: {
-  role: Role | "";
+  roles: Role[];
   positionTitleIds: string[];
   positionTitles: PositionTitle[];
-  onRoleChange: (role: Role | "") => void;
+  onAddRole: (role: Role) => void;
+  onRemoveRole: (role: Role) => void;
   onAddTitle: (titleId: string) => void;
   onRemoveTitle: (titleId: string) => void;
   roleError?: string;
 }) {
   const available = positionTitles.filter((t) => !positionTitleIds.includes(t.id));
+  const availableRoles = BASE_ROLES.filter((r) => !roles.includes(r) && roleCombinable(roles, r));
 
   return (
     <>
       <Field label="สิทธิ์" error={roleError} required>
-        <Select
-          value={role}
-          onChange={(e) => onRoleChange(e.target.value as Role | "")}
-          placeholder="เลือกสิทธิ์"
-        >
-          {BASE_ROLES.map((r) => (
-            <option key={r} value={r}>
-              {ROLE_LABEL[r]}
-            </option>
-          ))}
-        </Select>
+        <div className="space-y-2">
+          {roles.length > 0 && (
+            <ul className="space-y-1.5">
+              {roles.map((r) => (
+                <li
+                  key={r}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border px-2.5 py-1.5 text-xs"
+                >
+                  <span className="truncate">{ROLE_LABEL[r]}</span>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveRole(r)}
+                    aria-label="ลบสิทธิ์"
+                    className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {availableRoles.length > 0 && (
+            <Select
+              value=""
+              onChange={(e) => e.target.value && onAddRole(e.target.value as Role)}
+              placeholder={roles.length ? "+ เพิ่มสิทธิ์" : "เลือกสิทธิ์"}
+            >
+              {availableRoles.map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_LABEL[r]}
+                </option>
+              ))}
+            </Select>
+          )}
+        </div>
       </Field>
 
       <Field label="ตำแหน่งหัวหน้างาน (แผนกตัวเอง)">
@@ -876,9 +910,14 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
   // own values rather than the previously edited row's.
   const current: ProfileEdit | null = draft ?? (profile ? pickEditable(profile) : null);
 
-  function setRole(role: Role | "") {
+  function addRole(role: Role) {
+    if (!current || current.roles.includes(role)) return;
+    setDraft({ ...current, roles: [...current.roles, role] });
+  }
+
+  function removeRole(role: Role) {
     if (!current) return;
-    setDraft({ ...current, roles: role ? [role] : [] });
+    setDraft({ ...current, roles: current.roles.filter((r) => r !== role) });
   }
 
   function addTitle(titleId: string) {
@@ -893,6 +932,10 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
 
   function save() {
     if (!profile || !current) return;
+    if (current.roles.includes("dept_director") && !current.department_id) {
+      toast("ผู้บริหารแผนกต้องระบุแผนก", "error");
+      return;
+    }
     update.mutate(
       { id: profile.id, originalPhone: profile.phone, ...current },
       {
@@ -1016,10 +1059,11 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
 
           <FormSection icon={<ShieldIcon className="h-4 w-4" />} title="สิทธิ์และบัญชี">
             <RolePicker
-              role={current.roles[0] ?? ""}
+              roles={current.roles}
               positionTitleIds={current.positionTitleIds}
               positionTitles={positionTitles}
-              onRoleChange={setRole}
+              onAddRole={addRole}
+              onRemoveRole={removeRole}
               onAddTitle={addTitle}
               onRemoveTitle={removeTitle}
             />
@@ -1127,7 +1171,7 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [attempted, setAttempted] = useState(false);
 
-  const role = draft.roles[0] ?? "";
+  const role = primaryRole(draft.roles);
   const autoPassword = defaultPasswordFor(role, draft.date_of_birth, guardianStudents[0]?.student_code ?? null);
 
   function pickAvatar(file: File | null) {
@@ -1145,7 +1189,8 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
     if (!draft.last_name.trim()) e.last_name = "กรอกนามสกุล";
     if (!draft.date_of_birth) e.date_of_birth = "เลือกวันเดือนปีเกิดให้ครบ";
     if (!role) e.role = "เลือกสิทธิ์";
-    if (role === "teacher" && !draft.learning_area_id) e.learning_area_id = "เลือกกลุ่มสาระ";
+    if (draft.roles.includes("dept_director") && !draft.department_id) e.role = "ผู้บริหารแผนกต้องระบุแผนก";
+    if (draft.roles.includes("teacher") && !draft.learning_area_id) e.learning_area_id = "เลือกกลุ่มสาระ";
     if (role === "parent" && guardianStudents.length === 0) {
       e.guardianStudents = "เลือกนักเรียนที่ดูแลอย่างน้อย 1 คน";
     }
@@ -1164,9 +1209,13 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
     if (attempted) setErrors(validate());
   }, [attempted, draft, guardianStudents]);
 
-  function setRole(role: Role | "") {
-    setDraft((d) => ({ ...d, roles: role ? [role] : [] }));
-    if (role !== "parent") setGuardianStudents([]);
+  function addRole(role: Role) {
+    setDraft((d) => (d.roles.includes(role) ? d : { ...d, roles: [...d.roles, role] }));
+  }
+
+  function removeRole(role: Role) {
+    setDraft((d) => ({ ...d, roles: d.roles.filter((r) => r !== role) }));
+    if (role === "parent") setGuardianStudents([]);
   }
 
   function addTitle(titleId: string) {
@@ -1312,10 +1361,11 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
 
         <FormSection icon={<ShieldIcon className="h-4 w-4" />} title="สิทธิ์และบัญชี">
           <RolePicker
-            role={draft.roles[0] ?? ""}
+            roles={draft.roles}
             positionTitleIds={draft.positionTitleIds}
             positionTitles={positionTitles}
-            onRoleChange={setRole}
+            onAddRole={addRole}
+            onRemoveRole={removeRole}
             onAddTitle={addTitle}
             onRemoveTitle={removeTitle}
             roleError={errors.role}
