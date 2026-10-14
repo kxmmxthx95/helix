@@ -559,6 +559,7 @@ function SubjectPanel({
   const [copying, setCopying] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(cohortName);
+  const [search, setSearch] = useState("");
   const toast = useToast();
   const rename = useRenameCohort();
 
@@ -604,10 +605,29 @@ function SubjectPanel({
     });
   }, [rows, splitsByTerm, term, subjectById]);
 
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return visible;
+    return visible.filter((r) => {
+      const s = subjectById.get(r.subject_id);
+      return [s?.code, s?.name_th, s?.name_en].some((v) => v?.toLowerCase().includes(q));
+    });
+  }, [visible, search, subjectById]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex shrink-0 items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{cohortName}</span>
+        {visible.length > 0 && (
+          <Input
+            type="search"
+            className="w-48 shrink-0"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหารหัสหรือชื่อวิชา..."
+            aria-label="ค้นหาวิชาในหลักสูตร"
+          />
+        )}
         {mayEdit && (
           <Button
             variant="outline"
@@ -764,9 +784,15 @@ function SubjectPanel({
         </div>
       )}
 
-      {!isLoading && visible.length > 0 && (
+      {!isLoading && visible.length > 0 && shown.length === 0 && (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="ไม่พบข้อมูล" description="ไม่มีวิชาที่ตรงกับคำค้นหา" />
+        </div>
+      )}
+
+      {!isLoading && shown.length > 0 && (
         <SubjectTable
-          rows={visible}
+          rows={shown}
           subjectById={subjectById}
           studyPlans={studyPlans}
           areaLabel={topAreaLabel}

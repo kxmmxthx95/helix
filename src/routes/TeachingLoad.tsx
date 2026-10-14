@@ -994,7 +994,7 @@ function NewAssignmentForm({
                 />
               </div>
 
-              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              <div className="-mx-1 flex gap-2 scrollbar-hidden overflow-x-auto px-1 pb-1">
                 {[
                   ["", "ทั้งหมด"],
                   ...areaIds.map((id) => [id, areaName.get(id) ?? "—"]),
