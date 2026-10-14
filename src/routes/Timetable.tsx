@@ -608,9 +608,6 @@ function PickerList({
                 )}
                 <p className="truncate text-xs text-muted-foreground">{i.subtitle}</p>
               </div>
-              <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-                {i.subjects} รายวิชา
-              </span>
             </button>
           </li>
         ))}

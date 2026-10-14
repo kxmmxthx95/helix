@@ -1014,10 +1014,10 @@ function GroupLinkSheet({
                               <BookIcon className="h-5 w-5" />
                             </span>
                             <div className="min-w-0 flex-1 leading-tight">
-                              <p className="truncate text-sm font-medium">
+                              <p className="truncate text-xs font-medium">
                                 {s?.code ?? "—"} {s?.name_th ?? ""}
                               </p>
-                              <p className="text-xs text-muted-foreground">{room.label}</p>
+                              <p className="text-[11px] text-muted-foreground">{room.label}</p>
                             </div>
                             {statusChip(!!a.group_id)}
                           </button>
