@@ -3,6 +3,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import {
   CheckmarkCircleIcon,
   AppsIcon,
+  BookIcon,
   ChevronForward,
   DocumentTextIcon,
   EyeIcon,
@@ -39,6 +40,7 @@ import {
   type TaskStatus,
 } from "@/lib/docTasks";
 import { isOrgWide } from "@/lib/roles";
+import { subjectTint } from "@/lib/subjectTint";
 import { teacherLessonProgress, type LessonStatus, type TeacherLessonProgress } from "@/lib/teacherDocProgress";
 import { cn } from "@/lib/utils";
 
@@ -112,11 +114,11 @@ function LessonStatusChip({ status }: { status: LessonStatus }) {
   );
 }
 
-function LessonProgressBar({ status, percent }: { status: LessonStatus; percent: number | null }) {
+function LessonProgressBar({ status, percent, wide }: { status: LessonStatus; percent: number | null; wide?: boolean }) {
   if (percent === null) return <span className="text-muted-foreground">—</span>;
   return (
     <div className="flex items-center gap-2">
-      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+      <div className={cn("h-1.5 overflow-hidden rounded-full bg-muted", wide ? "flex-1" : "w-24")}>
         <div className={cn("h-full", LESSON_STATUS[status].bar)} style={{ width: `${percent}%` }} />
       </div>
       <span className="text-muted-foreground">{percent}%</span>
@@ -290,36 +292,105 @@ function SummaryCard({
   );
 }
 
+type PairFilter = "all" | "open" | "done";
+
+const pairStatus = (pair: { total: number; uploaded: number }): LessonStatus =>
+  !pair.total ? "nodata" : pair.uploaded >= pair.total ? "complete" : pair.uploaded === 0 ? "none" : "partial";
+
 /** One teacher's subject x grade pairs with เนื้อหาหลัก uploaded / total, files and progress (read-only for reviewers). */
 function TeacherLessonsSheet({ target, onClose }: { target: { teacher: ProfileRow; p: TeacherLessonProgress } | null; onClose: () => void }) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<PairFilter>("all");
+  const [sort, setSort] = useState<"code" | "progress">("code");
+
+  const pairs = target?.p.pairs ?? [];
+  const done = (p: (typeof pairs)[number]) => pairStatus(p) === "complete";
+  const doneCount = pairs.filter(done).length;
+  const q = search.trim().toLowerCase();
+  const shown = pairs
+    .filter((p) => (filter === "all" ? true : filter === "done" ? done(p) : !done(p)))
+    .filter((p) => !q || `${p.row?.code ?? ""} ${p.row?.nameTh ?? ""}`.toLowerCase().includes(q))
+    .sort((a, b) =>
+      sort === "progress"
+        ? (a.percent ?? -1) - (b.percent ?? -1)
+        : (a.row?.code ?? "").localeCompare(b.row?.code ?? "", "th", { numeric: true }) ||
+          (a.row?.gradeName ?? "").localeCompare(b.row?.gradeName ?? "", "th", { numeric: true }),
+    );
+  const tabs: [PairFilter, string, number][] = [
+    ["all", "ทั้งหมด", pairs.length],
+    ["open", "ยังไม่ครบ", pairs.length - doneCount],
+    ["done", "ครบแล้ว", doneCount],
+  ];
+
   return (
     <Sheet
       open={target !== null}
-      onOpenChange={(o) => !o && onClose()}
+      onOpenChange={(o) => {
+        if (!o) {
+          setSearch("");
+          setFilter("all");
+          onClose();
+        }
+      }}
       title={target ? profileFullName(target.teacher) : ""}
       description="วิชาและระดับชั้นที่สอน"
       headerEnd={target && <LessonStatusChip status={target.p.status} />}
     >
-      {!target || target.p.pairs.length === 0 ? (
+      {!target || pairs.length === 0 ? (
         <p className="text-xs text-muted-foreground">ยังไม่มีการมอบหมายสอนสำหรับครูท่านนี้</p>
       ) : (
-        <ul className="space-y-2">
-          {target.p.pairs.map((pair) => (
-            <li key={pair.key} className="space-y-1.5 rounded-xl border border-border p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{pair.row ? `${pair.row.code} ${pair.row.nameTh}` : "—"}</div>
-                  <div className="text-[11px] text-muted-foreground">{pair.row?.gradeName ?? "—"}</div>
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ค้นหารหัสวิชา หรือชื่อวิชา..." aria-label="ค้นหาวิชา" />
+          </div>
+
+          <div className="scrollbar-hidden -mx-1 flex gap-2 overflow-x-auto px-1 py-1">
+              {tabs.map(([key, label, n]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFilter(key)}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3.5 py-1.5 text-xs transition-colors",
+                    filter === key ? "border-accent bg-accent/10 font-medium text-accent" : "border-transparent bg-muted text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label} ({n})
+                </button>
+              ))}
+          </div>
+          <div>
+            <Select className="w-full" value={sort} onChange={(e) => setSort(e.target.value as "code" | "progress")} aria-label="เรียงลำดับ">
+              <option value="code">เรียงตามรหัสวิชา</option>
+              <option value="progress">เรียงตามความคืบหน้า</option>
+            </Select>
+          </div>
+
+          <ul className="space-y-2">
+            {shown.map((pair) => (
+              <li key={pair.key} className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <span className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", subjectTint(pair.row?.subjectId ?? pair.key))}>
+                  <BookIcon className="h-6 w-6" />
+                </span>
+                <div className="min-w-0 flex-1 space-y-1 leading-tight">
+                  <p className="text-xs text-muted-foreground">{pair.row?.code ?? "—"}</p>
+                  <p className="truncate text-sm font-medium">{pair.row?.nameTh ?? "—"}</p>
+                  <p className="text-[11px] text-muted-foreground">{pair.row?.gradeName ?? "—"}</p>
+                  <LessonProgressBar wide status={pairStatus(pair)} percent={pair.percent} />
                 </div>
-                <div className="shrink-0 text-right text-xs">
-                  <div className="font-medium">เนื้อหาหลัก {pair.uploaded} / {pair.total || "—"}</div>
-                  <div className="text-[11px] text-muted-foreground">{pair.files} ไฟล์</div>
+                <div className="shrink-0 border-l border-border pl-3 text-right text-xs">
+                  <p className="font-medium">เนื้อหาหลัก {pair.uploaded} / {pair.total || "—"}</p>
+                  <p className="mt-1 inline-flex items-center justify-end gap-1 text-[11px] text-muted-foreground">
+                    <DocumentTextIcon className="h-3 w-3" />
+                    {pair.files} ไฟล์
+                  </p>
                 </div>
-              </div>
-              <LessonProgressBar status={!pair.total ? "nodata" : pair.uploaded >= pair.total ? "complete" : pair.uploaded === 0 ? "none" : "partial"} percent={pair.percent} />
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+            {shown.length === 0 && <li className="py-8 text-center text-xs text-muted-foreground">ไม่พบวิชาที่ตรงเงื่อนไข</li>}
+          </ul>
+        </div>
       )}
     </Sheet>
   );
