@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import {
   AlertTriangle,
@@ -42,6 +42,18 @@ export const SUBJECT_TYPES: { value: SubjectType; label: string }[] = [
 
 /** Select value for "ทั้งหมด" — distinct from "" (nothing picked yet) so the select shows the word instead of its placeholder. */
 const ALL = "all";
+
+/** Date on the first line, time under it. */
+function DateTime({ iso }: { iso: string | undefined }) {
+  if (!iso) return <>—</>;
+  const d = new Date(iso);
+  return (
+    <>
+      <div>{thDate(iso)}</div>
+      <div className="text-[11px] text-muted-foreground">{d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}</div>
+    </>
+  );
+}
 
 const thDate = (iso: string) =>
   new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
@@ -103,7 +115,7 @@ function ProgressBar({ status, percent }: { status: CoverageStatus; percent: num
   );
 }
 
-const ofTarget = (n: number, target: number) => `${n} / ${target || "—"}`;
+const ofTarget = (n: number, target: number) => (target ? `${n} / ${target}` : String(n));
 
 /** ติดตามเนื้อหา — per วิชา × ระดับชั้น: เนื้อหาหลัก / เนื้อหาย่อย recorded against the targets, files, and who recorded last. */
 export function DocCoverageTab() {
@@ -125,7 +137,18 @@ export function DocCoverageTab() {
   const [view, setView] = useState<"list" | "grid">("list");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<string | null>(null); // expanded row
-  const [menu, setMenu] = useState<string | null>(null); // ⋯ menu row
+  // ⋯ menu: fixed-positioned from the button's rect so the table's overflow-x scroller can't clip it; flips upward near the viewport bottom.
+  const [menu, setMenu] = useState<{ key: string; right: number; top?: number; bottom?: number } | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [menu]);
   const [targetFor, setTargetFor] = useState<CoverageRow[] | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
 
@@ -134,6 +157,11 @@ export function DocCoverageTab() {
   const canPickDept = me!.roles.some((r) => r === "super_admin" || r === "director");
   const [deptPick, setDeptPick] = useState("");
   const deptId = canPickDept ? (deptPick === ALL ? "" : deptPick) : (me!.department_id ?? "");
+  // Grade options grouped by department (useDepartments order: อนุบาล -> ประถม -> มัธยม), then by level — sort_order alone interleaves departments.
+  const deptRank = new Map(departments.map((d, i) => [d.id, i]));
+  const gradeOptions = grades
+    .filter((g) => !deptId || g.department_id === deptId)
+    .sort((a, b) => (deptRank.get(a.department_id) ?? 99) - (deptRank.get(b.department_id) ?? 99) || a.sort_order - b.sort_order);
   const scoped = useMemo(
     () =>
       rows.filter(
@@ -182,14 +210,30 @@ export function DocCoverageTab() {
   if (isError) return <EmptyState title="โหลดข้อมูลไม่สำเร็จ" description="ลองรีเฟรชหน้านี้อีกครั้ง" icon={AlertTriangle} />;
 
   const rowMenu = (r: CoverageRow) => (
-    <div className="relative inline-block text-left">
-      <Button size="icon" variant="outline" aria-label="จัดการ" aria-haspopup="menu" aria-expanded={menu === r.key} onClick={() => setMenu(menu === r.key ? null : r.key)}>
+    <>
+      <Button
+        size="icon"
+        variant="outline"
+        aria-label="จัดการ"
+        aria-haspopup="menu"
+        aria-expanded={menu?.key === r.key}
+        onClick={(e) => {
+          if (menu?.key === r.key) return setMenu(null);
+          const b = e.currentTarget.getBoundingClientRect();
+          const right = window.innerWidth - b.right;
+          setMenu(b.bottom + 100 > window.innerHeight ? { key: r.key, right, bottom: window.innerHeight - b.top + 4 } : { key: r.key, right, top: b.bottom + 4 });
+        }}
+      >
         <MoreIcon className="h-3.5 w-3.5" />
       </Button>
-      {menu === r.key && (
+      {menu?.key === r.key && (
         <>
-          <button type="button" aria-label="ปิดเมนู" className="fixed inset-0 z-10 cursor-default" onClick={() => setMenu(null)} />
-          <div role="menu" className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-border bg-card py-1 text-xs shadow-lg">
+          <button type="button" aria-label="ปิดเมนู" className="fixed inset-0 z-30 cursor-default" onClick={() => setMenu(null)} />
+          <div
+            role="menu"
+            style={{ top: menu.top, bottom: menu.bottom, right: menu.right }}
+            className="fixed z-40 w-44 overflow-hidden rounded-xl border border-border bg-card py-1 text-left text-xs shadow-lg"
+          >
             <button
               type="button"
               role="menuitem"
@@ -205,7 +249,7 @@ export function DocCoverageTab() {
           </div>
         </>
       )}
-    </div>
+    </>
   );
 
   return (
@@ -226,7 +270,7 @@ export function DocCoverageTab() {
           )}
           <Select aria-label="ระดับชั้น" placeholder="เลือกระดับชั้น" value={gradeId} onChange={(e) => setGradeId(e.target.value)}>
             <option value={ALL}>ทั้งหมด</option>
-            {grades.filter((g) => !deptId || g.department_id === deptId).map((g) => (
+            {gradeOptions.map((g) => (
               <option key={g.id} value={g.id}>{g.name}</option>
             ))}
           </Select>
@@ -328,7 +372,7 @@ export function DocCoverageTab() {
                       <td className="px-3 py-2.5">{ofTarget(s.lessons, r.lessonTarget)}</td>
                       <td className="px-3 py-2.5">{ofTarget(s.topics, r.topicTarget)}</td>
                       <td className="px-3 py-2.5 text-right">{s.files}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5">{s.last ? thDate(s.last.lastAt) : "—"}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5"><DateTime iso={s.last?.lastAt} /></td>
                       <td className="px-3 py-2.5">{nameOf(s.last?.lastBy ?? null)}</td>
                       <td className="px-3 py-2.5"><ProgressBar status={s.status} percent={s.progress} /></td>
                       <td className="px-3 py-2.5"><StatusChip status={s.status} /></td>
@@ -347,7 +391,7 @@ export function DocCoverageTab() {
                             <td />
                             <td className="px-3 py-2">{l.topicCount}</td>
                             <td className={cn("px-3 py-2 text-right", l.fileCount === 0 && "text-destructive")}>{l.fileCount}</td>
-                            <td className="whitespace-nowrap px-3 py-2">{thDate(l.lastAt)}</td>
+                            <td className="whitespace-nowrap px-3 py-2"><DateTime iso={l.lastAt} /></td>
                             <td className="px-3 py-2">{nameOf(l.lastBy)}</td>
                             <td />
                             <td className="px-3 py-2 text-[11px] text-destructive">{l.fileCount === 0 ? "ยังไม่มีไฟล์" : ""}</td>

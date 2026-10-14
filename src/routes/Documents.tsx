@@ -216,12 +216,15 @@ function DocBrowser({
   const { data: summary } = useDocSummary();
   const { data: departments = [] } = useDepartments();
   const { data: areas = [] } = useLearningAreas();
+  const { profile: me } = useAuth();
+  // Grade options follow the department: the picked one for org-wide managers, otherwise the viewer's own (none = every department).
+  const gradeDeptId = showDepartments ? departmentId : (me?.department_id ?? "");
 
   const gradeById = new Map(gradeLevels.map((g) => [g.id, g]));
   // อนุบาล (K) → ประถม (P) → มัธยม (M), then by number — sort_order alone interleaves departments.
   const levelRank = (code: string) => "KPM".indexOf(code[0]?.toUpperCase() ?? "");
   const gradeCodes = [
-    ...new Set(gradeLevels.filter((g) => !departmentId || g.department_id === departmentId).map((g) => g.code)),
+    ...new Set(gradeLevels.filter((g) => !gradeDeptId || g.department_id === gradeDeptId).map((g) => g.code)),
   ].sort((a, b) => levelRank(a) - levelRank(b) || Number.parseInt(a.slice(1)) - Number.parseInt(b.slice(1)));
   const q = search.trim().toLowerCase();
   const cards = subjects

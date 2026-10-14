@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DocFile, DocLesson, GradeLevel, SubjectType } from "@/lib/database.types";
+import { gradeShortLabel } from "@/lib/gradeLevels";
 import { supabase } from "@/lib/supabase";
 
 // เอกสาร — วิชา -> ระดับชั้น -> เนื้อหาหลัก -> ไฟล์.
@@ -330,7 +331,7 @@ export type CoverageRow = {
 };
 
 type CoverageSubject = { code: string; name_th: string; department_id: string; learning_area_id: string; subject_type: SubjectType };
-type CoverageGrade = { name: string; sort_order: number };
+type CoverageGrade = { name: string; code: string; sort_order: number };
 const SUBJECT_COLS = "code, name_th, department_id, learning_area_id, subject_type";
 
 /** Every curriculum (subject x grade) plus any that already have lessons, with per-lesson topic/file counts and targets — for the ติดตามเนื้อหา tab. RLS limits lessons to what the caller reads. */
@@ -341,11 +342,11 @@ export function useDocCoverage() {
       const [cur, les, tgt] = await Promise.all([
         supabase
           .from("curriculum_subjects")
-          .select(`subject_id, grade_level_id, subjects!inner(${SUBJECT_COLS}, is_active), grade_levels(name, sort_order)`)
+          .select(`subject_id, grade_level_id, subjects!inner(${SUBJECT_COLS}, is_active), grade_levels(name, code, sort_order)`)
           .eq("subjects.is_active", true),
         supabase
           .from("doc_lessons")
-          .select(`*, subjects(${SUBJECT_COLS}), grade_levels(name, sort_order), doc_topics(count), doc_files(created_at, uploaded_by, review_status)`)
+          .select(`*, subjects(${SUBJECT_COLS}), grade_levels(name, code, sort_order), doc_topics(count), doc_files(created_at, uploaded_by, review_status)`)
           .order("sort_order"),
         supabase.from("doc_targets").select("*"),
       ]);
@@ -361,7 +362,7 @@ export function useDocCoverage() {
           const t = targets.get(key);
           r = {
             key, subjectId, code: s.code, nameTh: s.name_th, departmentId: s.department_id, learningAreaId: s.learning_area_id, subjectType: s.subject_type,
-            gradeLevelId: gradeId, gradeName: g?.name ?? "—", gradeSort: g?.sort_order ?? 0,
+            gradeLevelId: gradeId, gradeName: g ? gradeShortLabel(g.code) : "—", gradeSort: g?.sort_order ?? 0,
             lessonTarget: t?.lesson_target ?? 0, topicTarget: t?.topic_target ?? 0, lessons: [],
           };
           out.set(key, r);
