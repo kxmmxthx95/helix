@@ -1,4 +1,4 @@
-import { AlertTriangle, DownloadIcon, FileUp } from "@/components/icons";
+import { AlertTriangle, BookIcon, CheckmarkCircleIcon, DownloadIcon, InfoIcon, Upload } from "@/components/icons";
 import { useMemo, useRef, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, Spinner } from "@/components/ui";
@@ -6,6 +6,7 @@ import { useImportSubjects, type SubjectDraft } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { downloadCsv, readTable, type CsvIssue } from "@/lib/csv";
 import type { LearningArea, SubjectType } from "@/lib/database.types";
+import { cn } from "@/lib/utils";
 
 const SUBJECT_TYPE_BY_LABEL = new Map<string, SubjectType>([
   ["พื้นฐาน", "basic"],
@@ -14,15 +15,15 @@ const SUBJECT_TYPE_BY_LABEL = new Map<string, SubjectType>([
 ]);
 
 const COLUMNS = [
-  { key: "code", header: "รหัสวิชา", required: true },
-  { key: "name_th", header: "ชื่อวิชา (ไทย)", required: true },
-  { key: "name_en", header: "ชื่อวิชา (อังกฤษ)" },
-  { key: "learning_area_code", header: "รหัสกลุ่มสาระ", required: true },
-  { key: "subject_type", header: "ประเภทวิชา", required: true },
-  { key: "credits", header: "หน่วยกิต", required: true },
-  { key: "hours_per_week", header: "ชั่วโมง/สัปดาห์", required: true },
-  { key: "suggested_grade_level_code", header: "ระดับชั้นที่แนะนำ (รหัส)" },
-  { key: "suggested_term", header: "เทอมที่แนะนำ" },
+  { key: "code", header: "รหัสวิชา", required: true, hint: "รหัสประจำวิชา เช่น sci101" },
+  { key: "name_th", header: "ชื่อวิชา (ไทย)", required: true, hint: "ชื่อวิชาภาษาไทย เช่น วิทยาศาสตร์พื้นฐาน 1" },
+  { key: "name_en", header: "ชื่อวิชา (อังกฤษ)", hint: "ชื่อวิชาภาษาอังกฤษ เช่น Basic Science 1" },
+  { key: "learning_area_code", header: "รหัสกลุ่มสาระ", required: true, hint: "รหัสหรือชื่อกลุ่มสาระ เช่น science" },
+  { key: "subject_type", header: "ประเภทวิชา", required: true, hint: "พื้นฐาน, เพิ่มเติม หรือ กิจกรรม" },
+  { key: "credits", header: "หน่วยกิต", required: true, hint: "จำนวนหน่วยกิต เช่น 1.5" },
+  { key: "hours_per_week", header: "ชั่วโมง/สัปดาห์", required: true, hint: "จำนวนชั่วโมงต่อสัปดาห์ (จำนวนเต็ม) เช่น 3" },
+  { key: "suggested_grade_level_code", header: "ระดับชั้นที่แนะนำ (รหัส)", hint: "รหัสระดับชั้น เช่น M1" },
+  { key: "suggested_term", header: "เทอมที่แนะนำ", hint: "เทอม 1 หรือ 2" },
 ];
 
 const TEMPLATE_HEADER = COLUMNS.map((c) => c.header).join(",");
@@ -30,6 +31,13 @@ const TEMPLATE_EXAMPLE = ["sci101", "วิทยาศาสตร์พื้�
   ",",
 );
 const TEMPLATE = `${TEMPLATE_HEADER}\n${TEMPLATE_EXAMPLE}`;
+const EXAMPLE_ROWS = [
+  TEMPLATE_EXAMPLE.split(","),
+  ["art101", "ศิลปะพื้นฐาน 1", "Basic Art 1", "art", "พื้นฐาน", "1", "2", "M1", "2"],
+];
+
+const CARD = "rounded-xl border p-4";
+const SECTION_TITLE = "flex items-center gap-2 text-sm font-semibold";
 
 type Parsed = { rows: Record<string, string>[]; issues: CsvIssue[] };
 type Resolved = { draft: SubjectDraft; row: number } | { issue: string; row: number };
@@ -174,6 +182,8 @@ export function ImportSubjectsSheet({
         onOpenChange(next);
       }}
       title="นำเข้ารายวิชา"
+      description="นำเข้าข้อมูลรายวิชาจากไฟล์ CSV ตามรูปแบบที่กำหนด"
+      wide
       footer={
         parsed ? (
           <div className="flex gap-2">
@@ -194,25 +204,122 @@ export function ImportSubjectsSheet({
       <div className="space-y-4">
         {!parsed && !outcome && (
           <>
-            <Card className="space-y-2">
-              <p className="text-sm font-medium">คอลัมน์ที่ต้องมี</p>
-              <p data-selectable className="font-mono text-xs text-muted-foreground">
-                {TEMPLATE_HEADER}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                คอลัมน์ที่จำเป็น: รหัสวิชา, ชื่อวิชา (ไทย), รหัสกลุ่มสาระ, ประเภทวิชา, หน่วยกิต, ชั่วโมง/สัปดาห์ —
-                รหัสกลุ่มสาระใช้รหัสหรือชื่อกลุ่มสาระ/สาระย่อยก็ได้ (เช่น "science" หรือ "ฟิสิกส์") — ประเภทวิชา:
-                พื้นฐาน, เพิ่มเติม, กิจกรรม — ระดับชั้นที่แนะนำใช้รหัสระดับชั้น เช่น "M1" (ไม่บังคับ)
-              </p>
+            <section className={cn(CARD, "space-y-3 border-primary/20 bg-primary/5")}>
+              <div>
+                <h3 className={cn(SECTION_TITLE, "text-primary")}>
+                  <InfoIcon className="h-4 w-4" />
+                  คอลัมน์ในไฟล์
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  หัวคอลัมน์ต้องตรงตามนี้ เรียงลำดับได้ตามต้องการ
+                </p>
+              </div>
+              <ol className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+                {COLUMNS.map((c, i) => (
+                  <li key={c.key} className="flex items-start gap-3 px-3 py-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                        {c.header}
+                        {!c.required && (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-normal text-muted-foreground">
+                            ไม่บังคับ
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{c.hint}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
+
+            <section className={cn(CARD, "space-y-2 border-success/40 bg-success/10")}>
+              <h3 className={cn(SECTION_TITLE, "text-success")}>
+                <CheckmarkCircleIcon className="h-4 w-4" />
+                รูปแบบที่รองรับ
+              </h3>
+              <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground marker:text-success">
+                <li>รหัสกลุ่มสาระใช้รหัสหรือชื่อกลุ่มสาระ/สาระย่อยก็ได้ (เช่น "science" หรือ "ฟิสิกส์")</li>
+                {learningAreas.some((a) => !a.parent_id) && (
+                  <li>
+                    รหัสกลุ่มสาระที่ใช้ได้:
+                    <ul data-selectable className="mt-1 list-disc space-y-0.5 pl-5 marker:text-success">
+                      {learningAreas.filter((a) => !a.parent_id).map((a) => (
+                        <li key={a.id}>
+                          <span className="font-mono text-foreground">{a.code}</span> · {a.name}
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                )}
+                <li>ประเภทวิชา: พื้นฐาน, เพิ่มเติม, กิจกรรม</li>
+                <li>ระดับชั้นที่แนะนำใช้รหัสหรือชื่อระดับชั้น เช่น "M1"</li>
+              </ul>
+            </section>
+
+            <section className={cn(CARD, "space-y-2 border-primary/20")}>
+              <h3 className={SECTION_TITLE}>
+                <BookIcon className="h-4 w-4 text-primary" />
+                ตัวอย่างไฟล์ CSV
+              </h3>
+              <div className="overflow-x-auto rounded-lg border border-border bg-card">
+                <table data-selectable className="w-full min-w-[40rem] text-xs">
+                  <thead className="bg-muted text-left text-muted-foreground">
+                    <tr>
+                      {COLUMNS.map((c) => (
+                        <th key={c.key} className="px-2 py-2 font-medium">
+                          {c.header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {EXAMPLE_ROWS.map((row, i) => (
+                      <tr key={i} className="border-t border-border">
+                        {row.map((cell, j) => (
+                          <td key={j} className="px-2 py-2">
+                            {cell}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className={cn(CARD, "space-y-2 border-warning/40 bg-warning/10")}>
+              <h3 className={cn(SECTION_TITLE, "text-warning")}>
+                <AlertTriangle className="h-4 w-4" />
+                ข้อควรระวัง
+              </h3>
+              <ul className="list-disc space-y-1 pl-5 text-xs text-muted-foreground marker:text-warning">
+                <li>ไฟล์ต้องเป็นนามสกุล .csv เท่านั้น</li>
+                <li>รหัสวิชาที่ซ้ำกับที่มีอยู่แล้วในแผนกนี้จะถูกข้าม</li>
+                <li>หน่วยกิตและชั่วโมง/สัปดาห์ต้องเป็นตัวเลข</li>
+                <li>เทอมที่แนะนำต้องเป็น 1 หรือ 2</li>
+                <li>ระบบแสดงตัวอย่างให้ตรวจก่อนยืนยัน ยังไม่บันทึกข้อมูลทันที</li>
+              </ul>
+            </section>
+
+            <div className="flex gap-2">
               <Button
                 variant="outline"
-                size="sm"
+                size="lg"
+                className="flex-1"
                 onClick={() => downloadCsv("helix-subjects-template.csv", TEMPLATE)}
               >
                 <DownloadIcon className="h-3 w-3" />
                 ดาวน์โหลด template
               </Button>
-            </Card>
+              <Button size="lg" className="flex-1" onClick={() => fileInput.current?.click()} disabled={!departmentId}>
+                <Upload className="h-3 w-3" />
+                เลือกไฟล์ CSV
+              </Button>
+            </div>
 
             <input
               ref={fileInput}
@@ -221,10 +328,6 @@ export function ImportSubjectsSheet({
               onChange={onFile}
               className="hidden"
             />
-            <Button size="lg" className="w-full" onClick={() => fileInput.current?.click()} disabled={!departmentId}>
-              <FileUp className="h-3 w-3" />
-              เลือกไฟล์ CSV
-            </Button>
           </>
         )}
 
