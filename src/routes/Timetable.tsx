@@ -455,10 +455,6 @@ function ClassroomTimetable({
         styling={styling}
         scope={{ departmentId, academicYear, term }}
         ghostEntries={ghostEntries}
-        teacherLines={(id) => {
-          const t = findTeacher(id);
-          return t ? [`${"prefix" in t ? (t.prefix ?? "") : ""}${t.first_name}`, t.last_name] : ["—", ""];
-        }}
         mode="classroom"
         mayEdit={mayEdit}
         isLoading={loadingDefaultPeriods || loadingGradePeriods || loadingEntries}
@@ -1025,7 +1021,6 @@ function TimetableGrid({
   subjectName,
   teacherLabel,
   roomLabel,
-  teacherLines,
   styling,
   scope,
   ghostEntries = [],
@@ -1042,8 +1037,6 @@ function TimetableGrid({
   subjectName: (id: string) => string;
   teacherLabel: (id: string) => string;
   roomLabel: (id: string) => string;
-  /** First name / last name as two lines, for the classroom view where the teacher is the card's last line. */
-  teacherLines?: (id: string) => [string, string];
   styling: TimetableStyling;
   /** Where these entries live — used to look up what a rejected placement collided with. */
   scope: { departmentId: string; academicYear: number; term: number | null };
@@ -1282,40 +1275,35 @@ function TimetableGrid({
                                 setOverKey(null);
                               }}
                               className={cn(
-                                "relative space-y-0.5 rounded-lg px-3 py-2.5 leading-snug",
-                                mayEdit && "cursor-grab active:cursor-grabbing",
+                                "relative space-y-0.5 rounded-lg px-2.5 py-2 leading-snug",
+                                mayEdit && "cursor-grab transition-shadow hover:shadow-md active:cursor-grabbing",
                                 drag?.id === e.id && "opacity-40",
                                 styling.gradient(subjectId, e.teaching_assignment.classroom_id),
                               )}
                             >
-                              <p className="pr-5 text-sm font-semibold">{subjectLabel(subjectId)}</p>
-                              <p className="truncate">{subjectName(subjectId)}</p>
-                              <div
+                              <span
+                                title={styling.typeLabel(subjectId)}
                                 className={cn(
-                                  "mt-1.5 text-[11px]",
-                                  // Teacher names are long: full width on the last line, badge above them.
-                                  mode === "classroom" ? "flex flex-col-reverse items-start gap-1" : "flex items-center justify-between gap-2",
+                                  "absolute top-3 h-2 w-2 rounded-full ring-2 ring-white/60",
+                                  mayEdit ? "right-8" : "right-3",
+                                  styling.typeBadge(subjectId),
                                 )}
-                              >
-                                <span className={cn("min-w-0 opacity-70", mode === "classroom" ? "break-words" : "truncate")}>
-                                  {mode === "classroom" ? (
-                                    teacherLines ? (
-                                      teacherLines(e.teaching_assignment.teacher_id).map((line, k) => (
-                                        <span key={k} className="block">
-                                          {line}
-                                        </span>
-                                      ))
-                                    ) : (
-                                      teacherLabel(e.teaching_assignment.teacher_id)
-                                    )
-                                  ) : (
-                                    roomLabel(e.teaching_assignment.classroom_id)
-                                  )}
-                                </span>
-                                <span className={cn("shrink-0 rounded-full px-2 py-px text-[10px] leading-4", styling.typeBadge(subjectId))}>
-                                  {styling.typeLabel(subjectId)}
-                                </span>
-                              </div>
+                              />
+                              <p className="pr-5 text-sm font-semibold">{subjectLabel(subjectId)}</p>
+                              <p title={subjectName(subjectId)} className="truncate">
+                                {subjectName(subjectId)}
+                              </p>
+                              {(() => {
+                                const text =
+                                  mode === "classroom"
+                                    ? teacherLabel(e.teaching_assignment.teacher_id)
+                                    : roomLabel(e.teaching_assignment.classroom_id);
+                                return (
+                                  <p title={text} className="truncate text-[11px] opacity-70">
+                                    {text}
+                                  </p>
+                                );
+                              })()}
                               {mayEdit && (
                                 <button
                                   type="button"
@@ -1323,7 +1311,7 @@ function TimetableGrid({
                                   onClick={() => {
                                     if (confirm(`ลบคาบนี้ออกจากตาราง?`)) del.mutate(e.id);
                                   }}
-                                  className="absolute right-2 top-2 opacity-60 hover:text-destructive hover:opacity-100"
+                                  className="absolute right-1 top-1 rounded-md p-1.5 opacity-60 transition-colors hover:bg-black/10 hover:text-destructive hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-current"
                                 >
                                   <X className="h-3 w-3" />
                                 </button>
@@ -1411,9 +1399,10 @@ function TimetableLegend({ styling, subjectIds }: { styling: TimetableStyling; s
         ชั้นสูง
       </span>
       <span className="inline-flex items-center gap-1.5">
-        ป้ายประเภท:
+        ประเภท:
         {(Object.keys(SUBJECT_TYPE_LABEL) as (keyof typeof SUBJECT_TYPE_LABEL)[]).map((t) => (
-          <span key={t} className={cn("rounded-full px-2 py-px text-[10px] leading-4", SUBJECT_TYPE_BADGE[t])}>
+          <span key={t} className="inline-flex items-center gap-1">
+            <span className={cn("h-2 w-2 rounded-full", SUBJECT_TYPE_BADGE[t])} />
             {SUBJECT_TYPE_LABEL[t]}
           </span>
         ))}
