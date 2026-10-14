@@ -7,6 +7,7 @@ import {
   DocumentTextIcon,
   EyeIcon,
   ListIcon,
+  PencilIcon,
   Search,
   TimeIcon,
   Upload,
@@ -644,6 +645,22 @@ export function ReviewDocsTab() {
   const [sort, setSort] = useState<"newest" | "oldest">("newest");
   const [view, setView] = useState<"list" | "grid">("list");
   const [reviewing, setReviewing] = useState<ReviewTarget | null>(null);
+  const [intent, setIntent] = useState<ReviewIntent>(null);
+  const toast = useToast();
+  const quickTask = useReviewDocTaskFile();
+  const quickDoc = useReviewDocFile();
+
+  function openReview(target: ReviewTarget, next: ReviewIntent = null) {
+    setIntent(next);
+    setReviewing(target);
+  }
+
+  function quickApprove(target: ReviewTarget) {
+    (target.kind === "doc" ? quickDoc : quickTask).mutate(
+      { fileId: target.file.id, status: "approved", note: null },
+      { onSuccess: () => toast("อนุมัติแล้ว"), onError: () => toast("บันทึกผลการตรวจไม่สำเร็จ", "error") },
+    );
+  }
 
   const personById = new Map(people.map((t) => [t.id, t]));
   const taskById = new Map(tasks.map((t) => [t.id, t]));
@@ -810,9 +827,32 @@ export function ReviewDocsTab() {
                     <ReviewChip status={i.target.file.review_status} />
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    <Button size="icon" variant="outline" aria-label="ตรวจเอกสาร" onClick={() => setReviewing(i.target)}>
-                      <EyeIcon className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex justify-end gap-1.5">
+                      <Button size="icon" variant="outline" aria-label="ตรวจเอกสาร" title="ดู/ตรวจเอกสาร" onClick={() => openReview(i.target)}>
+                        <EyeIcon className="h-3.5 w-3.5" />
+                      </Button>
+                      {i.target.file.review_status === "pending" && (
+                        <>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            aria-label="อนุมัติ"
+                            title="อนุมัติ"
+                            className="text-success"
+                            disabled={quickTask.isPending || quickDoc.isPending}
+                            onClick={() => quickApprove(i.target)}
+                          >
+                            <CheckmarkCircleIcon className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="outline" aria-label="แก้ไข" title="ส่งกลับให้แก้ไข" onClick={() => openReview(i.target, "edit")}>
+                            <PencilIcon className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="outline" aria-label="ปฏิเสธ" title="ปฏิเสธ" className="text-destructive" onClick={() => openReview(i.target, "reject")}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -822,7 +862,7 @@ export function ReviewDocsTab() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {pageRows.map((i) => (
-            <button key={i.key} type="button" onClick={() => setReviewing(i.target)} className="space-y-3 rounded-xl border border-border bg-card p-3 text-left hover:bg-muted/40">
+            <button key={i.key} type="button" onClick={() => openReview(i.target)} className="space-y-3 rounded-xl border border-border bg-card p-3 text-left hover:bg-muted/40">
               <div className="flex items-center gap-3">
                 <FileKindBadge mime={i.mime} />
                 <div className="min-w-0 flex-1">
@@ -843,10 +883,13 @@ export function ReviewDocsTab() {
       )}
       <Pagination page={page} pageCount={pageCount} onChange={setPage} />
 
-      <ReviewSheet target={reviewing} onClose={() => setReviewing(null)} />
+      <ReviewSheet target={reviewing} intent={intent} onClose={() => setReviewing(null)} />
     </div>
   );
 }
+
+/** null = open the full review (approve or send back); edit/reject jump straight to the note. */
+type ReviewIntent = "edit" | "reject" | null;
 
 type ReviewTarget = {
   kind: "task" | "doc";
@@ -856,7 +899,7 @@ type ReviewTarget = {
 };
 
 /** Review dialog shared by task submissions (doc_task_files) and lesson uploads (doc_files). */
-function ReviewSheet({ target, onClose }: { target: ReviewTarget | null; onClose: () => void }) {
+function ReviewSheet({ target, intent, onClose }: { target: ReviewTarget | null; intent: ReviewIntent; onClose: () => void }) {
   const toast = useToast();
   const reviewTask = useReviewDocTaskFile();
   const reviewDoc = useReviewDocFile();
@@ -890,14 +933,16 @@ function ReviewSheet({ target, onClose }: { target: ReviewTarget | null; onClose
   function submit(status: "approved" | "returned") {
     if (!file) return;
     if (status === "returned" && !note.trim()) {
-      toast("กรุณาระบุหมายเหตุที่ส่งกลับแก้ไข", "error");
+      toast(intent === "reject" ? "กรุณาระบุเหตุผลที่ปฏิเสธ" : "กรุณาระบุหมายเหตุที่ส่งกลับแก้ไข", "error");
       return;
     }
+    // There is no separate "rejected" state — a rejection is a send-back whose note says so.
+    const text = note.trim();
     review.mutate(
-      { fileId: file.id, status, note: note.trim() || null },
+      { fileId: file.id, status, note: text ? (intent === "reject" ? `ปฏิเสธ: ${text}` : text) : null },
       {
         onSuccess: () => {
-          toast(status === "approved" ? "อนุมัติแล้ว" : "ส่งกลับแก้ไขแล้ว");
+          toast(status === "approved" ? "อนุมัติแล้ว" : intent === "reject" ? "ปฏิเสธแล้ว" : "ส่งกลับแก้ไขแล้ว");
           close();
         },
         onError: () => toast("บันทึกผลการตรวจไม่สำเร็จ", "error"),
@@ -909,19 +954,36 @@ function ReviewSheet({ target, onClose }: { target: ReviewTarget | null; onClose
     <Sheet
       open={file !== null}
       onOpenChange={(o) => !o && close()}
-      title="ตรวจเอกสาร"
+      title={intent === "reject" ? "ปฏิเสธเอกสาร" : intent === "edit" ? "ส่งกลับให้แก้ไข" : "ตรวจเอกสาร"}
       description={file?.title}
       wide
       footer={
         file ? (
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1 text-destructive" disabled={review.isPending} onClick={() => submit("returned")}>
-              ส่งกลับแก้ไข
-            </Button>
-            <Button type="button" className="flex-1" disabled={review.isPending} onClick={() => submit("approved")}>
-              {review.isPending ? <Spinner /> : "อนุมัติ"}
-            </Button>
-          </div>
+          intent ? (
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={close}>
+                ยกเลิก
+              </Button>
+              <Button
+                type="button"
+                variant={intent === "reject" ? "outline" : "default"}
+                className={cn("flex-1", intent === "reject" && "text-destructive")}
+                disabled={review.isPending}
+                onClick={() => submit("returned")}
+              >
+                {review.isPending ? <Spinner /> : intent === "reject" ? "ปฏิเสธ" : "ส่งกลับแก้ไข"}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1 text-destructive" disabled={review.isPending} onClick={() => submit("returned")}>
+                ส่งกลับแก้ไข
+              </Button>
+              <Button type="button" className="flex-1" disabled={review.isPending} onClick={() => submit("approved")}>
+                {review.isPending ? <Spinner /> : "อนุมัติ"}
+              </Button>
+            </div>
+          )
         ) : undefined
       }
     >
@@ -945,8 +1007,16 @@ function ReviewSheet({ target, onClose }: { target: ReviewTarget | null; onClose
             </Button>
           )}
 
-          <Field label="หมายเหตุ (จำเป็นเมื่อส่งกลับแก้ไข)">
-            <Input value={note} onChange={(e) => setNote(e.target.value)} />
+          <Field
+            label={
+              intent === "reject"
+                ? "เหตุผลที่ปฏิเสธ (จำเป็น)"
+                : intent === "edit"
+                  ? "สิ่งที่ต้องแก้ไข (จำเป็น)"
+                  : "หมายเหตุ (จำเป็นเมื่อส่งกลับแก้ไข)"
+            }
+          >
+            <Input value={note} onChange={(e) => setNote(e.target.value)} autoFocus={intent !== null} />
           </Field>
         </div>
       )}
