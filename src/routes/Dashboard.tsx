@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
-import { Button, Field, Input, Skeleton, Spinner } from "@/components/ui";
+import { Button, Card, Field, Input, Skeleton, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions } from "@/hooks/useAssignments";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
@@ -21,7 +21,7 @@ import {
   type Student,
 } from "@/lib/database.types";
 import { useRoleSubtitle } from "@/hooks/useProfiles";
-import { cn } from "@/lib/utils";
+import { cn, todayIso } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
 import { bangkokTime } from "@/routes/TimeTracking";
 
@@ -40,22 +40,35 @@ const LEAVE_STATUS_STYLE: Record<StudentLeaveStatus, string> = {
 };
 
 const STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent", "leave"];
-const MONTH_LABEL = new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric" }).format(new Date());
+const monthLabel = () => new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric" }).format(new Date());
+/** ISO yyyy-mm-dd → "14 ต.ค." (parsed and formatted in UTC so the day never shifts). */
+const leaveDate = (iso: string) =>
+  new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
 
-export function currentMonthRange() {
-  const now = new Date();
-  const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
-  return { start, end };
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** Calendar parts of the Thailand day, so month and year ranges roll over at Bangkok midnight. */
+function bangkokYearMonth() {
+  const [year = 0, month = 1] = todayIso().split("-").map(Number);
+  return { year, month };
 }
 
+export function currentMonthRange() {
+  const { year, month } = bangkokYearMonth();
+  // Day 0 of next month = last day of this one; getUTCDate avoids the local-midnight-to-UTC day shift.
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return { start: `${year}-${pad(month)}-01`, end: `${year}-${pad(month)}-${pad(lastDay)}` };
+}
+
+/** Thai school year runs 1 May – 30 April. */
 export function currentAcademicYearRange() {
-  const now = new Date();
-  return { start: `${now.getFullYear()}-01-01`, end: `${now.getFullYear()}-12-31` };
+  const { year, month } = bangkokYearMonth();
+  const startYear = month >= 5 ? year : year - 1;
+  return { start: `${startYear}-05-01`, end: `${startYear + 1}-04-30` };
 }
 
 function greeting() {
-  const hour = new Date().getHours();
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Asia/Bangkok" }).format(new Date())) % 24;
   if (hour < 12) return "สวัสดีตอนเช้า";
   if (hour < 17) return "สวัสดีตอนบ่าย";
   return "สวัสดีตอนเย็น";
@@ -73,45 +86,94 @@ export function Dashboard() {
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <div>
-        <p className="font-heading text-2xl font-semibold">
+        <h1 className="font-heading text-lg font-semibold leading-snug">
           {greeting()}{profile && `, ${profileFullName(profile)}`}
-        </p>
-        {profile && <p className="text-sm text-muted-foreground">{roleSubtitle}</p>}
+        </h1>
+        {profile && <p className="text-xs leading-snug text-muted-foreground">{roleSubtitle}</p>}
       </div>
 
       {showClockWidget && profile && (
-        <QuickClockSection profileId={profile.id} departmentId={profile.department_id} />
+        <Card>
+          <QuickClockSection profileId={profile.id} departmentId={profile.department_id} />
+        </Card>
       )}
 
-      {myStudent && profile && <StudentLeaveSection student={myStudent} submittedBy={profile.id} />}
+      {myStudent && profile && (
+        <Card>
+          <StudentLeaveSection student={myStudent} submittedBy={profile.id} />
+        </Card>
+      )}
       {children.map(
-        (child) => profile && <StudentLeaveSection key={child.id} student={child} submittedBy={profile.id} />,
+        (child) =>
+          profile && (
+            <Card key={child.id}>
+              <StudentLeaveSection student={child} submittedBy={profile.id} />
+            </Card>
+          ),
       )}
 
-      {myStudent && <AssignmentSummarySection student={myStudent} />}
+      {myStudent && (
+        <Card>
+          <AssignmentSummarySection student={myStudent} />
+        </Card>
+      )}
       {children.map((child) => (
-        <AssignmentSummarySection key={child.id} student={child} />
+        <Card key={child.id}>
+          <AssignmentSummarySection student={child} />
+        </Card>
       ))}
-      {myStudent && <AttendanceSummarySection student={myStudent} />}
+      {myStudent && (
+        <Card>
+          <AttendanceSummarySection student={myStudent} />
+        </Card>
+      )}
       {children.map((child) => (
-        <AttendanceSummarySection key={child.id} student={child} />
+        <Card key={child.id}>
+          <AttendanceSummarySection student={child} />
+        </Card>
       ))}
-      {myStudent && <BehaviorScoreSection student={myStudent} />}
+      {myStudent && (
+        <Card>
+          <BehaviorScoreSection student={myStudent} />
+        </Card>
+      )}
       {children.map((child) => (
-        <BehaviorScoreSection key={child.id} student={child} />
+        <Card key={child.id}>
+          <BehaviorScoreSection student={child} />
+        </Card>
       ))}
     </div>
   );
 }
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const SECTION_TITLE = "font-ui text-xs font-medium text-muted-foreground";
+
+/** Shown when a query failed and there is no cached data — never render that as "empty" or zero. */
+function LoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <p role="alert" className="mt-1 text-sm text-destructive">
+      โหลดข้อมูลไม่สำเร็จ ·{" "}
+      <button type="button" className="tappable underline" onClick={onRetry}>
+        ลองใหม่
+      </button>
+    </p>
+  );
+}
+
+function SeeAll({ to }: { to: string }) {
+  const navigate = useNavigate();
+  return (
+    <Button variant="ghost" size="sm" className="-mr-2 text-accent" onClick={() => navigate(to)}>
+      ดูทั้งหมด
+    </Button>
+  );
+}
 
 /** Quick access to the full workspace at /time-tracking (history, ขอออกนอกโรงเรียน, approvals). */
 function QuickClockSection({ profileId, departmentId }: { profileId: string; departmentId: string | null }) {
-  const navigate = useNavigate();
   const toast = useToast();
   const date = todayIso();
-  const { data: record, isLoading } = useMyTimeClock(profileId, date);
+  const { data: record, isLoading, isError, refetch } = useMyTimeClock(profileId, date);
   const clockIn = useClockIn();
   const clockOut = useClockOut();
 
@@ -137,13 +199,15 @@ function QuickClockSection({ profileId, departmentId }: { profileId: string; dep
 
   return (
     <section>
+      <h2 className={SECTION_TITLE}>เวลาทำงานวันนี้</h2>
       {isLoading ? (
-        <div role="status" aria-label="กำลังโหลด">
-          <Skeleton className="h-4 w-56" />
+        <div role="status" aria-label="กำลังโหลดเวลาทำงาน">
+          <Skeleton className="mt-1 h-4 w-56" />
         </div>
+      ) : isError && record === undefined ? (
+        <LoadError onRetry={() => void refetch()} />
       ) : (
-        <p className="text-sm">
-          เวลาทำงานวันนี้ —{" "}
+        <p className="mt-1 text-sm">
           {record?.clock_in_time ? (
             <>
               เข้างานเวลา <strong className="font-semibold">{bangkokTime(record.clock_in_time)}</strong>
@@ -162,7 +226,7 @@ function QuickClockSection({ profileId, departmentId }: { profileId: string; dep
       <div className="mt-2 flex items-center gap-2">
         <Button
           size="sm"
-          disabled={!!record?.clock_in_time || clockIn.isPending}
+          disabled={isError && record === undefined ? true : !!record?.clock_in_time || clockIn.isPending}
           onClick={onClockIn}
         >
           {clockIn.isPending ? <Spinner className="h-3.5 w-3.5" /> : "เข้างาน"}
@@ -175,13 +239,9 @@ function QuickClockSection({ profileId, departmentId }: { profileId: string; dep
         >
           {clockOut.isPending ? <Spinner className="h-3.5 w-3.5" /> : "ออกงาน"}
         </Button>
-        <button
-          type="button"
-          className="tappable ml-auto text-xs text-accent underline"
-          onClick={() => navigate("/time-tracking")}
-        >
-          ดูทั้งหมด
-        </button>
+        <div className="ml-auto">
+          <SeeAll to="/time-tracking" />
+        </div>
       </div>
     </section>
   );
@@ -189,10 +249,23 @@ function QuickClockSection({ profileId, departmentId }: { profileId: string; dep
 
 /** role="student"/"parent" only — full to-do list + submit flow lives at /assignments. */
 export function AssignmentSummarySection({ student }: { student: Student }) {
-  const navigate = useNavigate();
-  const { data: items = [], isLoading } = useMyAssignments(student.id);
-  const { data: scores } = useMyItemScores(student.id);
-  const { data: submissions } = useMySubmissions(student.id);
+  const itemsQuery = useMyAssignments(student.id);
+  const scoresQuery = useMyItemScores(student.id);
+  const submissionsQuery = useMySubmissions(student.id);
+  const items = itemsQuery.data ?? [];
+  const scores = scoresQuery.data;
+  const submissions = submissionsQuery.data;
+  const isLoading = itemsQuery.isLoading;
+  // Missing scores/submissions would make every item read as "ยังไม่ส่ง", so any of the three failing is a failure.
+  const failed =
+    (itemsQuery.isError && !itemsQuery.data) ||
+    (scoresQuery.isError && !scoresQuery.data) ||
+    (submissionsQuery.isError && !submissionsQuery.data);
+  const retry = () => {
+    void itemsQuery.refetch();
+    void scoresQuery.refetch();
+    void submissionsQuery.refetch();
+  };
 
   const counts = { missing: 0, submitted: 0, late: 0, graded: 0 };
   for (const item of items) {
@@ -202,17 +275,17 @@ export function AssignmentSummarySection({ student }: { student: Student }) {
   return (
     <section>
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
+        <h2 className={SECTION_TITLE}>
           งานของ {student.first_name} {student.last_name}
-        </p>
-        <button type="button" className="tappable text-xs text-accent underline" onClick={() => navigate("/assignments")}>
-          ดูทั้งหมด
-        </button>
+        </h2>
+        <SeeAll to="/assignments" />
       </div>
       {isLoading ? (
-        <div role="status" aria-label="กำลังโหลด">
+        <div role="status" aria-label="กำลังโหลดงาน">
           <Skeleton className="mt-1 h-4 w-48" />
         </div>
+      ) : failed ? (
+        <LoadError onRetry={retry} />
       ) : items.length === 0 ? (
         <p className="mt-1 text-sm text-muted-foreground">ยังไม่มีงาน</p>
       ) : (
@@ -229,22 +302,24 @@ export function AssignmentSummarySection({ student }: { student: Student }) {
 /** role="student"/"parent" only — teacher/admin get the full check-in workspace at /attendance instead. */
 export function AttendanceSummarySection({ student }: { student: Student }) {
   const { start, end } = currentMonthRange();
-  const { data: records = [], isLoading } = useAttendanceRange({
+  const { data, isLoading, isError, refetch } = useAttendanceRange({
     studentId: student.id,
     startDate: start,
     endDate: end,
   });
-  const counts = summarizeAttendance(records);
+  const counts = summarizeAttendance(data ?? []);
 
   return (
     <section>
-      <p className="text-sm text-muted-foreground">
-        การมาเรียนของ {student.first_name} {student.last_name} · {MONTH_LABEL}
-      </p>
+      <h2 className={SECTION_TITLE}>
+        การมาเรียนของ {student.first_name} {student.last_name} · {monthLabel()}
+      </h2>
       {isLoading ? (
-        <div role="status" aria-label="กำลังโหลด">
+        <div role="status" aria-label="กำลังโหลดการมาเรียน">
           <Skeleton className="mt-1 h-4 w-40" />
         </div>
+      ) : isError && !data ? (
+        <LoadError onRetry={() => void refetch()} />
       ) : (
         <p className="mt-1 text-sm">
           {STATUS_ORDER.map((st, i) => (
@@ -263,22 +338,24 @@ export function AttendanceSummarySection({ student }: { student: Student }) {
 /** role="student"/"parent" only — teacher/admin get the roster workspace at /behavior instead. */
 export function BehaviorScoreSection({ student }: { student: Student }) {
   const { start, end } = currentAcademicYearRange();
-  const { data: records = [], isLoading } = useBehaviorRecords({
+  const { data, isLoading, isError, refetch } = useBehaviorRecords({
     studentId: student.id,
     startDate: start,
     endDate: end,
   });
-  const score = summarizeBehaviorScore(records);
+  const score = summarizeBehaviorScore(data ?? []);
 
   return (
     <section>
-      <p className="text-sm text-muted-foreground">
+      <h2 className={SECTION_TITLE}>
         คะแนนพฤติกรรมของ {student.first_name} {student.last_name}
-      </p>
+      </h2>
       {isLoading ? (
-        <div role="status" aria-label="กำลังโหลด">
+        <div role="status" aria-label="กำลังโหลดคะแนนพฤติกรรม">
           <Skeleton className="mt-1 h-4 w-32" />
         </div>
+      ) : isError && !data ? (
+        <LoadError onRetry={() => void refetch()} />
       ) : (
         <p className={cn("mt-1 text-sm", score < STARTING_SCORE ? "text-destructive" : "text-success")}>
           <strong className="text-lg font-semibold">{score}</strong> จาก {STARTING_SCORE} คะแนน
@@ -291,7 +368,8 @@ export function BehaviorScoreSection({ student }: { student: Student }) {
 /** role="student"/"parent" only — teacher/admin approve these at Attendance.tsx's "คำขอลา" view instead. */
 export function StudentLeaveSection({ student, submittedBy }: { student: Student; submittedBy: string }) {
   const toast = useToast();
-  const { data: requests = [], isLoading } = useStudentLeaveRequests(student.id);
+  const { data, isLoading, isError, refetch } = useStudentLeaveRequests(student.id);
+  const requests = data ?? [];
   const request = useRequestStudentLeave();
   const cancel = useCancelStudentLeaveRequest();
   const [open, setOpen] = useState(false);
@@ -324,16 +402,16 @@ export function StudentLeaveSection({ student, submittedBy }: { student: Student
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
+        <h2 className={SECTION_TITLE}>
           การลาของ {student.first_name} {student.last_name}
-        </p>
+        </h2>
         <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-          + ขอลา
+          ขอลา
         </Button>
       </div>
 
       {isLoading && (
-        <ul className="divide-y divide-border" role="status" aria-label="กำลังโหลด">
+        <ul className="divide-y divide-border" role="status" aria-label="กำลังโหลดการลา">
           {[0, 1].map((i) => (
             <li key={i} className="flex items-center justify-between gap-2 py-2">
               <Skeleton className="h-3 w-28" />
@@ -342,8 +420,9 @@ export function StudentLeaveSection({ student, submittedBy }: { student: Student
           ))}
         </ul>
       )}
-      {!isLoading && requests.length === 0 && (
-        <p className="text-sm">ยังไม่มีคำขอลา</p>
+      {isError && !data && <LoadError onRetry={() => void refetch()} />}
+      {!isLoading && !isError && requests.length === 0 && (
+        <p className="text-sm text-muted-foreground">ยังไม่มีคำขอลา</p>
       )}
       {requests.length > 0 && (
         <ul className="divide-y divide-border text-sm">
@@ -353,7 +432,7 @@ export function StudentLeaveSection({ student, submittedBy }: { student: Student
               <li key={r.id} className="space-y-1 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-muted-foreground">
-                    {r.start_date} – {r.end_date} ({r.days} วัน)
+                    {leaveDate(r.start_date)} – {leaveDate(r.end_date)} ({r.days} วัน)
                   </span>
                   <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs", LEAVE_STATUS_STYLE[r.status])}>
                     {LEAVE_STATUS_LABEL[r.status]}
@@ -363,10 +442,16 @@ export function StudentLeaveSection({ student, submittedBy }: { student: Student
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => cancel.mutate(r.id)}
+                    onClick={() => {
+                      if (!confirm("ยกเลิกคำขอลานี้?")) return;
+                      cancel.mutate(r.id, {
+                        onSuccess: () => toast("ยกเลิกคำขอลาแล้ว"),
+                        onError: (err) => toast(err instanceof Error ? err.message : "ยกเลิกไม่สำเร็จ", "error"),
+                      });
+                    }}
                     disabled={cancel.isPending}
                   >
-                    ยกเลิก
+                    ยกเลิกคำขอ
                   </Button>
                 )}
               </li>

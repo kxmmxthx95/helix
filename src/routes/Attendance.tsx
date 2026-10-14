@@ -26,7 +26,7 @@ import {
 } from "@/hooks/useStudentLeave";
 import type { AttendanceRecord, AttendanceStatus, Student } from "@/lib/database.types";
 import { canManage, isOrgWide, isSelfScoped } from "@/lib/roles";
-import { cn } from "@/lib/utils";
+import { cn, todayIso } from "@/lib/utils";
 
 export const STATUS_LABEL: Record<AttendanceStatus, string> = {
   present: "มา",
@@ -50,7 +50,6 @@ const MONTH_NAMES = Array.from({ length: 12 }, (_, i) =>
   new Intl.DateTimeFormat("th-TH", { month: "long" }).format(new Date(2000, i, 1)),
 );
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
 const currentAcademicYear = () => new Date().getFullYear() + 543;
 const daysInMonth = (ceYear: number, month: number) => new Date(ceYear, month, 0).getDate();
 

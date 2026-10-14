@@ -22,7 +22,7 @@ import {
 import { profileFullName, type PremisesExitStatus } from "@/lib/database.types";
 import { canManage } from "@/lib/roles";
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+import { todayIso } from "@/lib/utils";
 
 /** Renders a timestamptz as Thailand wall-clock HH:MM regardless of the browser's own timezone (fixed UTC+7, no DST). */
 export function bangkokTime(iso: string) {

@@ -28,9 +28,8 @@ import {
 import { useDepartments, useProfiles } from "@/hooks/useProfiles";
 import { profileFullName, type DutyPoint, type DutyTransferRequest, type DutyTransferStatus } from "@/lib/database.types";
 import { canManage, isDeptHead, isEmployeeRole, isOrgWide } from "@/lib/roles";
-import { cn } from "@/lib/utils";
+import { cn, todayIso } from "@/lib/utils";
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
 const addDays = (iso: string, days: number) => {
   const d = new Date(iso);
   d.setDate(d.getDate() + days);

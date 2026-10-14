@@ -20,7 +20,7 @@ import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import { useApprovedLeaveOnDate } from "@/hooks/useStudentLeave";
 import type { AttendanceStatus, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
-import { cn } from "@/lib/utils";
+import { cn, todayIso } from "@/lib/utils";
 
 // ----------------------------------------------------------- period check-in
 // เช็คชื่อรายคาบ ("บันทึกการเข้าเรียน") — keyed by (schedule_entry_id, date),
@@ -48,7 +48,6 @@ const STATUS_STYLE: Record<AttendanceStatus, string> = {
     "bg-slate-300 text-slate-800 ring-1 ring-slate-500 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600",
 };
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
 const currentAcademicYear = () => new Date().getFullYear() + 543;
 const daysInMonth = (ceYear: number, month: number) => new Date(ceYear, month, 0).getDate();
 

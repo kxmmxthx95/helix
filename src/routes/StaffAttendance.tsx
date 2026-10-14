@@ -8,9 +8,8 @@ import { useStaffAttendanceRange } from "@/hooks/useStaffAttendance";
 import { useDepartments, useProfiles } from "@/hooks/useProfiles";
 import { profileFullName, type AttendanceStatus } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
-import { cn } from "@/lib/utils";
+import { cn, todayIso } from "@/lib/utils";
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
 const MONTH_NAMES = Array.from({ length: 12 }, (_, i) =>
   new Intl.DateTimeFormat("th-TH", { month: "long" }).format(new Date(2000, i, 1)),
 );
