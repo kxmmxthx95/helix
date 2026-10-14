@@ -70,6 +70,18 @@ export function useCreateScheduleEntry() {
   });
 }
 
+/** Drag-move: same assignment, new slot. The DB trigger re-checks period type, conflicts and term lock. */
+export function useMoveScheduleEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, day_of_week, period_no }: { id: string; day_of_week: number; period_no: number }) => {
+      const { error } = await supabase.from("schedule_entries").update({ day_of_week, period_no }).eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["schedule_entries"] }),
+  });
+}
+
 export function useDeleteScheduleEntry() {
   const qc = useQueryClient();
   return useMutation({
