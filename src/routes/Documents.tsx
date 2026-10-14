@@ -26,16 +26,21 @@ import {
   type DocLessonNode,
   docFilePaths,
   docFileSignedUrl,
+  docTopicFilePaths,
   useAllGradeLevels,
   useCreateDocLesson,
+  useCreateDocTopic,
   useDeleteDocFile,
   useDeleteDocLesson,
+  useDeleteDocTopic,
   useDocFiles,
+  useDocTopics,
   useDocTree,
   useDocSummary,
   useSubjectGradeLevelIds,
   useSubjectClassroomCount,
   useUpdateDocLesson,
+  useUpdateDocTopic,
   useUploadDocFile,
 } from "@/hooks/useDocuments";
 import { useClassroomsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
@@ -51,7 +56,7 @@ import { DocCoverageTab, SUBJECT_TYPES } from "@/routes/DocCoverage";
 import { DocProgressTab, MyDocTasksTab, ReviewDocsTab } from "@/routes/DocProgress";
 import { EditableName } from "@/routes/Practice";
 
-// เอกสาร — วิชา -> ระดับชั้น -> เนื้อหาหลัก -> ไฟล์.
+// เอกสาร — วิชา -> ระดับชั้น -> เนื้อหาหลัก -> เนื้อหาย่อย (ไม่บังคับ) -> ไฟล์.
 // Teachers/managers curate; students/parents read the grade they're in. See migration 0071.
 
 export function Documents() {
@@ -672,19 +677,25 @@ function Modal({
 }
 
 /** Files of one เนื้อหาหลัก; PDFs preview inline in the popup, other types open in a new tab. */
-function LessonFilesDialog({ lesson, canEdit, open, onClose }: { lesson: DocLessonNode; canEdit: boolean; open: boolean; onClose: () => void }) {
-  return (
-    <Modal open={open} onClose={onClose} title={`เอกสาร · ${lesson.name}`} wide>
-      <LessonFiles lesson={lesson} canEdit={canEdit} onClose={onClose} />
-    </Modal>
-  );
-}
-
-function LessonFiles({ lesson, canEdit, onClose }: { lesson: DocLessonNode; canEdit: boolean; onClose: () => void }) {
+/** เนื้อหาย่อย of one เนื้อหาหลัก, each with its files; files with no topic sit under "ไม่ระบุเนื้อหาย่อย". */
+function LessonContent({
+  lesson,
+  canEdit,
+  onUpload,
+}: {
+  lesson: DocLessonNode;
+  canEdit: boolean;
+  onUpload: (preset: UploadPreset) => void;
+}) {
   const { data: files = [], isLoading } = useDocFiles(lesson.id);
-  const remove = useDeleteDocFile();
+  const { data: topics = [] } = useDocTopics(lesson.id);
+  const removeFile = useDeleteDocFile();
+  const createTopic = useCreateDocTopic();
+  const updateTopic = useUpdateDocTopic();
+  const removeTopic = useDeleteDocTopic();
   const toast = useToast();
   const [previewing, setPreviewing] = useState<{ file: DocFile; url: string } | null>(null);
+  const [newTopic, setNewTopic] = useState("");
 
   async function open(f: DocFile) {
     const isPdf = f.mime_type === "application/pdf";
@@ -701,6 +712,22 @@ function LessonFiles({ lesson, canEdit, onClose }: { lesson: DocLessonNode; canE
     else window.location.href = url;
   }
 
+  async function deleteTopic(id: string, name: string) {
+    const paths = await docTopicFilePaths(id);
+    const extra = paths.length ? ` เอกสาร ${paths.length} ไฟล์ในเนื้อหาย่อยนี้จะถูกลบด้วย` : "";
+    if (!confirm(`ลบเนื้อหาย่อย "${name}"?${extra}`)) return;
+    removeTopic.mutate({ id, paths }, { onError: () => toast("ลบไม่สำเร็จ", "error") });
+  }
+
+  function addTopic() {
+    const name = newTopic.trim();
+    if (!name) return;
+    createTopic.mutate(
+      { lesson_id: lesson.id, name, sort_order: topics.length },
+      { onSuccess: () => setNewTopic(""), onError: () => toast("เพิ่มไม่สำเร็จ", "error") },
+    );
+  }
+
   if (previewing) {
     return (
       <>
@@ -715,55 +742,122 @@ function LessonFiles({ lesson, canEdit, onClose }: { lesson: DocLessonNode; canE
     );
   }
 
+  function fileList(list: DocFile[]) {
+    return (
+      <ul className="divide-y divide-border rounded-lg border border-border">
+        {list.map((f) => (
+          <li key={f.id} className="flex items-center">
+            <button
+              type="button"
+              onClick={() => void open(f)}
+              className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left hover:bg-muted"
+            >
+              <DocumentTextIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-medium">{f.title}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                  {f.file_name} · {formatSize(f.size_bytes)}
+                  {f.review_status === "approved" && " · อนุมัติแล้ว"}
+                  {f.review_status === "returned" && ` · ส่งกลับแก้ไข${f.review_note ? `: ${f.review_note}` : ""}`}
+                </span>
+              </span>
+              <ChevronForward className="h-3 w-3 text-muted-foreground" />
+            </button>
+            {canEdit && (
+              <Button
+                className="mr-2 active:scale-100"
+                size="icon"
+                variant="ghost"
+                aria-label="ลบไฟล์"
+                onClick={() => {
+                  if (!confirm(`ลบไฟล์ "${f.title}"?`)) return;
+                  removeFile.mutate(f, { onError: () => toast("ลบไม่สำเร็จ", "error") });
+                }}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  const topicIds = new Set(topics.map((t) => t.id));
+  const loose = files.filter((f) => !f.topic_id || !topicIds.has(f.topic_id));
+
   return (
     <>
       {isLoading ? (
         <p className="text-xs text-muted-foreground">กำลังโหลด…</p>
-      ) : files.length === 0 ? (
-        <p className="text-xs text-muted-foreground">ยังไม่มีเอกสารในเนื้อหาหลักนี้</p>
+      ) : topics.length === 0 && loose.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          ยังไม่มีเนื้อหาย่อยหรือเอกสารในเนื้อหาหลักนี้{canEdit ? " — เพิ่มเนื้อหาย่อยด้านล่าง" : ""}
+        </p>
       ) : (
-        <ul className="divide-y divide-border rounded-lg border border-border">
-          {files.map((f) => (
-            <li key={f.id} className="flex items-center">
-              <button
-                type="button"
-                onClick={() => void open(f)}
-                className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left hover:bg-muted"
-              >
-                <DocumentTextIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-medium">{f.title}</span>
-                  <span className="block truncate text-[11px] text-muted-foreground">
-                    {f.file_name} · {formatSize(f.size_bytes)}
-                    {f.review_status === "approved" && " · อนุมัติแล้ว"}
-                    {f.review_status === "returned" && ` · ส่งกลับแก้ไข${f.review_note ? `: ${f.review_note}` : ""}`}
+        <div className="space-y-4">
+          {topics.map((t) => {
+            const own = files.filter((f) => f.topic_id === t.id);
+            return (
+              <section key={t.id} className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                    <BookIcon className="h-3.5 w-3.5" />
                   </span>
-                </span>
-                <ChevronForward className="h-3 w-3 text-muted-foreground" />
-              </button>
-              {canEdit && (
-                <Button
-                  className="mr-2 active:scale-100"
-                  size="icon"
-                  variant="ghost"
-                  aria-label="ลบไฟล์"
-                  onClick={() => {
-                    if (!confirm(`ลบไฟล์ "${f.title}"?`)) return;
-                    remove.mutate(f, { onError: () => toast("ลบไม่สำเร็จ", "error") });
-                  }}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
+                  <p className="min-w-0 flex-1 truncate text-sm font-semibold">{t.name}</p>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">{own.length} เอกสาร</span>
+                  {canEdit && (
+                    <>
+                      <Button
+                        className="active:scale-100"
+                        size="icon"
+                        variant="outline"
+                        aria-label={`อัพโหลดเอกสารใน ${t.name}`}
+                        onClick={() => onUpload({ lessonId: lesson.id, topicId: t.id })}
+                      >
+                        <Upload className="h-3 w-3" />
+                      </Button>
+                      <EditableName noMotion value={t.name} onSave={(name) => updateTopic.mutate({ id: t.id, name })} />
+                      <Button
+                        className="active:scale-100"
+                        size="icon"
+                        variant="ghost"
+                        aria-label={`ลบเนื้อหาย่อย ${t.name}`}
+                        onClick={() => void deleteTopic(t.id, t.name)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+                {own.length > 0 ? fileList(own) : <p className="pl-9 text-[11px] text-muted-foreground">ยังไม่มีเอกสาร</p>}
+              </section>
+            );
+          })}
+          {loose.length > 0 && (
+            <section className="space-y-2">
+              <p className="text-sm font-semibold text-muted-foreground">ไม่ระบุเนื้อหาย่อย</p>
+              {fileList(loose)}
+            </section>
+          )}
+        </div>
       )}
-      <div className="flex justify-end">
-        <Button className="active:scale-100" variant="outline" onClick={onClose}>
-          ปิด
-        </Button>
-      </div>
+
+      {canEdit && (
+        <div className="flex gap-2">
+          <Input
+            value={newTopic}
+            onChange={(e) => setNewTopic(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addTopic()}
+            placeholder="เพิ่มเนื้อหาย่อย เช่น 1.1 ความหมายของเวลา"
+            aria-label="ชื่อเนื้อหาย่อยใหม่"
+          />
+          <Button className="shrink-0 active:scale-100" variant="outline" onClick={addTopic} disabled={!newTopic.trim() || createTopic.isPending}>
+            <Plus className="h-3.5 w-3.5" />
+            เพิ่ม
+          </Button>
+        </div>
+      )}
     </>
   );
 }
@@ -835,13 +929,15 @@ function UploadDocDialog({
 }
 
 /** Pre-selects the lesson when upload is started from a lesson card instead of the toolbar. */
-type UploadPreset = { lessonId?: string };
+type UploadPreset = { lessonId?: string; topicId?: string };
 
 function UploadDocForm({ onClose, tree, preset }: { onClose: () => void; tree: DocLessonNode[]; preset: UploadPreset }) {
   const { profile: me } = useAuth();
   const upload = useUploadDocFile();
   const toast = useToast();
   const [lessonId, setLessonId] = useState(preset.lessonId ?? (tree.length === 1 ? tree[0]!.id : ""));
+  const [topicId, setTopicId] = useState(preset.topicId ?? "");
+  const { data: topics = [] } = useDocTopics(lessonId || null);
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -850,7 +946,7 @@ function UploadDocForm({ onClose, tree, preset }: { onClose: () => void; tree: D
   function submit() {
     if (!file || !lessonId || !me) return;
     upload.mutate(
-      { file, lessonId, title: title.trim() || file.name, description: description.trim() || null, uploadedBy: me.id, onProgress: setProgress },
+      { file, lessonId, topicId: topicId || null, title: title.trim() || file.name, description: description.trim() || null, uploadedBy: me.id, onProgress: setProgress },
       {
         onSuccess: () => {
           toast("อัพโหลดแล้ว");
@@ -866,12 +962,29 @@ function UploadDocForm({ onClose, tree, preset }: { onClose: () => void; tree: D
       <Field label="เนื้อหาหลัก" required>
         <Select
           value={lessonId}
-          onChange={(e) => setLessonId(e.target.value)}
+          onChange={(e) => {
+            setLessonId(e.target.value);
+            setTopicId("");
+          }}
           placeholder="เลือกเนื้อหาหลัก"
         >
           {tree.map((l) => (
             <option key={l.id} value={l.id}>
               {l.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+      <Field label="เนื้อหาย่อย (ไม่บังคับ)">
+        <Select
+          value={topicId}
+          onChange={(e) => setTopicId(e.target.value)}
+          placeholder={topics.length ? "ไม่ระบุเนื้อหาย่อย" : "ยังไม่มีเนื้อหาย่อย"}
+          disabled={topics.length === 0}
+        >
+          {topics.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
             </option>
           ))}
         </Select>
@@ -943,7 +1056,7 @@ function LessonRow({
   canEdit: boolean;
   onUpload: (preset: UploadPreset) => void;
 }) {
-  const [viewingFiles, setViewingFiles] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const updateLesson = useUpdateDocLesson();
   const removeLesson = useDeleteDocLesson();
   const toast = useToast();
@@ -957,7 +1070,13 @@ function LessonRow({
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm">
-      <div className="flex items-center gap-3 p-3">
+      <div
+        className="flex cursor-pointer items-center gap-3 p-3"
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest("button, input")) return;
+          setExpanded((v) => !v);
+        }}
+      >
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-bold text-accent">
           {index + 1}
         </span>
@@ -976,10 +1095,14 @@ function LessonRow({
             <Upload className="h-3 w-3" />
           </Button>
         )}
+        <div className="shrink-0 text-xs leading-tight text-muted-foreground">
+          <div className="font-bold text-foreground">{lesson.topicCount}</div>
+          <div className="text-[10px]">เนื้อหาย่อย</div>
+        </div>
         <button
           type="button"
           aria-label="ดูเอกสารทั้งหมดในเนื้อหาหลักนี้"
-          onClick={() => setViewingFiles(true)}
+          onClick={() => setExpanded((v) => !v)}
           className="flex shrink-0 items-center gap-2 rounded-xl text-left text-muted-foreground transition-colors hover:text-foreground"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background">
@@ -998,9 +1121,23 @@ function LessonRow({
             </Button>
           </div>
         )}
+        <Button
+          className="active:scale-100"
+          size="icon"
+          variant="ghost"
+          aria-label={expanded ? "ซ่อนเอกสาร" : "แสดงเอกสาร"}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          <ChevronForward className={cn("h-4 w-4 transition-transform", expanded ? "-rotate-90" : "rotate-90")} />
+        </Button>
       </div>
 
-      <LessonFilesDialog lesson={lesson} canEdit={canEdit} open={viewingFiles} onClose={() => setViewingFiles(false)} />
+      {expanded && (
+        <div className="space-y-3 border-t border-border p-3">
+          <LessonContent lesson={lesson} canEdit={canEdit} onUpload={onUpload} />
+        </div>
+      )}
     </div>
   );
 }

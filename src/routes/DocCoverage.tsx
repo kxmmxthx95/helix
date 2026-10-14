@@ -6,6 +6,7 @@ import {
   BarChartIcon,
   BookIcon,
   CheckmarkCircleIcon,
+  ChevronForward,
   DownloadIcon,
   HelpCircleIcon,
   ListIcon,
@@ -408,8 +409,22 @@ export function DocCoverageTab() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {pageRows.map((r) => {
             const s = stats.get(r.key)!;
+            const isOpen = open === r.key;
+            const canOpen = r.lessons.length > 0;
             return (
-              <div key={r.key} className={cn("space-y-3 rounded-xl border border-border bg-card p-3", selected.has(r.key) && "border-accent")}>
+              <div
+                key={r.key}
+                onClick={(e) => {
+                  // Whole card toggles its เนื้อหาหลัก list; controls inside keep their own behaviour.
+                  if (!canOpen || (e.target as HTMLElement).closest("input, button, [role=menu]")) return;
+                  setOpen(isOpen ? null : r.key);
+                }}
+                className={cn(
+                  "space-y-3 self-start rounded-xl border border-border bg-card p-3",
+                  canOpen && "cursor-pointer",
+                  selected.has(r.key) && "border-accent",
+                )}
+              >
                 <div className="flex items-start gap-2">
                   <input type="checkbox" className="mt-1" aria-label={`เลือก ${r.code}`} checked={selected.has(r.key)} onChange={(e) => toggle([r.key], e.target.checked)} />
                   <div className="min-w-0 flex-1">
@@ -428,6 +443,33 @@ export function DocCoverageTab() {
                   <span className="truncate">{s.last ? `${thDate(s.last.lastAt)} · ${nameOf(s.last.lastBy)}` : "ยังไม่มีการบันทึก"}</span>
                   <StatusChip status={s.status} />
                 </div>
+                <button
+                  type="button"
+                  disabled={!canOpen}
+                  aria-expanded={isOpen}
+                  onClick={() => setOpen(isOpen ? null : r.key)}
+                  className="flex w-full items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+                >
+                  {isOpen ? "ซ่อนเนื้อหาหลัก" : `ดูเนื้อหาหลัก (${r.lessons.length})`}
+                  <ChevronForward className={cn("h-3 w-3 transition-transform", isOpen && "rotate-90")} />
+                </button>
+                {isOpen && (
+                  <ul className="divide-y divide-border rounded-lg border border-border text-xs">
+                    {[...r.lessons]
+                      .sort((a, b) => a.sortOrder - b.sortOrder)
+                      .map((l) => (
+                        <li key={l.id} className="space-y-0.5 px-3 py-2">
+                          <p className="font-medium text-foreground">{l.name}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            ผู้สร้าง: {nameOf(l.createdBy)} · เนื้อหาย่อย {l.topicCount} ·{" "}
+                            <span className={cn(l.fileCount === 0 && "text-destructive")}>
+                              {l.fileCount === 0 ? "ยังไม่มีไฟล์" : `${l.fileCount} ไฟล์`}
+                            </span>
+                          </p>
+                        </li>
+                      ))}
+                  </ul>
+                )}
               </div>
             );
           })}

@@ -829,7 +829,7 @@ export type DocTopic = {
 export type DocFile = {
   id: string;
   lesson_id: string;
-  /** Legacy: เนื้อหาย่อยไม่ใช้แล้ว; only set on files uploaded before migration 0075. */
+  /** เนื้อหาย่อย the file belongs to; null = sits directly under the lesson (migration 0075 made it optional). */
   topic_id: string | null;
   title: string;
   description: string | null;
