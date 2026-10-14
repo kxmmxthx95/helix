@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
+import { useProfilesByIds } from "@/hooks/usePractice";
 import {
   BookIcon,
   CalendarIcon,
@@ -421,6 +422,13 @@ function ClassroomTimetable({
   const periods = useMemo(() => mergePeriods(defaultPeriods, gradePeriods), [defaultPeriods, gradePeriods]);
   const { data: entries = [], isLoading: loadingEntries } = useClassroomSchedule(classroomId, academicYear, term);
   const { data: assignments = [] } = useDepartmentTeachingAssignments(departmentId, academicYear, term);
+  // The role-filtered `teachers` list can miss people the viewer can't read roles for; look up the card teachers by id too.
+  const teacherIds = useMemo(
+    () => [...new Set([...entries, ...(ghostEntries ?? [])].map((e) => e.teaching_assignment.teacher_id))].sort(),
+    [entries, ghostEntries],
+  );
+  const { data: cardTeachers = [] } = useProfilesByIds(teacherIds);
+  const findTeacher = (id: string) => teachers.find((x) => x.id === id) ?? cardTeachers.find((x) => x.id === id);
   const { data: subjects = [] } = useSubjects({
     search: "",
     departmentId,
@@ -448,8 +456,8 @@ function ClassroomTimetable({
         scope={{ departmentId, academicYear, term }}
         ghostEntries={ghostEntries}
         teacherLines={(id) => {
-          const t = teachers.find((x) => x.id === id);
-          return t ? [`${t.prefix ?? ""}${t.first_name}`, t.last_name] : ["—", ""];
+          const t = findTeacher(id);
+          return t ? [`${"prefix" in t ? (t.prefix ?? "") : ""}${t.first_name}`, t.last_name] : ["—", ""];
         }}
         mode="classroom"
         mayEdit={mayEdit}
@@ -457,8 +465,8 @@ function ClassroomTimetable({
         subjectLabel={(id) => subjects.find((s) => s.id === id)?.code ?? "—"}
         subjectName={(id) => subjects.find((s) => s.id === id)?.name_th ?? ""}
         teacherLabel={(id) => {
-          const t = teachers.find((x) => x.id === id);
-          return t ? profileFullName(t) : "—";
+          const t = findTeacher(id);
+          return t ? `${t.first_name} ${t.last_name}` : "—";
         }}
         roomLabel={(id) => {
           const c = classrooms.find((x) => x.id === id);
