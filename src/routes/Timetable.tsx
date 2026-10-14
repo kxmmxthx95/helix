@@ -4,7 +4,6 @@ import {
   BookIcon,
   CalendarIcon,
   CheckboxIcon,
-  CheckboxOutlineIcon,
   ChevronBack,
   ChevronForward,
   CheckmarkCircleIcon,
@@ -15,6 +14,7 @@ import {
   RestaurantIcon,
   Search,
   SettingsIcon,
+  SquareIcon,
   TimeIcon,
   TimetableIcon,
   TrashIcon,
@@ -43,6 +43,7 @@ import {
   useClassroomSchedule,
   useCreateScheduleEntry,
   useDeleteScheduleEntry,
+  useDepartmentSchedule,
   useMoveScheduleEntry,
   useTeacherSchedule,
   type ScheduleEntryRow,
@@ -447,6 +448,8 @@ function ClassroomTimetable({
 type PickerItem = {
   id: string;
   name: string;
+  /** Shown instead of `name` as two lines (e.g. first name / last name); `name` still drives search and sort. */
+  nameLines?: [string, string];
   subtitle: string;
   /** Subjects taught / scheduled — shown as the pill and used for the second sort. */
   subjects: number;
@@ -523,7 +526,15 @@ function PickerList({
             >
               {i.avatar}
               <div className="min-w-0 flex-1 font-sarabun leading-tight">
-                <p className="truncate text-sm font-medium text-foreground">{i.name}</p>
+                {i.nameLines ? (
+                  i.nameLines.map((line, k) => (
+                    <p key={k} className="truncate text-sm font-medium text-foreground">
+                      {line}
+                    </p>
+                  ))
+                ) : (
+                  <p className="truncate text-sm font-medium text-foreground">{i.name}</p>
+                )}
                 <p className="truncate text-xs text-muted-foreground">{i.subtitle}</p>
               </div>
               <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
@@ -564,6 +575,8 @@ function StatChip({
     </div>
   );
 }
+
+const SHOW_OTHERS_KEY = "timetable.showOtherTeachers";
 
 type TeacherTab = "week" | "subjects" | "hours";
 const TEACHER_TABS: [TeacherTab, string][] = [
@@ -630,6 +643,30 @@ function TeacherWorkspace({
   const mine = summary.get(teacherId);
   const { data: entries = [] } = useTeacherSchedule(teacherId, academicYear, term);
 
+  // Per-viewer preference; storage can be blocked, so every access is guarded.
+  const [showOthers, setShowOthers] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_OTHERS_KEY) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  function toggleOthers(on: boolean) {
+    setShowOthers(on);
+    try {
+      localStorage.setItem(SHOW_OTHERS_KEY, on ? "1" : "0");
+    } catch {
+      /* preference just won't persist */
+    }
+  }
+  const { data: deptEntries = [] } = useDepartmentSchedule(departmentId, academicYear, term, showOthers && tab === "week");
+  const myRooms = new Set((mine?.assignments ?? []).map((a) => a.classroom_id));
+  const ghostEntries = showOthers
+    ? deptEntries.filter(
+        (e) => e.teaching_assignment.teacher_id !== teacherId && myRooms.has(e.teaching_assignment.classroom_id),
+      )
+    : [];
+
   const teacherArea = areaById.get(teacher?.learning_area_id ?? "");
   const areaText = (teacherArea?.parent_id ? areaById.get(teacherArea.parent_id) : teacherArea)?.name ?? "";
 
@@ -673,6 +710,7 @@ function TeacherWorkspace({
           return {
             id: t.id,
             name: profileFullName(t),
+            nameLines: [`${t.prefix ?? ""}${t.first_name}`, t.last_name],
             subtitle: (area?.parent_id ? areaById.get(area.parent_id) : area)?.name ?? "—",
             subjects: summary.get(t.id)?.subjects.size ?? 0,
             search: [profileFullName(t), t.teacher_code ?? ""].join(" "),
@@ -703,19 +741,27 @@ function TeacherWorkspace({
               </div>
             </div>
 
-            <div className="flex w-full border-b border-border" role="tablist">
-              {TEACHER_TABS.map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === key}
-                  onClick={() => setTab(key)}
-                  className={lineTab(tab === key, true)}
-                >
-                  {label}
-                </button>
-              ))}
+            <div className="flex w-full items-center gap-3 border-b border-border">
+              <div className="flex min-w-0 flex-1" role="tablist">
+                {TEACHER_TABS.map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === key}
+                    onClick={() => setTab(key)}
+                    className={lineTab(tab === key, true)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {tab === "week" && (
+                <label className="flex shrink-0 cursor-pointer items-center gap-2 pb-1 text-xs text-muted-foreground">
+                  <Switch checked={showOthers} onChange={toggleOthers} size="sm" />
+                  แสดงคาบครูคนอื่น
+                </label>
+              )}
             </div>
 
             {tab === "week" && (
@@ -728,6 +774,7 @@ function TeacherWorkspace({
                 classrooms={classrooms}
                 gradeLevels={gradeLevels}
                 teachers={teachers}
+                ghostEntries={ghostEntries}
               />
             )}
 
@@ -809,9 +856,11 @@ function TeacherTimetable({
   classrooms,
   gradeLevels,
   teachers,
+  ghostEntries,
 }: {
   departmentId: string;
   teacherId: string;
+  ghostEntries?: ScheduleEntryRow[];
   academicYear: number;
   term: number | null;
   mayEdit: boolean;
@@ -843,6 +892,7 @@ function TeacherTimetable({
         periods={periods}
         entries={entries}
         candidates={candidates}
+        ghostEntries={ghostEntries}
         mode="teacher"
         mayEdit={mayEdit}
         isLoading={loadingPeriods || loadingEntries}
@@ -911,10 +961,13 @@ function TimetableGrid({
   subjectName,
   teacherLabel,
   roomLabel,
+  ghostEntries = [],
 }: {
   periods: PeriodDefinition[];
   entries: ScheduleEntryRow[];
   candidates: TeachingAssignment[];
+  /** Faint, read-only entries of other teachers (same rooms) — context only. */
+  ghostEntries?: ScheduleEntryRow[];
   mode: "classroom" | "teacher";
   mayEdit: boolean;
   isLoading: boolean;
@@ -932,6 +985,15 @@ function TimetableGrid({
 
   const days = useMemo(() => [...new Set(periods.map((p) => p.day_of_week))].sort((a, b) => a - b), [periods]);
   const maxPeriodNo = periods.reduce((m, p) => Math.max(m, p.period_no), 0);
+
+  const ghostAt = useMemo(() => {
+    const map = new Map<string, ScheduleEntryRow[]>();
+    for (const e of ghostEntries) {
+      const key = `${e.day_of_week}-${e.period_no}`;
+      map.set(key, [...(map.get(key) ?? []), e]);
+    }
+    return map;
+  }, [ghostEntries]);
 
   const displayNo = (periodNo: number) => {
     let n = 0;
@@ -1132,6 +1194,16 @@ function TimetableGrid({
                             </div>
                           );
                         })}
+                        {(ghostAt.get(cellKey) ?? []).map((g) => (
+                          <div
+                            key={g.id}
+                            title={`${subjectName(g.teaching_assignment.subject_id)} — ${teacherLabel(g.teaching_assignment.teacher_id)}`}
+                            className="truncate rounded-lg border border-dashed border-border bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground opacity-60"
+                          >
+                            {subjectLabel(g.teaching_assignment.subject_id)} · {teacherLabel(g.teaching_assignment.teacher_id)} ·{" "}
+                            {roomLabel(g.teaching_assignment.classroom_id)}
+                          </div>
+                        ))}
                         {mayEdit ? (
                           <button
                             type="button"
@@ -1141,7 +1213,8 @@ function TimetableGrid({
                             <Plus className="h-3 w-3" />
                           </button>
                         ) : (
-                          cellEntries.length === 0 && (
+                          cellEntries.length === 0 &&
+                          !ghostAt.has(cellKey) && (
                             <p className="py-4 text-center text-muted-foreground">—</p>
                           )
                         )}
@@ -1314,8 +1387,7 @@ function PlaceSheet({
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="scrollbar-hidden flex min-w-0 flex-1 gap-2 overflow-x-auto">
+        <div className="scrollbar-hidden -mx-1 flex gap-2 overflow-x-auto px-1 py-1">
             {tabs.map(([key, label, n]) => (
               <button
                 key={key}
@@ -1331,9 +1403,10 @@ function PlaceSheet({
                 {label} ({n})
               </button>
             ))}
-          </div>
+        </div>
+        <div>
           <Select
-            className="h-8 w-auto min-w-[8rem] text-xs"
+            className="w-full"
             value={sort}
             onChange={(e) => setSort(e.target.value as "code" | "left")}
             aria-label="เรียงลำดับ"
@@ -1362,7 +1435,7 @@ function PlaceSheet({
                   {checked ? (
                     <CheckboxIcon className="h-5 w-5 shrink-0 text-accent" />
                   ) : (
-                    <CheckboxOutlineIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    <SquareIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
                   )}
                   <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", cardTint(a.subject_id))}>
                     <BookIcon className="h-5 w-5" />
