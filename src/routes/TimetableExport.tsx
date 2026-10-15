@@ -71,9 +71,10 @@ function ExportBody({
   const entries = (fixedClassroomId ? roomSchedule.data : deptSchedule.data) ?? [];
   const loading = fixedClassroomId ? roomSchedule.isLoading : deptSchedule.isLoading;
 
-  const teacherIds = useMemo(() => [...new Set(entries.map((e) => e.teaching_assignment.teacher_id))].sort(), [entries]);
+  const teacherIds = useMemo(() => [...new Set(entries.flatMap((e) => (e.teaching_assignment.teacher_id ? [e.teaching_assignment.teacher_id] : [])))].sort(), [entries]);
   const { data: entryTeachers = [] } = useProfilesByIds(teacherIds);
-  const teacherName = (id: string) => {
+  const teacherName = (id: string | null) => {
+    if (!id) return "ไม่มีครู";
     const t = teachers.find((x) => x.id === id);
     if (t) return profileFullName(t);
     const o = entryTeachers.find((x) => x.id === id);
@@ -95,7 +96,9 @@ function ExportBody({
   const countBy = useMemo(() => {
     const m = new Map<string, number>();
     for (const e of entries) {
-      for (const k of [e.teaching_assignment.classroom_id, e.teaching_assignment.teacher_id]) m.set(k, (m.get(k) ?? 0) + 1);
+      for (const k of [e.teaching_assignment.classroom_id, e.teaching_assignment.teacher_id]) {
+        if (k) m.set(k, (m.get(k) ?? 0) + 1);
+      }
     }
     return m;
   }, [entries]);

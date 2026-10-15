@@ -594,7 +594,8 @@ export type ClassroomHomeroomTeacher = {
  */
 export type TeachingAssignment = {
   id: string;
-  teacher_id: string;
+  /** Null only for activity subjects with no teacher (migration 0084). */
+  teacher_id: string | null;
   subject_id: string;
   classroom_id: string;
   academic_year: number;

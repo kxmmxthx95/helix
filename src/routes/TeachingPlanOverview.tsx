@@ -129,7 +129,7 @@ function OverviewBoard({
     const la = learningAreas.find((x) => x.id === s?.learning_area_id);
     const dept = departments.find((x) => x.id === s?.department_id);
     return {
-      teacher: t ? profileFullName(t) : "—",
+      teacher: t ? profileFullName(t) : a.teacher_id === null ? "ไม่มีครู" : "—",
       code: s?.code ?? "—",
       learningArea: la?.name ?? "—",
       name: s?.name_th ?? "—",

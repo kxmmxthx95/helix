@@ -489,11 +489,11 @@ export function useTeacherPairs() {
     queryFn: async (): Promise<Map<string, Set<string>>> => {
       const { data, error } = await supabase.from("teaching_assignments").select("teacher_id, subject_id, academic_year, classrooms(grade_level_id)");
       if (error) throw error;
-      const rows = data as unknown as { teacher_id: string; subject_id: string; academic_year: number; classrooms: { grade_level_id: string } | null }[];
+      const rows = data as unknown as { teacher_id: string | null; subject_id: string; academic_year: number; classrooms: { grade_level_id: string } | null }[];
       const year = Math.max(0, ...rows.map((r) => r.academic_year));
       const out = new Map<string, Set<string>>();
       for (const r of rows) {
-        if (r.academic_year !== year || !r.classrooms) continue;
+        if (r.academic_year !== year || !r.classrooms || !r.teacher_id) continue;
         const set = out.get(r.teacher_id) ?? new Set<string>();
         set.add(`${r.subject_id}:${r.classrooms.grade_level_id}`);
         out.set(r.teacher_id, set);

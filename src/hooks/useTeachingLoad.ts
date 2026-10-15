@@ -60,6 +60,18 @@ export function useUpdateTeachingAssignmentPeriods() {
   });
 }
 
+/** Hand an activity over to a teacher, or take the teacher off (null). The DB only allows null for activity subjects. */
+export function useUpdateAssignmentTeacher() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, teacher_id }: { id: string; teacher_id: string | null }) => {
+      const { error } = await supabase.from("teaching_assignments").update({ teacher_id }).eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["teaching_assignments"] }),
+  });
+}
+
 export function useDeleteTeachingAssignment() {
   const qc = useQueryClient();
   return useMutation({

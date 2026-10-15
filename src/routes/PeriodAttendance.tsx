@@ -15,11 +15,12 @@ import {
   usePeriodAttendanceRange,
   usePeriodAttendanceTakenSet,
 } from "@/hooks/usePeriodAttendance";
-import { useTeacherSchedule, type ScheduleEntryRow } from "@/hooks/useSchedule";
+import { useDepartmentSchedule, useTeacherSchedule, type ScheduleEntryRow } from "@/hooks/useSchedule";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import { useApprovedLeaveOnDate } from "@/hooks/useStudentLeave";
 import type { AttendanceStatus, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
+import { canManageAcademic } from "@/lib/roles";
 import { cn, todayIso } from "@/lib/utils";
 
 // ----------------------------------------------------------- period check-in
@@ -54,8 +55,10 @@ const daysInMonth = (ceYear: number, month: number) => new Date(ceYear, month, 0
 export function PeriodAttendance() {
   const { profile: me } = useAuth();
   const isTeacher = me ? (me.roles.includes("teacher") as boolean) : false;
+  // The academic group also checks in teacherless activities (migration 0084) of their own department.
+  const academic = me ? canManageAcademic(me.roles) : false;
 
-  if (!me || !isTeacher) {
+  if (!me || (!isTeacher && !academic)) {
     return <Card className="text-sm text-muted-foreground">เมนูนี้สำหรับครูผู้สอนเท่านั้น</Card>;
   }
 
@@ -64,6 +67,7 @@ export function PeriodAttendance() {
       <PeriodCheckInPanel
         teacherId={me.id}
         isTeacher={isTeacher}
+        academic={academic}
         departmentId={me.department_id ?? ""}
         recorderId={me.id}
       />
@@ -74,11 +78,13 @@ export function PeriodAttendance() {
 function PeriodCheckInPanel({
   teacherId,
   isTeacher,
+  academic,
   departmentId,
   recorderId,
 }: {
   teacherId: string;
   isTeacher: boolean;
+  academic: boolean;
   departmentId: string;
   recorderId: string;
 }) {
@@ -94,11 +100,22 @@ function PeriodCheckInPanel({
   const term: 1 | 2 = activeTerm?.term_type === "term2" ? 2 : 1;
   const scheduleTerm = splitsByTerm ? term : null;
 
-  const { data: allEntries = [], isLoading } = useTeacherSchedule(
+  const { data: ownEntries = [], isLoading: loadingOwn } = useTeacherSchedule(
     isTeacher ? teacherId : null,
     academicYear,
     scheduleTerm,
   );
+  const { data: deptEntries = [], isLoading: loadingDept } = useDepartmentSchedule(
+    departmentId || null,
+    academicYear,
+    scheduleTerm,
+    academic && !!departmentId,
+  );
+  const allEntries = useMemo(
+    () => [...ownEntries, ...deptEntries.filter((e) => e.teaching_assignment.teacher_id === null)],
+    [ownEntries, deptEntries],
+  );
+  const isLoading = loadingOwn || (academic && !!departmentId && loadingDept);
   const weekday = new Date(`${date}T00:00:00`).getDay(); // Sun=0..Sat=6, matches day_of_week 1-6 (จันทร์-เสาร์) directly
   const todaysEntries = useMemo(
     () => allEntries.filter((e) => e.day_of_week === weekday).sort((a, b) => a.period_no - b.period_no),

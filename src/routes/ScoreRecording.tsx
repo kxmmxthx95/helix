@@ -214,7 +214,7 @@ export function ScoreRecording() {
                       <td className="px-3 py-2 font-medium">{subject?.code ?? "—"}</td>
                       <td className="px-3 py-2 text-muted-foreground">{subject?.name_th ?? "—"}</td>
                       <td className="px-3 py-2">{c ? `${g ? gradeShortLabel(g.code) : "—"}/${c.name}` : "—"}</td>
-                      {manager && <td className="px-3 py-2">{a.teacher_id === me.id ? "ตัวเอง" : "—"}</td>}
+                      {manager && <td className="px-3 py-2">{a.teacher_id === me.id ? "ตัวเอง" : a.teacher_id === null ? "ไม่มีครู" : "—"}</td>}
                     </tr>
                   );
                 })}

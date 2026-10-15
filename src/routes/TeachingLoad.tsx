@@ -47,11 +47,12 @@ import {
   useDepartmentTeachingAssignments,
   useLinkAssignments,
   useUnlinkAssignmentGroup,
+  useUpdateAssignmentTeacher,
   useUpdateTeachingAssignmentPeriods,
 } from "@/hooks/useTeachingLoad";
 import { profileFullName, type Classroom, type GradeLevel, type Subject, type TeachingAssignment } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
-import { canManage, isDeptHead, isOrgWide } from "@/lib/roles";
+import { canManage, canManageAcademic, isDeptHead, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const AREA_TONES = [
@@ -64,11 +65,16 @@ const AREA_TONES = [
 
 const TERM_LABEL: Record<number, string> = { 1: "ภาคเรียน 1", 2: "ภาคเรียน 2" };
 
+/** Pseudo teacher id for the list entry that holds activity subjects with no teacher (teacher_id = null). */
+const NO_TEACHER = "__none__";
+const NO_TEACHER_LABEL = "ไม่มีครู (กิจกรรม)";
+
 export function TeachingLoad() {
   const { profile: me } = useAuth();
   const { data: departments = [] } = useDepartments();
   const orgWide = me ? isOrgWide(me.roles) : false;
   const mayEdit = me ? canManage(me.roles) : false;
+  const academic = me ? canManageAcademic(me.roles) : false;
 
   const [pickedDept, setPickedDept] = useState("");
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
@@ -168,6 +174,7 @@ export function TeachingLoad() {
           minPeriods={deptSettings?.min_periods_per_week ?? null}
           maxPeriods={deptSettings?.max_periods_per_week ?? null}
           mayEdit={mayEdit}
+          academic={academic}
           selectedTeacherId={selectedTeacherId}
           onSelectTeacher={setSelectedTeacherId}
         />
@@ -195,6 +202,7 @@ function TeachingLoadBoard({
   minPeriods,
   maxPeriods,
   mayEdit,
+  academic,
   selectedTeacherId,
   onSelectTeacher,
 }: {
@@ -204,6 +212,8 @@ function TeachingLoadBoard({
   minPeriods: number | null;
   maxPeriods: number | null;
   mayEdit: boolean;
+  /** May create/hand over teacherless activities (the academic group, not ธุรการ). */
+  academic: boolean;
   selectedTeacherId: string;
   onSelectTeacher: (id: string) => void;
 }) {
@@ -224,6 +234,7 @@ function TeachingLoadBoard({
   const totalByTeacher = useMemo(() => {
     const totals = new Map<string, number>();
     for (const a of assignments)
+      a.teacher_id &&
       totals.set(
         a.teacher_id,
         (totals.get(a.teacher_id) ?? 0) + a.periods_per_week,
@@ -257,7 +268,9 @@ function TeachingLoadBoard({
     return list;
   }, [teachers, sortKey, sortDir, totalByTeacher]);
 
+  const noTeacher = selectedTeacherId === NO_TEACHER;
   const selectedTeacher = teachers.find((t) => t.id === selectedTeacherId);
+  const teacherlessCount = assignments.filter((a) => a.teacher_id === null).length;
   const { data: classrooms = [] } = useClassroomsByDepartment(departmentId);
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
   const { data: allSubjects = [] } = useSubjects({
@@ -283,7 +296,7 @@ function TeachingLoadBoard({
       ] as const;
     };
     return assignments
-      .filter((a) => a.teacher_id === selectedTeacherId)
+      .filter((a) => a.teacher_id === (noTeacher ? null : selectedTeacherId))
       .sort((x, y) => {
         const [gx, cx, sx] = key(x);
         const [gy, cy, sy] = key(y);
@@ -300,7 +313,7 @@ function TeachingLoadBoard({
   const subjectCountByTeacher = useMemo(() => {
     const counts = new Map<string, number>();
     for (const a of assignments)
-      counts.set(a.teacher_id, (counts.get(a.teacher_id) ?? 0) + 1);
+      a.teacher_id && counts.set(a.teacher_id, (counts.get(a.teacher_id) ?? 0) + 1);
     return counts;
   }, [assignments]);
 
@@ -315,7 +328,7 @@ function TeachingLoadBoard({
 
   const totalPeriods = rows.reduce((sum, a) => sum + a.periods_per_week, 0);
   const classroomCount = new Set(rows.map((a) => a.classroom_id)).size;
-  const loadState = loadStatus(totalPeriods, minPeriods, maxPeriods);
+  const loadState = noTeacher ? "ok" : loadStatus(totalPeriods, minPeriods, maxPeriods);
 
   return (
     <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-stretch">
@@ -353,6 +366,30 @@ function TeachingLoadBoard({
         </div>
 
         <ul className="table-panel-scroll scrollbar-hidden space-y-1 p-2">
+          {(academic || teacherlessCount > 0) && (
+            <li>
+              <button
+                type="button"
+                onClick={() => onSelectTeacher(NO_TEACHER)}
+                aria-current={noTeacher}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
+                  noTeacher ? "bg-accent/10" : "hover:bg-muted",
+                )}
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                  <Users className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{NO_TEACHER_LABEL}</span>
+                  <span className="block truncate text-xs text-muted-foreground">ชุมนุม ลูกเสือ ฯลฯ ที่ไม่ผูกครู</span>
+                </span>
+                <span className="shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">
+                  {teacherlessCount} รายวิชา
+                </span>
+              </button>
+            </li>
+          )}
           {visibleTeachers.map((t) => {
             const active = selectedTeacherId === t.id;
             const status = loadStatus(
@@ -425,27 +462,33 @@ function TeachingLoadBoard({
         </div>
       </div>
 
-      {selectedTeacher ? (
+      {noTeacher || selectedTeacher ? (
         <div className="flex min-h-0 flex-col gap-4 scrollbar-hidden overflow-auto">
           <Card className="shrink-0 space-y-4">
             <div className="flex flex-wrap items-center gap-4">
-              <Avatar
-                name={profileFullName(selectedTeacher)}
-                src={avatarUrl(selectedTeacher)}
-                className="h-16 w-16 text-lg"
-              />
+              {selectedTeacher ? (
+                <Avatar
+                  name={profileFullName(selectedTeacher)}
+                  src={avatarUrl(selectedTeacher)}
+                  className="h-16 w-16 text-lg"
+                />
+              ) : (
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                  <Users className="h-6 w-6" />
+                </span>
+              )}
               <div className="min-w-0 flex-1">
                 <h3 className="font-heading truncate text-lg font-semibold">
-                  {profileFullName(selectedTeacher)}
+                  {selectedTeacher ? profileFullName(selectedTeacher) : NO_TEACHER_LABEL}
                 </h3>
                 <p className="truncate text-sm text-muted-foreground">
-                  {areaName(selectedTeacher)}
+                  {selectedTeacher ? areaName(selectedTeacher) : "ไม่นับเป็นภาระงานสอนของครูคนใด"}
                 </p>
               </div>
-              {mayEdit && (
+              {mayEdit && (!noTeacher || academic) && (
                 <NewAssignmentForm
                   departmentId={departmentId}
-                  teacherId={selectedTeacher.id}
+                  teacherId={noTeacher ? null : selectedTeacherId}
                   academicYear={academicYear}
                   term={term}
                   existingAssignments={rows}
@@ -524,6 +567,7 @@ function TeachingLoadBoard({
                         teachers={teachers}
                         departmentId={departmentId}
                         mayEdit={mayEdit}
+                        academic={academic}
                         onDelete={() => del.mutate(a.id)}
                       />
                     ))}
@@ -602,7 +646,8 @@ function AssignmentRow({
   allAssignments,
   teachers,
   departmentId,
-  mayEdit,
+  mayEdit: mayEditLoad,
+  academic,
   onDelete,
 }: {
   index: number;
@@ -611,8 +656,11 @@ function AssignmentRow({
   teachers: ProfileRow[];
   departmentId: string;
   mayEdit: boolean;
+  academic: boolean;
   onDelete: () => void;
 }) {
+  // A teacherless activity is the academic group's call (matches teaching_assignments_write, 0084).
+  const mayEdit = mayEditLoad && (assignment.teacher_id !== null || academic);
   const { data: subjects = [] } = useSubjects({
     search: "",
     departmentId,
@@ -626,6 +674,7 @@ function AssignmentRow({
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
   const unlink = useUnlinkAssignmentGroup();
   const updatePeriods = useUpdateTeachingAssignmentPeriods();
+  const updateTeacher = useUpdateAssignmentTeacher();
   const toast = useToast();
   const [linking, setLinking] = useState(false);
   const [periodsDraft, setPeriodsDraft] = useState(String(assignment.periods_per_week));
@@ -668,7 +717,7 @@ function AssignmentRow({
     const g = gradeLevels.find((x) => x.id === c?.grade_level_id);
     const gLabel = g ? gradeShortLabel(g.code) : null;
     const t = teachers.find((x) => x.id === a.teacher_id);
-    return `${t ? profileFullName(t) : "—"} · ${s ? s.code : "—"} · ${c ? `${gLabel ?? "—"}/${c.name}` : "—"}`;
+    return `${a.teacher_id === null ? "ไม่มีครู" : t ? profileFullName(t) : "—"} · ${s ? s.code : "—"} · ${c ? `${gLabel ?? "—"}/${c.name}` : "—"}`;
   }
 
   return (
@@ -676,6 +725,27 @@ function AssignmentRow({
       <td className="px-3 py-2.5 text-muted-foreground">{index}</td>
       <td className="px-3 py-2.5">
         <span className="block font-medium">{subject?.name_th ?? "—"}</span>
+        {mayEdit && subject?.subject_type === "activity" && academic && (
+          <Select
+            className="mt-1 h-7 w-auto min-w-[9rem] text-xs"
+            value={assignment.teacher_id ?? ""}
+            aria-label="ครูผู้สอนกิจกรรม"
+            disabled={updateTeacher.isPending}
+            onChange={(e) =>
+              updateTeacher.mutate(
+                { id: assignment.id, teacher_id: e.target.value || null },
+                { onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error") },
+              )
+            }
+          >
+            <option value="">{NO_TEACHER_LABEL}</option>
+            {teachers.map((t) => (
+              <option key={t.id} value={t.id}>
+                {profileFullName(t)}
+              </option>
+            ))}
+          </Select>
+        )}
         {groupMates.length > 0 && (
           <span className="mt-0.5 block text-[10px] text-accent">
             เรียนรวม/แบ่งคาบกับ {groupMates.map(label).join(", ")}
@@ -809,6 +879,7 @@ function GroupLinkSheet({
     return { c, label: c ? `${g ? gradeShortLabel(g.code) : "—"}/${c.name}` : "—" };
   };
   const teacherName = (id: string) => {
+    if (id === NO_TEACHER) return NO_TEACHER_LABEL;
     const t = teachers.find((x) => x.id === id);
     return t ? profileFullName(t) : "—";
   };
@@ -830,9 +901,9 @@ function GroupLinkSheet({
       const c = classrooms.find((x) => x.id === a.classroom_id);
       const g = gradeLevels.find((x) => x.id === c?.grade_level_id);
       const t = teachers.find((x) => x.id === a.teacher_id);
-      const hay = `${t ? profileFullName(t) : ""} ${s?.code ?? ""} ${s?.name_th ?? ""} ${g ? gradeShortLabel(g.code) : ""}/${c?.name ?? ""}`.toLowerCase();
+      const hay = `${t ? profileFullName(t) : a.teacher_id === null ? NO_TEACHER_LABEL : ""} ${s?.code ?? ""} ${s?.name_th ?? ""} ${g ? gradeShortLabel(g.code) : ""}/${c?.name ?? ""}`.toLowerCase();
       if (q && !hay.includes(q)) continue;
-      byTeacher.set(a.teacher_id, [...(byTeacher.get(a.teacher_id) ?? []), a]);
+      byTeacher.set(a.teacher_id ?? NO_TEACHER, [...(byTeacher.get(a.teacher_id ?? NO_TEACHER) ?? []), a]);
     }
     const code = (a: TeachingAssignment) => subjects.find((s) => s.id === a.subject_id)?.code ?? "";
     return [...byTeacher.entries()]
@@ -1044,7 +1115,8 @@ function NewAssignmentForm({
   existingAssignments,
 }: {
   departmentId: string;
-  teacherId: string;
+  /** Null = teacherless activities (only activity subjects are offered). */
+  teacherId: string | null;
   academicYear: number;
   term: number | null;
   existingAssignments: TeachingAssignment[];
@@ -1112,7 +1184,7 @@ function NewAssignmentForm({
         continue;
       seen.add(r.subject_id);
       const s = subjectById.get(r.subject_id);
-      if (!s) continue;
+      if (!s || (teacherId === null && s.subject_type !== "activity")) continue;
       out.push({
         id: s.id,
         code: s.code,
@@ -1123,7 +1195,7 @@ function NewAssignmentForm({
     }
     out.sort((a, b) => a.code.localeCompare(b.code, "th", { numeric: true }));
     return out;
-  }, [classroomId, termRows, assignedSubjectIds, subjectById]);
+  }, [classroomId, termRows, assignedSubjectIds, subjectById, teacherId]);
 
   useEffect(() => {
     setClassroomId("");

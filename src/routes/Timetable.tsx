@@ -76,6 +76,7 @@ const DAY_LABEL: Record<number, string> = {
   6: "เสาร์",
 };
 const TERM_LABEL: Record<number, string> = { 1: "ภาคเรียน 1", 2: "ภาคเรียน 2" };
+const NO_TEACHER_LABEL = "ไม่มีครู";
 
 type View = "classroom" | "teacher";
 
@@ -352,11 +353,12 @@ function ClassroomWorkspace({
 
   const mine = assignments.filter((a) => a.classroom_id === room.id);
   const students = studentCount.get(room.id) ?? 0;
-  const roomTeachers = new Set(mine.map((a) => a.teacher_id));
+  const roomTeachers = new Set(mine.flatMap((a) => (a.teacher_id ? [a.teacher_id] : [])));
   // Teachers of this room who are busy teaching another room at the same time.
   const ghostEntries = showOthers
     ? deptEntries.filter(
-        (e) => e.teaching_assignment.classroom_id !== room.id && roomTeachers.has(e.teaching_assignment.teacher_id),
+        (e) => e.teaching_assignment.classroom_id !== room.id && e.teaching_assignment.teacher_id !== null &&
+          roomTeachers.has(e.teaching_assignment.teacher_id),
       )
     : [];
 
@@ -469,7 +471,14 @@ function ClassroomTimetable({
   const { data: assignments = [] } = useDepartmentTeachingAssignments(departmentId, academicYear, term);
   // The role-filtered `teachers` list can miss people the viewer can't read roles for; look up the card teachers by id too.
   const teacherIds = useMemo(
-    () => [...new Set([...entries, ...(ghostEntries ?? [])].map((e) => e.teaching_assignment.teacher_id))].sort(),
+    () =>
+      [
+        ...new Set(
+          [...entries, ...(ghostEntries ?? [])].flatMap((e) =>
+            e.teaching_assignment.teacher_id ? [e.teaching_assignment.teacher_id] : [],
+          ),
+        ),
+      ].sort(),
     [entries, ghostEntries],
   );
   const { data: cardTeachers = [] } = useProfilesByIds(teacherIds);
@@ -506,6 +515,7 @@ function ClassroomTimetable({
         subjectLabel={(id) => subjects.find((s) => s.id === id)?.code ?? "—"}
         subjectName={(id) => subjects.find((s) => s.id === id)?.name_th ?? ""}
         teacherLabel={(id) => {
+          if (!id) return NO_TEACHER_LABEL;
           const t = findTeacher(id);
           return t ? `${t.first_name} ${t.last_name}` : "—";
         }}
@@ -768,6 +778,7 @@ function TeacherWorkspace({
   const summary = useMemo(() => {
     const map = new Map<string, { subjects: Set<string>; periods: number; assignments: TeachingAssignment[] }>();
     for (const a of assignments) {
+      if (!a.teacher_id) continue;
       const cur = map.get(a.teacher_id) ?? { subjects: new Set<string>(), periods: 0, assignments: [] };
       cur.subjects.add(a.subject_id);
       cur.periods += a.periods_per_week;
@@ -1011,6 +1022,7 @@ function TeacherTimetable({
         subjectLabel={(id) => subjects.find((s) => s.id === id)?.code ?? "—"}
         subjectName={(id) => subjects.find((s) => s.id === id)?.name_th ?? ""}
         teacherLabel={(id) => {
+          if (!id) return NO_TEACHER_LABEL;
           const t = teachers.find((x) => x.id === id);
           return t ? profileFullName(t) : "—";
         }}
@@ -1080,7 +1092,7 @@ function TimetableGrid({
   isLoading: boolean;
   subjectLabel: (id: string) => string;
   subjectName: (id: string) => string;
-  teacherLabel: (id: string) => string;
+  teacherLabel: (id: string | null) => string;
   roomLabel: (id: string) => string;
   styling: TimetableStyling;
   /** Where these entries live — used to look up what a rejected placement collided with. */
@@ -1135,12 +1147,12 @@ function TimetableGrid({
           e.id !== selfEntryId &&
           e.day_of_week === day &&
           e.period_no === periodNo &&
-          (e.teaching_assignment.teacher_id === a.teacher_id || e.teaching_assignment.classroom_id === a.classroom_id) &&
+          ((a.teacher_id !== null && e.teaching_assignment.teacher_id === a.teacher_id) || e.teaching_assignment.classroom_id === a.classroom_id) &&
           !(a.group_id && e.teaching_assignment.group_id === a.group_id),
       )
       .map((e) => {
         const t = e.teaching_assignment;
-        const why = [t.teacher_id === a.teacher_id && "ครูมีคาบนี้แล้ว", t.classroom_id === a.classroom_id && "ห้องมีคาบนี้แล้ว"]
+        const why = [a.teacher_id !== null && t.teacher_id === a.teacher_id && "ครูมีคาบนี้แล้ว", t.classroom_id === a.classroom_id && "ห้องมีคาบนี้แล้ว"]
           .filter(Boolean)
           .join(" และ ");
         return `• ${subjectLabel(t.subject_id)} ${subjectName(t.subject_id)} · ${teacherLabel(t.teacher_id)} · ${roomLabel(t.classroom_id)} (${why})`;
@@ -1484,7 +1496,7 @@ function PlaceSheet({
   mode: "classroom" | "teacher";
   subjectLabel: (id: string) => string;
   subjectName: (id: string) => string;
-  teacherLabel: (id: string) => string;
+  teacherLabel: (id: string | null) => string;
   roomLabel: (id: string) => string;
   styling: TimetableStyling;
   explainFailure: (
