@@ -172,6 +172,20 @@ export function gradeStep(gradeLevelId: string | null | undefined, gradeLevels: 
   return Math.min(2, Math.floor((idx * 3) / ladder.length)) as GradeStep;
 }
 
+/** Tailwind 100/200/300 of each hue as hex — for PDF cells, where class strings don't apply. */
+const SHADE_HEX: Record<AreaHue, [string, string, string]> = {
+  rose: ["#ffe4e6", "#fecdd3", "#fda4af"],
+  blue: ["#dbeafe", "#bfdbfe", "#93c5fd"],
+  emerald: ["#d1fae5", "#a7f3d0", "#6ee7b7"],
+  amber: ["#fef3c7", "#fde68a", "#fcd34d"],
+  orange: ["#ffedd5", "#fed7aa", "#fdba74"],
+  violet: ["#ede9fe", "#ddd6fe", "#c4b5fd"],
+  cyan: ["#cffafe", "#a5f3fc", "#67e8f9"],
+  pink: ["#fce7f3", "#fbcfe8", "#f9a8d4"],
+  slate: ["#f1f5f9", "#e2e8f0", "#cbd5e1"],
+};
+
+export const subjectHex = (hue: AreaHue, step: GradeStep = 1) => SHADE_HEX[hue][step];
 export const subjectShade = (hue: AreaHue, step: GradeStep = 1) => SHADES[hue][step];
 export const subjectGradient = (hue: AreaHue, step: GradeStep = 1) => GRADIENTS[hue][step];
 export const areaDot = (hue: AreaHue) => DOTS[hue];

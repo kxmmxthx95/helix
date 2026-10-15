@@ -8,6 +8,7 @@ import {
   ChevronBack,
   ChevronForward,
   CheckmarkCircleIcon,
+  DownloadIcon,
   GraduationCap,
   InfoIcon,
   PencilIcon,
@@ -51,6 +52,7 @@ import {
   useTeacherSchedule,
   type ScheduleEntryRow,
 } from "@/hooks/useSchedule";
+import { TimetableExportSheet } from "@/routes/TimetableExport";
 import { generatePeriods } from "@/lib/periodGenerator";
 import {
   profileFullName,
@@ -87,6 +89,7 @@ export function Timetable() {
   const [pickedDept, setPickedDept] = useState("");
   const [view, setView] = useState<View | "">("");
   const [periodSettingsOpen, setPeriodSettingsOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const departmentId = orgWide ? pickedDept : (me?.department_id ?? "");
   const { data: currentTerm } = useCurrentTerm(departmentId || null);
@@ -115,6 +118,7 @@ export function Timetable() {
   if (isStudent) {
     return myClassroom ? (
       <div className="space-y-4 pb-8">
+        <div className="flex items-center gap-2">
         {splitsByTerm && (
           <div className="inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
             {[1, 2].map((t) => (
@@ -134,6 +138,22 @@ export function Timetable() {
             ))}
           </div>
         )}
+          <Button size="sm" variant="outline" className="ml-auto h-8 shrink-0" onClick={() => setExportOpen(true)}>
+            <DownloadIcon className="h-3.5 w-3.5" />
+            ส่งออก PDF
+          </Button>
+        </div>
+        <TimetableExportSheet
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          departmentId={departmentId}
+          academicYear={academicYear}
+          term={scheduleTerm}
+          defaultKind="classroom"
+          classrooms={classrooms}
+          teachers={teachers}
+          fixedClassroomId={myClassroom.id}
+        />
         <ClassroomTimetable
           departmentId={departmentId}
           classroomId={myClassroom.id}
@@ -197,11 +217,23 @@ export function Timetable() {
           </Select>
         )}
 
-        {departmentId && mayEdit && (
+        {departmentId && view && (
           <Button
             size="sm"
             variant="outline"
             className={cn("h-8 shrink-0", !splitsByTerm && "ml-auto")}
+            onClick={() => setExportOpen(true)}
+          >
+            <DownloadIcon className="h-3.5 w-3.5" />
+            ส่งออก PDF
+          </Button>
+        )}
+
+        {departmentId && mayEdit && (
+          <Button
+            size="sm"
+            variant="outline"
+            className={cn("h-8 shrink-0", !view && !splitsByTerm && "ml-auto")}
             onClick={() => setPeriodSettingsOpen(true)}
           >
             <SettingsIcon className="h-3.5 w-3.5" />
@@ -209,6 +241,19 @@ export function Timetable() {
           </Button>
         )}
       </div>
+
+      {departmentId && view && (
+        <TimetableExportSheet
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          departmentId={departmentId}
+          academicYear={academicYear}
+          term={scheduleTerm}
+          defaultKind={view}
+          classrooms={classrooms}
+          teachers={teachers}
+        />
+      )}
 
       {departmentId && (
         <PeriodSettingsSheet
