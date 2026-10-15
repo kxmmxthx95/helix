@@ -1,8 +1,12 @@
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import {
+  CalendarIcon,
   CheckmarkCircleIcon,
   AppsIcon,
+  DownloadIcon,
+  LinkIcon,
+  ProfileIcon,
   BookIcon,
   ChevronForward,
   DocumentTextIcon,
@@ -40,6 +44,7 @@ import {
   todayISO,
   type TaskStatus,
 } from "@/lib/docTasks";
+import { textareaClass } from "@/routes/Roster";
 import { isOrgWide } from "@/lib/roles";
 import { teacherLessonProgress, type LessonStatus, type TeacherLessonProgress } from "@/lib/teacherDocProgress";
 import { cn } from "@/lib/utils";
@@ -465,7 +470,12 @@ export function MyDocTasksTab() {
   const { page, setPage, pageCount, pageRows } = usePagination(filtered, [tab, search, typeFilter]);
 
   if (rows.length === 0) {
-    return <EmptyState title="ยังไม่มีงานเอกสาร" description="เมื่อมีงานที่มอบหมายให้คุณ จะแสดงที่นี่" icon={DocumentTextIcon} />;
+    return (
+      <div className="space-y-4">
+        <EmptyState title="ยังไม่มีงานเอกสาร" description="เมื่อมีงานที่มอบหมายให้คุณ จะแสดงที่นี่" icon={DocumentTextIcon} />
+        <MyLessonDocs />
+      </div>
+    );
   }
 
   const tabs: { id: MyTab; label: string; n: number }[] = [
@@ -655,8 +665,69 @@ export function MyDocTasksTab() {
         )}
       </section>
 
+      <MyLessonDocs />
+
       <UploadTaskFileSheet task={uploadFor} onClose={() => setUploadFor(null)} />
     </div>
+  );
+}
+
+/** เอกสารการสอนที่ฉันอัปโหลด — the signed-in teacher's own lesson uploads (doc_files) with review status and the reviewer's note. */
+function MyLessonDocs() {
+  const { profile: me } = useAuth();
+  const toast = useToast();
+  const { data: uploads = [] } = useRecentDocFiles();
+  const mine = uploads.filter((f) => f.uploaded_by === me!.id);
+  const { page, setPage, pageCount, pageRows } = usePagination(mine, []);
+
+  return (
+    <section className="space-y-3 rounded-2xl border border-border bg-card p-4">
+      <h3 className="text-sm font-bold">เอกสารการสอนที่อัปโหลด ({mine.length})</h3>
+      {mine.length === 0 ? (
+        <p className="py-6 text-center text-xs text-muted-foreground">ยังไม่มีเอกสารการสอนที่อัปโหลด</p>
+      ) : (
+        <div className="space-y-3">
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full min-w-[40rem] text-xs">
+              <thead className="bg-muted text-left text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 font-medium">เอกสาร</th>
+                  <th className="px-3 py-2 font-medium">วิชา · บทเรียน</th>
+                  <th className="px-3 py-2 font-medium">อัปโหลดเมื่อ</th>
+                  <th className="px-3 py-2 font-medium">สถานะ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map((f) => (
+                  <tr key={f.id} className="border-t border-border">
+                    <td className="px-3 py-2.5">
+                      <button type="button" className="flex items-center gap-3 text-left" onClick={() => void openFile(f.file_path, toast)}>
+                        <FileKindBadge mime={f.mime_type} />
+                        <span className="min-w-0">
+                          <span className="block max-w-[16rem] truncate text-sm font-medium">{f.title}</span>
+                          <span className="block text-[11px] text-muted-foreground">{formatSize(f.size_bytes)}</span>
+                        </span>
+                      </button>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {[f.doc_lessons?.subjects?.name_th, f.doc_lessons?.name].filter(Boolean).join(" · ") || "—"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5">{thDateTime(f.created_at)}</td>
+                    <td className="px-3 py-2.5">
+                      <ReviewChip status={f.review_status} />
+                      {f.review_status === "returned" && f.review_note && (
+                        <div className="mt-1 max-w-[14rem] text-[11px] text-destructive">หมายเหตุ: {f.review_note}</div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -754,6 +825,7 @@ export function ReviewDocsTab() {
           kind: "task",
           file: f,
           heading: task?.title ?? "—",
+          sender: nameOf(f.teacher_id),
           meta: `${nameOf(f.teacher_id)} · ส่งเมื่อ ${thDate(f.created_at.slice(0, 10))}${task ? ` · กำหนดส่ง ${thDate(task.due_date)}` : ""}`,
         },
         mime: f.mime_type,
@@ -774,6 +846,7 @@ export function ReviewDocsTab() {
           kind: "doc",
           file: f,
           heading: where || "เอกสาร",
+          sender: nameOf(f.uploaded_by),
           meta: `${nameOf(f.uploaded_by)} · อัปโหลดเมื่อ ${thDate(f.created_at.slice(0, 10))}`,
         },
         mime: f.mime_type,
@@ -966,9 +1039,10 @@ type ReviewIntent = "edit" | "reject" | null;
 
 type ReviewTarget = {
   kind: "task" | "doc";
-  file: Pick<DocTaskFile, "id" | "title" | "file_path" | "file_name" | "mime_type" | "review_status" | "review_note">;
+  file: Pick<DocTaskFile, "id" | "title" | "file_path" | "file_name" | "mime_type" | "size_bytes" | "created_at" | "review_status" | "review_note">;
   heading: string;
   meta: string;
+  sender: string;
 };
 
 /** Review dialog shared by task submissions (doc_task_files) and lesson uploads (doc_files). */
@@ -1003,6 +1077,25 @@ function ReviewSheet({ target, intent, onClose }: { target: ReviewTarget | null;
     else window.location.href = url;
   }
 
+  async function download() {
+    if (!file) return;
+    const url = await docFileSignedUrl(file.file_path);
+    if (!url) return toast("ดาวน์โหลดไม่สำเร็จ", "error");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.file_name;
+    a.click();
+  }
+
+  // Signed URL — expires in 60 s (docFileSignedUrl), so the copied link is short-lived.
+  async function copyLink() {
+    if (!file) return;
+    const url = await docFileSignedUrl(file.file_path);
+    if (!url) return toast("คัดลอกลิงก์ไม่สำเร็จ", "error");
+    await navigator.clipboard.writeText(url);
+    toast("คัดลอกลิงก์แล้ว");
+  }
+
   function submit(status: "approved" | "returned") {
     if (!file) return;
     if (status === "returned" && !note.trim()) {
@@ -1029,6 +1122,8 @@ function ReviewSheet({ target, intent, onClose }: { target: ReviewTarget | null;
       onOpenChange={(o) => !o && close()}
       title={intent === "reject" ? "ปฏิเสธเอกสาร" : intent === "edit" ? "ส่งกลับให้แก้ไข" : "ตรวจเอกสาร"}
       description={file?.title}
+      icon={<DocumentTextIcon className="h-5 w-5" />}
+      closable
       wide
       footer={
         file ? (
@@ -1062,35 +1157,80 @@ function ReviewSheet({ target, intent, onClose }: { target: ReviewTarget | null;
     >
       {file && (
         <div className="space-y-4">
-          <div className="space-y-1 rounded-xl border border-border p-3 text-xs">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium">{target!.heading}</span>
-              <ReviewChip status={file.review_status} />
+          <div className="space-y-3 rounded-2xl border border-border p-3">
+            <div className="flex gap-3">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                <DocumentTextIcon className="h-7 w-7" />
+              </div>
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-semibold">{target!.heading}</span>
+                  <ReviewChip status={file.review_status} />
+                </div>
+                <div className="text-xs text-muted-foreground">{target!.sender}</div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <CalendarIcon className="h-3.5 w-3.5" /> อัปโหลดเมื่อ {thDateTime(file.created_at)} น.
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="truncate">{file.file_name}</span>
+                  <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px]">{formatSize(file.size_bytes)}</span>
+                </div>
+              </div>
             </div>
-            <div className="text-muted-foreground">{target!.meta}</div>
-            <div className="text-muted-foreground">{file.file_name}</div>
-            {file.review_note && <div className="text-destructive">หมายเหตุเดิม: {file.review_note}</div>}
+            {file.review_note && <div className="text-xs text-destructive">หมายเหตุเดิม: {file.review_note}</div>}
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => void open()}>
+                <EyeIcon className="h-3.5 w-3.5" /> เปิดดูไฟล์
+              </Button>
+              <Button type="button" variant="outline" onClick={() => void download()}>
+                <DownloadIcon className="h-3.5 w-3.5" /> ดาวน์โหลด
+              </Button>
+              <Button type="button" variant="outline" onClick={() => void copyLink()}>
+                <LinkIcon className="h-3.5 w-3.5" /> คัดลอกลิงก์
+              </Button>
+            </div>
           </div>
 
-          {previewUrl ? (
-            <iframe src={previewUrl} title={file.title} className="h-[60vh] w-full rounded-lg border border-border" />
-          ) : (
-            <Button type="button" variant="outline" onClick={() => void open()}>
-              <DocumentTextIcon className="h-3.5 w-3.5" /> เปิดดูไฟล์
-            </Button>
-          )}
+          {previewUrl && <iframe src={previewUrl} title={file.title} className="h-[60vh] w-full rounded-lg border border-border" />}
 
-          <Field
-            label={
-              intent === "reject"
-                ? "เหตุผลที่ปฏิเสธ (จำเป็น)"
-                : intent === "edit"
-                  ? "สิ่งที่ต้องแก้ไข (จำเป็น)"
-                  : "หมายเหตุ (จำเป็นเมื่อส่งกลับแก้ไข)"
-            }
-          >
-            <Input value={note} onChange={(e) => setNote(e.target.value)} autoFocus={intent !== null} />
-          </Field>
+          <section className="space-y-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <DocumentTextIcon className="h-4 w-4" /> ข้อมูลเพิ่มเติม
+            </h3>
+            <div className="grid grid-cols-3 divide-x divide-border rounded-xl bg-muted/50 py-3 text-xs">
+              {[
+                { icon: ProfileIcon, label: "ผู้ส่งเอกสาร", value: target!.sender },
+                { icon: CalendarIcon, label: "วันที่อัปโหลด", value: `${thDateTime(file.created_at)} น.` },
+                { icon: DocumentTextIcon, label: "ขนาดไฟล์", value: `${formatSize(file.size_bytes)} ${file.mime_type === "application/pdf" ? "PDF" : ""}` },
+              ].map(({ icon: Icon, label, value }) => (
+                <div key={label} className="flex min-w-0 items-start gap-2 px-3">
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <div className="text-muted-foreground">{label}</div>
+                    <div className="text-sm font-medium">{value}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-semibold">
+              {intent === "reject" ? "เหตุผลที่ปฏิเสธ" : intent === "edit" ? "สิ่งที่ต้องแก้ไข" : "หมายเหตุ"}{" "}
+              <span className="text-xs font-normal text-muted-foreground">
+                {intent ? "(จำเป็น)" : "(จำเป็นเมื่อส่งกลับแก้ไข)"}
+              </span>
+            </h3>
+            <textarea
+              className={cn(textareaClass, "min-h-32")}
+              placeholder="ระบุเหตุผลหรือรายละเอียดที่ต้องแก้ไข..."
+              maxLength={500}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              autoFocus={intent !== null}
+            />
+            <div className="text-right text-xs text-muted-foreground">{note.length}/500</div>
+          </section>
         </div>
       )}
     </Sheet>

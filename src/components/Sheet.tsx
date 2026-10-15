@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Drawer } from "vaul";
-import { ContractIcon, ExpandIcon } from "@/components/icons";
+import { ContractIcon, ExpandIcon, X } from "@/components/icons";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,8 @@ export function Sheet({
   title,
   description,
   headerEnd,
+  icon,
+  closable = false,
   children,
   footer,
   className,
@@ -28,6 +30,10 @@ export function Sheet({
   description?: string;
   /** Optional trailing content in the header row (e.g. a badge). */
   headerEnd?: React.ReactNode;
+  /** Optional tinted tile before the title (e.g. a document icon). */
+  icon?: React.ReactNode;
+  /** Shows an X button at the end of the header row. */
+  closable?: boolean;
   children: React.ReactNode;
   /** Sticky actions below the scroll body (cancel / save, etc.). */
   footer?: React.ReactNode;
@@ -57,6 +63,7 @@ export function Sheet({
         >
           <div className="shrink-0 border-b border-border px-3 pb-3 pt-3">
             <div className="flex items-center gap-2">
+              {icon && <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">{icon}</div>}
               <Drawer.Title className="font-heading min-w-0 flex-1 truncate text-base font-semibold">{title}</Drawer.Title>
               {resizable && (
                 <Button
@@ -69,6 +76,11 @@ export function Sheet({
                 </Button>
               )}
               {headerEnd}
+              {closable && (
+                <Button size="icon" variant="outline" aria-label="ปิด" onClick={() => onOpenChange(false)}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </div>
             {description ? (
               <Drawer.Description className="font-sarabun text-xs text-muted-foreground">
