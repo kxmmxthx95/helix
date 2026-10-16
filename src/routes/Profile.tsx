@@ -85,7 +85,7 @@ export function Profile() {
   }
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[20rem_1fr]">
+    <div className="mx-auto grid w-full max-w-6xl gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
       <input ref={setAvatarInput} type="file" accept="image/*" className="hidden" onChange={onAvatarChosen} />
 
       <aside className="h-fit overflow-hidden rounded-2xl border border-border bg-card">
