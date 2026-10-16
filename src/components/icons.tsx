@@ -1,6 +1,5 @@
 import type React from "react";
 // Deep imports — the package barrel pulls every icon into the main chunk.
-import SwapVerticalOutline from "react-ionicons/lib/SwapVerticalOutline";
 import BusinessOutline from "react-ionicons/lib/BusinessOutline";
 import ChevronDownOutline from "react-ionicons/lib/ChevronDownOutline";
 import FunnelOutline from "react-ionicons/lib/FunnelOutline";
@@ -111,7 +110,6 @@ export const HomeIcon = wrap(HomeOutline);
 export const AlertTriangle = wrap(Warning);
 export const FileUp = wrap(DocumentAttach);
 export const DownloadIcon = wrap(Download);
-export const SortIcon = wrap(SwapVerticalOutline);
 export const BuildingIcon = wrap(BusinessOutline);
 export const ChevronDown = wrap(ChevronDownOutline);
 export const FunnelIcon = wrap(FunnelOutline);

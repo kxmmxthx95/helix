@@ -13,10 +13,8 @@ import {
   DocumentTextIcon,
   EyeIcon,
   ListIcon,
-  MoreIcon,
   PencilIcon,
   Search,
-  SortIcon,
   TimeIcon,
   Upload,
   X,
@@ -675,154 +673,99 @@ export function MyDocTasksTab() {
 }
 
 /** เอกสารการสอนที่ฉันอัปโหลด — the signed-in teacher's own lesson uploads (doc_files) with review status and the reviewer's note. */
-type LessonSort = "newest" | "oldest" | "subject";
-
 function MyLessonDocs() {
   const { profile: me } = useAuth();
   const toast = useToast();
   const { data: uploads = [] } = useRecentDocFiles();
   const removeFile = useDeleteDocFile();
-  const [sort, setSort] = useState<LessonSort>("newest");
-  const [menu, setMenu] = useState<{ id: string; right: number; top?: number; bottom?: number } | null>(null);
-  const mine = useMemo(() => {
-    const list = uploads.filter((f) => f.uploaded_by === me!.id);
-    return list.sort((a, b) =>
-      sort === "subject"
-        ? (a.doc_lessons?.subjects?.code ?? "").localeCompare(b.doc_lessons?.subjects?.code ?? "", "th", { numeric: true }) ||
-          b.created_at.localeCompare(a.created_at)
-        : sort === "oldest"
-          ? a.created_at.localeCompare(b.created_at)
-          : b.created_at.localeCompare(a.created_at),
-    );
-  }, [uploads, me, sort]);
-  const { page, setPage, pageCount, pageRows } = usePagination(mine, [sort]);
-  const menuFile = pageRows.find((f) => f.id === menu?.id);
-  const cell = "border-l border-border/60 px-4 py-4";
+  const mine = useMemo(
+    () => uploads.filter((f) => f.uploaded_by === me!.id).sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    [uploads, me],
+  );
+  const { page, setPage, pageCount, pageRows } = usePagination(mine, []);
 
   return (
     <section className="space-y-3">
-      <div className="overflow-hidden rounded-2xl border border-border bg-card">
-        <div className="flex items-center gap-3 bg-accent/5 px-4 py-3">
-          <DocumentTextIcon className="h-5 w-5" />
-          <h3 className="flex-1 text-sm font-bold">เอกสารการสอนที่อัปโหลด ({mine.length})</h3>
-          <div className="relative">
-            <SortIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-            <Select className="w-auto min-w-[9rem] pl-9" value={sort} onChange={(e) => setSort(e.target.value as LessonSort)} aria-label="เรียงลำดับ">
-              <option value="newest">ล่าสุดก่อน</option>
-              <option value="oldest">เก่าสุดก่อน</option>
-              <option value="subject">รหัสวิชา</option>
-            </Select>
-          </div>
-        </div>
-        {mine.length === 0 ? (
-          <p className="py-8 text-center text-xs text-muted-foreground">ยังไม่มีเอกสารการสอนที่อัปโหลด</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[64rem] text-sm">
-              <thead className="border-y border-border text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-medium">เอกสาร</th>
-                  {["รหัสวิชา", "ชื่อวิชา", "เนื้อหาหลัก", "เนื้อหาย่อย", "ผู้อนุมัติ", "อัปโหลดเมื่อ", "สถานะ", "จัดการ"].map((h) => (
-                    <th key={h} className="border-l border-border/60 px-4 py-3 font-medium">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((f) => (
-                  <tr key={f.id} className="border-t border-border">
-                    <td className="px-4 py-4">
-                      <button type="button" className="flex items-center gap-3 text-left" onClick={() => void openFile(f.file_path, toast)}>
-                        <FileKindBadge mime={f.mime_type} />
-                        <span className="min-w-0">
-                          <span className="block max-w-[18rem] truncate text-sm font-medium">{f.title}</span>
-                          <span className="block text-xs text-muted-foreground">{formatSize(f.size_bytes)}</span>
-                        </span>
-                      </button>
-                    </td>
-                    <td className={cell}>
-                      {f.doc_lessons?.subjects?.code ? (
-                        <span className="inline-flex whitespace-nowrap rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
-                          {f.doc_lessons.subjects.code}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className={cell}>{f.doc_lessons?.subjects?.name_th ?? "—"}</td>
-                    <td className={cell}>{f.doc_lessons?.name ?? "—"}</td>
-                    <td className={cell}>{f.doc_topics?.name ?? "—"}</td>
-                    <td className={cn(cell, "whitespace-nowrap")}>{f.reviewer ? `${f.reviewer.first_name} ${f.reviewer.last_name}` : "—"}</td>
-                    <td className={cn(cell, "whitespace-nowrap text-xs leading-relaxed")}>
-                      {new Date(f.created_at).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })}
-                      <br />
-                      {new Date(f.created_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.
-                    </td>
-                    <td className={cell}>
-                      <ReviewChip status={f.review_status} />
-                      {f.review_status === "returned" && f.review_note && (
-                        <div className="mt-1 max-w-[14rem] text-[11px] text-destructive">หมายเหตุ: {f.review_note}</div>
-                      )}
-                    </td>
-                    <td className={cell}>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        aria-label="จัดการ"
-                        aria-haspopup="menu"
-                        onClick={(e) => {
-                          if (menu?.id === f.id) return setMenu(null);
-                          const b = e.currentTarget.getBoundingClientRect();
-                          const right = window.innerWidth - b.right;
-                          setMenu(b.bottom + 100 > window.innerHeight ? { id: f.id, right, bottom: window.innerHeight - b.top + 4 } : { id: f.id, right, top: b.bottom + 4 });
-                        }}
-                      >
-                        <MoreIcon className="h-4 w-4 rotate-90" />
+      <h3 className="text-sm font-semibold">เอกสารการสอนที่อัปโหลด ({mine.length})</h3>
+      {mine.length === 0 ? (
+        <p className="py-6 text-center text-xs text-muted-foreground">ยังไม่มีเอกสารการสอนที่อัปโหลด</p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-border bg-card">
+          <table className="w-full min-w-[48rem] text-xs">
+            <thead className="bg-muted/50 text-left text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2.5 font-medium">ชื่อเอกสาร</th>
+                <th className="px-3 py-2.5 font-medium">รายวิชา</th>
+                <th className="px-3 py-2.5 font-medium">วันที่อัปโหลด</th>
+                <th className="px-3 py-2.5 font-medium">สถานะ</th>
+                <th className="px-3 py-2.5 text-right font-medium">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {pageRows.map((f) => (
+                <tr key={f.id} className="hover:bg-muted/40">
+                  <td className="max-w-[22rem] px-3 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <FileKindBadge mime={f.mime_type} />
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium">{f.title}</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {fileKindLabel(f.mime_type)} · {formatSize(f.size_bytes)}
+                        </div>
+                        {(f.doc_lessons?.name || f.doc_topics?.name) && (
+                          <div className="truncate text-[11px] text-muted-foreground">
+                            {[f.doc_lessons?.name, f.doc_topics?.name].filter(Boolean).join(" · ")}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <div className="font-medium">{f.doc_lessons?.subjects?.code ?? "—"}</div>
+                    <div className="text-[11px] text-muted-foreground">{f.doc_lessons?.subjects?.name_th ?? ""}</div>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2.5">
+                    <div>{thDate(f.created_at.slice(0, 10))}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {new Date(f.created_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2.5">
+                    <ReviewChip status={f.review_status} />
+                    {f.reviewer && (
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        ผู้อนุมัติ: {f.reviewer.first_name} {f.reviewer.last_name}
+                      </div>
+                    )}
+                    {f.review_status === "returned" && f.review_note && (
+                      <div className="mt-1 max-w-[14rem] text-[11px] text-destructive">หมายเหตุ: {f.review_note}</div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2.5 text-right">
+                    <div className="flex justify-end gap-1.5">
+                      <Button size="icon" variant="outline" aria-label="ดูไฟล์" title="ดูไฟล์" onClick={() => void openFile(f.file_path, toast)}>
+                        <EyeIcon className="h-3.5 w-3.5" />
                       </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {menu && menuFile && (
-        <>
-          <button type="button" aria-label="ปิดเมนู" className="fixed inset-0 z-30 cursor-default" onClick={() => setMenu(null)} />
-          <div
-            role="menu"
-            style={{ top: menu.top, bottom: menu.bottom, right: menu.right }}
-            className="fixed z-40 w-44 overflow-hidden rounded-xl border border-border bg-card py-1 text-left text-xs shadow-lg"
-          >
-            <button
-              type="button"
-              role="menuitem"
-              className="block w-full px-3 py-2 text-left hover:bg-muted"
-              onClick={() => {
-                setMenu(null);
-                void openFile(menuFile.file_path, toast);
-              }}
-            >
-              เปิดไฟล์
-            </button>
-            {menuFile.review_status !== "approved" && (
-              <button
-                type="button"
-                role="menuitem"
-                className="block w-full px-3 py-2 text-left text-destructive hover:bg-muted"
-                onClick={() => {
-                  setMenu(null);
-                  if (confirm(`ลบไฟล์ "${menuFile.title}"?`)) removeFile.mutate(menuFile, { onError: () => toast("ลบไม่สำเร็จ", "error") });
-                }}
-              >
-                ลบไฟล์
-              </button>
-            )}
-          </div>
-        </>
+                      {f.review_status !== "approved" && (
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          aria-label="ลบไฟล์"
+                          title="ลบไฟล์"
+                          className="text-destructive"
+                          disabled={removeFile.isPending}
+                          onClick={() => confirm(`ลบไฟล์ "${f.title}"?`) && removeFile.mutate(f, { onError: () => toast("ลบไม่สำเร็จ", "error") })}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <PageFooter shown={pageRows.length} total={mine.length} page={page} pageCount={pageCount} onChange={setPage} />
