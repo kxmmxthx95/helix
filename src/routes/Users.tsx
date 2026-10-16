@@ -53,6 +53,7 @@ import { blobToBase64, compressImage } from "@/lib/image";
 import { passwordFromDob } from "@/lib/password";
 import { canManageUsers, isOrgWide, PREFIXES, ROLE_LABEL, ROLES, STUDENT_PREFIXES, roleLabels, type Role } from "@/lib/roles";
 import { pickAddress } from "@/routes/Roster";
+import { CloseButton, FormSection } from "@/components/ui";
 
 const EMPTY: ProfileFilters = { search: "", departmentId: "", role: "", active: "" };
 
@@ -591,46 +592,6 @@ function RolePicker({
         </div>
       </Field>
     </>
-  );
-}
-
-function CloseButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-label="ปิด"
-      onClick={onClick}
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
-    >
-      <X className="h-4 w-4" />
-    </button>
-  );
-}
-
-function FormSection({
-  icon,
-  title,
-  description,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="space-y-3 rounded-2xl border border-border bg-muted/40 p-3">
-      <div className="flex items-center gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
-          {icon}
-        </span>
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold leading-tight">{title}</h3>
-          {description && <p className="text-xs text-muted-foreground">{description}</p>}
-        </div>
-      </div>
-      {children}
-    </section>
   );
 }
 

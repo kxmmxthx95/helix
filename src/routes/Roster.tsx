@@ -1,10 +1,10 @@
-import { AlertTriangle, CheckmarkCircleIcon, KeyIcon, Plus, Search, SlidersHorizontal, Upload, X } from "@/components/icons";
+import { AlertTriangle, CallIcon, CheckmarkCircleIcon, HomeIcon, KeyIcon, ProfileIcon, ShieldIcon, Users as UsersIcon, Plus, Search, SlidersHorizontal, Upload, X } from "@/components/icons";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Avatar, Card, EmptyState, Field, Input, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
+import { Button, Avatar, Card, CloseButton, EmptyState, Field, FormSection, Input, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
@@ -695,14 +695,6 @@ function blankDraft(departmentId: string): StudentDraft {
   };
 }
 
-type Section = "basic" | "health" | "guardian";
-
-const SECTIONS: { key: Section; label: string }[] = [
-  { key: "basic", label: "พื้นฐาน" },
-  { key: "health", label: "สุขภาพ" },
-  { key: "guardian", label: "ผู้ปกครอง" },
-];
-
 export function EditStudentSheet({
   target,
   onClose,
@@ -718,7 +710,6 @@ export function EditStudentSheet({
   const { data: departments = [] } = useDepartments();
   const save = useSaveStudent();
   const [draft, setDraft] = useState<StudentDraft | null>(null);
-  const [section, setSection] = useState<Section>("basic");
 
   const isNew = target === "new";
   // Teachers can open a row to view it (mayView in the parent) but can't
@@ -740,7 +731,6 @@ export function EditStudentSheet({
 
   function close() {
     setDraft(null);
-    setSection("basic");
     onClose();
   }
 
@@ -755,7 +745,6 @@ export function EditStudentSheet({
       !current.department_id ||
       !current.grade_level_id
     ) {
-      setSection("basic");
       return;
     }
     save.mutate(
@@ -773,6 +762,8 @@ export function EditStudentSheet({
       open={target !== null}
       onOpenChange={(open) => !open && close()}
       title={isNew ? "เพิ่มนักเรียน" : readOnly ? "ข้อมูลนักเรียน" : "แก้ไขข้อมูลนักเรียน"}
+      description={current && !isNew ? `${current.first_name} ${current.last_name}`.trim() : undefined}
+      headerEnd={<CloseButton onClick={close} />}
       footer={
         current ? (
           <div className="flex gap-2">
@@ -790,27 +781,9 @@ export function EditStudentSheet({
     >
       {current && (
         <div className="space-y-4">
-          <div className="flex gap-2">
-            {SECTIONS.map((s) => (
-              <button
-                key={s.key}
-                type="button"
-                onClick={() => setSection(s.key)}
-                className={
-                  section === s.key
-                    ? "rounded-full border border-foreground bg-foreground/10 px-3 py-1 text-xs text-foreground transition-colors"
-                    : "rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted"
-                }
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-
           <form id="edit-student" onSubmit={submit} className="space-y-4">
           <fieldset disabled={readOnly} className="space-y-4">
-            {section === "basic" && (
-              <>
+            <FormSection icon={<ProfileIcon className="h-4 w-4" />} title="ข้อมูลทั่วไป" description="ข้อมูลพื้นฐานของนักเรียน">
                 <Field label="รหัสนักเรียน">
                   <Input
                     value={current.student_code}
@@ -912,6 +885,9 @@ export function EditStudentSheet({
                   </Field>
                 </div>
 
+            </FormSection>
+
+            <FormSection icon={<CallIcon className="h-4 w-4" />} title="ข้อมูลติดต่อ">
                 <Field label="เบอร์โทรศัพท์">
                   <Input
                     type="tel"
@@ -928,15 +904,13 @@ export function EditStudentSheet({
                   />
                 </Field>
 
-                <div>
-                  <p className="mb-1.5 text-xs font-medium text-muted-foreground">ที่อยู่</p>
-                  <AddressInputs value={current} onChange={(patch) => setDraft({ ...current, ...patch })} />
-                </div>
-              </>
-            )}
+            </FormSection>
 
-            {section === "health" && (
-              <>
+            <FormSection icon={<HomeIcon className="h-4 w-4" />} title="ที่อยู่">
+              <AddressInputs value={current} onChange={(patch) => setDraft({ ...current, ...patch })} />
+            </FormSection>
+
+            <FormSection icon={<ShieldIcon className="h-4 w-4" />} title="สุขภาพ">
                 <Field label="หมู่เลือด">
                   <Select
                     value={current.blood_type ?? ""}
@@ -976,12 +950,11 @@ export function EditStudentSheet({
                     onChange={(e) => setDraft({ ...current, food_allergy: e.target.value || null })}
                   />
                 </Field>
-              </>
-            )}
+            </FormSection>
           </fieldset>
           </form>
 
-          {section === "guardian" && (
+          <FormSection icon={<UsersIcon className="h-4 w-4" />} title="ผู้ปกครอง">
             <fieldset disabled={readOnly} className="space-y-4">
               <Field label="สถานภาพครอบครัว">
                 <Select
@@ -1009,7 +982,7 @@ export function EditStudentSheet({
                 />
               )}
             </fieldset>
-          )}
+          </FormSection>
         </div>
       )}
     </Sheet>
