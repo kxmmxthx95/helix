@@ -1149,6 +1149,10 @@ export type AcademicEvent = {
   end_date: string;
   students_attend: boolean;
   staff_attend: boolean;
+  description: string | null;
+  show_in_schedule: boolean;
+  /** Flag only — no delivery job reads it yet. See migration 0085. */
+  notify_users: boolean;
   /** Dedupe key for API-synced rows, e.g. "iapp:2026-01-01" — null for manually created events. See migration 0045. */
   external_ref: string | null;
   created_at: string;
@@ -1367,7 +1371,10 @@ export type Database = {
       academic_terms: Table<AcademicTerm, InsertOf<AcademicTerm, "start_date" | "end_date" | "status">>;
       academic_events: Table<
         AcademicEvent,
-        InsertOf<AcademicEvent, "students_attend" | "staff_attend" | "external_ref">
+        InsertOf<
+          AcademicEvent,
+          "students_attend" | "staff_attend" | "external_ref" | "description" | "show_in_schedule" | "notify_users"
+        >
       >;
       academic_event_departments: Table<AcademicEventDepartment, AcademicEventDepartment>;
       student_contacts: Table<

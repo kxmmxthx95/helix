@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { ChevronBack, ChevronForward, DownloadIcon, Plus } from "@/components/icons";
+import { BuildingIcon, CalendarIcon, ChevronBack, ChevronForward, DownloadIcon, InfoIcon, Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
+import { Button, Card, Field, FormSection, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import {
   useAcademicEvents,
   useDeleteAcademicEvent,
@@ -495,6 +495,9 @@ function EventSheet({
     start_date: initialDate ?? "",
     end_date: initialDate ?? "",
     ...ATTEND_DEFAULTS.holiday,
+    description: null,
+    show_in_schedule: true,
+    notify_users: false,
     // A dept_head's event is always scoped to their own department — the
     // "whole school" (empty) option is org-wide only, so it's never offered here.
     departmentIds: orgWide ? [] : myDepartmentId ? [myDepartmentId] : [],
@@ -513,6 +516,9 @@ function EventSheet({
             end_date: event.end_date,
             students_attend: event.students_attend,
             staff_attend: event.staff_attend,
+            description: event.description,
+            show_in_schedule: event.show_in_schedule,
+            notify_users: event.notify_users,
             departmentIds: event.departmentIds,
           }
         : blank(),
@@ -545,54 +551,125 @@ function EventSheet({
     );
   }
 
+  const invalid = !draft.name.trim() || !draft.start_date || !draft.end_date;
+
   return (
     <Sheet
       open={open}
       onOpenChange={(o) => !o && onClose()}
-      title={mode === "create" ? "เพิ่ม Event" : "แก้ไข Event"}
+      title={mode === "create" ? "เพิ่ม Event ใหม่" : "แก้ไข Event"}
+      description="ตั้งชื่อ ประเภท และช่วงวันที่ของ Event"
+      icon={<CalendarIcon className="h-5 w-5" />}
+      closable
       footer={
-        onDelete ? (
-          <Button variant="outline" className="w-full text-destructive" onClick={onDelete}>
-            ลบ Event
+        <div className="flex gap-2">
+          {onDelete && (
+            <Button type="button" variant="outline" className="text-destructive" onClick={onDelete}>
+              ลบ
+            </Button>
+          )}
+          <Button type="button" variant="outline" className="ml-auto" onClick={onClose}>
+            ยกเลิก
           </Button>
-        ) : undefined
+          <Button type="submit" form="event-form" disabled={invalid || save.isPending}>
+            {save.isPending ? <Spinner className="h-3 w-3" /> : mode === "create" ? "เพิ่ม Event" : "บันทึก"}
+          </Button>
+        </div>
       }
     >
-      <form onSubmit={submit} className="space-y-4">
-        <Field label="ชื่อ Event">
-          <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} required />
-        </Field>
-
-        <Field label="ประเภท">
-          <Select value={draft.event_type} onChange={(e) => setEventType(e.target.value as AcademicEventType)}>
-            {(Object.keys(EVENT_TYPE_LABEL) as AcademicEventType[]).map((t) => (
-              <option key={t} value={t}>
-                {EVENT_TYPE_LABEL[t]}
-              </option>
-            ))}
-          </Select>
-        </Field>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="วันเริ่ม">
+      <form id="event-form" onSubmit={submit} className="space-y-3">
+        <FormSection icon={<CalendarIcon className="h-4 w-4" />} title="รายละเอียด">
+          <Field label="ชื่อ Event" required>
             <Input
-              type="date"
-              value={draft.start_date}
-              onChange={(e) => setDraft({ ...draft, start_date: e.target.value })}
+              value={draft.name}
+              maxLength={100}
+              placeholder="เช่น วันหยุด, ประชุมผู้ปกครอง, สอบกลางภาค..."
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               required
             />
+            <span className="block text-right text-xs text-muted-foreground">{draft.name.length}/100</span>
           </Field>
-          <Field label="วันสิ้นสุด">
-            <Input
-              type="date"
-              value={draft.end_date}
-              onChange={(e) => setDraft({ ...draft, end_date: e.target.value })}
-              required
-            />
-          </Field>
-        </div>
 
-        <div className="flex gap-4">
+          <div role="radiogroup" aria-label="ประเภท" className="space-y-1">
+            <span className="font-ui text-xs font-medium">
+              ประเภท<span className="text-destructive"> *</span>
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              {(Object.keys(EVENT_TYPE_LABEL) as AcademicEventType[]).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft.event_type === t}
+                  onClick={() => setEventType(t)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl border bg-background px-3 py-2.5 text-left text-sm transition-colors",
+                    draft.event_type === t ? "border-primary ring-1 ring-primary" : "border-border hover:bg-muted",
+                  )}
+                >
+                  <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", EVENT_TYPE_DOT[t])} />
+                  {EVENT_TYPE_LABEL[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Field label="รายละเอียด (ถ้ามี)">
+            <textarea
+              value={draft.description ?? ""}
+              maxLength={300}
+              rows={3}
+              placeholder="ระบุรายละเอียดเพิ่มเติม..."
+              onChange={(e) => setDraft({ ...draft, description: e.target.value || null })}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            />
+            <span className="block text-right text-xs text-muted-foreground">{draft.description?.length ?? 0}/300</span>
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="วันที่เริ่ม" required>
+              <Input
+                type="date"
+                value={draft.start_date}
+                onChange={(e) => setDraft({ ...draft, start_date: e.target.value })}
+                required
+              />
+            </Field>
+            <Field label="วันที่สิ้นสุด" required>
+              <Input
+                type="date"
+                value={draft.end_date}
+                min={draft.start_date || undefined}
+                onChange={(e) => setDraft({ ...draft, end_date: e.target.value })}
+                required
+              />
+            </Field>
+          </div>
+        </FormSection>
+
+        {orgWide && (
+          <FormSection
+            icon={<BuildingIcon className="h-4 w-4" />}
+            title="แผนกที่เกี่ยวข้อง"
+            description="ไม่เลือก = ทั้งโรงเรียน"
+          >
+            <div className="grid grid-cols-2 gap-2">
+              {departments.map((d) => (
+                <label key={d.id} className="flex items-center gap-2 rounded-xl bg-background px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={draft.departmentIds.includes(d.id)}
+                    onChange={(e) => toggleDepartment(d.id, e.target.checked)}
+                    className="h-5 w-5 accent-[hsl(var(--accent))]"
+                  />
+                  {d.name}
+                </label>
+              ))}
+            </div>
+          </FormSection>
+        )}
+
+        <FormSection icon={<InfoIcon className="h-4 w-4" />} title="ตัวเลือกเพิ่มเติม">
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -611,33 +688,25 @@ function EventSheet({
             />
             ครูทำงาน
           </label>
-        </div>
-
-        {orgWide && (
-          <Field label="แผนกที่เกี่ยวข้อง (ไม่ติ๊ก = ทั้งโรงเรียน)">
-            <div className="space-y-1.5">
-              {departments.map((d) => (
-                <label key={d.id} className="flex items-center gap-2 py-1 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={draft.departmentIds.includes(d.id)}
-                    onChange={(e) => toggleDepartment(d.id, e.target.checked)}
-                    className="h-5 w-5 accent-[hsl(var(--accent))]"
-                  />
-                  {d.name}
-                </label>
-              ))}
-            </div>
-          </Field>
-        )}
-
-        <Button
-          type="submit"
-          className="w-full"
-          disabled={!draft.name.trim() || !draft.start_date || !draft.end_date || save.isPending}
-        >
-          {save.isPending ? <Spinner className="h-3 w-3" /> : mode === "create" ? "เพิ่ม" : "บันทึก"}
-        </Button>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={draft.show_in_schedule}
+              onChange={(e) => setDraft({ ...draft, show_in_schedule: e.target.checked })}
+              className="h-5 w-5 accent-[hsl(var(--accent))]"
+            />
+            แสดงในตารางของผู้ใช้ที่เกี่ยวข้อง
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={draft.notify_users}
+              onChange={(e) => setDraft({ ...draft, notify_users: e.target.checked })}
+              className="h-5 w-5 accent-[hsl(var(--accent))]"
+            />
+            ส่งการแจ้งเตือนให้ผู้ใช้ที่เกี่ยวข้อง
+          </label>
+        </FormSection>
       </form>
     </Sheet>
   );

@@ -146,7 +146,7 @@ export function useAcademicEvents() {
 
 export type AcademicEventDraft = Pick<
   AcademicEvent,
-  "name" | "event_type" | "start_date" | "end_date" | "students_attend" | "staff_attend"
+  "name" | "event_type" | "start_date" | "end_date" | "students_attend" | "staff_attend" | "description" | "show_in_schedule" | "notify_users"
 >;
 
 /** Saves the event row, then replaces its department links with exactly departmentIds (empty = whole school). */
