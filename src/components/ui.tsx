@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { forwardRef, useState, type ComponentType, type ReactNode } from "react";
-import { BarChartIcon, EyeIcon, EyeOffIcon } from "@/components/icons";
+import { BarChartIcon, ChevronBack, ChevronForward, EyeIcon, EyeOffIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 const button = cva(
@@ -298,6 +298,42 @@ export function Pagination({
       >
         ถัดไป
       </button>
+    </div>
+  );
+}
+
+/** "แสดง 1 จาก 20 รายการ" on the left, numbered page buttons on the right. */
+export function PageFooter({ shown, total, page, pageCount, onChange }: { shown: number; total: number; page: number; pageCount: number; onChange: (p: number) => void }) {
+  if (total === 0) return null;
+  // First, last and the pages around the current one; gaps become an ellipsis.
+  const pages = [...new Set([1, page - 1, page, page + 1, pageCount])].filter((n) => n >= 1 && n <= pageCount).sort((a, b) => a - b);
+  const btn = "flex h-9 min-w-9 items-center justify-center rounded-lg border border-border px-2 text-sm hover:bg-muted disabled:pointer-events-none disabled:opacity-40";
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+      <span>
+        แสดง {shown} จาก {total} รายการ
+      </span>
+      <div className="flex items-center gap-1.5">
+        <button type="button" aria-label="หน้าก่อนหน้า" className={btn} disabled={page <= 1} onClick={() => onChange(page - 1)}>
+          <ChevronBack className="h-4 w-4" />
+        </button>
+        {pages.map((n, i) => (
+          <span key={n} className="flex items-center gap-1.5">
+            {i > 0 && n - pages[i - 1]! > 1 && <span className="px-1">…</span>}
+            <button
+              type="button"
+              aria-current={n === page ? "page" : undefined}
+              className={cn(btn, n === page && "border-accent bg-accent/10 font-semibold text-accent")}
+              onClick={() => onChange(n)}
+            >
+              {n}
+            </button>
+          </span>
+        ))}
+        <button type="button" aria-label="หน้าถัดไป" className={btn} disabled={page >= pageCount} onClick={() => onChange(page + 1)}>
+          <ChevronForward className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
