@@ -21,3 +21,4 @@ supabase/.branches/
 
 # impeccable critique reports
 .impeccable/critique/
+supabase/.temp/
