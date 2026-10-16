@@ -11,12 +11,14 @@ import {
   LibraryIcon,
   ListIcon,
   Plus,
+  PrintIcon,
   Search,
   Upload,
   Users,
   X,
 } from "@/components/icons";
 import { useToast } from "@/components/Toast";
+import { downloadLessonPdf } from "@/lib/lessonDocPdf";
 import { Button, Card, EmptyState, Field, Input, Pagination, Select } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
 import { usePagination } from "@/hooks/usePagination";
@@ -611,7 +613,7 @@ function SubjectDocs({
       ) : (
         <div className={cn("gap-3", view === "grid" ? "grid items-start md:grid-cols-2" : "flex flex-col")}>
           {lessons.map((l) => (
-            <LessonRow key={l.id} lesson={l} index={tree.indexOf(l)} tint={lessonTint} canEdit={canEdit} onUpload={openUpload} />
+            <LessonRow key={l.id} lesson={l} subjectLabel={`${subject.code} ${subject.name_th}`} gradeLabel={grade ? gradeShortLabel(grade.code) : "-"} index={tree.indexOf(l)} tint={lessonTint} canEdit={canEdit} onUpload={openUpload} />
           ))}
         </div>
       )}
@@ -1033,12 +1035,16 @@ function Stat({ icon: Icon, value, label }: { icon: typeof BookIcon; value: numb
 /** One เนื้อหาหลัก row: number, name, file count. Teachers can rename/delete (cascade, with a file-count confirm) and upload. */
 function LessonRow({
   lesson,
+  subjectLabel,
+  gradeLabel,
   index,
   tint,
   canEdit,
   onUpload,
 }: {
   lesson: DocLessonNode;
+  subjectLabel: string;
+  gradeLabel: string;
   index: number;
   /** Colour classes for the icon tile (subject area hue, shaded by this grade). */
   tint: string;
@@ -1049,6 +1055,14 @@ function LessonRow({
   const updateLesson = useUpdateDocLesson();
   const removeLesson = useDeleteDocLesson();
   const toast = useToast();
+  const [printing, setPrinting] = useState(false);
+
+  function printPdf() {
+    setPrinting(true);
+    downloadLessonPdf({ lessonId: lesson.id, lessonName: lesson.name, subject: subjectLabel, grade: gradeLabel })
+      .catch(() => toast("สร้าง PDF ไม่สำเร็จ", "error"))
+      .finally(() => setPrinting(false));
+  }
 
   async function deleteLesson() {
     const paths = await docFilePaths(lesson.id);
@@ -1073,6 +1087,16 @@ function LessonRow({
           <LibraryIcon className="h-6 w-6" />
         </div>
         <div className="min-w-0 flex-1 truncate text-sm font-bold">{lesson.name}</div>
+        <Button
+          className="active:scale-100"
+          size="icon"
+          variant="outline"
+          aria-label="พิมพ์ PDF เนื้อหาหลักนี้"
+          disabled={printing}
+          onClick={printPdf}
+        >
+          <PrintIcon className="h-3 w-3" />
+        </Button>
         {canEdit && (
           <Button
             className="active:scale-100"
