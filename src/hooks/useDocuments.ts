@@ -354,7 +354,11 @@ export function useSubjectClassroomCount(subjectId: string | null, gradeLevelId:
   });
 }
 
-export type RecentDocFile = DocFile & { doc_lessons: { name: string; subjects: { code: string; name_th: string } | null } | null };
+export type RecentDocFile = DocFile & {
+  doc_lessons: { name: string; subjects: { code: string; name_th: string } | null } | null;
+  doc_topics: { name: string } | null;
+  reviewer: { first_name: string; last_name: string } | null;
+};
 
 /** Uploads for the ตรวจเอกสาร tab: RLS returns files in subjects the caller can write plus files of teachers they review. */
 export function useRecentDocFiles() {
@@ -363,7 +367,7 @@ export function useRecentDocFiles() {
     queryFn: async (): Promise<RecentDocFile[]> => {
       const { data, error } = await supabase
         .from("doc_files")
-        .select("*, doc_lessons(name, subjects(code, name_th))")
+        .select("*, doc_lessons(name, subjects(code, name_th)), doc_topics(name), reviewer:profiles!reviewed_by(first_name, last_name)")
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;

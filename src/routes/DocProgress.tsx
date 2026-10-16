@@ -472,7 +472,6 @@ export function MyDocTasksTab() {
   if (rows.length === 0) {
     return (
       <div className="space-y-4">
-        <EmptyState title="ยังไม่มีงานเอกสาร" description="เมื่อมีงานที่มอบหมายให้คุณ จะแสดงที่นี่" icon={DocumentTextIcon} />
         <MyLessonDocs />
       </div>
     );
@@ -688,11 +687,15 @@ function MyLessonDocs() {
       ) : (
         <div className="space-y-3">
           <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full min-w-[40rem] text-xs">
+            <table className="w-full min-w-[64rem] text-xs">
               <thead className="bg-muted text-left text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">เอกสาร</th>
-                  <th className="px-3 py-2 font-medium">วิชา · บทเรียน</th>
+                  <th className="px-3 py-2 font-medium">รหัสวิชา</th>
+                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
+                  <th className="px-3 py-2 font-medium">เนื้อหาหลัก</th>
+                  <th className="px-3 py-2 font-medium">เนื้อหาย่อย</th>
+                  <th className="px-3 py-2 font-medium">ผู้อนุมัติ</th>
                   <th className="px-3 py-2 font-medium">อัปโหลดเมื่อ</th>
                   <th className="px-3 py-2 font-medium">สถานะ</th>
                 </tr>
@@ -709,8 +712,12 @@ function MyLessonDocs() {
                         </span>
                       </button>
                     </td>
-                    <td className="px-3 py-2.5">
-                      {[f.doc_lessons?.subjects?.name_th, f.doc_lessons?.name].filter(Boolean).join(" · ") || "—"}
+                    <td className="whitespace-nowrap px-3 py-2.5">{f.doc_lessons?.subjects?.code ?? "—"}</td>
+                    <td className="px-3 py-2.5">{f.doc_lessons?.subjects?.name_th ?? "—"}</td>
+                    <td className="px-3 py-2.5">{f.doc_lessons?.name ?? "—"}</td>
+                    <td className="px-3 py-2.5">{f.doc_topics?.name ?? "—"}</td>
+                    <td className="whitespace-nowrap px-3 py-2.5">
+                      {f.reviewer ? `${f.reviewer.first_name} ${f.reviewer.last_name}` : "—"}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">{thDateTime(f.created_at)}</td>
                     <td className="px-3 py-2.5">
