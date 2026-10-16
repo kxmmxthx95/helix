@@ -1141,6 +1141,7 @@ function NewAssignmentForm({
     includeInactive: false,
   });
   const create = useCreateTeachingAssignment();
+  const toast = useToast();
 
   const classroom = classrooms.find((c) => c.id === classroomId);
   const gradeLevelId = classroom?.grade_level_id ?? null;
@@ -1232,8 +1233,9 @@ function NewAssignmentForm({
       }
       setPicked({});
       setOpen(false);
-    } catch {
+    } catch (err) {
       // already-saved subjects drop out of the list on refetch; the rest stay selected
+      toast(err instanceof Error ? err.message : "เพิ่มรายวิชาไม่สำเร็จ", "error");
     }
   }
 

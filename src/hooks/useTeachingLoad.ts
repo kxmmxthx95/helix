@@ -19,8 +19,9 @@ export function useDepartmentTeachingAssignments(
     queryFn: async (): Promise<TeachingAssignment[]> => {
       let q = supabase
         .from("teaching_assignments")
-        .select("*, teacher:profiles!inner(department_id)")
-        .eq("teacher.department_id", departmentId!)
+        // Department via the classroom, not the teacher: teacherless activities (0084) have no teacher row to join.
+        .select("*, classroom:classrooms!inner(grade_level:grade_levels!inner(department_id))")
+        .eq("classroom.grade_level.department_id", departmentId!)
         .eq("academic_year", academicYear);
       q = term === null ? q.is("term", null) : q.eq("term", term);
       const { data, error } = await q;
