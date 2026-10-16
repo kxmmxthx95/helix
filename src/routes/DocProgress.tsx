@@ -8,12 +8,15 @@ import {
   LinkIcon,
   ProfileIcon,
   BookIcon,
+  ChevronBack,
   ChevronForward,
   DocumentTextIcon,
   EyeIcon,
   ListIcon,
+  MoreIcon,
   PencilIcon,
   Search,
+  SortIcon,
   TimeIcon,
   Upload,
   X,
@@ -31,7 +34,7 @@ import {
   useUploadDocTaskFile,
 } from "@/hooks/useDocTasks";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
-import { DOC_ACCEPT, docFileSignedUrl, useAllGradeLevels, useDocCoverage, useRecentDocFiles, useReviewDocFile, useTeacherPairs } from "@/hooks/useDocuments";
+import { DOC_ACCEPT, docFileSignedUrl, useAllGradeLevels, useDeleteDocFile, useDocCoverage, useRecentDocFiles, useReviewDocFile, useTeacherPairs } from "@/hooks/useDocuments";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments, useProfiles, type ProfileRow } from "@/hooks/useProfiles";
 import { profileFullName, type DocTask, type DocTaskFile, type DocTaskReviewStatus, type DocTaskType } from "@/lib/database.types";
@@ -672,69 +675,194 @@ export function MyDocTasksTab() {
 }
 
 /** เอกสารการสอนที่ฉันอัปโหลด — the signed-in teacher's own lesson uploads (doc_files) with review status and the reviewer's note. */
+type LessonSort = "newest" | "oldest" | "subject";
+
 function MyLessonDocs() {
   const { profile: me } = useAuth();
   const toast = useToast();
   const { data: uploads = [] } = useRecentDocFiles();
-  const mine = uploads.filter((f) => f.uploaded_by === me!.id);
-  const { page, setPage, pageCount, pageRows } = usePagination(mine, []);
+  const removeFile = useDeleteDocFile();
+  const [sort, setSort] = useState<LessonSort>("newest");
+  const [menu, setMenu] = useState<{ id: string; right: number; top?: number; bottom?: number } | null>(null);
+  const mine = useMemo(() => {
+    const list = uploads.filter((f) => f.uploaded_by === me!.id);
+    return list.sort((a, b) =>
+      sort === "subject"
+        ? (a.doc_lessons?.subjects?.code ?? "").localeCompare(b.doc_lessons?.subjects?.code ?? "", "th", { numeric: true }) ||
+          b.created_at.localeCompare(a.created_at)
+        : sort === "oldest"
+          ? a.created_at.localeCompare(b.created_at)
+          : b.created_at.localeCompare(a.created_at),
+    );
+  }, [uploads, me, sort]);
+  const { page, setPage, pageCount, pageRows } = usePagination(mine, [sort]);
+  const menuFile = pageRows.find((f) => f.id === menu?.id);
+  const cell = "border-l border-border/60 px-4 py-4";
 
   return (
-    <section className="space-y-3 rounded-2xl border border-border bg-card p-4">
-      <h3 className="text-sm font-bold">เอกสารการสอนที่อัปโหลด ({mine.length})</h3>
-      {mine.length === 0 ? (
-        <p className="py-6 text-center text-xs text-muted-foreground">ยังไม่มีเอกสารการสอนที่อัปโหลด</p>
-      ) : (
-        <div className="space-y-3">
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full min-w-[64rem] text-xs">
-              <thead className="bg-muted text-left text-muted-foreground">
+    <section className="space-y-3">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="flex items-center gap-3 bg-accent/5 px-4 py-3">
+          <DocumentTextIcon className="h-5 w-5" />
+          <h3 className="flex-1 text-sm font-bold">เอกสารการสอนที่อัปโหลด ({mine.length})</h3>
+          <div className="relative">
+            <SortIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+            <Select className="w-auto min-w-[9rem] pl-9" value={sort} onChange={(e) => setSort(e.target.value as LessonSort)} aria-label="เรียงลำดับ">
+              <option value="newest">ล่าสุดก่อน</option>
+              <option value="oldest">เก่าสุดก่อน</option>
+              <option value="subject">รหัสวิชา</option>
+            </Select>
+          </div>
+        </div>
+        {mine.length === 0 ? (
+          <p className="py-8 text-center text-xs text-muted-foreground">ยังไม่มีเอกสารการสอนที่อัปโหลด</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[64rem] text-sm">
+              <thead className="border-y border-border text-left text-xs text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">เอกสาร</th>
-                  <th className="px-3 py-2 font-medium">รหัสวิชา</th>
-                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
-                  <th className="px-3 py-2 font-medium">เนื้อหาหลัก</th>
-                  <th className="px-3 py-2 font-medium">เนื้อหาย่อย</th>
-                  <th className="px-3 py-2 font-medium">ผู้อนุมัติ</th>
-                  <th className="px-3 py-2 font-medium">อัปโหลดเมื่อ</th>
-                  <th className="px-3 py-2 font-medium">สถานะ</th>
+                  <th className="px-4 py-3 font-medium">เอกสาร</th>
+                  {["รหัสวิชา", "ชื่อวิชา", "เนื้อหาหลัก", "เนื้อหาย่อย", "ผู้อนุมัติ", "อัปโหลดเมื่อ", "สถานะ", "จัดการ"].map((h) => (
+                    <th key={h} className="border-l border-border/60 px-4 py-3 font-medium">
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {pageRows.map((f) => (
                   <tr key={f.id} className="border-t border-border">
-                    <td className="px-3 py-2.5">
+                    <td className="px-4 py-4">
                       <button type="button" className="flex items-center gap-3 text-left" onClick={() => void openFile(f.file_path, toast)}>
                         <FileKindBadge mime={f.mime_type} />
                         <span className="min-w-0">
-                          <span className="block max-w-[16rem] truncate text-sm font-medium">{f.title}</span>
-                          <span className="block text-[11px] text-muted-foreground">{formatSize(f.size_bytes)}</span>
+                          <span className="block max-w-[18rem] truncate text-sm font-medium">{f.title}</span>
+                          <span className="block text-xs text-muted-foreground">{formatSize(f.size_bytes)}</span>
                         </span>
                       </button>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2.5">{f.doc_lessons?.subjects?.code ?? "—"}</td>
-                    <td className="px-3 py-2.5">{f.doc_lessons?.subjects?.name_th ?? "—"}</td>
-                    <td className="px-3 py-2.5">{f.doc_lessons?.name ?? "—"}</td>
-                    <td className="px-3 py-2.5">{f.doc_topics?.name ?? "—"}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5">
-                      {f.reviewer ? `${f.reviewer.first_name} ${f.reviewer.last_name}` : "—"}
+                    <td className={cell}>
+                      {f.doc_lessons?.subjects?.code ? (
+                        <span className="inline-flex whitespace-nowrap rounded-full bg-accent/10 px-3 py-1 text-xs font-medium text-accent">
+                          {f.doc_lessons.subjects.code}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2.5">{thDateTime(f.created_at)}</td>
-                    <td className="px-3 py-2.5">
+                    <td className={cell}>{f.doc_lessons?.subjects?.name_th ?? "—"}</td>
+                    <td className={cell}>{f.doc_lessons?.name ?? "—"}</td>
+                    <td className={cell}>{f.doc_topics?.name ?? "—"}</td>
+                    <td className={cn(cell, "whitespace-nowrap")}>{f.reviewer ? `${f.reviewer.first_name} ${f.reviewer.last_name}` : "—"}</td>
+                    <td className={cn(cell, "whitespace-nowrap text-xs leading-relaxed")}>
+                      {new Date(f.created_at).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })}
+                      <br />
+                      {new Date(f.created_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.
+                    </td>
+                    <td className={cell}>
                       <ReviewChip status={f.review_status} />
                       {f.review_status === "returned" && f.review_note && (
                         <div className="mt-1 max-w-[14rem] text-[11px] text-destructive">หมายเหตุ: {f.review_note}</div>
                       )}
+                    </td>
+                    <td className={cell}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        aria-label="จัดการ"
+                        aria-haspopup="menu"
+                        onClick={(e) => {
+                          if (menu?.id === f.id) return setMenu(null);
+                          const b = e.currentTarget.getBoundingClientRect();
+                          const right = window.innerWidth - b.right;
+                          setMenu(b.bottom + 100 > window.innerHeight ? { id: f.id, right, bottom: window.innerHeight - b.top + 4 } : { id: f.id, right, top: b.bottom + 4 });
+                        }}
+                      >
+                        <MoreIcon className="h-4 w-4 rotate-90" />
+                      </Button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
-        </div>
+        )}
+      </div>
+
+      {menu && menuFile && (
+        <>
+          <button type="button" aria-label="ปิดเมนู" className="fixed inset-0 z-30 cursor-default" onClick={() => setMenu(null)} />
+          <div
+            role="menu"
+            style={{ top: menu.top, bottom: menu.bottom, right: menu.right }}
+            className="fixed z-40 w-44 overflow-hidden rounded-xl border border-border bg-card py-1 text-left text-xs shadow-lg"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              className="block w-full px-3 py-2 text-left hover:bg-muted"
+              onClick={() => {
+                setMenu(null);
+                void openFile(menuFile.file_path, toast);
+              }}
+            >
+              เปิดไฟล์
+            </button>
+            {menuFile.review_status !== "approved" && (
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-3 py-2 text-left text-destructive hover:bg-muted"
+                onClick={() => {
+                  setMenu(null);
+                  if (confirm(`ลบไฟล์ "${menuFile.title}"?`)) removeFile.mutate(menuFile, { onError: () => toast("ลบไม่สำเร็จ", "error") });
+                }}
+              >
+                ลบไฟล์
+              </button>
+            )}
+          </div>
+        </>
       )}
+
+      <PageFooter shown={pageRows.length} total={mine.length} page={page} pageCount={pageCount} onChange={setPage} />
     </section>
+  );
+}
+
+/** "แสดง 1 จาก 20 รายการ" on the left, numbered page buttons on the right. */
+function PageFooter({ shown, total, page, pageCount, onChange }: { shown: number; total: number; page: number; pageCount: number; onChange: (p: number) => void }) {
+  if (total === 0) return null;
+  // First, last and the pages around the current one; gaps become an ellipsis.
+  const pages = [...new Set([1, page - 1, page, page + 1, pageCount])].filter((n) => n >= 1 && n <= pageCount).sort((a, b) => a - b);
+  const btn = "flex h-9 min-w-9 items-center justify-center rounded-lg border border-border px-2 text-sm hover:bg-muted disabled:pointer-events-none disabled:opacity-40";
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+      <span>
+        แสดง {shown} จาก {total} รายการ
+      </span>
+      <div className="flex items-center gap-1.5">
+        <button type="button" aria-label="หน้าก่อนหน้า" className={btn} disabled={page <= 1} onClick={() => onChange(page - 1)}>
+          <ChevronBack className="h-4 w-4" />
+        </button>
+        {pages.map((n, i) => (
+          <span key={n} className="flex items-center gap-1.5">
+            {i > 0 && n - pages[i - 1]! > 1 && <span className="px-1">…</span>}
+            <button
+              type="button"
+              aria-current={n === page ? "page" : undefined}
+              className={cn(btn, n === page && "border-accent bg-accent/10 font-semibold text-accent")}
+              onClick={() => onChange(n)}
+            >
+              {n}
+            </button>
+          </span>
+        ))}
+        <button type="button" aria-label="หน้าถัดไป" className={btn} disabled={page >= pageCount} onClick={() => onChange(page + 1)}>
+          <ChevronForward className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
   );
 }
 
