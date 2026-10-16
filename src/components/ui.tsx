@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { forwardRef, useState, type ComponentType, type ReactNode } from "react";
-import { BarChartIcon, ChevronBack, ChevronForward, EyeIcon, EyeOffIcon } from "@/components/icons";
+import { BarChartIcon, ChevronBack, ChevronForward, EyeIcon, EyeOffIcon, X } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 const button = cva(
@@ -451,3 +451,42 @@ export function Switch({
   );
 }
 
+export function CloseButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="ปิด"
+      onClick={onClick}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
+    >
+      <X className="h-4 w-4" />
+    </button>
+  );
+}
+
+export function FormSection({
+  icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-3 rounded-2xl border border-border bg-muted/40 p-3">
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold leading-tight">{title}</h3>
+          {description && <p className="text-xs text-muted-foreground">{description}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
