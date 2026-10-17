@@ -533,6 +533,17 @@ export type LearningUnit = {
   updated_at: string;
 };
 
+/** ผังการเรียน — standard content topics for a subject, shared across cohorts. See migration 0086. */
+export type SubjectTopic = {
+  id: string;
+  subject_id: string;
+  sort_order: number;
+  title: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 /** KG หัวข้อการประเมินพัฒนาการ, grouped under one of the 4 fixed domains. */
 export type KgAssessmentTopic = {
   id: string;
@@ -1289,6 +1300,7 @@ export type Database = {
         CurriculumSubject,
         InsertOf<CurriculumSubject, "study_plan_id" | "term" | "score_collect_pct" | "score_exam_pct">
       >;
+      subject_topics: Table<SubjectTopic, InsertOf<SubjectTopic, "sort_order" | "description">>;
       learning_units: Table<LearningUnit, InsertOf<LearningUnit, "name_en" | "sort_order">>;
       kg_assessment_topics: Table<KgAssessmentTopic, InsertOf<KgAssessmentTopic, "sort_order">>;
       student_cohort_enrollments: Table<

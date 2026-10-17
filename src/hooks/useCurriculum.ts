@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { LearningArea, Subject, SubjectType } from "@/lib/database.types";
+import type { LearningArea, Subject, SubjectTopic, SubjectType } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 import type { ImportOutcome } from "@/hooks/useStudents";
 
@@ -156,5 +156,49 @@ export function useDeleteSubject() {
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["subjects"] }),
+  });
+}
+
+// ------------------------------------------------------------ subject_topics
+
+export function useSubjectTopics(subjectIds: string[]) {
+  return useQuery({
+    queryKey: ["subject_topics", subjectIds],
+    enabled: subjectIds.length > 0,
+    queryFn: async (): Promise<SubjectTopic[]> => {
+      const { data, error } = await supabase
+        .from("subject_topics")
+        .select("*")
+        .in("subject_id", subjectIds)
+        .order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export type SubjectTopicDraft = Pick<SubjectTopic, "subject_id" | "title" | "description" | "sort_order">;
+
+export function useSaveSubjectTopic() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...draft }: SubjectTopicDraft & { id?: string }) => {
+      const { error } = id
+        ? await supabase.from("subject_topics").update(draft).eq("id", id)
+        : await supabase.from("subject_topics").insert(draft);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["subject_topics"] }),
+  });
+}
+
+export function useDeleteSubjectTopic() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("subject_topics").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["subject_topics"] }),
   });
 }

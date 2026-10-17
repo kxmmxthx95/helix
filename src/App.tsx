@@ -21,6 +21,7 @@ import { StudentLogin } from "@/routes/StudentLogin";
 import { Onboarding } from "@/routes/Onboarding";
 import { Classrooms } from "@/routes/Classrooms";
 import { Curriculum } from "@/routes/Curriculum";
+import { CurriculumMap } from "@/routes/CurriculumMap";
 import { Employees } from "@/routes/Employees";
 import { StaffAttendance } from "@/routes/StaffAttendance";
 import { Enrollment } from "@/routes/Enrollment";
@@ -79,6 +80,7 @@ function Gate() {
         <Route path="behavior" element={<BehaviorScore />} />
         <Route path="subjects" element={<Subjects />} />
         <Route path="curriculum" element={<Curriculum />} />
+        <Route path="curriculum-map" element={<CurriculumMap />} />
         <Route path="enrollment" element={<Enrollment />} />
         <Route path="teaching-load" element={<TeachingLoad />} />
         <Route path="teaching-plan" element={<TeachingPlan />} />
