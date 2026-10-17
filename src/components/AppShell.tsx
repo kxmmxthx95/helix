@@ -146,7 +146,7 @@ const TABS = [
     orgWideOnly: false,
     deptManagerOnly: false,
     academicManagerOnly: false,
-    teacherOrManagerOnly: false,
+    teacherOrManagerOnly: true,
     hideFromStudent: true,
   },
   {

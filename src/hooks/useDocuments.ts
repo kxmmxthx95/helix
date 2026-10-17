@@ -506,3 +506,33 @@ export function useTeacherPairs() {
     },
   });
 }
+
+// ------------------------------------------------------------------ outline
+
+export type DocOutlineTopic = DocTopic & { fileCount: number };
+export type DocOutlineLesson = DocLesson & { topics: DocOutlineTopic[] };
+
+/** วิชา + ระดับชั้น → บทเรียน → หัวข้อ (with per-topic file counts) in one query — ผังการเรียน. */
+export function useDocOutline(subjectId: string | null, gradeLevelId: string | null) {
+  return useQuery({
+    queryKey: ["doc_summary", "outline", subjectId, gradeLevelId],
+    enabled: !!subjectId && !!gradeLevelId,
+    queryFn: async (): Promise<DocOutlineLesson[]> => {
+      const { data, error } = await supabase
+        .from("doc_lessons")
+        .select("*, doc_topics(*, doc_files(count))")
+        .eq("subject_id", subjectId!)
+        .eq("grade_level_id", gradeLevelId!)
+        .order("sort_order")
+        .order("created_at");
+      if (error) throw error;
+      const rows = data as unknown as (DocLesson & { doc_topics: (DocTopic & { doc_files: { count: number }[] })[] })[];
+      return rows.map(({ doc_topics, ...lesson }) => ({
+        ...lesson,
+        topics: doc_topics
+          .sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at))
+          .map(({ doc_files, ...t }) => ({ ...t, fileCount: doc_files[0]?.count ?? 0 })),
+      }));
+    },
+  });
+}

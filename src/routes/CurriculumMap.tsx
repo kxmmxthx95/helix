@@ -1,320 +1,273 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { ChevronDown, ChevronForward, ClipboardIcon, Plus, X } from "@/components/icons";
+import { BookIcon, ChevronForward, DocumentTextIcon, LibraryIcon, Plus, X } from "@/components/icons";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Input, Select, Skeleton } from "@/components/ui";
+import { Button, Card, EmptyState, Input, Skeleton } from "@/components/ui";
+import { useLearningAreas } from "@/hooks/useCurriculum";
 import {
-  useDeleteSubjectTopic,
-  useLearningAreas,
-  useSaveSubjectTopic,
-  useSubjects,
-  useSubjectTopics,
-} from "@/hooks/useCurriculum";
-import { useCohorts, useCurriculumSubjects, useGradeLevels, useStudyPlans } from "@/hooks/useCurriculumStructure";
-import { useDepartments } from "@/hooks/useProfiles";
-import type { Subject, SubjectTopic } from "@/lib/database.types";
-import { gradesInEntryPath } from "@/lib/gradeLevels";
-import { canManageAcademic, isOrgWide } from "@/lib/roles";
+  docFilePaths,
+  docTopicFilePaths,
+  useAllGradeLevels,
+  useCreateDocLesson,
+  useCreateDocTopic,
+  useDeleteDocLesson,
+  useDeleteDocTopic,
+  useDocOutline,
+  useUpdateDocLesson,
+  useUpdateDocTopic,
+  type DocOutlineLesson,
+} from "@/hooks/useDocuments";
+import { useSubjectColors } from "@/hooks/useSubjectColors";
+import type { Subject } from "@/lib/database.types";
+import { gradeShortLabel } from "@/lib/gradeLevels";
+import { canManage } from "@/lib/roles";
 import { SUBJECT_TYPE_LABEL } from "@/lib/subjectColor";
 import { cn } from "@/lib/utils";
+import { DocBrowser, useBrowsableSubjects } from "@/routes/Documents";
+import { EditableName } from "@/routes/Practice";
+
+// ผังการเรียน — วิชา -> ระดับชั้น -> บทเรียน -> หัวข้อ. Same data as เอกสาร (doc_lessons /
+// doc_topics, same RLS): this page is the outline view, files live in /documents.
 
 export function CurriculumMap() {
   const { profile: me } = useAuth();
-  const { data: departments = [] } = useDepartments();
-  const orgWide = me ? isOrgWide(me.roles) : false;
-  const mayEdit = me ? canManageAcademic(me.roles) : false;
-
-  const [pickedDept, setPickedDept] = useState("");
-  const [pickedCohort, setPickedCohort] = useState("");
-  const [pickedGrade, setPickedGrade] = useState("");
-  const [planId, setPlanId] = useState("");
-
-  const departmentId = orgWide ? pickedDept : (me?.department_id ?? "");
-  const isKg = departments.find((d) => d.id === departmentId)?.code === "KG";
-
-  const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
-  const { data: cohorts = [] } = useCohorts(!isKg ? departmentId || null : null);
-
-  // cohorts arrive newest first — default to the latest.
-  const cohortId = cohorts.some((c) => c.id === pickedCohort) ? pickedCohort : (cohorts[0]?.id ?? "");
-  const cohort = cohorts.find((c) => c.id === cohortId);
-  const grades = useMemo(
-    () => (cohort ? gradesInEntryPath(gradeLevels, cohort.entry_grade_level_id) : []),
-    [gradeLevels, cohort],
+  const { subjects, showDepartments } = useBrowsableSubjects();
+  if (!me || !(me.roles.includes("teacher") || canManage(me.roles))) {
+    return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
+  }
+  return (
+    <DocBrowser
+      subjects={subjects}
+      canEdit
+      showDepartments={showDepartments}
+      renderSubject={(s, onBack) => <SubjectMap subject={s} onBack={onBack} />}
+    />
   );
+}
+
+function SubjectMap({ subject, onBack }: { subject: Subject; onBack: () => void }) {
+  const [pickedGrade, setPickedGrade] = useState("");
+  const { data: allGrades = [] } = useAllGradeLevels();
+  const { data: areas = [] } = useLearningAreas();
+  const colors = useSubjectColors(allGrades);
+  const grades = allGrades.filter((g) => g.department_id === subject.department_id).sort((a, b) => a.sort_order - b.sort_order);
   const gradeId = grades.some((g) => g.id === pickedGrade) ? pickedGrade : (grades[0]?.id ?? "");
 
-  useEffect(() => setPlanId(""), [cohortId, gradeId]);
-
-  if (!me) return null;
-
   return (
-    <div className="page-fill">
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {orgWide && departments.length > 0 && (
-          <Select
-            className="w-auto min-w-[10rem]"
-            value={pickedDept}
-            onChange={(e) => setPickedDept(e.target.value)}
-            aria-label="แผนก"
-            placeholder="เลือกแผนก"
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button className="active:scale-100" size="sm" variant="ghost" onClick={onBack}>
+          <ChevronForward className="h-3 w-3 rotate-180" /> {subject.code} {subject.name_th}
+        </Button>
+        {gradeId && (
+          <Link
+            to={`/documents?subject=${subject.id}&grade=${gradeId}`}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs hover:bg-muted"
           >
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </Select>
-        )}
-        {cohorts.length > 0 && (
-          <Select
-            className="w-auto min-w-[10rem]"
-            value={cohortId}
-            onChange={(e) => setPickedCohort(e.target.value)}
-            aria-label="รุ่นหลักสูตร"
-          >
-            {cohorts.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
+            <DocumentTextIcon className="h-3.5 w-3.5" /> ดูเอกสาร
+          </Link>
         )}
       </div>
 
-      {!departmentId ? (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="เลือกแผนก" description="เลือกแผนกเพื่อดูผังการเรียน" icon={ClipboardIcon} />
-        </div>
-      ) : isKg ? (
-        <EmptyState title="ไม่รองรับระดับอนุบาล" description="ดูหัวข้อพัฒนาการของอนุบาลได้ที่เมนูหลักสูตร" />
-      ) : !cohort ? (
-        <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีรุ่นหลักสูตรในแผนกนี้" />
-      ) : (
-        <>
-          <div className="flex w-full shrink-0 gap-0 overflow-x-auto border-b border-border" role="tablist">
-            {grades.map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                role="tab"
-                aria-selected={gradeId === g.id}
-                onClick={() => setPickedGrade(g.id)}
-                className={cn(
-                  "inline-flex h-8 min-w-0 flex-1 items-center justify-center border-b-2 px-3 text-xs font-medium transition-colors -mb-px",
-                  gradeId === g.id
-                    ? "border-foreground text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <span className="truncate">{g.name}</span>
-              </button>
-            ))}
-          </div>
-          {gradeId && (
-            <GradeMap
-              key={`${cohortId}-${gradeId}`}
-              departmentId={departmentId}
-              cohortId={cohortId}
-              gradeId={gradeId}
-              planId={planId}
-              onPlanChange={setPlanId}
-              mayEdit={mayEdit}
-            />
+      <div className="flex items-center gap-3">
+        <div
+          className={cn(
+            "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl",
+            colors.shade(subject.learning_area_id, gradeId),
           )}
-        </>
-      )}
-    </div>
-  );
-}
-
-function GradeMap({
-  departmentId,
-  cohortId,
-  gradeId,
-  planId,
-  onPlanChange,
-  mayEdit,
-}: {
-  departmentId: string;
-  cohortId: string;
-  gradeId: string;
-  planId: string;
-  onPlanChange: (id: string) => void;
-  mayEdit: boolean;
-}) {
-  const { data: rows = [], isLoading } = useCurriculumSubjects(gradeId, cohortId);
-  const { data: subjects = [] } = useSubjects({
-    search: "",
-    departmentId,
-    learningAreaId: "",
-    gradeLevelId: "",
-    term: "",
-    subjectType: "",
-    includeInactive: true,
-  });
-  const { data: learningAreas = [] } = useLearningAreas();
-  const { data: studyPlans = [] } = useStudyPlans();
-
-  const planIds = useMemo(() => [...new Set(rows.map((r) => r.study_plan_id).filter((x): x is string => !!x))], [rows]);
-  const visible = rows.filter((r) => !planId || !r.study_plan_id || r.study_plan_id === planId);
-
-  const entries = useMemo(
-    () =>
-      visible.flatMap((r) => {
-        const subject = subjects.find((s) => s.id === r.subject_id);
-        return subject ? [{ term: r.term, subject }] : [];
-      }),
-    [visible, subjects],
-  );
-  const { data: topics = [] } = useSubjectTopics(useMemo(() => [...new Set(entries.map((e) => e.subject.id))], [entries]));
-
-  if (isLoading) return <Skeleton className="h-40 w-full" />;
-  if (entries.length === 0) return <EmptyState title="ไม่พบข้อมูล" description="ชั้นนี้ยังไม่มีรายวิชาในหลักสูตร" />;
-
-  // term is null outside SEC → single group.
-  const terms = [...new Set(entries.map((e) => e.term))].sort((a, b) => (a ?? 0) - (b ?? 0));
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
-      {planIds.length > 0 && (
-        <Select
-          className="w-auto min-w-[10rem] self-start"
-          value={planId}
-          onChange={(e) => onPlanChange(e.target.value)}
-          aria-label="สายการเรียน"
-          placeholder="ทุกสายการเรียน"
         >
-          {planIds.map((id) => (
-            <option key={id} value={id}>
-              {studyPlans.find((p) => p.id === id)?.name ?? id}
-            </option>
-          ))}
-        </Select>
+          <BookIcon className="h-6 w-6" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-bold">{subject.name_th}</h2>
+          <p className="text-xs text-muted-foreground">
+            {[subject.code, areas.find((a) => a.id === subject.learning_area_id)?.name, SUBJECT_TYPE_LABEL[subject.subject_type]]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        </div>
+      </div>
+
+      <div className="scrollbar-hidden flex w-full shrink-0 gap-0 overflow-x-auto border-b border-border" role="tablist">
+        {grades.map((g) => (
+          <button
+            key={g.id}
+            type="button"
+            role="tab"
+            aria-selected={gradeId === g.id}
+            onClick={() => setPickedGrade(g.id)}
+            className={cn(
+              "inline-flex h-8 min-w-0 flex-1 items-center justify-center border-b-2 px-3 text-xs font-medium transition-colors -mb-px",
+              gradeId === g.id
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <span className="truncate">{gradeShortLabel(g.code)}</span>
+          </button>
+        ))}
+      </div>
+
+      {gradeId ? (
+        <Outline
+          key={gradeId}
+          subjectId={subject.id}
+          gradeId={gradeId}
+          tint={colors.shade(subject.learning_area_id, gradeId)}
+        />
+      ) : (
+        <EmptyState title="ไม่พบระดับชั้น" description="แผนกของวิชานี้ยังไม่มีระดับชั้น" />
       )}
-      {terms.map((term) => {
-        const inTerm = entries.filter((e) => e.term === term).map((e) => e.subject);
-        const areaIds = [...new Set(inTerm.map((s) => s.learning_area_id))];
-        return (
-          <section key={term ?? "all"} className="flex flex-col gap-2">
-            {term !== null && <h2 className="text-xs font-semibold">ภาคเรียน {term}</h2>}
-            {areaIds.map((areaId) => (
-              <div key={areaId} className="flex flex-col gap-1">
-                <h3 className="text-[11px] font-medium text-muted-foreground">
-                  {learningAreas.find((a) => a.id === areaId)?.name ?? "—"}
-                </h3>
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                  {inTerm
-                    .filter((s) => s.learning_area_id === areaId)
-                    .map((s) => (
-                      <SubjectCard
-                        key={s.id}
-                        subject={s}
-                        topics={topics.filter((t) => t.subject_id === s.id)}
-                        mayEdit={mayEdit}
-                      />
-                    ))}
-                </div>
-              </div>
-            ))}
-          </section>
-        );
-      })}
     </div>
   );
 }
 
-function SubjectCard({ subject, topics, mayEdit }: { subject: Subject; topics: SubjectTopic[]; mayEdit: boolean }) {
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const save = useSaveSubjectTopic();
-  const del = useDeleteSubjectTopic();
+function Outline({ subjectId, gradeId, tint }: { subjectId: string; gradeId: string; tint: string }) {
+  const { data: lessons = [], isLoading } = useDocOutline(subjectId, gradeId);
+  const create = useCreateDocLesson();
   const toast = useToast();
-  const Chevron = open ? ChevronDown : ChevronForward;
+  const [name, setName] = useState("");
 
   function add() {
+    const n = name.trim();
+    if (!n) return;
+    create.mutate(
+      { subject_id: subjectId, grade_level_id: gradeId, name: n, sort_order: lessons.length },
+      { onSuccess: () => setName(""), onError: () => toast("เพิ่มไม่สำเร็จ", "error") },
+    );
+  }
+
+  if (isLoading) return <Skeleton className="h-40 w-full" />;
+
+  return (
+    <div className="scrollbar-hidden flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+      {lessons.length === 0 && <EmptyState title="ยังไม่มีบทเรียน" description="เพิ่มบทเรียนเพื่อเริ่มวางโครงเนื้อหา" />}
+      {lessons.map((l, i) => (
+        <LessonCard key={l.id} lesson={l} index={i} tint={tint} />
+      ))}
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          add();
+        }}
+      >
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={200}
+          placeholder="เพิ่มบทเรียน"
+          aria-label="ชื่อบทเรียน"
+        />
+        <Button type="submit" size="icon" variant="outline" disabled={!name.trim() || create.isPending} aria-label="เพิ่มบทเรียน">
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
+      </form>
+    </div>
+  );
+}
+
+function LessonCard({ lesson, index, tint }: { lesson: DocOutlineLesson; index: number; tint: string }) {
+  const [title, setTitle] = useState("");
+  const updateLesson = useUpdateDocLesson();
+  const removeLesson = useDeleteDocLesson();
+  const createTopic = useCreateDocTopic();
+  const updateTopic = useUpdateDocTopic();
+  const removeTopic = useDeleteDocTopic();
+  const toast = useToast();
+  const fail = (msg: string) => () => toast(msg, "error");
+
+  async function deleteLesson() {
+    const paths = await docFilePaths(lesson.id);
+    const extra = paths.length ? ` เอกสาร ${paths.length} ไฟล์ในบทเรียนนี้จะถูกลบด้วย` : "";
+    if (!confirm(`ลบบทเรียน "${lesson.name}"? หัวข้อทั้งหมดในบทนี้จะถูกลบด้วย${extra}`)) return;
+    removeLesson.mutate({ id: lesson.id, paths }, { onError: fail("ลบไม่สำเร็จ") });
+  }
+
+  async function deleteTopic(id: string, name: string) {
+    const paths = await docTopicFilePaths(id);
+    const extra = paths.length ? ` เอกสาร ${paths.length} ไฟล์ในหัวข้อนี้จะถูกลบด้วย` : "";
+    if (!confirm(`ลบหัวข้อ "${name}"?${extra}`)) return;
+    removeTopic.mutate({ id, paths }, { onError: fail("ลบไม่สำเร็จ") });
+  }
+
+  function addTopic() {
     const t = title.trim();
     if (!t) return;
-    save.mutate(
-      {
-        subject_id: subject.id,
-        title: t,
-        description: null,
-        sort_order: topics.length ? Math.max(...topics.map((x) => x.sort_order)) + 1 : 0,
-      },
-      {
-        onSuccess: () => setTitle(""),
-        onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
-      },
+    createTopic.mutate(
+      { lesson_id: lesson.id, name: t, sort_order: lesson.topics.length },
+      { onSuccess: () => setTitle(""), onError: fail("เพิ่มไม่สำเร็จ") },
     );
   }
 
   return (
-    <Card className="flex flex-col gap-2 p-2.5">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-start gap-2 text-left"
-      >
-        <Chevron className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-medium">{subject.name_th}</span>
-          <span className="block text-[10px] text-muted-foreground">
-            {subject.code} · {SUBJECT_TYPE_LABEL[subject.subject_type]} · {subject.credits} นก. · {subject.hours_per_week} คาบ/สัปดาห์
-          </span>
+    <div className="rounded-2xl border border-border bg-card shadow-sm">
+      <div className="flex items-center gap-3 p-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-bold text-accent">
+          {index + 1}
         </span>
-        <span className="shrink-0 text-[10px] text-muted-foreground">{topics.length} หัวข้อ</span>
-      </button>
-
-      {open && (
-        <div className="flex flex-col gap-1 border-t border-border pt-2">
-          {topics.length === 0 && <p className="text-[11px] text-muted-foreground">ยังไม่มีหัวข้อเนื้อหา</p>}
-          <ol className="flex flex-col gap-1">
-            {topics.map((t, i) => (
-              <li key={t.id} className="flex items-start gap-2 text-xs">
-                <span className="w-4 shrink-0 text-right text-muted-foreground">{i + 1}.</span>
-                <span className="min-w-0 flex-1">{t.title}</span>
-                {mayEdit && (
-                  <button
-                    type="button"
-                    aria-label={`ลบหัวข้อ ${t.title}`}
-                    disabled={del.isPending}
-                    onClick={() =>
-                      del.mutate(t.id, {
-                        onError: (err) => toast(err instanceof Error ? err.message : "ลบไม่สำเร็จ", "error"),
-                      })
-                    }
-                    className="shrink-0 text-muted-foreground hover:text-destructive"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </li>
-            ))}
-          </ol>
-          {mayEdit && (
-            <form
-              className="flex gap-1.5"
-              onSubmit={(e) => {
-                e.preventDefault();
-                add();
-              }}
-            >
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={200}
-                placeholder="เพิ่มหัวข้อเนื้อหา"
-                aria-label="หัวข้อเนื้อหา"
-              />
-              <Button type="submit" size="icon" variant="outline" disabled={!title.trim() || save.isPending} aria-label="เพิ่ม">
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
-            </form>
-          )}
+        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", tint)}>
+          <LibraryIcon className="h-5 w-5" />
         </div>
-      )}
-    </Card>
+        <div className="min-w-0 flex-1 truncate text-sm font-bold">{lesson.name}</div>
+        <EditableName noMotion value={lesson.name} onSave={(name) => updateLesson.mutate({ id: lesson.id, name })} />
+        <Button
+          className="active:scale-100"
+          size="icon"
+          variant="ghost"
+          aria-label={`ลบบทเรียน ${lesson.name}`}
+          disabled={removeLesson.isPending}
+          onClick={deleteLesson}
+        >
+          <X className="h-3 w-3" />
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-1 border-t border-border px-3 py-2">
+        {lesson.topics.length === 0 && <p className="py-1 text-[11px] text-muted-foreground">ยังไม่มีหัวข้อ</p>}
+        <ol className="flex flex-col">
+          {lesson.topics.map((t, i) => (
+            <li key={t.id} className="flex items-center gap-2 py-1 text-xs">
+              <span className="w-8 shrink-0 text-right text-muted-foreground">
+                {index + 1}.{i + 1}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{t.name}</span>
+              <span className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+                <DocumentTextIcon className="h-3 w-3" /> {t.fileCount}
+              </span>
+              <EditableName noMotion value={t.name} onSave={(name) => updateTopic.mutate({ id: t.id, name })} />
+              <button
+                type="button"
+                aria-label={`ลบหัวข้อ ${t.name}`}
+                disabled={removeTopic.isPending}
+                onClick={() => deleteTopic(t.id, t.name)}
+                className="shrink-0 text-muted-foreground hover:text-destructive"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          ))}
+        </ol>
+        <form
+          className="flex gap-2 pt-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            addTopic();
+          }}
+        >
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={200}
+            placeholder="เพิ่มหัวข้อ"
+            aria-label={`เพิ่มหัวข้อในบทเรียน ${lesson.name}`}
+          />
+          <Button type="submit" size="icon" variant="outline" disabled={!title.trim() || createTopic.isPending} aria-label="เพิ่มหัวข้อ">
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        </form>
+      </div>
+    </div>
   );
 }
