@@ -754,7 +754,7 @@ function TopicRow({
   return (
     <li className="flex flex-col gap-1 py-1 text-xs">
       <div className="flex items-center gap-2">
-        <span className="w-8 shrink-0 text-right text-muted-foreground">{label}</span>
+        <span className="w-9 shrink-0 text-left tabular-nums text-muted-foreground">{label}</span>
         <span className="min-w-0 flex-1 truncate">{topic.name}</span>
         {mayEdit && (
           <>
@@ -824,7 +824,7 @@ function LinkedFiles({
     if (!(await openDocFile(path))) toast("เปิดไฟล์ไม่สำเร็จ", "error");
   }
   return (
-    <ul className={cn("flex flex-wrap gap-1.5 text-xs", indent && "pl-10")}>
+    <ul className={cn("flex flex-wrap gap-1.5 text-xs", indent && "pl-11")}>
       {files.map(({ linkId, file }) => (
         <li key={linkId} className="flex items-center gap-1 rounded-full bg-muted py-0.5 pl-2 pr-1 text-[11px]">
           {file ? (
