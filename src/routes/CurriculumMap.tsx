@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { AppsIcon, BookIcon, CheckboxIcon, ChevronForward, ClipboardIcon, DocumentTextIcon, LibraryIcon, LinkIcon, ListIcon, PaletteIcon, Plus, PricetagIcon, Search, SquareIcon, Upload, X } from "@/components/icons";
+import { AppsIcon, BookIcon, CheckboxIcon, ChevronForward, ClipboardIcon, DocumentTextIcon, LibraryIcon, LinkIcon, ListIcon, PaletteIcon, Plus, PricetagIcon, PrintIcon, Search, SquareIcon, Upload, X } from "@/components/icons";
 import { ImportPlanSheet } from "@/components/ImportPlanSheet";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -40,6 +40,7 @@ import { useDepartments } from "@/hooks/useProfiles";
 import type { GradeLevel } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManageAcademic, isOrgWide } from "@/lib/roles";
+import { downloadPlanLessonPdf } from "@/lib/planLessonPdf";
 import { PLAN_HUES, PLAN_ICONS, planIconFor, planTileClass } from "@/lib/planStyle";
 import { SUBJECT_TYPE_BADGE, SUBJECT_TYPE_LABEL, subjectShade, type AreaHue } from "@/lib/subjectColor";
 import { cn } from "@/lib/utils";
@@ -431,6 +432,7 @@ function SubjectPlan({
           <GradeSection
             key={grade.id}
             subjectId={subject.id}
+            subjectName={subject.name}
             departmentId={subject.department_id}
             grade={grade}
             lessons={lessons.filter((l) => l.grade_level_id === grade.id)}
@@ -444,12 +446,14 @@ function SubjectPlan({
 
 function GradeSection({
   subjectId,
+  subjectName,
   departmentId,
   grade,
   lessons,
   mayEdit,
 }: {
   subjectId: string;
+  subjectName: string;
   departmentId: string;
   grade: GradeLevel;
   lessons: PlanLessonNode[];
@@ -472,7 +476,15 @@ function GradeSection({
     <section className="flex flex-col gap-3">
       {lessons.length === 0 && <p className="text-xs text-muted-foreground">ยังไม่มีบทเรียนในชั้นนี้</p>}
       {lessons.map((l, i) => (
-        <LessonCard key={l.id} lesson={l} index={i} departmentId={departmentId} mayEdit={mayEdit} />
+        <LessonCard
+          key={l.id}
+          lesson={l}
+          index={i}
+          subjectName={subjectName}
+          gradeLabel={gradeShortLabel(grade.code)}
+          departmentId={departmentId}
+          mayEdit={mayEdit}
+        />
       ))}
       {mayEdit && (
         <form
@@ -501,11 +513,15 @@ function GradeSection({
 function LessonCard({
   lesson,
   index,
+  subjectName,
+  gradeLabel,
   departmentId,
   mayEdit,
 }: {
   lesson: PlanLessonNode;
   index: number;
+  subjectName: string;
+  gradeLabel: string;
   departmentId: string;
   mayEdit: boolean;
 }) {
@@ -519,10 +535,18 @@ function LessonCard({
   const unlinkFile = useUnlinkPlanLessonFile();
   const [picking, setPicking] = useState(false);
   const [tagging, setTagging] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const tag = useTagPlanLesson();
   const untag = useUntagPlanLesson();
   const toast = useToast();
   const fail = (msg: string) => () => toast(msg, "error");
+
+  function printPdf() {
+    setPrinting(true);
+    downloadPlanLessonPdf({ lesson, index, subject: subjectName, grade: gradeLabel })
+      .catch(() => toast("สร้าง PDF ไม่สำเร็จ", "error"))
+      .finally(() => setPrinting(false));
+  }
 
   function deleteLesson() {
     const extra = lesson.topics.length ? ` หัวข้อ ${lesson.topics.length} หัวข้อในบทนี้จะถูกลบด้วย` : "";
@@ -572,6 +596,16 @@ function LessonCard({
             </ul>
           )}
         </div>
+        <Button
+          className="active:scale-100"
+          size="icon"
+          variant="ghost"
+          aria-label={`พิมพ์ PDF บทเรียน ${lesson.name}`}
+          disabled={printing}
+          onClick={printPdf}
+        >
+          <PrintIcon className="h-3 w-3" />
+        </Button>
         {mayEdit && (
           <>
             <Button

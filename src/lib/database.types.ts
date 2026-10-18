@@ -880,6 +880,20 @@ export type DocFile = {
   reviewed_at: string | null;
 };
 
+/** รายการพิมพ์ — a document queued for printing. See migration 0093. */
+export type DocPrintRequest = {
+  id: string;
+  doc_file_id: string;
+  department_id: string | null;
+  copies: number;
+  note: string | null;
+  requested_by: string;
+  status: "pending" | "printed";
+  printed_by: string | null;
+  printed_at: string | null;
+  created_at: string;
+};
+
 export type DocTaskReviewStatus = "pending" | "approved" | "returned";
 
 export type DocTaskType = "lesson_plan" | "worksheet" | "exam" | "media" | "other";
@@ -1483,6 +1497,10 @@ export type Database = {
       doc_lessons: Table<DocLesson, InsertOf<DocLesson, "sort_order" | "created_by" | "created_at" | "updated_at">>;
       doc_targets: Table<DocTarget, InsertOf<DocTarget, "id" | "lesson_target" | "topic_target" | "updated_at">>;
       doc_topics: Table<DocTopic, InsertOf<DocTopic, "sort_order" | "created_at" | "updated_at">>;
+      doc_print_requests: Table<
+        DocPrintRequest,
+        { doc_file_id: string; copies?: number; note?: string | null; status?: "pending" | "printed" }
+      >;
       doc_files: Table<DocFile, InsertOf<DocFile, "description" | "topic_id" | "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
       doc_tasks: Table<DocTask, InsertOf<DocTask, "description" | "department_id" | "learning_area_id">>;
       doc_task_files: Table<DocTaskFile, InsertOf<DocTaskFile, "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
