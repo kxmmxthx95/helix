@@ -70,5 +70,7 @@ export const useUpdatePrintRequest = () =>
   });
 export const useMarkPrinted = () =>
   useWrite((id: string) => supabase.from("doc_print_requests").update({ status: "printed" }).eq("id", id));
+export const useUndoPrinted = () =>
+  useWrite((id: string) => supabase.from("doc_print_requests").update({ status: "pending" }).eq("id", id));
 export const useDeletePrintRequest = () =>
   useWrite((id: string) => supabase.from("doc_print_requests").delete().eq("id", id));

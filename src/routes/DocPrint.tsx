@@ -11,6 +11,7 @@ import {
   useAddPrintRequests,
   useDeletePrintRequest,
   useMarkPrinted,
+  useUndoPrinted,
   usePrintRequests,
   useUpdatePrintRequest,
   type PrintRequestRow,
@@ -113,6 +114,7 @@ const thDate = (iso: string) => new Date(iso).toLocaleDateString("th-TH", { date
 function RequestRow({ request: r, mayRequest }: { request: PrintRequestRow; mayRequest: boolean }) {
   const update = useUpdatePrintRequest();
   const markPrinted = useMarkPrinted();
+  const undo = useUndoPrinted();
   const remove = useDeletePrintRequest();
   const toast = useToast();
   const [copies, setCopies] = useState(String(r.copies));
@@ -138,24 +140,32 @@ function RequestRow({ request: r, mayRequest }: { request: PrintRequestRow; mayR
     if (r.file && !(await openDocFile(r.file.file_path))) toast("เปิดไฟล์ไม่สำเร็จ", "error");
   }
 
+  const lessonLine = [r.file?.subjectLabel, r.file?.lessonName].filter(Boolean).join(" · ") || r.file?.file_name;
+  // Quiet until focused: the fields read as plain text in the list, as inputs only when edited.
+  const field = "h-8 rounded-lg border-transparent bg-muted/60 px-2.5 text-xs shadow-none focus:border-border focus:bg-background disabled:opacity-100 disabled:text-muted-foreground";
+
   return (
-    <li className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3">
-      <div className="flex items-start gap-3">
-        <FileTile fileName={r.file?.file_name ?? ""} />
-        <div className="min-w-0 flex-1 font-sarabun leading-tight">
-          <p className="truncate text-sm font-medium">{r.file?.title ?? "ไม่มีสิทธิ์ดูไฟล์นี้"}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {[r.file?.subjectLabel, r.file?.gradeCode && gradeShortLabel(r.file.gradeCode), r.file?.lessonName]
-              .filter(Boolean)
-              .join(" · ") || r.file?.file_name}
-          </p>
-          <p className="text-[11px] text-muted-foreground">
-            ส่งโดย {r.requester} · {thDate(r.created_at)}
+    <li className="rounded-2xl border border-border bg-card p-4">
+      <div className="flex items-center gap-4">
+        <FileTile fileName={r.file?.file_name ?? ""} className="h-12 w-12" />
+        <div className="min-w-0 flex-1 space-y-1 font-sarabun">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-sm font-semibold leading-tight">{r.file?.title ?? "ไม่มีสิทธิ์ดูไฟล์นี้"}</p>
+            {r.file?.gradeCode && (
+              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {gradeShortLabel(r.file.gradeCode)}
+              </span>
+            )}
+          </div>
+          <p className="truncate text-xs text-muted-foreground">{lessonLine}</p>
+          <p className="truncate text-[11px] text-muted-foreground/80">
+            {r.requester} · {thDate(r.created_at)}
+            {!pending && r.printed_at && <> · พิมพ์เมื่อ {thDate(r.printed_at)}</>}
           </p>
         </div>
         <span
           className={cn(
-            "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium",
+            "shrink-0 self-start rounded-full px-2.5 py-1 text-[11px] font-medium",
             pending ? "bg-warning/15 text-warning" : "bg-success/15 text-success",
           )}
         >
@@ -163,14 +173,13 @@ function RequestRow({ request: r, mayRequest }: { request: PrintRequestRow; mayR
         </span>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          จำนวน
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+        <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
           <Input
             type="number"
             min={1}
             max={999}
-            className="h-8 w-20"
+            className={cn(field, "w-16 text-center")}
             value={copies}
             disabled={!mayRequest || !pending}
             onChange={(e) => setCopies(e.target.value)}
@@ -180,48 +189,62 @@ function RequestRow({ request: r, mayRequest }: { request: PrintRequestRow; mayR
           ชุด
         </label>
         <Input
-          className="h-8 min-w-[10rem] flex-1"
+          className={cn(field, "min-w-[10rem] flex-1")}
           value={note}
           maxLength={300}
-          placeholder={mayRequest && pending ? "หมายเหตุ เช่น พิมพ์สองหน้า" : "ไม่มีหมายเหตุ"}
+          placeholder={mayRequest && pending ? "เพิ่มหมายเหตุ เช่น พิมพ์สองหน้า" : "ไม่มีหมายเหตุ"}
           disabled={!mayRequest || !pending}
           onChange={(e) => setNote(e.target.value)}
           onBlur={saveNote}
           aria-label="หมายเหตุ"
         />
-        <Button variant="outline" size="sm" disabled={!r.file} onClick={open}>
-          <DocumentTextIcon className="h-3.5 w-3.5" />
-          เปิดไฟล์
-        </Button>
-        {pending && (
-          <Button
-            size="sm"
-            disabled={markPrinted.isPending}
-            onClick={() => markPrinted.mutate(r.id, { onError: fail("บันทึกไม่สำเร็จ") })}
-          >
-            <PrintIcon className="h-3.5 w-3.5" />
-            พิมพ์แล้ว
+        <div className="ml-auto flex items-center gap-1.5">
+          <Button variant="ghost" size="sm" disabled={!r.file} onClick={open}>
+            <DocumentTextIcon className="h-3.5 w-3.5" />
+            เปิดไฟล์
           </Button>
-        )}
-        {pending && mayRequest && (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="ลบออกจากรายการพิมพ์"
-            disabled={remove.isPending}
-            onClick={() => {
-              if (confirm(`ลบ "${r.file?.title ?? "เอกสารนี้"}" ออกจากรายการพิมพ์?`)) {
-                remove.mutate(r.id, { onError: fail("ลบไม่สำเร็จ") });
+          {pending ? (
+            <Button
+              size="sm"
+              disabled={markPrinted.isPending}
+              onClick={() => markPrinted.mutate(r.id, { onError: fail("บันทึกไม่สำเร็จ") })}
+            >
+              <PrintIcon className="h-3.5 w-3.5" />
+              พิมพ์แล้ว
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={undo.isPending}
+              onClick={() =>
+                undo.mutate(r.id, {
+                  // the partial unique index rejects a second pending request for the same file (23505)
+                  onError: (err) =>
+                    toast((err as { code?: string }).code === "23505" ? "เอกสารนี้มีรายการรอพิมพ์อยู่แล้ว" : "บันทึกไม่สำเร็จ", "error"),
+                })
               }
-            }}
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        )}
+            >
+              ยกเลิกสถานะพิมพ์แล้ว
+            </Button>
+          )}
+          {pending && mayRequest && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="ลบออกจากรายการพิมพ์"
+              disabled={remove.isPending}
+              onClick={() => {
+                if (confirm(`ลบ "${r.file?.title ?? "เอกสารนี้"}" ออกจากรายการพิมพ์?`)) {
+                  remove.mutate(r.id, { onError: fail("ลบไม่สำเร็จ") });
+                }
+              }}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </div>
-      {!pending && r.printed_at && (
-        <p className="text-[11px] text-muted-foreground">พิมพ์เมื่อ {thDate(r.printed_at)}</p>
-      )}
     </li>
   );
 }
