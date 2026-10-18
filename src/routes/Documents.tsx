@@ -53,9 +53,10 @@ import { useDepartments } from "@/hooks/useProfiles";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import type { DocFile, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
-import { canManage, isOrgWide } from "@/lib/roles";
+import { canManage, canManageAcademic, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { DocCoverageTab, SUBJECT_TYPES } from "@/routes/DocCoverage";
+import { PrintListTab } from "@/routes/DocPrint";
 import { DocProgressTab, MyDocTasksTab, ReviewDocsTab } from "@/routes/DocProgress";
 import { EditableName } from "@/routes/Practice";
 
@@ -100,6 +101,8 @@ function TeacherDocuments() {
         ]
       : []),
     { id: "docs", label: "เอกสารการสอน", icon: DocumentTextIcon },
+    // รายการพิมพ์: department heads and up queue documents, ธุรการ prints them.
+    ...(canManageAcademic(me!.roles) || me!.roles.includes("staff") ? [{ id: "print", label: "รายการพิมพ์", icon: PrintIcon }] : []),
     ...(me!.roles.includes("teacher") ? [{ id: "mine", label: "งานของฉัน", icon: ClipboardIcon }] : []),
   ];
   // First tab is the landing one: progress overview for reviewers, documents list for everyone else.
@@ -127,7 +130,7 @@ function TeacherDocuments() {
           </button>
         ))}
       </div>
-      {tab === "progress" ? <DocProgressTab /> : tab === "review" ? <ReviewDocsTab /> : tab === "coverage" ? <DocCoverageTab /> : tab === "mine" ? <MyDocTasksTab /> : browser}
+      {tab === "progress" ? <DocProgressTab /> : tab === "review" ? <ReviewDocsTab /> : tab === "coverage" ? <DocCoverageTab /> : tab === "mine" ? <MyDocTasksTab /> : tab === "print" ? <PrintListTab /> : browser}
     </div>
   );
 }

@@ -138,6 +138,18 @@ const TABS = [
     teacherOrManagerOnly: false,
   },
   {
+    to: "/curriculum-map",
+    label: "ผังการเรียน",
+    icon: LibraryIcon,
+    section: "งานวิชาการ",
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: true,
+    hideFromStudent: true,
+  },
+  {
     to: "/enrollment",
     label: "ลงทะเบียน",
     icon: PersonAddIcon,

@@ -533,6 +533,40 @@ export type LearningUnit = {
   updated_at: string;
 };
 
+/** ผังการเรียน — วิชา -> ระดับชั้น -> บทเรียน -> หัวข้อ, independent of the subject catalog. See migration 0088. */
+export type PlanSubject = {
+  id: string;
+  department_id: string;
+  name: string;
+  /** Preset hue key (subjectColor AreaHue) / icon key (lib/planStyle) — null = default. See migration 0092. */
+  color: string | null;
+  icon: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type PlanLesson = {
+  id: string;
+  subject_id: string;
+  grade_level_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+export type PlanTopic = {
+  id: string;
+  lesson_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Link from a ผังการเรียน หัวข้อ to an uploaded document. See migration 0089. */
+export type PlanTopicFile = { id: string; topic_id: string; doc_file_id: string; created_at: string };
+export type PlanLessonSubject = { id: string; lesson_id: string; subject_id: string; created_at: string };
+export type PlanLessonFile = { id: string; lesson_id: string; doc_file_id: string; created_at: string };
+
 /** KG หัวข้อการประเมินพัฒนาการ, grouped under one of the 4 fixed domains. */
 export type KgAssessmentTopic = {
   id: string;
@@ -844,6 +878,20 @@ export type DocFile = {
   review_note: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
+};
+
+/** รายการพิมพ์ — a document queued for printing. See migration 0093. */
+export type DocPrintRequest = {
+  id: string;
+  doc_file_id: string;
+  department_id: string | null;
+  copies: number;
+  note: string | null;
+  requested_by: string;
+  status: "pending" | "printed";
+  printed_by: string | null;
+  printed_at: string | null;
+  created_at: string;
 };
 
 export type DocTaskReviewStatus = "pending" | "approved" | "returned";
@@ -1440,9 +1488,19 @@ export type Database = {
         InsertOf<ExamAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
       >;
       exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
+      plan_subjects: Table<PlanSubject, InsertOf<PlanSubject, "color" | "icon">>;
+      plan_lessons: Table<PlanLesson, InsertOf<PlanLesson, "sort_order">>;
+      plan_lesson_subjects: Table<PlanLessonSubject, InsertOf<PlanLessonSubject, never>>;
+      plan_lesson_files: Table<PlanLessonFile, InsertOf<PlanLessonFile, never>>;
+      plan_topic_files: Table<PlanTopicFile, InsertOf<PlanTopicFile, never>>;
+      plan_topics: Table<PlanTopic, InsertOf<PlanTopic, "sort_order">>;
       doc_lessons: Table<DocLesson, InsertOf<DocLesson, "sort_order" | "created_by" | "created_at" | "updated_at">>;
       doc_targets: Table<DocTarget, InsertOf<DocTarget, "id" | "lesson_target" | "topic_target" | "updated_at">>;
       doc_topics: Table<DocTopic, InsertOf<DocTopic, "sort_order" | "created_at" | "updated_at">>;
+      doc_print_requests: Table<
+        DocPrintRequest,
+        { doc_file_id: string; copies?: number; note?: string | null; status?: "pending" | "printed" }
+      >;
       doc_files: Table<DocFile, InsertOf<DocFile, "description" | "topic_id" | "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
       doc_tasks: Table<DocTask, InsertOf<DocTask, "description" | "department_id" | "learning_area_id">>;
       doc_task_files: Table<DocTaskFile, InsertOf<DocTaskFile, "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
