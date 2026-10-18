@@ -534,7 +534,16 @@ export type LearningUnit = {
 };
 
 /** ผังการเรียน — วิชา -> ระดับชั้น -> บทเรียน -> หัวข้อ, independent of the subject catalog. See migration 0088. */
-export type PlanSubject = { id: string; department_id: string; name: string; created_at: string; updated_at: string };
+export type PlanSubject = {
+  id: string;
+  department_id: string;
+  name: string;
+  /** Preset hue key (subjectColor AreaHue) / icon key (lib/planStyle) — null = default. See migration 0092. */
+  color: string | null;
+  icon: string | null;
+  created_at: string;
+  updated_at: string;
+};
 export type PlanLesson = {
   id: string;
   subject_id: string;
@@ -1465,7 +1474,7 @@ export type Database = {
         InsertOf<ExamAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
       >;
       exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
-      plan_subjects: Table<PlanSubject, InsertOf<PlanSubject, never>>;
+      plan_subjects: Table<PlanSubject, InsertOf<PlanSubject, "color" | "icon">>;
       plan_lessons: Table<PlanLesson, InsertOf<PlanLesson, "sort_order">>;
       plan_lesson_subjects: Table<PlanLessonSubject, InsertOf<PlanLessonSubject, never>>;
       plan_lesson_files: Table<PlanLessonFile, InsertOf<PlanLessonFile, never>>;

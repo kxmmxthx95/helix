@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { AppsIcon, BookIcon, ChevronForward, ClipboardIcon, DocumentTextIcon, LibraryIcon, LinkIcon, ListIcon, Plus, PricetagIcon, Search, Upload, X } from "@/components/icons";
+import { AppsIcon, BookIcon, CheckboxIcon, ChevronForward, ClipboardIcon, DocumentTextIcon, LibraryIcon, LinkIcon, ListIcon, PaletteIcon, Plus, PricetagIcon, Search, SquareIcon, Upload, X } from "@/components/icons";
 import { ImportPlanSheet } from "@/components/ImportPlanSheet";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Input, Select, Skeleton } from "@/components/ui";
-import { useSubjects } from "@/hooks/useCurriculum";
+import { Button, Card, EmptyState, Input, Select, Skeleton, Spinner } from "@/components/ui";
+import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
+import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
+import { useAllGradeLevels } from "@/hooks/useDocuments";
 import {
   useCreatePlanLesson,
   useCreatePlanSubject,
@@ -18,6 +20,7 @@ import {
   useLinkPlanFile,
   useLinkPlanLessonFile,
   useTagPlanLesson,
+  useStylePlanSubject,
   useUntagPlanLesson,
   useUnlinkPlanFile,
   useUnlinkPlanLessonFile,
@@ -28,6 +31,7 @@ import {
   useRenamePlanSubject,
   useRenamePlanTopic,
   type PlanLessonNode,
+  type PlanLessonTag,
   type PlanLinkedFile,
   type PlanTopicNode,
   type PlanSubjectSummary,
@@ -36,6 +40,8 @@ import { useDepartments } from "@/hooks/useProfiles";
 import type { GradeLevel } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManageAcademic, isOrgWide } from "@/lib/roles";
+import { PLAN_HUES, PLAN_ICONS, planIconFor, planTileClass } from "@/lib/planStyle";
+import { SUBJECT_TYPE_BADGE, SUBJECT_TYPE_LABEL, subjectShade, type AreaHue } from "@/lib/subjectColor";
 import { cn } from "@/lib/utils";
 import { EditableName } from "@/routes/Practice";
 
@@ -43,6 +49,17 @@ import { EditableName } from "@/routes/Practice";
 // read the subject catalog, curriculum, teaching assignments or documents. See migration 0088.
 
 const DUPLICATE = "23505";
+/** Rows a picker drawer renders before "แสดงเพิ่ม" — keeps long catalogs light. */
+const PICKER_PAGE = 20;
+
+function ShowMore({ shown, total, onMore }: { shown: number; total: number; onMore: () => void }) {
+  if (shown >= total) return null;
+  return (
+    <Button variant="outline" className="w-full" onClick={onMore}>
+      แสดงเพิ่ม (เหลือ {total - shown} รายการ)
+    </Button>
+  );
+}
 const errorText = (err: unknown, fallback: string) =>
   (err as { code?: string })?.code === DUPLICATE ? "มีชื่อนี้อยู่แล้ว" : fallback;
 
@@ -270,9 +287,7 @@ function SubjectList({
               className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm hover:shadow-md"
             >
               <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-muted">
-                  <BookIcon className="h-6 w-6" />
-                </div>
+                <SubjectTile subject={s} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-bold">{s.name}</div>
                   <div className="text-[11px] text-muted-foreground">
@@ -323,6 +338,7 @@ function SubjectPlan({
 }) {
   const { data: lessons = [], isLoading } = usePlanOutline(subject.id);
   const [pickedGrade, setPickedGrade] = useState("");
+  const [styling, setStyling] = useState(false);
   const rename = useRenamePlanSubject();
   const remove = useDeletePlanSubject();
   const toast = useToast();
@@ -346,9 +362,7 @@ function SubjectPlan({
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-muted">
-          <BookIcon className="h-6 w-6" />
-        </div>
+        <SubjectTile subject={subject} />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-base font-bold">{subject.name}</h2>
           <p className="text-xs text-muted-foreground">
@@ -357,6 +371,15 @@ function SubjectPlan({
         </div>
         {mayEdit && (
           <>
+            <Button
+              className="active:scale-100"
+              size="icon"
+              variant="ghost"
+              aria-label="ตั้งค่าสีและไอคอน"
+              onClick={() => setStyling(true)}
+            >
+              <PaletteIcon className="h-3 w-3" />
+            </Button>
             <EditableName
               noMotion
               value={subject.name}
@@ -377,6 +400,8 @@ function SubjectPlan({
           </>
         )}
       </div>
+
+      {mayEdit && <StyleSheet open={styling} onClose={() => setStyling(false)} subject={subject} />}
 
       {isLoading ? (
         <Skeleton className="h-40 w-full" />
@@ -593,9 +618,19 @@ function LessonCard({
           onClose={() => setTagging(false)}
           departmentId={departmentId}
           lessonName={lesson.name}
-          taggedIds={new Set(lesson.tags.map((t) => t.subject.id))}
-          onTag={(subjectId) => tag.mutate({ lesson_id: lesson.id, subject_id: subjectId }, { onError: fail("ติดแท็กไม่สำเร็จ") })}
-          pending={tag.isPending}
+          tags={lesson.tags}
+          onApply={async (add, remove) => {
+            try {
+              await Promise.all([
+                ...add.map((subject_id) => tag.mutateAsync({ lesson_id: lesson.id, subject_id })),
+                ...remove.map((linkId) => untag.mutateAsync(linkId)),
+              ]);
+              return true;
+            } catch {
+              toast("บันทึกแท็กไม่สำเร็จ", "error");
+              return false;
+            }
+          }}
         />
       )}
       {mayEdit && (
@@ -778,12 +813,15 @@ function DocPicker({
   pending: boolean;
 }) {
   const [search, setSearch] = useState("");
+  const [limit, setLimit] = useState(PICKER_PAGE);
   const { data: choices = [], isLoading } = useDocFileChoices(open);
   const toast = useToast();
   const q = search.trim().toLowerCase();
   const shown = choices.filter(
     (c) => !linked.has(c.id) && (!q || `${c.title} ${c.fileName} ${c.context}`.toLowerCase().includes(q)),
   );
+
+  useEffect(() => setLimit(PICKER_PAGE), [search]);
 
   return (
     <Sheet
@@ -814,7 +852,7 @@ function DocPicker({
           <EmptyState title="ไม่พบเอกสาร" description="ลองเปลี่ยนคำค้นหา หรือยังไม่มีเอกสารที่เชื่อมได้" />
         ) : (
           <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-            {shown.map((c) => (
+            {shown.slice(0, limit).map((c) => (
               <li key={c.id}>
                 <button
                   type="button"
@@ -829,80 +867,350 @@ function DocPicker({
             ))}
           </ul>
         )}
+        <ShowMore shown={Math.min(limit, shown.length)} total={shown.length} onMore={() => setLimit((n) => n + PICKER_PAGE)} />
       </div>
     </Sheet>
   );
 }
 
-/** Pick catalog subjects (รหัสวิชา) of the department to tag a บทเรียน with; stays open for several picks. */
+type TagFilter = "all" | "on" | "off";
+
+/**
+ * Tag a บทเรียน with catalog subjects (รหัสวิชา). Opens with the current tags ticked; confirming adds the
+ * newly ticked and removes the un-ticked ones in one go (same drawer shape as the timetable's วางคาบ).
+ */
 function SubjectTagPicker({
   open,
   onClose,
   departmentId,
   lessonName,
-  taggedIds,
-  onTag,
-  pending,
+  tags,
+  onApply,
 }: {
   open: boolean;
   onClose: () => void;
   departmentId: string;
   lessonName: string;
-  taggedIds: Set<string>;
-  onTag: (subjectId: string) => void;
-  pending: boolean;
+  tags: PlanLessonTag[];
+  onApply: (add: string[], remove: string[]) => Promise<boolean>;
 }) {
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<TagFilter>("all");
+  const [sort, setSort] = useState<"code" | "name">("code");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [limit, setLimit] = useState(PICKER_PAGE);
+  const { profile: me } = useAuth();
+  const orgWide = me ? isOrgWide(me.roles) : false;
+  // Only org-wide users can see more than their own department, so only they get the แผนก filter.
+  const [deptFilter, setDeptFilter] = useState(departmentId);
+  const [areaFilter, setAreaFilter] = useState("");
+  const [gradeFilter, setGradeFilter] = useState("");
+  const { data: departments = [] } = useDepartments();
+  const { data: areas = [] } = useLearningAreas();
+  const { data: allGrades = [] } = useAllGradeLevels();
   const { data: subjects = [], isLoading } = useSubjects(
-    { search, departmentId, learningAreaId: "", gradeLevelId: "", term: "", subjectType: "", includeInactive: false },
+    { search: "", departmentId: orgWide ? deptFilter : departmentId, learningAreaId: "", gradeLevelId: "", term: "", subjectType: "", includeInactive: false },
     { enabled: open },
   );
-  const shown = subjects.filter((s) => !taggedIds.has(s.id));
+  const grades = deptFilter ? allGrades.filter((g) => g.department_id === deptFilter) : allGrades;
+  const colors = useSubjectColors(allGrades);
+  // A top-level กลุ่มสาระ also matches its sub-areas (สาระย่อย).
+  const areaIds = new Set(areaFilter ? [areaFilter, ...areas.filter((a) => a.parent_id === areaFilter).map((a) => a.id)] : []);
+  const tagged = new Set(tags.map((t) => t.subject.id));
+
+  // Start from the lesson's current tags each time the drawer opens.
+  useEffect(() => {
+    if (open) setSelected(new Set(tags.map((t) => t.subject.id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seed on open only, not on every refetch
+  }, [open]);
+
+  const q = search.trim().toLowerCase();
+  const shown = subjects
+    .filter((s) => !q || s.code.toLowerCase().includes(q) || s.name_th.toLowerCase().includes(q))
+    .filter((s) => !areaFilter || areaIds.has(s.learning_area_id))
+    .filter((s) => !gradeFilter || s.suggested_grade_level_id === gradeFilter)
+    .filter((s) => filter === "all" || (filter === "on") === selected.has(s.id))
+    .sort((a, b) => (sort === "code" ? a.code.localeCompare(b.code) : a.name_th.localeCompare(b.name_th, "th")));
+  // Back to the first page whenever the list is re-filtered or re-sorted.
+  useEffect(() => setLimit(PICKER_PAGE), [search, filter, sort, areaFilter, gradeFilter, deptFilter]);
+  const chips: [TagFilter, string, number][] = [
+    ["all", "ทั้งหมด", subjects.length],
+    ["on", "เลือกแล้ว", subjects.filter((s) => selected.has(s.id)).length],
+    ["off", "ยังไม่เลือก", subjects.filter((s) => !selected.has(s.id)).length],
+  ];
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
+  async function save() {
+    const add = [...selected].filter((id) => !tagged.has(id));
+    const remove = tags.filter((t) => !selected.has(t.subject.id)).map((t) => t.linkId);
+    setSaving(true);
+    const ok = add.length + remove.length === 0 || (await onApply(add, remove));
+    setSaving(false);
+    if (ok) onClose();
+  }
+
+  const changed = selected.size !== tagged.size || [...selected].some((id) => !tagged.has(id));
 
   return (
     <Sheet
       open={open}
-      onOpenChange={(next) => {
-        if (!next) {
+      onOpenChange={(o) => {
+        if (!o) {
           setSearch("");
+          setFilter("all");
+          setAreaFilter("");
+          setGradeFilter("");
+          setDeptFilter(departmentId);
           onClose();
         }
       }}
       title="ติดแท็กรายวิชา"
       description={`เลือกรายวิชาที่เกี่ยวข้องกับบท "${lessonName}"`}
+      footer={
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground">เลือกแล้ว {selected.size} รายวิชา</p>
+          {selected.size > 0 && (
+            <button type="button" onClick={() => setSelected(new Set())} className="text-xs text-accent hover:underline">
+              ล้างการเลือก
+            </button>
+          )}
+          <div className="ml-auto flex gap-2">
+            <Button variant="outline" onClick={onClose}>
+              ยกเลิก
+            </Button>
+            <Button onClick={save} disabled={!changed || saving}>
+              {saving ? (
+                <Spinner className="h-3 w-3" />
+              ) : (
+                <>
+                  <PricetagIcon className="h-3.5 w-3.5" />
+                  บันทึกแท็ก
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      }
     >
       <div className="space-y-3">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
+            type="search"
+            className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ค้นหารหัสวิชา หรือชื่อวิชา..."
-            className="pl-9"
             aria-label="ค้นหารายวิชา"
           />
         </div>
+
+        <div className="scrollbar-hidden -mx-1 flex gap-2 overflow-x-auto px-1 py-1">
+          {chips.map(([key, label, n]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key)}
+              className={cn(
+                "shrink-0 rounded-full border px-3.5 py-1.5 text-xs transition-colors",
+                filter === key
+                  ? "border-accent bg-accent/10 font-medium text-accent"
+                  : "border-transparent bg-muted text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label} ({n})
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {orgWide && (
+            <Select
+              className="w-full"
+              value={deptFilter}
+              onChange={(e) => {
+                setDeptFilter(e.target.value);
+                setGradeFilter("");
+              }}
+              aria-label="แผนก"
+              placeholder="ทุกแผนก"
+            >
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </Select>
+          )}
+          <Select
+            className="w-full"
+            value={areaFilter}
+            onChange={(e) => setAreaFilter(e.target.value)}
+            aria-label="กลุ่มสาระ"
+            placeholder="ทุกกลุ่มสาระ"
+          >
+            {areas
+              .filter((a) => !a.parent_id)
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+          </Select>
+          <Select
+            className="w-full"
+            value={gradeFilter}
+            onChange={(e) => setGradeFilter(e.target.value)}
+            aria-label="ระดับชั้น"
+            placeholder="ทุกระดับชั้น"
+          >
+            {grades.map((g) => (
+              <option key={g.id} value={g.id}>
+                {gradeShortLabel(g.code)}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <Select className="w-full" value={sort} onChange={(e) => setSort(e.target.value as "code" | "name")} aria-label="เรียงลำดับ">
+          <option value="code">เรียงตาม รหัสวิชา</option>
+          <option value="name">เรียงตาม ชื่อวิชา</option>
+        </Select>
+
         {isLoading ? (
           <Skeleton className="h-32 w-full" />
-        ) : shown.length === 0 ? (
-          <EmptyState title="ไม่พบรายวิชา" description="ลองเปลี่ยนคำค้นหา" />
         ) : (
-          <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-            {shown.map((s) => (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => onTag(s.id)}
-                  className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-xs hover:bg-muted"
-                >
-                  <span className="font-mono font-medium uppercase">{s.code}</span>
-                  <span className="min-w-0 flex-1 truncate text-muted-foreground">{s.name_th}</span>
-                </button>
-              </li>
-            ))}
+          <ul className="space-y-2">
+            {shown.slice(0, limit).map((s) => {
+              const checked = selected.has(s.id);
+              const grade = grades.find((g) => g.id === s.suggested_grade_level_id);
+              return (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(s.id)}
+                    aria-pressed={checked}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors",
+                      checked ? "border-accent/50 bg-accent/5" : "border-border hover:bg-muted/50",
+                    )}
+                  >
+                    {checked ? (
+                      <CheckboxIcon className="h-5 w-5 shrink-0 text-accent" />
+                    ) : (
+                      <SquareIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    )}
+                    <span
+                      className={cn(
+                        "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+                        colors.shade(s.learning_area_id, s.suggested_grade_level_id),
+                      )}
+                    >
+                      <BookIcon className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1 font-sarabun leading-tight">
+                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        {s.code}
+                        <span className={cn("rounded-full px-1.5 py-px text-[10px]", SUBJECT_TYPE_BADGE[s.subject_type])}>
+                          {SUBJECT_TYPE_LABEL[s.subject_type]}
+                        </span>
+                      </p>
+                      <p className="truncate text-sm font-medium text-foreground">{s.name_th}</p>
+                      {grade && <p className="truncate text-xs text-muted-foreground">{gradeShortLabel(grade.code)}</p>}
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+            {shown.length === 0 && (
+              <li className="py-8 text-center text-sm text-muted-foreground">ไม่พบรายวิชาที่ตรงเงื่อนไข</li>
+            )}
           </ul>
         )}
+        <ShowMore shown={Math.min(limit, shown.length)} total={shown.length} onMore={() => setLimit((n) => n + PICKER_PAGE)} />
+      </div>
+    </Sheet>
+  );
+}
+
+function SubjectTile({ subject }: { subject: { color: string | null; icon: string | null } }) {
+  const Icon = planIconFor(subject.icon);
+  return (
+    <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", planTileClass(subject.color))}>
+      <Icon className="h-6 w-6" />
+    </div>
+  );
+}
+
+/** Pick the tile colour and icon of a plan subject; saves on every click, live preview in the header. */
+function StyleSheet({ open, onClose, subject }: { open: boolean; onClose: () => void; subject: PlanSubjectSummary }) {
+  const style = useStylePlanSubject();
+  const toast = useToast();
+  const save = (color: string | null, icon: string | null) =>
+    style.mutate({ id: subject.id, color, icon }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") });
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title="สีและไอคอน"
+      description={`ตั้งค่าการแสดงผลของวิชา "${subject.name}"`}
+    >
+      <div className="space-y-5">
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold">สีพื้นหลัง</h3>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              aria-label="สีเริ่มต้น"
+              aria-pressed={subject.color === null}
+              onClick={() => save(null, subject.icon)}
+              className={cn("h-9 w-9 rounded-xl bg-muted ring-offset-2 ring-offset-background", subject.color === null && "ring-2 ring-foreground")}
+            />
+            {PLAN_HUES.map((h: AreaHue) => (
+              <button
+                key={h}
+                type="button"
+                aria-label={`สี ${h}`}
+                aria-pressed={subject.color === h}
+                onClick={() => save(h, subject.icon)}
+                className={cn(
+                  "h-9 w-9 rounded-xl ring-offset-2 ring-offset-background",
+                  subjectShade(h, 1),
+                  subject.color === h && "ring-2 ring-foreground",
+                )}
+              />
+            ))}
+          </div>
+        </section>
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold">ไอคอน</h3>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(PLAN_ICONS).map(([key, Icon]) => (
+              <button
+                key={key}
+                type="button"
+                aria-label={`ไอคอน ${key}`}
+                aria-pressed={(subject.icon ?? "book") === key}
+                onClick={() => save(subject.color, key)}
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-xl border border-border hover:bg-muted",
+                  (subject.icon ?? "book") === key && "border-foreground bg-muted",
+                )}
+              >
+                <Icon className="h-5 w-5" />
+              </button>
+            ))}
+          </div>
+        </section>
       </div>
     </Sheet>
   );

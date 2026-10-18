@@ -92,6 +92,10 @@ export const useCreatePlanSubject = () =>
   useWrite((v: { department_id: string; name: string }) => supabase.from("plan_subjects").insert(v));
 export const useRenamePlanSubject = () =>
   useWrite((v: { id: string; name: string }) => supabase.from("plan_subjects").update({ name: v.name }).eq("id", v.id));
+export const useStylePlanSubject = () =>
+  useWrite((v: { id: string; color: string | null; icon: string | null }) =>
+    supabase.from("plan_subjects").update({ color: v.color, icon: v.icon }).eq("id", v.id),
+  );
 export const useDeletePlanSubject = () =>
   useWrite((id: string) => supabase.from("plan_subjects").delete().eq("id", id));
 
