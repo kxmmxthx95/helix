@@ -213,7 +213,15 @@ export function useImportPlan(departmentId: string) {
 
 // ---------------------------------------------------------------- doc links
 
-export type DocFileChoice = { id: string; title: string; fileName: string; context: string };
+export type DocFileChoice = {
+  id: string;
+  title: string;
+  fileName: string;
+  /** "รหัส ชื่อวิชา" / grade code / บทเรียน — "" when the document's lesson is not readable. */
+  subjectLabel: string;
+  gradeCode: string;
+  lessonName: string;
+};
 
 /** Every document the viewer can read, flattened with "วิชา · ชั้น · บทเรียน" context, for the link picker. */
 export function useDocFileChoices(enabled: boolean) {
@@ -237,9 +245,9 @@ export function useDocFileChoices(enabled: boolean) {
         id: f.id,
         title: f.title,
         fileName: f.file_name,
-        context: [f.doc_lessons?.subjects && `${f.doc_lessons.subjects.code} ${f.doc_lessons.subjects.name_th}`, f.doc_lessons?.grade_levels?.code, f.doc_lessons?.name]
-          .filter(Boolean)
-          .join(" · "),
+        subjectLabel: f.doc_lessons?.subjects ? `${f.doc_lessons.subjects.code} ${f.doc_lessons.subjects.name_th}` : "",
+        gradeCode: f.doc_lessons?.grade_levels?.code ?? "",
+        lessonName: f.doc_lessons?.name ?? "",
       }));
     },
   });

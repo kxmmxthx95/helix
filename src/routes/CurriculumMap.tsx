@@ -638,9 +638,19 @@ function LessonCard({
           open={picking}
           onClose={() => setPicking(false)}
           title={lesson.name}
-          linkedIds={linkedIds(lesson.files)}
-          onLink={(docFileId, done) => linkFile.mutate({ lesson_id: lesson.id, doc_file_id: docFileId }, done)}
-          pending={linkFile.isPending}
+          files={lesson.files}
+          onApply={async (add, remove) => {
+            try {
+              await Promise.all([
+                ...add.map((doc_file_id) => linkFile.mutateAsync({ lesson_id: lesson.id, doc_file_id })),
+                ...remove.map((linkId) => unlinkFile.mutateAsync(linkId)),
+              ]);
+              return true;
+            } catch {
+              toast("บันทึกเอกสารไม่สำเร็จ", "error");
+              return false;
+            }
+          }}
         />
       )}
 
@@ -704,6 +714,7 @@ function TopicRow({
   const [picking, setPicking] = useState(false);
   const unlink = useUnlinkPlanFile();
   const link = useLinkPlanFile();
+  const toast = useToast();
 
   return (
     <li className="flex flex-col gap-1 py-1 text-xs">
@@ -739,16 +750,25 @@ function TopicRow({
           open={picking}
           onClose={() => setPicking(false)}
           title={topic.name}
-          linkedIds={linkedIds(topic.files)}
-          onLink={(docFileId, done) => link.mutate({ topic_id: topic.id, doc_file_id: docFileId }, done)}
-          pending={link.isPending}
+          files={topic.files}
+          onApply={async (add, remove) => {
+            try {
+              await Promise.all([
+                ...add.map((doc_file_id) => link.mutateAsync({ topic_id: topic.id, doc_file_id })),
+                ...remove.map((linkId) => unlink.mutateAsync(linkId)),
+              ]);
+              return true;
+            } catch {
+              toast("บันทึกเอกสารไม่สำเร็จ", "error");
+              return false;
+            }
+          }}
         />
       )}
     </li>
   );
 }
 
-const linkedIds = (files: PlanLinkedFile[]) => new Set(files.flatMap((f) => (f.file ? [f.file.id] : [])));
 type Done = { onSuccess?: () => void; onError?: () => void };
 
 /** Linked-file chips under a บทเรียน or หัวข้อ; unreadable files show as a muted placeholder (doc_files RLS). */
@@ -797,31 +817,77 @@ function LinkedFiles({
   );
 }
 
+/**
+ * Link uploaded documents to a บทเรียน/หัวข้อ. Same drawer shape as the subject-tag picker: opens with the
+ * current links ticked, confirming adds the newly ticked and removes the un-ticked in one go. Links the viewer
+ * cannot read (no choice row) are left alone.
+ */
 function DocPicker({
   open,
   onClose,
   title,
-  linkedIds: linked,
-  onLink,
-  pending,
+  files,
+  onApply,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
-  linkedIds: Set<string>;
-  onLink: (docFileId: string, done: Done) => void;
-  pending: boolean;
+  files: PlanLinkedFile[];
+  onApply: (add: string[], remove: string[]) => Promise<boolean>;
 }) {
   const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<TagFilter>("all");
+  const [subjectFilter, setSubjectFilter] = useState("");
+  const [gradeFilter, setGradeFilter] = useState("");
+  const [sort, setSort] = useState<"new" | "name">("new");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
   const [limit, setLimit] = useState(PICKER_PAGE);
   const { data: choices = [], isLoading } = useDocFileChoices(open);
-  const toast = useToast();
-  const q = search.trim().toLowerCase();
-  const shown = choices.filter(
-    (c) => !linked.has(c.id) && (!q || `${c.title} ${c.fileName} ${c.context}`.toLowerCase().includes(q)),
-  );
 
-  useEffect(() => setLimit(PICKER_PAGE), [search]);
+  const linked = new Map(files.flatMap((f) => (f.file ? [[f.file.id, f.linkId] as const] : [])));
+
+  // Start from the current links each time the drawer opens.
+  useEffect(() => {
+    if (open) setSelected(new Set(linked.keys()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seed on open only, not on every refetch
+  }, [open]);
+  useEffect(() => setLimit(PICKER_PAGE), [search, filter, subjectFilter, gradeFilter, sort]);
+
+  const subjectOptions = [...new Set(choices.map((c) => c.subjectLabel).filter(Boolean))].sort((a, b) => a.localeCompare(b, "th"));
+  const gradeOptions = [...new Set(choices.map((c) => c.gradeCode).filter(Boolean))].sort();
+  const q = search.trim().toLowerCase();
+  const shown = choices
+    .filter((c) => !q || `${c.title} ${c.fileName} ${c.subjectLabel} ${c.lessonName}`.toLowerCase().includes(q))
+    .filter((c) => !subjectFilter || c.subjectLabel === subjectFilter)
+    .filter((c) => !gradeFilter || c.gradeCode === gradeFilter)
+    .filter((c) => filter === "all" || (filter === "on") === selected.has(c.id));
+  if (sort === "name") shown.sort((a, b) => a.title.localeCompare(b.title, "th"));
+  const chips: [TagFilter, string, number][] = [
+    ["all", "ทั้งหมด", choices.length],
+    ["on", "เลือกแล้ว", choices.filter((c) => selected.has(c.id)).length],
+    ["off", "ยังไม่เลือก", choices.filter((c) => !selected.has(c.id)).length],
+  ];
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
+  async function save() {
+    const add = [...selected].filter((id) => !linked.has(id));
+    const remove = [...linked].filter(([id]) => !selected.has(id)).map(([, linkId]) => linkId);
+    setSaving(true);
+    const ok = add.length + remove.length === 0 || (await onApply(add, remove));
+    setSaving(false);
+    if (ok) onClose();
+  }
+
+  const changed = selected.size !== linked.size || [...selected].some((id) => !linked.has(id));
+  const ext = (name: string) => (name.includes(".") ? name.split(".").pop()!.toUpperCase().slice(0, 4) : "FILE");
 
   return (
     <Sheet
@@ -829,42 +895,131 @@ function DocPicker({
       onOpenChange={(next) => {
         if (!next) {
           setSearch("");
+          setFilter("all");
+          setSubjectFilter("");
+          setGradeFilter("");
           onClose();
         }
       }}
       title="เชื่อมเอกสาร"
       description={`เลือกเอกสารที่ครูอัปโหลดมาเชื่อมกับ "${title}"`}
+      footer={
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground">เลือกแล้ว {selected.size} เอกสาร</p>
+          {selected.size > 0 && (
+            <button type="button" onClick={() => setSelected(new Set())} className="text-xs text-accent hover:underline">
+              ล้างการเลือก
+            </button>
+          )}
+          <div className="ml-auto flex gap-2">
+            <Button variant="outline" onClick={onClose}>
+              ยกเลิก
+            </Button>
+            <Button onClick={save} disabled={!changed || saving}>
+              {saving ? (
+                <Spinner className="h-3 w-3" />
+              ) : (
+                <>
+                  <LinkIcon className="h-3.5 w-3.5" />
+                  บันทึกเอกสาร
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      }
     >
       <div className="space-y-3">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
+            type="search"
+            className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ค้นหาชื่อเอกสาร วิชา หรือบทเรียน..."
-            className="pl-9"
             aria-label="ค้นหาเอกสาร"
           />
         </div>
+
+        <div className="scrollbar-hidden -mx-1 flex gap-2 overflow-x-auto px-1 py-1">
+          {chips.map(([key, label, n]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key)}
+              className={cn(
+                "shrink-0 rounded-full border px-3.5 py-1.5 text-xs transition-colors",
+                filter === key
+                  ? "border-accent bg-accent/10 font-medium text-accent"
+                  : "border-transparent bg-muted text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label} ({n})
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Select className="w-full" value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)} aria-label="วิชา" placeholder="ทุกวิชา">
+            {subjectOptions.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </Select>
+          <Select className="w-full" value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)} aria-label="ระดับชั้น" placeholder="ทุกระดับชั้น">
+            {gradeOptions.map((o) => (
+              <option key={o} value={o}>
+                {gradeShortLabel(o)}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <Select className="w-full" value={sort} onChange={(e) => setSort(e.target.value as "new" | "name")} aria-label="เรียงลำดับ">
+          <option value="new">เรียงตาม ล่าสุด</option>
+          <option value="name">เรียงตาม ชื่อเอกสาร</option>
+        </Select>
+
         {isLoading ? (
           <Skeleton className="h-32 w-full" />
-        ) : shown.length === 0 ? (
-          <EmptyState title="ไม่พบเอกสาร" description="ลองเปลี่ยนคำค้นหา หรือยังไม่มีเอกสารที่เชื่อมได้" />
         ) : (
-          <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-            {shown.slice(0, limit).map((c) => (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => onLink(c.id, { onSuccess: onClose, onError: () => toast("เชื่อมไม่สำเร็จ", "error") })}
-                  className="flex w-full flex-col gap-0.5 px-3 py-2 text-left text-xs hover:bg-muted"
-                >
-                  <span className="font-medium">{c.title}</span>
-                  <span className="text-[11px] text-muted-foreground">{c.context || c.fileName}</span>
-                </button>
-              </li>
-            ))}
+          <ul className="space-y-2">
+            {shown.slice(0, limit).map((c) => {
+              const checked = selected.has(c.id);
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(c.id)}
+                    aria-pressed={checked}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors",
+                      checked ? "border-accent/50 bg-accent/5" : "border-border hover:bg-muted/50",
+                    )}
+                  >
+                    {checked ? (
+                      <CheckboxIcon className="h-5 w-5 shrink-0 text-accent" />
+                    ) : (
+                      <SquareIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    )}
+                    <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-muted">
+                      <DocumentTextIcon className="h-4 w-4" />
+                      <span className="text-[9px] font-medium text-muted-foreground">{ext(c.fileName)}</span>
+                    </span>
+                    <div className="min-w-0 flex-1 font-sarabun leading-tight">
+                      <p className="truncate text-sm font-medium text-foreground">{c.title}</p>
+                      <p className="truncate text-xs text-muted-foreground">{c.subjectLabel || c.fileName}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {[c.gradeCode && gradeShortLabel(c.gradeCode), c.lessonName].filter(Boolean).join(" · ")}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+            {shown.length === 0 && (
+              <li className="py-8 text-center text-sm text-muted-foreground">ไม่พบเอกสารที่ตรงเงื่อนไข</li>
+            )}
           </ul>
         )}
         <ShowMore shown={Math.min(limit, shown.length)} total={shown.length} onMore={() => setLimit((n) => n + PICKER_PAGE)} />
