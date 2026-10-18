@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { AppsIcon, BookIcon, CheckboxIcon, ChevronForward, ClipboardIcon, DocumentTextIcon, LibraryIcon, LinkIcon, ListIcon, PaletteIcon, Plus, PricetagIcon, PrintIcon, Search, SquareIcon, Upload, X } from "@/components/icons";
 import { ImportPlanSheet } from "@/components/ImportPlanSheet";
+import { FileTile } from "@/components/FileTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Input, Select, Skeleton, Spinner } from "@/components/ui";
@@ -921,7 +922,6 @@ function DocPicker({
   }
 
   const changed = selected.size !== linked.size || [...selected].some((id) => !linked.has(id));
-  const ext = (name: string) => (name.includes(".") ? name.split(".").pop()!.toUpperCase().slice(0, 4) : "FILE");
 
   return (
     <Sheet
@@ -1036,10 +1036,7 @@ function DocPicker({
                     ) : (
                       <SquareIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
                     )}
-                    <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-muted">
-                      <DocumentTextIcon className="h-4 w-4" />
-                      <span className="text-[9px] font-medium text-muted-foreground">{ext(c.fileName)}</span>
-                    </span>
+                    <FileTile fileName={c.fileName} />
                     <div className="min-w-0 flex-1 font-sarabun leading-tight">
                       <p className="truncate text-sm font-medium text-foreground">{c.title}</p>
                       <p className="truncate text-xs text-muted-foreground">{c.subjectLabel || c.fileName}</p>

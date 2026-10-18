@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { CheckboxIcon, DocumentTextIcon, Plus, PrintIcon, Search, SquareIcon, X } from "@/components/icons";
+import { FileTile } from "@/components/FileTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, EmptyState, Input, Select, Skeleton, Spinner } from "@/components/ui";
@@ -140,9 +141,7 @@ function RequestRow({ request: r, mayRequest }: { request: PrintRequestRow; mayR
   return (
     <li className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3">
       <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted">
-          <DocumentTextIcon className="h-5 w-5" />
-        </span>
+        <FileTile fileName={r.file?.file_name ?? ""} />
         <div className="min-w-0 flex-1 font-sarabun leading-tight">
           <p className="truncate text-sm font-medium">{r.file?.title ?? "ไม่มีสิทธิ์ดูไฟล์นี้"}</p>
           <p className="truncate text-xs text-muted-foreground">
@@ -230,7 +229,6 @@ function RequestRow({ request: r, mayRequest }: { request: PrintRequestRow; mayR
 /** Pick uploaded documents to queue; same drawer shape as the curriculum map's document picker. */
 function AddDrawer({ open, onClose, queuedIds }: { open: boolean; onClose: () => void; queuedIds: Set<string> }) {
   const [search, setSearch] = useState("");
-  const [subjectFilter, setSubjectFilter] = useState("");
   const [gradeFilter, setGradeFilter] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [areaFilter, setAreaFilter] = useState("");
@@ -248,23 +246,20 @@ function AddDrawer({ open, onClose, queuedIds }: { open: boolean; onClose: () =>
   useEffect(() => {
     if (open) setSelected(new Set());
   }, [open]);
-  useEffect(() => setLimit(PAGE), [search, subjectFilter, gradeFilter, deptFilter, areaFilter]);
+  useEffect(() => setLimit(PAGE), [search, gradeFilter, deptFilter, areaFilter]);
 
   // A top-level กลุ่มสาระ also matches its sub-areas (สาระย่อย).
   const areaIds = new Set(areaFilter ? [areaFilter, ...areas.filter((a) => a.parent_id === areaFilter).map((a) => a.id)] : []);
   const available = choices.filter((c) => !queuedIds.has(c.id));
-  // Subject / grade options follow the แผนก and กลุ่มสาระ picked above them.
+  // Grade options follow the แผนก and กลุ่มสาระ picked above them.
   const scoped = available
     .filter((c) => !deptFilter || c.departmentId === deptFilter)
     .filter((c) => !areaFilter || areaIds.has(c.areaId));
-  const subjectOptions = [...new Set(scoped.map((c) => c.subjectLabel).filter(Boolean))].sort((a, b) => a.localeCompare(b, "th"));
   const gradeOptions = [...new Set(scoped.map((c) => c.gradeCode).filter(Boolean))].sort();
   const q = search.trim().toLowerCase();
   const shown = scoped
     .filter((c) => !q || `${c.title} ${c.fileName} ${c.subjectLabel} ${c.lessonName}`.toLowerCase().includes(q))
-    .filter((c) => !subjectFilter || c.subjectLabel === subjectFilter)
     .filter((c) => !gradeFilter || c.gradeCode === gradeFilter);
-  const ext = (name: string) => (name.includes(".") ? name.split(".").pop()!.toUpperCase().slice(0, 4) : "FILE");
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -290,7 +285,6 @@ function AddDrawer({ open, onClose, queuedIds }: { open: boolean; onClose: () =>
       onOpenChange={(o) => {
         if (!o) {
           setSearch("");
-          setSubjectFilter("");
           setGradeFilter("");
           setDeptFilter("");
           setAreaFilter("");
@@ -344,7 +338,6 @@ function AddDrawer({ open, onClose, queuedIds }: { open: boolean; onClose: () =>
               value={deptFilter}
               onChange={(e) => {
                 setDeptFilter(e.target.value);
-                setSubjectFilter("");
                 setGradeFilter("");
               }}
               aria-label="แผนก"
@@ -362,7 +355,6 @@ function AddDrawer({ open, onClose, queuedIds }: { open: boolean; onClose: () =>
             value={areaFilter}
             onChange={(e) => {
               setAreaFilter(e.target.value);
-              setSubjectFilter("");
               setGradeFilter("");
             }}
             aria-label="กลุ่มสาระ"
@@ -375,13 +367,6 @@ function AddDrawer({ open, onClose, queuedIds }: { open: boolean; onClose: () =>
                   {a.name}
                 </option>
               ))}
-          </Select>
-          <Select className="w-full" value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)} aria-label="วิชา" placeholder="ทุกวิชา">
-            {subjectOptions.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
           </Select>
           <Select className="w-full" value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)} aria-label="ระดับชั้น" placeholder="ทุกระดับชั้น">
             {gradeOptions.map((o) => (
@@ -414,10 +399,7 @@ function AddDrawer({ open, onClose, queuedIds }: { open: boolean; onClose: () =>
                     ) : (
                       <SquareIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
                     )}
-                    <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl bg-muted">
-                      <DocumentTextIcon className="h-4 w-4" />
-                      <span className="text-[9px] font-medium text-muted-foreground">{ext(c.fileName)}</span>
-                    </span>
+                    <FileTile fileName={c.fileName} />
                     <div className="min-w-0 flex-1 font-sarabun leading-tight">
                       <p className="truncate text-sm font-medium text-foreground">{c.title}</p>
                       <p className="truncate text-xs text-muted-foreground">{c.subjectLabel || c.fileName}</p>
