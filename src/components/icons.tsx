@@ -56,6 +56,7 @@ import HomeOutline from "react-ionicons/lib/HomeOutline";
 import Key from "react-ionicons/lib/Key";
 import LibraryOutline from "react-ionicons/lib/LibraryOutline";
 import IonLogOut from "react-ionicons/lib/LogOut";
+import ReorderTwoOutline from "react-ionicons/lib/ReorderTwoOutline";
 import MenuOutline from "react-ionicons/lib/MenuOutline";
 import IonMoon from "react-ionicons/lib/Moon";
 import NotificationsOutline from "react-ionicons/lib/NotificationsOutline";
@@ -110,6 +111,7 @@ function wrap(Ion: (props: Record<string, unknown>) => React.JSX.Element) {
 export const CloudOff = wrap(CloudOffline);
 export const LayoutDashboard = wrap(GridOutline);
 export const LogOut = wrap(IonLogOut);
+export const GripIcon = wrap(ReorderTwoOutline);
 export const MenuIcon = wrap(MenuOutline);
 export const ProfileIcon = wrap(PersonCircleOutline);
 export const Moon = wrap(IonMoon);

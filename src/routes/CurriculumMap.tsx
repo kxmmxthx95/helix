@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { AppsIcon, BookIcon, CheckboxIcon, ChevronForward, ClipboardIcon, DocumentTextIcon, LibraryIcon, LinkIcon, ListIcon, PaletteIcon, Plus, PricetagIcon, PrintIcon, Search, SquareIcon, Upload, X } from "@/components/icons";
+import { AppsIcon, BookIcon, CheckboxIcon, ChevronForward, ClipboardIcon, DocumentTextIcon, GripIcon, LibraryIcon, LinkIcon, ListIcon, PaletteIcon, Plus, PricetagIcon, PrintIcon, Search, SquareIcon, Upload, X } from "@/components/icons";
 import { ImportPlanSheet } from "@/components/ImportPlanSheet";
 import { FileTile } from "@/components/FileTile";
 import { Sheet } from "@/components/Sheet";
@@ -31,6 +31,7 @@ import {
   useRenamePlanLesson,
   useRenamePlanSubject,
   useRenamePlanTopic,
+  useReorderPlanTopics,
   type PlanLessonNode,
   type PlanLessonTag,
   type PlanLinkedFile,
@@ -537,6 +538,9 @@ function LessonCard({
   const [picking, setPicking] = useState(false);
   const [tagging, setTagging] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [open, setOpen] = useState(true);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const reorder = useReorderPlanTopics();
   const tag = useTagPlanLesson();
   const untag = useUntagPlanLesson();
   const toast = useToast();
@@ -555,6 +559,13 @@ function LessonCard({
     removeLesson.mutate(lesson.id, { onError: fail("ลบไม่สำเร็จ") });
   }
 
+  function dropOn(targetId: string) {
+    if (!dragId || dragId === targetId) return;
+    const ids = lesson.topics.map((t) => t.id).filter((id) => id !== dragId);
+    ids.splice(ids.indexOf(targetId) + (lesson.topics.findIndex((t) => t.id === dragId) < lesson.topics.findIndex((t) => t.id === targetId) ? 1 : 0), 0, dragId);
+    reorder.mutate(ids, { onError: fail("จัดลำดับไม่สำเร็จ") });
+  }
+
   function addTopic() {
     const n = title.trim();
     if (!n) return;
@@ -567,6 +578,15 @@ function LessonCard({
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm">
       <div className="flex items-center gap-3 p-3">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-label={`${open ? "หุบ" : "ขยาย"}บทเรียน ${lesson.name}`}
+          onClick={() => setOpen(!open)}
+          className="-mr-1 shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <ChevronForward className={cn("h-4 w-4 transition-transform", open && "rotate-90")} />
+        </button>
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-bold text-accent">
           {index + 1}
         </span>
@@ -642,7 +662,7 @@ function LessonCard({
         )}
       </div>
 
-      {lesson.files.length > 0 && (
+      {open && lesson.files.length > 0 && (
         <div className="px-3 pb-2">
           <LinkedFiles files={lesson.files} mayEdit={mayEdit} onUnlink={(id, done) => unlinkFile.mutate(id, done)} />
         </div>
@@ -689,6 +709,7 @@ function LessonCard({
         />
       )}
 
+      {open && (
       <div className="flex flex-col gap-1 border-t border-border px-3 py-2">
         {lesson.topics.length === 0 && <p className="py-1 text-[11px] text-muted-foreground">ยังไม่มีหัวข้อ</p>}
         <ol className="flex flex-col">
@@ -703,6 +724,10 @@ function LessonCard({
                 if (confirm(`ลบหัวข้อ "${t.name}"?`)) removeTopic.mutate(t.id, { onError: fail("ลบไม่สำเร็จ") });
               }}
               deleting={removeTopic.isPending}
+              dragging={dragId === t.id}
+              onDragStart={() => setDragId(t.id)}
+              onDragEnd={() => setDragId(null)}
+              onDrop={() => dropOn(t.id)}
             />
           ))}
         </ol>
@@ -727,6 +752,7 @@ function LessonCard({
           </form>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -738,7 +764,15 @@ function TopicRow({
   onRename,
   onDelete,
   deleting,
+  dragging,
+  onDragStart,
+  onDragEnd,
+  onDrop,
 }: {
+  dragging: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onDrop: () => void;
   topic: PlanTopicNode;
   label: string;
   mayEdit: boolean;
@@ -752,8 +786,30 @@ function TopicRow({
   const toast = useToast();
 
   return (
-    <li className="flex flex-col gap-1 py-1 text-xs">
+    <li
+      className={cn("flex flex-col gap-1 py-1 text-xs", dragging && "opacity-40")}
+      onDragOver={(e) => mayEdit && e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop();
+      }}
+    >
       <div className="flex items-center gap-2">
+        {mayEdit && (
+          <span
+            draggable
+            aria-label={`ลากเพื่อสลับลำดับหัวข้อ ${topic.name}`}
+            onDragStart={(e) => {
+              const row = e.currentTarget.closest("li");
+              if (row) e.dataTransfer.setDragImage(row, 0, 0);
+              onDragStart();
+            }}
+            onDragEnd={onDragEnd}
+            className="-mr-1 shrink-0 cursor-grab text-muted-foreground hover:text-foreground active:cursor-grabbing"
+          >
+            <GripIcon className="h-4 w-4" />
+          </span>
+        )}
         <span className="w-9 shrink-0 text-left tabular-nums text-muted-foreground">{label}</span>
         <span className="min-w-0 flex-1 truncate">{topic.name}</span>
         {mayEdit && (
