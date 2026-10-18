@@ -533,6 +533,31 @@ export type LearningUnit = {
   updated_at: string;
 };
 
+/** ผังการเรียน — วิชา -> ระดับชั้น -> บทเรียน -> หัวข้อ, independent of the subject catalog. See migration 0088. */
+export type PlanSubject = { id: string; department_id: string; name: string; created_at: string; updated_at: string };
+export type PlanLesson = {
+  id: string;
+  subject_id: string;
+  grade_level_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+export type PlanTopic = {
+  id: string;
+  lesson_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Link from a ผังการเรียน หัวข้อ to an uploaded document. See migration 0089. */
+export type PlanTopicFile = { id: string; topic_id: string; doc_file_id: string; created_at: string };
+export type PlanLessonSubject = { id: string; lesson_id: string; subject_id: string; created_at: string };
+export type PlanLessonFile = { id: string; lesson_id: string; doc_file_id: string; created_at: string };
+
 /** KG หัวข้อการประเมินพัฒนาการ, grouped under one of the 4 fixed domains. */
 export type KgAssessmentTopic = {
   id: string;
@@ -1440,6 +1465,12 @@ export type Database = {
         InsertOf<ExamAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
       >;
       exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
+      plan_subjects: Table<PlanSubject, InsertOf<PlanSubject, never>>;
+      plan_lessons: Table<PlanLesson, InsertOf<PlanLesson, "sort_order">>;
+      plan_lesson_subjects: Table<PlanLessonSubject, InsertOf<PlanLessonSubject, never>>;
+      plan_lesson_files: Table<PlanLessonFile, InsertOf<PlanLessonFile, never>>;
+      plan_topic_files: Table<PlanTopicFile, InsertOf<PlanTopicFile, never>>;
+      plan_topics: Table<PlanTopic, InsertOf<PlanTopic, "sort_order">>;
       doc_lessons: Table<DocLesson, InsertOf<DocLesson, "sort_order" | "created_by" | "created_at" | "updated_at">>;
       doc_targets: Table<DocTarget, InsertOf<DocTarget, "id" | "lesson_target" | "topic_target" | "updated_at">>;
       doc_topics: Table<DocTopic, InsertOf<DocTopic, "sort_order" | "created_at" | "updated_at">>;

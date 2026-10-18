@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import {
   AppsIcon,
@@ -71,8 +70,7 @@ export function Documents() {
   return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
 }
 
-/** Subjects a teacher/manager may browse: a teacher's own, or the department's (every department for org-wide managers). */
-export function useBrowsableSubjects() {
+function TeacherDocuments() {
   const { profile: me } = useAuth();
   const isManager = canManage(me!.roles);
   const orgWide = isOrgWide(me!.roles);
@@ -90,22 +88,7 @@ export function useBrowsableSubjects() {
     },
     { enabled: isManager },
   );
-  return { subjects: isManager ? managerSubjects : teacherSubjects, showDepartments: isManager && orgWide };
-}
-
-function TeacherDocuments() {
-  const { profile: me } = useAuth();
-  const [params] = useSearchParams();
-  const { subjects, showDepartments } = useBrowsableSubjects();
-  const browser = (
-    <DocBrowser
-      subjects={subjects}
-      canEdit
-      showDepartments={showDepartments}
-      initialSubjectId={params.get("subject") ?? undefined}
-      initialGradeId={params.get("grade") ?? undefined}
-    />
-  );
+  const browser = <DocBrowser subjects={isManager ? managerSubjects : teacherSubjects} canEdit showDepartments={isManager && orgWide} />;
 
   // งานเอกสาร tabs: reviewers (super_admin / director / dept_head) track progress, teachers answer their tasks.
   const tabs = [
@@ -120,8 +103,7 @@ function TeacherDocuments() {
     ...(me!.roles.includes("teacher") ? [{ id: "mine", label: "งานของฉัน", icon: ClipboardIcon }] : []),
   ];
   // First tab is the landing one: progress overview for reviewers, documents list for everyone else.
-  // A deep link from ผังการเรียน (?subject=) lands straight on the document browser.
-  const [tab, setTab] = useState(params.has("subject") ? "docs" : tabs[0]!.id);
+  const [tab, setTab] = useState(tabs[0]!.id);
   if (tabs.length === 1) return browser;
   return (
     <div className="space-y-4">
@@ -200,26 +182,19 @@ function StudentDocBrowser({ studentId }: { studentId: string }) {
 type SortKey = "az" | "za" | "files";
 
 /** Landing: banner, search + grade filter, subject cards (grid/list). Opening a card goes to SubjectDocs. `fixedGradeLevelId` (students) pins the grade. */
-export function DocBrowser({
+function DocBrowser({
   subjects,
   canEdit,
   fixedGradeLevelId,
   showDepartments = false,
-  initialSubjectId,
-  initialGradeId,
-  renderSubject,
 }: {
   subjects: Subject[];
   canEdit: boolean;
   fixedGradeLevelId?: string | null;
   /** Org-wide managers only — adds the แผนก filter. */
   showDepartments?: boolean;
-  initialSubjectId?: string;
-  initialGradeId?: string;
-  /** Replaces the per-subject document view (ผังการเรียน reuses this landing for its own subject view). */
-  renderSubject?: (subject: Subject, onBack: () => void) => React.ReactNode;
 }) {
-  const [openId, setOpenId] = useState(initialSubjectId ?? "");
+  const [openId, setOpenId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [search, setSearch] = useState("");
   const [gradeCode, setGradeCode] = useState("");
@@ -272,15 +247,8 @@ export function DocBrowser({
 
   const open = subjects.find((s) => s.id === openId) ?? null;
   if (open) {
-    if (renderSubject) return <>{renderSubject(open, () => setOpenId(""))}</>;
     return (
-      <SubjectDocs
-        subject={open}
-        canEdit={canEdit}
-        fixedGradeLevelId={fixedGradeLevelId}
-        initialGradeId={initialGradeId}
-        onBack={() => setOpenId("")}
-      />
+      <SubjectDocs subject={open} canEdit={canEdit} fixedGradeLevelId={fixedGradeLevelId} onBack={() => setOpenId("")} />
     );
   }
 
@@ -496,16 +464,14 @@ function SubjectDocs({
   subject,
   canEdit,
   fixedGradeLevelId,
-  initialGradeId,
   onBack,
 }: {
   subject: Subject;
   canEdit: boolean;
   fixedGradeLevelId?: string | null;
-  initialGradeId?: string;
   onBack: () => void;
 }) {
-  const [pickedGradeId, setPickedGradeId] = useState(initialGradeId ?? "");
+  const [pickedGradeId, setPickedGradeId] = useState("");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<LessonSort>("order");
   const [view, setView] = useState<"list" | "grid">("list");
