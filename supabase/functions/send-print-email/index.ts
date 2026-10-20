@@ -3,8 +3,9 @@
 //
 // รายการพิมพ์: emails one queued document as an attachment from the shared Gmail account.
 // Permission = the caller can read the print request (RLS: can_see_print_request), so the
-// department scope matches the tab. Gmail SMTP over implicit TLS on 465 — Supabase blocks 25/587.
+// department scope matches the tab. Gmail SMTP (nodemailer) over implicit TLS on 465 — Supabase blocks 25/587.
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import nodemailer from "npm:nodemailer@6.9.16";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -85,21 +86,22 @@ async function handle(req: Request): Promise<Response> {
   if (r.note) lines.push(`หมายเหตุ: ${r.note}`);
   lines.push("", `ส่งโดย ${sender} (Helix)`);
 
-  const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
-  const client = new SMTPClient({
-    connection: { hostname: "smtp.gmail.com", port: 465, tls: true, auth: { username: gmailUser, password: gmailPass } },
+  const transport = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
+    auth: { user: gmailUser, pass: gmailPass },
   });
   try {
-    await client.send({
-      from: gmailUser,
+    await transport.sendMail({
+      from: { name: `Helix (${sender})`, address: gmailUser },
       to,
       subject: `ขอให้พิมพ์เอกสาร: ${file.title} (${r.copies} ชุด)`,
-      content: lines.join("\n"),
+      text: lines.join("\n"),
       attachments: [
         {
           filename: file.file_name,
           content: new Uint8Array(await blob.arrayBuffer()),
-          encoding: "binary",
           contentType: blob.type || "application/octet-stream",
         },
       ],
@@ -107,7 +109,7 @@ async function handle(req: Request): Promise<Response> {
   } catch (e) {
     return json({ error: `ส่งอีเมลไม่สำเร็จ: ${(e as Error).message}` }, 502);
   } finally {
-    await client.close().catch(() => {});
+    transport.close();
   }
 
   return json({ ok: true });
