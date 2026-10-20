@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { AppsIcon, CheckboxIcon, DocumentTextIcon, ListIcon, Plus, PrintIcon, Search, SquareIcon, X } from "@/components/icons";
+import { AppsIcon, CheckboxIcon, DocumentTextIcon, ListIcon, MailIcon, Plus, PrintIcon, Search, SquareIcon, X } from "@/components/icons";
 import { FileTile } from "@/components/FileTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -10,6 +10,7 @@ import { useDepartments } from "@/hooks/useProfiles";
 import {
   useAddPrintRequests,
   useDeletePrintRequest,
+  useEmailPrintRequest,
   useMarkPrinted,
   useUndoPrinted,
   usePrintRequests,
@@ -251,9 +252,112 @@ function NoteField({ st, editable, className }: { st: RowState; editable: boolea
   );
 }
 
+const RECENT_KEY = "print-email-recent";
+const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
+
+function readRecent(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((e): e is string => typeof e === "string").slice(0, 5) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Centered popup: recipients → send-print-email Edge Function. Recent recipients live in localStorage only. */
+function EmailDialog({ r, onClose }: { r: PrintRequestRow; onClose: () => void }) {
+  const send = useEmailPrintRequest();
+  const toast = useToast();
+  const [value, setValue] = useState("");
+  const [recent] = useState(readRecent);
+
+  const list = value.split(/[,;\s]+/).filter(Boolean);
+  const valid = list.length > 0 && list.length <= 5 && list.every((e) => EMAIL_RE.test(e));
+
+  function submit() {
+    if (!valid) return;
+    send.mutate(
+      { requestId: r.id, to: list },
+      {
+        onSuccess: () => {
+          try {
+            localStorage.setItem(RECENT_KEY, JSON.stringify([...new Set([...list, ...recent])].slice(0, 5)));
+          } catch {
+            /* storage unavailable — recents are a convenience only */
+          }
+          toast("ส่งอีเมลแล้ว");
+          onClose();
+        },
+        onError: (err) => toast((err as Error).message || "ส่งอีเมลไม่สำเร็จ", "error"),
+      },
+    );
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+      onMouseDown={(e) => e.target === e.currentTarget && !send.isPending && onClose()}
+      onKeyDown={(e) => e.key === "Escape" && !send.isPending && onClose()}
+    >
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-label="ส่งไฟล์ทางอีเมล"
+        className="flex w-full max-w-md flex-col gap-4 whitespace-normal rounded-2xl border border-border bg-card p-5 shadow-xl"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <div>
+          <h2 className="text-sm font-bold">ส่งไฟล์ทางอีเมล</h2>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">{r.file?.title}</p>
+        </div>
+        <div className="space-y-2">
+          <Input
+            autoFocus
+            type="text"
+            inputMode="email"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="อีเมลผู้รับ (หลายที่อยู่คั่นด้วยจุลภาค)"
+            aria-label="อีเมลผู้รับ"
+          />
+          {recent.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {recent.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setValue((v) => (list.includes(e) ? v : v.trim() ? `${v.trim().replace(/[,;]$/, "")}, ${e}` : e))}
+                  className="rounded-full bg-muted px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground"
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
+          {list.length > 5 && <p className="text-[11px] text-destructive">ส่งได้ไม่เกิน 5 ที่อยู่ต่อครั้ง</p>}
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" disabled={send.isPending} onClick={onClose}>
+            ยกเลิก
+          </Button>
+          <Button type="submit" className="flex-1" disabled={!valid || send.isPending}>
+            {send.isPending ? <Spinner className="h-3 w-3" /> : <MailIcon className="h-3.5 w-3.5" />}
+            {send.isPending ? "กำลังส่ง" : "ส่ง"}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function RequestActions({ r, st, mayRequest }: { r: PrintRequestRow; st: RowState; mayRequest: boolean }) {
+  const [emailing, setEmailing] = useState(false);
   return (
     <div className="flex items-center gap-1.5 whitespace-nowrap">
+      {emailing && <EmailDialog r={r} onClose={() => setEmailing(false)} />}
       <Button variant="ghost" size="sm" disabled={!r.file} onClick={st.open}>
         <DocumentTextIcon className="h-3.5 w-3.5" />
         เปิดไฟล์
@@ -261,6 +365,10 @@ function RequestActions({ r, st, mayRequest }: { r: PrintRequestRow; st: RowStat
       <Button variant="outline" size="sm" disabled={!r.file || st.printing} onClick={st.printNow}>
         {st.printing ? <Spinner className="h-3 w-3" /> : <PrintIcon className="h-3.5 w-3.5" />}
         สั่งพิมพ์
+      </Button>
+      <Button variant="outline" size="sm" disabled={!r.file} onClick={() => setEmailing(true)}>
+        <MailIcon className="h-3.5 w-3.5" />
+        ส่งอีเมล
       </Button>
       {st.pending ? (
         <Button size="sm" disabled={st.busy} onClick={st.markPrinted}>
