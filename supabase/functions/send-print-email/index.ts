@@ -5,7 +5,6 @@
 // Permission = the caller can read the print request (RLS: can_see_print_request), so the
 // department scope matches the tab. Gmail SMTP over implicit TLS on 465 — Supabase blocks 25/587.
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,6 +25,15 @@ const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  try {
+    return await handle(req);
+  } catch (e) {
+    // an uncaught throw would answer 500 without CORS headers, which the browser reports as a CORS error
+    return json({ error: `เกิดข้อผิดพลาดในระบบ: ${(e as Error).message}` }, 500);
+  }
+});
+
+async function handle(req: Request): Promise<Response> {
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return json({ error: "missing authorization" }, 401);
@@ -77,6 +85,7 @@ Deno.serve(async (req) => {
   if (r.note) lines.push(`หมายเหตุ: ${r.note}`);
   lines.push("", `ส่งโดย ${sender} (Helix)`);
 
+  const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
   const client = new SMTPClient({
     connection: { hostname: "smtp.gmail.com", port: 465, tls: true, auth: { username: gmailUser, password: gmailPass } },
   });
@@ -102,4 +111,4 @@ Deno.serve(async (req) => {
   }
 
   return json({ ok: true });
-});
+}
