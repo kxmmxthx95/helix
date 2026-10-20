@@ -112,6 +112,11 @@ export const useCreatePlanTopic = () =>
   useWrite((v: { lesson_id: string; name: string; sort_order: number }) => supabase.from("plan_topics").insert(v));
 export const useRenamePlanTopic = () =>
   useWrite((v: { id: string; name: string }) => supabase.from("plan_topics").update({ name: v.name }).eq("id", v.id));
+export const useReorderPlanTopics = () =>
+  useWrite(async (ids: string[]) => {
+    const rs = await Promise.all(ids.map((id, i) => supabase.from("plan_topics").update({ sort_order: i }).eq("id", id)));
+    return { error: rs.find((r) => r.error)?.error ?? null };
+  });
 export const useDeletePlanTopic = () =>
   useWrite((id: string) => supabase.from("plan_topics").delete().eq("id", id));
 

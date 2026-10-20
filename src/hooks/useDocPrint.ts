@@ -74,3 +74,17 @@ export const useUndoPrinted = () =>
   useWrite((id: string) => supabase.from("doc_print_requests").update({ status: "pending" }).eq("id", id));
 export const useDeletePrintRequest = () =>
   useWrite((id: string) => supabase.from("doc_print_requests").delete().eq("id", id));
+
+/** Emails the queued document as an attachment via the send-print-email Edge Function. */
+export const useEmailPrintRequest = () =>
+  useMutation({
+    mutationFn: async (v: { requestId: string; to: string[] }) => {
+      const { data, error } = await supabase.functions.invoke("send-print-email", { body: v });
+      if (error) {
+        // non-2xx: supabase-js hides the JSON body behind a generic message
+        const detail = await (error as { context?: Response }).context?.json().catch(() => null);
+        throw new Error(detail?.error ?? error.message);
+      }
+      if (data?.error) throw new Error(String(data.error));
+    },
+  });

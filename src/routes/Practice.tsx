@@ -934,8 +934,14 @@ export function EditableName({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
-  if (!editing) {
-    return (
+  function save() {
+    setEditing(false);
+    const name = draft.trim();
+    if (name && name !== value) onSave(name);
+  }
+
+  return (
+    <>
       <Button
         size="icon"
         variant="ghost"
@@ -948,24 +954,36 @@ export function EditableName({
       >
         <PencilIcon className="h-3 w-3" />
       </Button>
-    );
-  }
-
-  function save() {
-    setEditing(false);
-    const name = draft.trim();
-    if (name && name !== value) onSave(name);
-  }
-
-  return (
-    <Input
-      autoFocus
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={save}
-      onKeyDown={(e) => e.key === "Enter" && save()}
-      className="h-7 w-32 text-xs"
-    />
+      {editing && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onMouseDown={(e) => e.target === e.currentTarget && setEditing(false)}
+          onKeyDown={(e) => e.key === "Escape" && setEditing(false)}
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-label="แก้ไขชื่อ"
+            className="flex w-full max-w-md flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-xl"
+            onSubmit={(e) => {
+              e.preventDefault();
+              save();
+            }}
+          >
+            <h2 className="text-sm font-bold">แก้ไขชื่อ</h2>
+            <Input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="ชื่อ" />
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setEditing(false)}>
+                ยกเลิก
+              </Button>
+              <Button type="submit" className="flex-1" disabled={!draft.trim()}>
+                บันทึก
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
   );
 }
 
