@@ -35,6 +35,7 @@ import { TeachingPlan } from "@/routes/TeachingPlan";
 import { TeachingPlanOverview } from "@/routes/TeachingPlanOverview";
 import { Timetable } from "@/routes/Timetable";
 import { TimeTracking } from "@/routes/TimeTracking";
+import { Tuition } from "@/routes/Tuition";
 import { Leave } from "@/routes/Leave";
 import { LineNotifications } from "@/routes/LineNotifications";
 import { DutyRoster } from "@/routes/DutyRoster";
@@ -89,6 +90,7 @@ function Gate() {
         <Route path="academic-events" element={<AcademicEvents />} />
         <Route path="time-tracking" element={<TimeTracking />} />
         <Route path="leave" element={<Leave />} />
+        <Route path="tuition" element={<Tuition />} />
         <Route path="duty-roster" element={<DutyRoster />} />
         <Route path="employees" element={<Employees />} />
         <Route path="staff-attendance" element={<StaffAttendance />} />

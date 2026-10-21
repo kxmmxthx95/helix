@@ -1167,6 +1167,41 @@ export type BehaviorCategory = {
   created_at: string;
 };
 
+// ----------------------------------------------------------- tuition (0095)
+// ค่าเทอม. Money rows are never deleted: cancel an invoice via status, void a
+// payment via voided_at/void_reason.
+
+export type TuitionPaymentMethod = "cash" | "transfer" | "other";
+
+export type TuitionInvoice = {
+  id: string;
+  student_id: string;
+  term_id: string;
+  title: string;
+  amount: number;
+  due_date: string | null;
+  status: "open" | "cancelled";
+  file_path: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TuitionPayment = {
+  id: string;
+  invoice_id: string;
+  receipt_no: number;
+  amount: number;
+  method: TuitionPaymentMethod;
+  paid_at: string;
+  note: string | null;
+  voided_at: string | null;
+  void_reason: string | null;
+  recorded_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
 // ------------------------------------------------------------- academic_terms
 // See supabase/migrations/0018_academic_terms.sql for the full grill rationale.
 
@@ -1452,6 +1487,11 @@ export type Database = {
       period_attendance_records: Table<PeriodAttendanceRecord, InsertOf<PeriodAttendanceRecord, "note">>;
       behavior_records: Table<BehaviorRecord, InsertOf<BehaviorRecord, never>>;
       behavior_categories: Table<BehaviorCategory, InsertOf<BehaviorCategory, "severity">>;
+      tuition_invoices: Table<TuitionInvoice, InsertOf<TuitionInvoice, "due_date" | "status">>;
+      tuition_payments: Table<
+        TuitionPayment,
+        InsertOf<TuitionPayment, "receipt_no" | "paid_at" | "note" | "voided_at" | "void_reason">
+      >;
       audit_logs: Table<{
         id: number;
         actor_id: string | null;

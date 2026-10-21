@@ -381,6 +381,18 @@ const TABS = [
     teacherOrManagerOnly: true,
   },
   {
+    to: "/tuition",
+    label: "ค่าเทอม",
+    icon: BarChartIcon,
+    section: "การเงิน",
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: false,
+    orgWideOrParentOnly: true,
+  },
+  {
     to: "/line-notifications",
     label: "แจ้งเตือนไลน์",
     icon: NotificationIcon,
@@ -488,6 +500,7 @@ function AppShellInner() {
             canManage(profile.roles) ||
             profile.roles.includes("student") ||
             profile.roles.includes("parent")))) &&
+      (!t.orgWideOrParentOnly || (profile && (isOrgWide(profile.roles) || profile.roles.includes("parent")))) &&
       (!t.hideFromStudent || !profile || !profile.roles.includes("student")) &&
       // /time-tracking is further gated by the school-wide per-role toggle (migration 0032).
       (t.to !== "/time-tracking" ||
