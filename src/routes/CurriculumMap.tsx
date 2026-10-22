@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { AppsIcon, BookIcon, CheckboxIcon, ChevronForward, ClipboardIcon, DocumentTextIcon, GripIcon, LibraryIcon, LinkIcon, ListIcon, PaletteIcon, Plus, PricetagIcon, PrintIcon, Search, SquareIcon, Upload, X } from "@/components/icons";
+import { AppsIcon, BookIcon, CheckboxIcon, ChevronForward, ClipboardIcon, DocumentTextIcon, GripIcon, LibraryIcon, LinkIcon, ListIcon, PaletteIcon, Plus, PricetagIcon, PrintIcon, Search, SquareIcon, TrashIcon, Upload, X } from "@/components/icons";
 import { ImportPlanSheet } from "@/components/ImportPlanSheet";
 import { FileTile } from "@/components/FileTile";
 import { Sheet } from "@/components/Sheet";
@@ -32,6 +32,7 @@ import {
   useRenamePlanSubject,
   useRenamePlanTopic,
   useReorderPlanTopics,
+  type DocFileChoice,
   type PlanLessonNode,
   type PlanLessonTag,
   type PlanLinkedFile,
@@ -919,12 +920,17 @@ export function DocPicker({
   title,
   files,
   onApply,
+  canDelete,
+  onDelete,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   files: PlanLinkedFile[];
   onApply: (add: string[], remove: string[]) => Promise<boolean>;
+  /** Opt-in permanent delete: a trash button on the rows `canDelete` accepts; `onDelete` resolves true once the file is gone. */
+  canDelete?: (c: DocFileChoice) => boolean;
+  onDelete?: (c: DocFileChoice) => Promise<boolean>;
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<TagFilter>("all");
@@ -959,6 +965,14 @@ export function DocPicker({
     ["on", "เลือกแล้ว", choices.filter((c) => selected.has(c.id)).length],
     ["off", "ยังไม่เลือก", choices.filter((c) => !selected.has(c.id)).length],
   ];
+
+  // A deleted file must not stay ticked, or saving would try to link it.
+  const toggleOff = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -1077,13 +1091,13 @@ export function DocPicker({
             {shown.slice(0, limit).map((c) => {
               const checked = selected.has(c.id);
               return (
-                <li key={c.id}>
+                <li key={c.id} className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => toggle(c.id)}
                     aria-pressed={checked}
                     className={cn(
-                      "flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors",
+                      "flex min-w-0 flex-1 items-center gap-3 rounded-xl border p-3 text-left transition-colors",
                       checked ? "border-accent/50 bg-accent/5" : "border-border hover:bg-muted/50",
                     )}
                   >
@@ -1101,6 +1115,20 @@ export function DocPicker({
                       </p>
                     </div>
                   </button>
+                  {onDelete && canDelete?.(c) && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="shrink-0"
+                      aria-label={`ลบไฟล์ ${c.title}`}
+                      onClick={async () => {
+                        if (!confirm(`ลบไฟล์ "${c.title}" ถาวร? จะหายจากทุกบทเรียนและรายการพิมพ์`)) return;
+                        if (await onDelete(c)) toggleOff(c.id);
+                      }}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </Button>
+                  )}
                 </li>
               );
             })}
