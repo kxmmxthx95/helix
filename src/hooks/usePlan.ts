@@ -120,6 +120,43 @@ export const useReorderPlanTopics = () =>
 export const useDeletePlanTopic = () =>
   useWrite((id: string) => supabase.from("plan_topics").delete().eq("id", id));
 
+/** Copy a lesson (name + topics, in order) to other grades of the same subject; tags and linked files stay behind. */
+export function useCopyPlanLesson() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: {
+      subjectId: string;
+      lessonName: string;
+      topicNames: string[];
+      targets: { gradeLevelId: string; sortOrder: number }[];
+    }): Promise<{ done: string[]; failed: string[] }> => {
+      const done: string[] = [];
+      const failed: string[] = [];
+      for (const t of v.targets) {
+        const { data: lesson, error } = await supabase
+          .from("plan_lessons")
+          .insert({ subject_id: v.subjectId, grade_level_id: t.gradeLevelId, name: v.lessonName, sort_order: t.sortOrder })
+          .select("id")
+          .single();
+        if (error) {
+          failed.push(t.gradeLevelId);
+          continue;
+        }
+        const { error: topicErr } = v.topicNames.length
+          ? await supabase.from("plan_topics").insert(v.topicNames.map((name, i) => ({ lesson_id: lesson.id, name, sort_order: i })))
+          : { error: null };
+        if (topicErr) {
+          // No transaction here: drop the half-copied lesson so the grade is left as it was.
+          await supabase.from("plan_lessons").delete().eq("id", lesson.id);
+          failed.push(t.gradeLevelId);
+        } else done.push(t.gradeLevelId);
+      }
+      return { done, failed };
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["plan"] }),
+  });
+}
+
 // ------------------------------------------------------------------- import
 
 export type PlanImportEntry = { subject: string; gradeLevelId: string; lesson: string; topic: string | null };
