@@ -142,7 +142,27 @@ async function uploadWithProgress(path: string, file: File, onProgress?: (pct: n
   });
 }
 
-/** Checks type/size, uploads to the private bucket under `${lessonId}/`, then inserts the row; removes the object again if the insert fails. */
+/** The เอกสาร lesson (วิชา + ระดับชั้น + ชื่อบท) a file hangs under — created on first use. Returns its id. */
+export async function findOrCreateDocLesson(subjectId: string, gradeLevelId: string, name: string): Promise<string> {
+  const { data: found, error } = await supabase
+    .from("doc_lessons")
+    .select("id")
+    .eq("subject_id", subjectId)
+    .eq("grade_level_id", gradeLevelId)
+    .eq("name", name)
+    .limit(1);
+  if (error) throw error;
+  if (found[0]) return found[0].id;
+  const { data, error: insErr } = await supabase
+    .from("doc_lessons")
+    .insert({ subject_id: subjectId, grade_level_id: gradeLevelId, name })
+    .select("id")
+    .single();
+  if (insErr) throw insErr;
+  return data.id;
+}
+
+/** Checks type/size, uploads to the private bucket under `${lessonId}/`, then inserts the row and returns its id; removes the object again if the insert fails. */
 export function useUploadDocFile() {
   const qc = useQueryClient();
   return useMutation({
@@ -169,7 +189,7 @@ export function useUploadDocFile() {
       const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : "";
       const path = `${lessonId}/${crypto.randomUUID()}${ext}`;
       await uploadWithProgress(path, file, onProgress);
-      const { error } = await supabase.from("doc_files").insert({
+      const { data: row, error } = await supabase.from("doc_files").insert({
         lesson_id: lessonId,
         topic_id: topicId,
         title,
@@ -179,11 +199,12 @@ export function useUploadDocFile() {
         mime_type: file.type,
         size_bytes: file.size,
         uploaded_by: uploadedBy,
-      });
+      }).select("id").single();
       if (error) {
         await supabase.storage.from(BUCKET).remove([path]);
         throw error;
       }
+      return row.id;
     },
     onSettled: (_d, _e, vars) => void qc.invalidateQueries({ queryKey: ["doc_files", vars.lessonId] }).then(() => qc.invalidateQueries({ queryKey: ["doc_summary"] })),
   });

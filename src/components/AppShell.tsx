@@ -381,6 +381,18 @@ const TABS = [
     teacherOrManagerOnly: true,
   },
   {
+    to: "/tuition",
+    label: "ค่าเทอม",
+    icon: BarChartIcon,
+    section: "การเงิน",
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: false,
+    orgWideOrParentOnly: true,
+  },
+  {
     to: "/line-notifications",
     label: "แจ้งเตือนไลน์",
     icon: NotificationIcon,
@@ -488,6 +500,7 @@ function AppShellInner() {
             canManage(profile.roles) ||
             profile.roles.includes("student") ||
             profile.roles.includes("parent")))) &&
+      (!t.orgWideOrParentOnly || (profile && (isOrgWide(profile.roles) || profile.roles.includes("parent")))) &&
       (!t.hideFromStudent || !profile || !profile.roles.includes("student")) &&
       // /time-tracking is further gated by the school-wide per-role toggle (migration 0032).
       (t.to !== "/time-tracking" ||
@@ -840,8 +853,8 @@ function AppShellInner() {
           </div>
         )}
 
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
-          <div className="mx-auto flex min-h-full w-full max-w-6xl flex-1 flex-col px-shell pb-[max(2rem,env(safe-area-inset-bottom))]">
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges]">
+          <div className="mx-auto flex min-h-full w-full max-w-screen-2xl flex-1 flex-col px-shell pb-[max(2rem,env(safe-area-inset-bottom))]">
             <header
               className={cn(
                 "sticky top-0 z-20 hidden h-12 shrink-0 items-center bg-background dark:bg-muted lg:relative lg:flex",

@@ -565,6 +565,8 @@ export type PlanTopic = {
 /** Link from a ผังการเรียน หัวข้อ to an uploaded document. See migration 0089. */
 export type PlanTopicFile = { id: string; topic_id: string; doc_file_id: string; created_at: string };
 export type PlanLessonSubject = { id: string; lesson_id: string; subject_id: string; created_at: string };
+/** Subjects a user hid from the dept dashboard classroom cards (migration 0097). */
+export type DeptOverviewHiddenSubject = { profile_id: string; subject_id: string; created_at: string };
 export type PlanLessonFile = { id: string; lesson_id: string; doc_file_id: string; created_at: string };
 
 /** KG หัวข้อการประเมินพัฒนาการ, grouped under one of the 4 fixed domains. */
@@ -1167,6 +1169,41 @@ export type BehaviorCategory = {
   created_at: string;
 };
 
+// ----------------------------------------------------------- tuition (0095)
+// ค่าเทอม. Money rows are never deleted: cancel an invoice via status, void a
+// payment via voided_at/void_reason.
+
+export type TuitionPaymentMethod = "cash" | "transfer" | "other";
+
+export type TuitionInvoice = {
+  id: string;
+  student_id: string;
+  term_id: string;
+  title: string;
+  amount: number;
+  due_date: string | null;
+  status: "open" | "cancelled";
+  file_path: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TuitionPayment = {
+  id: string;
+  invoice_id: string;
+  receipt_no: number;
+  amount: number;
+  method: TuitionPaymentMethod;
+  paid_at: string;
+  note: string | null;
+  voided_at: string | null;
+  void_reason: string | null;
+  recorded_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
 // ------------------------------------------------------------- academic_terms
 // See supabase/migrations/0018_academic_terms.sql for the full grill rationale.
 
@@ -1452,6 +1489,11 @@ export type Database = {
       period_attendance_records: Table<PeriodAttendanceRecord, InsertOf<PeriodAttendanceRecord, "note">>;
       behavior_records: Table<BehaviorRecord, InsertOf<BehaviorRecord, never>>;
       behavior_categories: Table<BehaviorCategory, InsertOf<BehaviorCategory, "severity">>;
+      tuition_invoices: Table<TuitionInvoice, InsertOf<TuitionInvoice, "due_date" | "status">>;
+      tuition_payments: Table<
+        TuitionPayment,
+        InsertOf<TuitionPayment, "receipt_no" | "paid_at" | "note" | "voided_at" | "void_reason">
+      >;
       audit_logs: Table<{
         id: number;
         actor_id: string | null;
@@ -1491,6 +1533,7 @@ export type Database = {
       plan_subjects: Table<PlanSubject, InsertOf<PlanSubject, "color" | "icon">>;
       plan_lessons: Table<PlanLesson, InsertOf<PlanLesson, "sort_order">>;
       plan_lesson_subjects: Table<PlanLessonSubject, InsertOf<PlanLessonSubject, never>>;
+      dept_overview_hidden_subjects: Table<DeptOverviewHiddenSubject, InsertOf<DeptOverviewHiddenSubject, "created_at">>;
       plan_lesson_files: Table<PlanLessonFile, InsertOf<PlanLessonFile, never>>;
       plan_topic_files: Table<PlanTopicFile, InsertOf<PlanTopicFile, never>>;
       plan_topics: Table<PlanTopic, InsertOf<PlanTopic, "sort_order">>;
