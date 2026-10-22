@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { AppsIcon, BookIcon, CheckboxIcon, ChevronForward, ClipboardIcon, DocumentTextIcon, GripIcon, LibraryIcon, LinkIcon, ListIcon, PaletteIcon, Plus, PricetagIcon, PrintIcon, Search, SquareIcon, TrashIcon, Upload, X } from "@/components/icons";
+import { AppsIcon, BookIcon, CheckboxIcon, ChevronForward, ClipboardIcon, CopyIcon, DocumentTextIcon, GripIcon, LibraryIcon, LinkIcon, ListIcon, PaletteIcon, Plus, PricetagIcon, PrintIcon, Search, SquareIcon, TrashIcon, Upload, X } from "@/components/icons";
 import { ImportPlanSheet } from "@/components/ImportPlanSheet";
 import { FileTile } from "@/components/FileTile";
+import { Modal } from "@/components/Modal";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Input, Select, Skeleton, Spinner } from "@/components/ui";
@@ -13,6 +14,7 @@ import { useAllGradeLevels } from "@/hooks/useDocuments";
 import {
   useCreatePlanLesson,
   useCreatePlanSubject,
+  useCopyPlanLesson,
   useCreatePlanTopic,
   useDeletePlanLesson,
   useDeletePlanSubject,
@@ -439,6 +441,12 @@ function SubjectPlan({
             departmentId={subject.department_id}
             grade={grade}
             lessons={lessons.filter((l) => l.grade_level_id === grade.id)}
+            copyTargets={grades
+              .filter((g) => g.id !== grade.id)
+              .map((g) => {
+                const there = lessons.filter((l) => l.grade_level_id === g.id);
+                return { gradeLevelId: g.id, label: gradeShortLabel(g.code), sortOrder: there.length, names: there.map((l) => l.name.trim().toLowerCase()) };
+              })}
             mayEdit={mayEdit}
           />
         </>
@@ -453,6 +461,7 @@ function GradeSection({
   departmentId,
   grade,
   lessons,
+  copyTargets,
   mayEdit,
 }: {
   subjectId: string;
@@ -460,6 +469,7 @@ function GradeSection({
   departmentId: string;
   grade: GradeLevel;
   lessons: PlanLessonNode[];
+  copyTargets: CopyTarget[];
   mayEdit: boolean;
 }) {
   const [name, setName] = useState("");
@@ -486,6 +496,8 @@ function GradeSection({
           subjectName={subjectName}
           gradeLabel={gradeShortLabel(grade.code)}
           departmentId={departmentId}
+          subjectId={subjectId}
+          copyTargets={copyTargets}
           mayEdit={mayEdit}
         />
       ))}
@@ -513,12 +525,117 @@ function GradeSection({
   );
 }
 
+/** Pick grades to copy a lesson (name + topics) to; grades that already have a lesson of the same name are skipped. */
+function CopyLessonModal({
+  lesson,
+  subjectId,
+  targets,
+  onClose,
+}: {
+  lesson: PlanLessonNode;
+  subjectId: string;
+  targets: CopyTarget[];
+  onClose: () => void;
+}) {
+  const copy = useCopyPlanLesson();
+  const toast = useToast();
+  const key = lesson.name.trim().toLowerCase();
+  const has = (t: CopyTarget) => t.names.includes(key);
+  const free = targets.filter((t) => !has(t));
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+
+  function submit() {
+    const chosen = targets.filter((t) => picked.has(t.gradeLevelId) && !has(t));
+    copy.mutate(
+      { subjectId, lessonName: lesson.name, topicNames: lesson.topics.map((t) => t.name), targets: chosen },
+      {
+        onSuccess: ({ done, failed }) => {
+          const label = (ids: string[]) => chosen.filter((t) => ids.includes(t.gradeLevelId)).map((t) => t.label).join(", ");
+          const skipped = targets.filter((t) => has(t) && picked.has(t.gradeLevelId)).map((t) => t.label).join(", ");
+          if (done.length) toast(`คัดลอกไป ${label(done)} แล้ว${skipped ? ` · ข้าม ${skipped} (มีบทชื่อเดียวกันอยู่แล้ว)` : ""}`);
+          if (failed.length) toast(`คัดลอกไป ${label(failed)} ไม่สำเร็จ`, "error");
+          if (!failed.length) onClose();
+        },
+        onError: () => toast("คัดลอกไม่สำเร็จ", "error"),
+      },
+    );
+  }
+
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => !o && !copy.isPending && onClose()}
+      title="คัดลอกไปชั้นอื่น"
+      description={`"${lesson.name}" พร้อมหัวข้อย่อย ${lesson.topics.length} หัวข้อ (ไม่รวมแท็กและเอกสาร)`}
+      footer={
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="text-xs text-accent hover:underline disabled:opacity-50"
+            disabled={copy.isPending}
+            onClick={() => setPicked(new Set(free.map((t) => t.gradeLevelId)))}
+          >
+            เลือกทุกชั้น
+          </button>
+          <div className="ml-auto flex gap-2">
+            <Button variant="outline" onClick={onClose} disabled={copy.isPending}>
+              ยกเลิก
+            </Button>
+            <Button onClick={submit} disabled={picked.size === 0 || copy.isPending}>
+              {copy.isPending ? <Spinner className="h-3 w-3" /> : `คัดลอก${picked.size ? ` (${picked.size})` : ""}`}
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <ul className="space-y-2">
+        {targets.map((t) => {
+          const exists = has(t);
+          const checked = picked.has(t.gradeLevelId);
+          return (
+            <li key={t.gradeLevelId}>
+              <button
+                type="button"
+                disabled={exists || copy.isPending}
+                aria-pressed={checked}
+                onClick={() => toggle(t.gradeLevelId)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-xl border p-3 text-left text-sm transition-colors disabled:opacity-50",
+                  checked ? "border-accent/50 bg-accent/5" : "border-border hover:bg-muted/50",
+                )}
+              >
+                {checked ? (
+                  <CheckboxIcon className="h-5 w-5 shrink-0 text-accent" />
+                ) : (
+                  <SquareIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
+                )}
+                <span className="flex-1 font-medium">{t.label}</span>
+                {exists && <span className="text-xs text-muted-foreground">มีบทนี้แล้ว</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </Modal>
+  );
+}
+
+type CopyTarget = { gradeLevelId: string; label: string; sortOrder: number; names: string[] };
+
 function LessonCard({
   lesson,
   index,
   subjectName,
   gradeLabel,
   departmentId,
+  subjectId,
+  copyTargets,
   mayEdit,
 }: {
   lesson: PlanLessonNode;
@@ -526,6 +643,8 @@ function LessonCard({
   subjectName: string;
   gradeLabel: string;
   departmentId: string;
+  subjectId: string;
+  copyTargets: CopyTarget[];
   mayEdit: boolean;
 }) {
   const [title, setTitle] = useState("");
@@ -539,6 +658,7 @@ function LessonCard({
   const [picking, setPicking] = useState(false);
   const [tagging, setTagging] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [open, setOpen] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
   const reorder = useReorderPlanTopics();
@@ -628,6 +748,17 @@ function LessonCard({
         >
           <PrintIcon className="h-3 w-3" />
         </Button>
+        {mayEdit && copyTargets.length > 0 && (
+          <Button
+            className="active:scale-100"
+            size="icon"
+            variant="ghost"
+            aria-label={`คัดลอกบทเรียน ${lesson.name} ไปชั้นอื่น`}
+            onClick={() => setCopying(true)}
+          >
+            <CopyIcon className="h-3 w-3" />
+          </Button>
+        )}
         {mayEdit && (
           <>
             <Button
@@ -663,6 +794,7 @@ function LessonCard({
         )}
       </div>
 
+      {copying && <CopyLessonModal lesson={lesson} subjectId={subjectId} targets={copyTargets} onClose={() => setCopying(false)} />}
       {open && lesson.files.length > 0 && (
         <div className="px-3 pb-2">
           <LinkedFiles files={lesson.files} mayEdit={mayEdit} onUnlink={(id, done) => unlinkFile.mutate(id, done)} />
