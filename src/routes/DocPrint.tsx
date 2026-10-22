@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { AppsIcon, CheckboxIcon, DocumentTextIcon, ListIcon, MailIcon, Plus, PrintIcon, Search, SquareIcon, X } from "@/components/icons";
+import { AppsIcon, CheckboxIcon, DocumentTextIcon, ListIcon, MailIcon, Plus, PrintIcon, Search, SquareIcon, TimeIcon, X } from "@/components/icons";
 import { FileTile } from "@/components/FileTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -13,6 +13,7 @@ import {
   useEmailPrintRequest,
   useMarkPrinted,
   useUndoPrinted,
+  usePrintEmails,
   usePrintRequests,
   useUpdatePrintRequest,
   type PrintRequestRow,
@@ -34,6 +35,7 @@ export function PrintListTab() {
   const { data: requests = [], isLoading } = usePrintRequests();
   const [filter, setFilter] = useState<Filter>("pending");
   const [adding, setAdding] = useState(false);
+  const [history, setHistory] = useState(false);
   const [limit, setLimit] = useState(PAGE);
   const [view, setView] = useState<"card" | "table">("card");
   useEffect(() => setLimit(PAGE), [filter]);
@@ -73,6 +75,10 @@ export function PrintListTab() {
               </button>
             ))}
           </div>
+          <Button variant="outline" onClick={() => setHistory(true)}>
+            <TimeIcon className="h-3.5 w-3.5" />
+            ประวัติอีเมล
+          </Button>
           {mayRequest && (
             <Button onClick={() => setAdding(true)}>
               <Plus className="h-3.5 w-3.5" />
@@ -141,6 +147,7 @@ export function PrintListTab() {
         </Button>
       )}
 
+      <EmailHistorySheet open={history} onClose={() => setHistory(false)} />
       {mayRequest && (
         <AddDrawer
           open={adding}
@@ -264,6 +271,83 @@ function readRecent(): string[] {
   }
 }
 
+const thDateTime = (iso: string) => new Date(iso).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
+
+/** ประวัติการส่งอีเมล (migration 0098): every send attempt, newest first; `requestId` limits it to one print request. */
+function EmailHistorySheet({ open, onClose, requestId }: { open: boolean; onClose: () => void; requestId?: string }) {
+  const { data: emails = [], isLoading, isError, refetch } = usePrintEmails(open);
+  const [search, setSearch] = useState("");
+  const q = search.trim().toLowerCase();
+  const shown = emails
+    .filter((e) => !requestId || e.request_id === requestId)
+    .filter((e) => !q || e.doc_title.toLowerCase().includes(q) || e.recipients.some((to) => to.toLowerCase().includes(q)));
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) {
+          setSearch("");
+          onClose();
+        }
+      }}
+      title="ประวัติการส่งอีเมล"
+      description={requestId ? "เฉพาะรายการพิมพ์นี้" : "ทุกครั้งที่ส่งไฟล์ทางอีเมล (ใหม่สุดก่อน)"}
+    >
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหาชื่อเอกสารหรืออีเมลผู้รับ..."
+            aria-label="ค้นหาประวัติอีเมล"
+          />
+        </div>
+        {isLoading ? (
+          <Skeleton className="h-32 w-full" />
+        ) : isError ? (
+          <div role="alert" className="flex items-center justify-between gap-2">
+            <p className="text-sm text-destructive">โหลดประวัติไม่สำเร็จ</p>
+            <Button size="sm" variant="outline" onClick={() => void refetch()}>
+              ลองใหม่
+            </Button>
+          </div>
+        ) : shown.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            {emails.length === 0 ? "ยังไม่มีประวัติการส่งอีเมล" : "ไม่พบประวัติที่ตรงเงื่อนไข"}
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {shown.map((e) => (
+              <li key={e.id} className="space-y-1 rounded-xl border border-border p-3 font-sarabun">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="min-w-0 truncate text-sm font-medium">{e.doc_title}</p>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                      e.status === "sent" ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive",
+                    )}
+                  >
+                    {e.status === "sent" ? "ส่งแล้ว" : "ส่งไม่สำเร็จ"}
+                  </span>
+                </div>
+                <p className="break-words text-xs text-muted-foreground">ถึง {e.recipients.join(", ")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {e.copies} ชุด · โดย {e.sender} · {thDateTime(e.created_at)}
+                </p>
+                {e.error && <p className="break-words text-xs text-destructive">{e.error}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
 /** Centered popup: recipients → send-print-email Edge Function. Recent recipients live in localStorage only. */
 function EmailDialog({ r, onClose }: { r: PrintRequestRow; onClose: () => void }) {
   const send = useEmailPrintRequest();
@@ -355,9 +439,11 @@ function EmailDialog({ r, onClose }: { r: PrintRequestRow; onClose: () => void }
 
 function RequestActions({ r, st, mayRequest }: { r: PrintRequestRow; st: RowState; mayRequest: boolean }) {
   const [emailing, setEmailing] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   return (
     <div className="flex items-center gap-1.5 whitespace-nowrap">
       {emailing && <EmailDialog r={r} onClose={() => setEmailing(false)} />}
+      <EmailHistorySheet open={historyOpen} onClose={() => setHistoryOpen(false)} requestId={r.id} />
       <Button variant="ghost" size="sm" disabled={!r.file} onClick={st.open}>
         <DocumentTextIcon className="h-3.5 w-3.5" />
         เปิดไฟล์
@@ -369,6 +455,9 @@ function RequestActions({ r, st, mayRequest }: { r: PrintRequestRow; st: RowStat
       <Button variant="outline" size="sm" disabled={!r.file} onClick={() => setEmailing(true)}>
         <MailIcon className="h-3.5 w-3.5" />
         ส่งอีเมล
+      </Button>
+      <Button variant="ghost" size="icon" aria-label="ประวัติการส่งอีเมลของรายการนี้" onClick={() => setHistoryOpen(true)}>
+        <TimeIcon className="h-3.5 w-3.5" />
       </Button>
       {st.pending ? (
         <Button size="sm" disabled={st.busy} onClick={st.markPrinted}>

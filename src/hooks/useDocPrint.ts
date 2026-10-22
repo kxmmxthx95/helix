@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DocPrintRequest } from "@/lib/database.types";
+import type { DocPrintEmail, DocPrintRequest } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
 // รายการพิมพ์ — see migration 0093.
@@ -79,8 +79,9 @@ export const useDeletePrintRequest = () =>
   useWrite((id: string) => supabase.from("doc_print_requests").delete().eq("id", id));
 
 /** Emails the queued document as an attachment via the send-print-email Edge Function. */
-export const useEmailPrintRequest = () =>
-  useMutation({
+export const useEmailPrintRequest = () => {
+  const qc = useQueryClient();
+  return useMutation({
     mutationFn: async (v: { requestId: string; to: string[] }) => {
       const { data, error } = await supabase.functions.invoke("send-print-email", { body: v });
       if (error) {
@@ -90,4 +91,30 @@ export const useEmailPrintRequest = () =>
       }
       if (data?.error) throw new Error(String(data.error));
     },
+    // Failed sends are logged too, so refresh the history either way.
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["doc_print_emails"] }),
   });
+};
+
+/** ประวัติการส่งอีเมล, newest first — see migration 0098. */
+export type PrintEmailRow = DocPrintEmail & { sender: string };
+
+export function usePrintEmails(enabled: boolean) {
+  return useQuery({
+    queryKey: ["doc_print_emails"],
+    enabled,
+    queryFn: async (): Promise<PrintEmailRow[]> => {
+      const { data, error } = await supabase
+        .from("doc_print_emails")
+        .select("*, sender:profiles!sent_by(first_name, last_name)")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      type Raw = DocPrintEmail & { sender: { first_name: string; last_name: string } | null };
+      return (data as unknown as Raw[]).map(({ sender, ...e }) => ({
+        ...e,
+        sender: sender ? `${sender.first_name} ${sender.last_name}` : "-",
+      }));
+    },
+  });
+}

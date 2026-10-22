@@ -896,6 +896,21 @@ export type DocPrintRequest = {
   created_at: string;
 };
 
+/** ประวัติการส่งอีเมลรายการพิมพ์ — written by the send-print-email Edge Function. See migration 0098. */
+export type DocPrintEmail = {
+  id: string;
+  request_id: string | null;
+  department_id: string | null;
+  doc_title: string;
+  file_name: string;
+  copies: number;
+  recipients: string[];
+  sent_by: string;
+  status: "sent" | "failed";
+  error: string | null;
+  created_at: string;
+};
+
 export type DocTaskReviewStatus = "pending" | "approved" | "returned";
 
 export type DocTaskType = "lesson_plan" | "worksheet" | "exam" | "media" | "other";
@@ -1544,6 +1559,7 @@ export type Database = {
         DocPrintRequest,
         { doc_file_id: string; copies?: number; note?: string | null; status?: "pending" | "printed" }
       >;
+      doc_print_emails: Table<DocPrintEmail, never>;
       doc_files: Table<DocFile, InsertOf<DocFile, "description" | "topic_id" | "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
       doc_tasks: Table<DocTask, InsertOf<DocTask, "description" | "department_id" | "learning_area_id">>;
       doc_task_files: Table<DocTaskFile, InsertOf<DocTaskFile, "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;

@@ -67,7 +67,7 @@ async function handle(req: Request): Promise<Response> {
   // RLS on the caller's client is the permission check.
   const { data: request } = await callerClient
     .from("doc_print_requests")
-    .select("copies, note, doc_files(title, file_name, file_path)")
+    .select("id, department_id, copies, note, doc_files(title, file_name, file_path)")
     .eq("id", body.requestId)
     .maybeSingle();
   const file = (request as { doc_files: { title: string; file_name: string; file_path: string } | null } | null)?.doc_files;
@@ -80,7 +80,7 @@ async function handle(req: Request): Promise<Response> {
 
   const { data: me } = await admin.from("profiles").select("first_name, last_name").eq("id", caller.id).maybeSingle();
   const sender = me ? `${me.first_name} ${me.last_name}` : "ผู้ใช้ระบบ";
-  const r = request as { copies: number; note: string | null };
+  const r = request as { id: string; department_id: string | null; copies: number; note: string | null };
 
   const lines = [`ไฟล์: ${file.title}`, `จำนวน: ${r.copies} ชุด`];
   if (r.note) lines.push(`หมายเหตุ: ${r.note}`);
@@ -92,6 +92,21 @@ async function handle(req: Request): Promise<Response> {
     secure: true,
     auth: { user: gmailUser, pass: gmailPass },
   });
+  // ประวัติการส่ง: one row per attempt, sent or failed. A logging failure must not fail the send.
+  const record = async (status: "sent" | "failed", error?: string) => {
+    const { error: logError } = await admin.from("doc_print_emails").insert({
+      request_id: r.id,
+      department_id: r.department_id,
+      doc_title: file.title,
+      file_name: file.file_name,
+      copies: r.copies,
+      recipients: to,
+      sent_by: caller.id,
+      status,
+      error: error ?? null,
+    });
+    if (logError) console.error("doc_print_emails insert failed:", logError.message);
+  };
   try {
     await transport.sendMail({
       from: { name: `Helix (${sender})`, address: gmailUser },
@@ -107,10 +122,12 @@ async function handle(req: Request): Promise<Response> {
       ],
     });
   } catch (e) {
+    await record("failed", (e as Error).message.slice(0, 500));
     return json({ error: `ส่งอีเมลไม่สำเร็จ: ${(e as Error).message}` }, 502);
   } finally {
     transport.close();
   }
 
+  await record("sent");
   return json({ ok: true });
 }
