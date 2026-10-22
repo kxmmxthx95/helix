@@ -217,10 +217,12 @@ function DeptClassroomSection({
   return (
     <section className="space-y-3 pb-12">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-bold text-foreground">
-          ห้องเรียน{term && ` · ปีการศึกษา ${term.academicYear}${isSec ? ` ภาคเรียน ${term.term}` : ""}`}
-        </h2>
-        <div className="flex items-center gap-2">
+        {open && (
+          <Button size="sm" variant="ghost" onClick={() => (openSubject ? setSubjectId("") : setRoomId(""))}>
+            <ChevronForward className="h-3 w-3 rotate-180" /> {openSubject ? open.name : "ห้องเรียนทั้งหมด"}
+          </Button>
+        )}
+        <div className="ml-auto flex items-center gap-2">
           {pickDepartment && (
             <Select
               aria-label="แผนก"
@@ -252,9 +254,6 @@ function DeptClassroomSection({
       )}
       {open ? (
         <div className="space-y-3">
-          <Button size="sm" variant="ghost" onClick={() => (openSubject ? setSubjectId("") : setRoomId(""))}>
-            <ChevronForward className="h-3 w-3 rotate-180" /> {openSubject ? open.name : "ห้องเรียนทั้งหมด"}
-          </Button>
           {openSubject ? (
             <>
               <div className="flex items-center gap-3">
@@ -339,19 +338,19 @@ function DeptClassroomSection({
                 <button type="button" onClick={() => {
                     setRoomId(room.id);
                     setSubjectId("");
-                  }} className="flex items-center gap-3 rounded-2xl p-4 pr-12 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
+                  }} className="flex h-full min-h-32 items-center gap-3 rounded-2xl p-4 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
                   <div className="flex min-w-0 flex-1 items-center gap-3">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
                       <BuildingIcon className="h-6 w-6" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-base font-bold leading-snug text-foreground">{room.name}</div>
-                      <div className="truncate text-sm font-medium text-foreground/70">
+                      <div className="line-clamp-2 pr-6 text-base font-bold leading-snug text-foreground">{room.name}</div>
+                      <div className="mt-1 truncate text-sm font-medium text-foreground/70">
                         {room.subjects.length} วิชา · {lessons.length} บท · {lessons.reduce((n, l) => n + l.topics.length, 0)} หัวข้อ
                       </div>
                     </div>
                   </div>
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center self-end rounded-lg bg-muted text-foreground">
                     <ChevronForward className="h-4 w-4" />
                   </span>
                 </button>
