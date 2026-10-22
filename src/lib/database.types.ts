@@ -566,7 +566,7 @@ export type PlanTopic = {
 export type PlanTopicFile = { id: string; topic_id: string; doc_file_id: string; created_at: string };
 export type PlanLessonSubject = { id: string; lesson_id: string; subject_id: string; created_at: string };
 /** Subjects a user hid from the dept dashboard classroom cards (migration 0097). */
-export type DeptOverviewHiddenSubject = { profile_id: string; subject_id: string; created_at: string };
+export type DeptOverviewHiddenSubject = { profile_id: string; classroom_id: string; subject_id: string; created_at: string };
 export type PlanLessonFile = { id: string; lesson_id: string; doc_file_id: string; created_at: string };
 
 /** KG หัวข้อการประเมินพัฒนาการ, grouped under one of the 4 fixed domains. */

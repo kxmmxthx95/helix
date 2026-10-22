@@ -116,32 +116,35 @@ export function useDeptClassroomOverview(departmentId: string | null, academicYe
   });
 }
 
-// ------------------------------------------------------------- hidden subjects (migration 0097)
-// Per-user list of subjects hidden from the overview, applied to every room.
+// ------------------------------------------------------------- hidden subjects (migrations 0097, 0099)
+// Per-user list of subjects hidden from the overview, kept per room.
 
 const hiddenKey = (profileId: string | null) => ["dept_overview_hidden_subjects", profileId] as const;
+
+/** Key of one (room, subject) pair in the hidden list. */
+export const hiddenSubjectKey = (classroomId: string, subjectId: string) => `${classroomId}:${subjectId}`;
 
 export function useHiddenOverviewSubjects(profileId: string | null) {
   return useQuery({
     queryKey: hiddenKey(profileId),
     enabled: !!profileId,
     queryFn: async (): Promise<string[]> => {
-      const { data, error } = await supabase.from("dept_overview_hidden_subjects").select("subject_id");
+      const { data, error } = await supabase.from("dept_overview_hidden_subjects").select("classroom_id, subject_id");
       if (error) throw error;
-      return data.map((r) => r.subject_id);
+      return data.map((r) => hiddenSubjectKey(r.classroom_id, r.subject_id));
     },
   });
 }
 
-/** Apply a batch edit: `hide` ids are added to the hidden list, `show` ids removed. */
+/** Apply a batch edit to one room: `hide` subject ids are added to the hidden list, `show` ids removed. */
 export function useSetHiddenOverviewSubjects(profileId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ hide, show }: { hide: string[]; show: string[] }) => {
+    mutationFn: async ({ classroomId, hide, show }: { classroomId: string; hide: string[]; show: string[] }) => {
       if (hide.length) {
         const { error } = await supabase
           .from("dept_overview_hidden_subjects")
-          .upsert(hide.map((subject_id) => ({ profile_id: profileId, subject_id })));
+          .upsert(hide.map((subject_id) => ({ profile_id: profileId, classroom_id: classroomId, subject_id })));
         if (error) throw error;
       }
       if (show.length) {
@@ -149,6 +152,7 @@ export function useSetHiddenOverviewSubjects(profileId: string) {
           .from("dept_overview_hidden_subjects")
           .delete()
           .eq("profile_id", profileId)
+          .eq("classroom_id", classroomId)
           .in("subject_id", show);
         if (error) throw error;
       }
