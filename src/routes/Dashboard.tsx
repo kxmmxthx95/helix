@@ -1,14 +1,21 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
+import { Modal } from "@/components/Modal";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions } from "@/hooks/useAssignments";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
 import { STARTING_SCORE, summarizeBehaviorScore, useBehaviorRecords } from "@/hooks/useBehaviorRecords";
-import { BookIcon, BuildingIcon, CheckboxIcon, ChevronForward, Search, SettingsIcon, SquareIcon } from "@/components/icons";
+import { BookIcon, BuildingIcon, CheckboxIcon, ChevronForward, DocumentTextIcon, LinkIcon, PrintIcon, Search, SettingsOutlineIcon, SquareIcon, UploadOutlineIcon } from "@/components/icons";
+import { DOC_ACCEPT, findOrCreateDocLesson, useUploadDocFile } from "@/hooks/useDocuments";
+import { useAddPrintRequest, usePrintRequests } from "@/hooks/useDocPrint";
+import { openDocFile, useLinkPlanLessonFile, useUnlinkPlanLessonFile } from "@/hooks/usePlan";
+import { DocPicker } from "@/routes/CurriculumMap";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
+import type { OverviewLesson } from "@/hooks/useDeptClassroomOverview";
 import { useCurrentTerm } from "@/hooks/useAcademicTerms";
 import {
   useDeptClassroomOverview,
@@ -196,7 +203,7 @@ function DeptClassroomSection({
     ...allRooms
       .flatMap((r) => r.subjects.map((s) => ({ id: s.id, name: s.name, areaId: s.areaId, grade: r.gradeCode })))
       .reduce((m, s) => {
-        const g = m.get(s.name) ?? { name: s.name, areaId: s.areaId, ids: new Set<string>(), grades: new Set<string>() };
+        const g = m.get(s.name) ?? { name: s.name, code: "", areaId: s.areaId, ids: new Set<string>(), grades: new Set<string>() };
         g.ids.add(s.id);
         g.grades.add(s.grade);
         return m.set(s.name, g);
@@ -206,6 +213,16 @@ function DeptClassroomSection({
   const [roomId, setRoomId] = useState("");
   const settingsRoom = allRooms.find((r) => r.id === settingsRoomId);
   const open = rooms.find((r) => r.id === roomId);
+  const [subjectId, setSubjectId] = useState("");
+  const openSubject = open?.subjects.find((x) => x.id === subjectId);
+  const colors = useSubjectColors([]); // hue from กลุ่มสาระ only
+  const subjectTile = (areaId: string | null) => (
+    <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", colors.shade(areaId))}>
+      <BookIcon className="h-6 w-6" />
+    </div>
+  );
+  const subjectCounts = (s: { lessons: { topics: unknown[] }[] }) =>
+    `${s.lessons.length} บท · ${s.lessons.reduce((n, l) => n + l.topics.length, 0)} หัวข้อ`;
   const loading = termLoading || isLoading;
 
   return (
@@ -241,43 +258,81 @@ function DeptClassroomSection({
       )}
       {open ? (
         <div className="space-y-3">
-          <Button size="sm" variant="ghost" onClick={() => setRoomId("")}>
-            <ChevronForward className="h-3 w-3 rotate-180" /> ห้องเรียนทั้งหมด
+          <Button size="sm" variant="ghost" onClick={() => (openSubject ? setSubjectId("") : setRoomId(""))}>
+            <ChevronForward className="h-3 w-3 rotate-180" /> {openSubject ? open.name : "ห้องเรียนทั้งหมด"}
           </Button>
-          <h3 className="text-base font-bold">{open.name}</h3>
-          {open.subjects.length === 0 && <p className="text-sm text-muted-foreground">ไม่มีวิชาที่แสดง</p>}
-          <ul className="space-y-2">
-            {open.subjects.map((s) => (
-              <li key={s.id}>
-                <details className="rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
-                  <summary className="cursor-pointer text-sm font-bold">
-                    {s.name}
-                    <span className="text-[11px] font-normal text-muted-foreground">
-                      {s.teachers.length > 0 && ` · ${s.teachers.join(", ")}`} · {s.lessons.length} บทเรียน
-                    </span>
-                  </summary>
-                  {s.lessons.length === 0 ? (
-                    <p className="mt-2 text-xs text-muted-foreground">ยังไม่มีบทเรียนในผังการเรียน</p>
-                  ) : (
-                    <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
-                      {s.lessons.map((l) => (
-                        <li key={l.id}>
-                          {l.name}
-                          {l.topics.length > 0 && (
-                            <ul className="list-disc pl-5 text-xs text-muted-foreground">
-                              {l.topics.map((t) => (
-                                <li key={t.id}>{t.name}</li>
-                              ))}
-                            </ul>
-                          )}
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </details>
-              </li>
-            ))}
-          </ul>
+          {openSubject ? (
+            <>
+              <div className="flex items-center gap-3">
+                {subjectTile(openSubject.areaId)}
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs text-muted-foreground">{openSubject.code}</div>
+                  <h3 className="truncate text-base font-bold">{openSubject.name}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {openSubject.teachers.join(", ") || "ไม่ระบุครู"} · {subjectCounts(openSubject)}
+                  </p>
+                </div>
+              </div>
+              {openSubject.lessons.length === 0 ? (
+                <p className="text-sm text-muted-foreground">ยังไม่มีบทเรียนในผังการเรียน</p>
+              ) : (
+                <ol className="space-y-2">
+                  {openSubject.lessons.map((l, i) => (
+                    <li key={l.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="text-sm font-bold">
+                          {i + 1}. {l.name}
+                        </div>
+                        <LessonDocActions
+                          lesson={l}
+                          profileId={profileId}
+                          subjectId={openSubject.id}
+                          gradeLevelId={open.gradeLevelId}
+                        />
+                      </div>
+                      {l.topics.length > 0 && (
+                        <ul className="mt-2 list-disc space-y-0.5 pl-9 text-xs text-muted-foreground">
+                          {l.topics.map((t) => (
+                            <li key={t.id}>{t.name}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </>
+          ) : (
+            <>
+              <h3 className="text-base font-bold">{open.name}</h3>
+              {open.subjects.length === 0 && <p className="text-sm text-muted-foreground">ไม่มีวิชาที่แสดง</p>}
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {open.subjects.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSubjectId(s.id)}
+                    className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm hover:shadow-md"
+                  >
+                    <div className="flex min-w-0 items-start gap-3">
+                      {subjectTile(s.areaId)}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-xs text-muted-foreground">{s.code}</div>
+                        <div className="truncate text-sm font-bold">{s.name}</div>
+                        <div className="truncate text-[11px] text-muted-foreground">{s.teachers.join(", ") || "ไม่ระบุครู"}</div>
+                        <div className="text-[11px] text-muted-foreground">{subjectCounts(s)}</div>
+                      </div>
+                    </div>
+                    <div className="mt-auto flex justify-end pt-2">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-foreground">
+                        <ChevronForward className="h-3.5 w-3.5" />
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -288,7 +343,10 @@ function DeptClassroomSection({
                 key={room.id}
                 className="relative flex flex-col rounded-2xl border border-border bg-card shadow-sm hover:shadow-md"
               >
-                <button type="button" onClick={() => setRoomId(room.id)} className="flex flex-col gap-3 p-4 text-left">
+                <button type="button" onClick={() => {
+                    setRoomId(room.id);
+                    setSubjectId("");
+                  }} className="flex flex-col gap-3 p-4 text-left">
                   <div className="flex min-w-0 items-start gap-3 pr-8">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
                       <BuildingIcon className="h-6 w-6" />
@@ -313,7 +371,7 @@ function DeptClassroomSection({
                   aria-label={`ตั้งค่าวิชาที่จะแสดง ${room.name}`}
                   onClick={() => setSettingsRoomId(room.id)}
                 >
-                  <SettingsIcon className="h-3.5 w-3.5" />
+                  <SettingsOutlineIcon className="h-3.5 w-3.5" />
                 </Button>
               </div>
             );
@@ -325,14 +383,248 @@ function DeptClassroomSection({
         onClose={() => setSettingsRoomId("")}
         profileId={profileId}
         roomName={settingsRoom?.name ?? ""}
-        groups={groups.filter((g) => settingsRoom?.subjects.some((s) => s.name === g.name))}
+        // This room's subjects (its own code and grade); ids span every grade of the name so hiding applies everywhere.
+        // One entry per name: a room can hold two subject rows with the same name.
+        groups={[
+          ...new Map(
+            (settingsRoom?.subjects ?? []).map((s) => [
+              s.name,
+              {
+                name: s.name,
+                code: s.code,
+                areaId: s.areaId,
+                ids: groups.find((g) => g.name === s.name)?.ids ?? new Set([s.id]),
+                grades: new Set([settingsRoom!.gradeCode]),
+              },
+            ]),
+          ).values(),
+        ]}
         hiddenIds={hiddenIds}
       />
     </section>
   );
 }
 
-type SubjectGroup = { name: string; areaId: string | null; ids: Set<string>; grades: Set<string> };
+/** Teaching-document actions on a lesson card: open, queue for printing, link existing documents, upload a new one. */
+function LessonDocActions({
+  lesson,
+  profileId,
+  subjectId,
+  gradeLevelId,
+}: {
+  lesson: OverviewLesson;
+  profileId: string;
+  subjectId: string;
+  gradeLevelId: string;
+}) {
+  const [picking, setPicking] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [printing, setPrinting] = useState(false);
+  const link = useLinkPlanLessonFile();
+  const unlink = useUnlinkPlanLessonFile();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const refresh = () => qc.invalidateQueries({ queryKey: ["dept_classroom_overview"] });
+  const iconButton = (label: string, onClick: () => void, icon: React.ReactNode) => (
+    <Button size="icon" variant="ghost" className="-my-1.5 shrink-0" aria-label={label} onClick={onClick}>
+      {icon}
+    </Button>
+  );
+
+  return (
+    <div className="-mr-2 flex shrink-0 items-center">
+      {lesson.file &&
+        iconButton(
+          `เปิดเอกสารการสอน ${lesson.file.name}`,
+          async () => {
+            if (!(await openDocFile(lesson.file!.path))) toast("เปิดเอกสารไม่สำเร็จ", "error");
+          },
+          <DocumentTextIcon className="h-4 w-4" />,
+        )}
+      {lesson.file && iconButton(`ส่ง ${lesson.file.name} เข้ารายการพิมพ์`, () => setPrinting(true), <PrintIcon className="h-4 w-4" />)}
+      {iconButton(`เชื่อมต่อเอกสารกับบทเรียน ${lesson.name}`, () => setPicking(true), <LinkIcon className="h-4 w-4" />)}
+      {iconButton(`อัปโหลดเอกสารของบทเรียน ${lesson.name}`, () => setUploading(true), <UploadOutlineIcon className="h-4 w-4" />)}
+
+      {printing && lesson.file && <PrintDialog file={lesson.file} onClose={() => setPrinting(false)} />}
+      <DocPicker
+        open={picking}
+        onClose={() => setPicking(false)}
+        title={lesson.name}
+        files={lesson.files}
+        onApply={async (add, remove) => {
+          try {
+            await Promise.all([
+              ...add.map((doc_file_id) => link.mutateAsync({ lesson_id: lesson.id, doc_file_id })),
+              ...remove.map((linkId) => unlink.mutateAsync(linkId)),
+            ]);
+            await refresh();
+            return true;
+          } catch {
+            toast("บันทึกเอกสารไม่สำเร็จ", "error");
+            return false;
+          }
+        }}
+      />
+      {uploading && (
+        <UploadDialog
+          lesson={lesson}
+          profileId={profileId}
+          subjectId={subjectId}
+          gradeLevelId={gradeLevelId}
+          onClose={() => setUploading(false)}
+          onDone={refresh}
+        />
+      )}
+    </div>
+  );
+}
+
+function PrintDialog({ file, onClose }: { file: { id: string; name: string }; onClose: () => void }) {
+  const [copies, setCopies] = useState("1");
+  const [note, setNote] = useState("");
+  const { data: requests = [] } = usePrintRequests();
+  const add = useAddPrintRequest();
+  const toast = useToast();
+  const queued = requests.some((r) => r.doc_file_id === file.id && r.status === "pending");
+  const n = Number(copies);
+  const valid = Number.isInteger(n) && n >= 1 && n <= 999;
+
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title="ส่งเข้ารายการพิมพ์"
+      description={file.name}
+      footer={
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            ยกเลิก
+          </Button>
+          <Button
+            className="flex-1"
+            disabled={queued || !valid || add.isPending}
+            onClick={() =>
+              add.mutate(
+                { doc_file_id: file.id, copies: n, note: note.trim() || null },
+                {
+                  onSuccess: () => {
+                    toast("ส่งเข้ารายการพิมพ์แล้ว");
+                    onClose();
+                  },
+                  onError: () => toast("ส่งเข้ารายการพิมพ์ไม่สำเร็จ", "error"),
+                },
+              )
+            }
+          >
+            {add.isPending ? <Spinner className="h-3 w-3" /> : queued ? "อยู่ในคิวพิมพ์แล้ว" : "ส่งเข้าคิว"}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <Field label="จำนวนชุด">
+          <Input type="number" min={1} max={999} value={copies} onChange={(e) => setCopies(e.target.value)} />
+        </Field>
+        <Field label="หมายเหตุ">
+          <Input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="เช่น พิมพ์สองหน้า" />
+        </Field>
+      </div>
+    </Modal>
+  );
+}
+
+function UploadDialog({
+  lesson,
+  profileId,
+  subjectId,
+  gradeLevelId,
+  onClose,
+  onDone,
+}: {
+  lesson: OverviewLesson;
+  profileId: string;
+  subjectId: string;
+  gradeLevelId: string;
+  onClose: () => void;
+  onDone: () => unknown;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("");
+  const [progress, setProgress] = useState<number | null>(null);
+  const upload = useUploadDocFile();
+  const link = useLinkPlanLessonFile();
+  const toast = useToast();
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file || !title.trim()) return;
+    setProgress(0);
+    try {
+      // The file hangs under the เอกสาร lesson with the same name, created on first use; then it is linked to the plan lesson.
+      const lessonId = await findOrCreateDocLesson(subjectId, gradeLevelId, lesson.name);
+      const docFileId = await upload.mutateAsync({
+        file,
+        lessonId,
+        title: title.trim(),
+        description: null,
+        uploadedBy: profileId,
+        onProgress: setProgress,
+      });
+      await link.mutateAsync({ lesson_id: lesson.id, doc_file_id: docFileId });
+      await onDone();
+      toast("อัปโหลดและเชื่อมเอกสารแล้ว");
+      onClose();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "อัปโหลดไม่สำเร็จ", "error");
+      setProgress(null);
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => !o && progress === null && onClose()}
+      title="อัปโหลดเอกสาร"
+      description={`เชื่อมกับบทเรียน "${lesson.name}"`}
+      footer={
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" disabled={progress !== null} onClick={onClose}>
+            ยกเลิก
+          </Button>
+          <Button type="submit" form="dept-doc-upload" className="flex-1" disabled={!file || !title.trim() || progress !== null}>
+            {progress !== null ? <Spinner className="h-3 w-3" /> : "อัปโหลด"}
+          </Button>
+        </div>
+      }
+    >
+      <form id="dept-doc-upload" className="space-y-4" onSubmit={submit}>
+        <Field label="ไฟล์">
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-input px-3 py-6 text-center transition-colors hover:bg-muted/50 focus-within:border-ring">
+            <UploadOutlineIcon className="h-6 w-6 text-muted-foreground" />
+            <span className="max-w-full truncate text-sm font-medium">{file ? file.name : "เลือกไฟล์"}</span>
+            <span className="text-xs text-muted-foreground">PDF, Word, PowerPoint, Excel หรือรูปภาพ ไม่เกิน 20 MB</span>
+            <input
+              type="file"
+              accept={DOC_ACCEPT}
+              className="sr-only"
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                setFile(f);
+                if (f && !title) setTitle(f.name.replace(/\.[^.]+$/, ""));
+              }}
+            />
+          </label>
+        </Field>
+        <Field label="ชื่อเอกสาร">
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} />
+        </Field>
+        {progress !== null && <p className="text-xs text-muted-foreground">กำลังอัปโหลด {progress}%</p>}
+      </form>
+    </Modal>
+  );
+}
+
+type SubjectGroup = { name: string; code: string; areaId: string | null; ids: Set<string>; grades: Set<string> };
 type ShownFilter = "all" | "on" | "off";
 
 /** Choose which subjects the overview shows (ticked = shown); same drawer shape as ติดแท็กรายวิชา in CurriculumMap. */
@@ -386,14 +678,14 @@ function VisibleSubjectsSheet({
   }
 
   function apply() {
-    const hide: string[] = [];
-    const show: string[] = [];
+    const hide = new Set<string>();
+    const show = new Set<string>();
     for (const g of groups) {
       if (shownNames.has(g.name) === isShown(g)) continue;
-      (shownNames.has(g.name) ? show : hide).push(...g.ids);
+      g.ids.forEach((id) => (shownNames.has(g.name) ? show : hide).add(id));
     }
     save.mutate(
-      { hide, show },
+      { hide: [...hide], show: [...show] },
       { onSuccess: onClose, onError: () => toast("บันทึกไม่สำเร็จ", "error") },
     );
   }
@@ -488,6 +780,7 @@ function VisibleSubjectsSheet({
                     <BookIcon className="h-5 w-5" />
                   </span>
                   <div className="min-w-0 flex-1 font-sarabun leading-tight">
+                    <p className="truncate text-xs text-muted-foreground">{g.code}</p>
                     <p className="truncate text-sm font-medium text-foreground">{g.name}</p>
                     <p className="truncate text-xs text-muted-foreground">{grades.map(gradeShortLabel).join(" · ")}</p>
                   </div>

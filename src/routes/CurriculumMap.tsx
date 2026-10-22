@@ -913,7 +913,7 @@ function LinkedFiles({
  * current links ticked, confirming adds the newly ticked and removes the un-ticked in one go. Links the viewer
  * cannot read (no choice row) are left alone.
  */
-function DocPicker({
+export function DocPicker({
   open,
   onClose,
   title,

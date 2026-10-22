@@ -63,6 +63,9 @@ export const useAddPrintRequests = () =>
   useWrite((docFileIds: string[]) =>
     supabase.from("doc_print_requests").insert(docFileIds.map((doc_file_id) => ({ doc_file_id }))),
   );
+/** Queue one document with an explicit number of copies and an optional note. */
+export const useAddPrintRequest = () =>
+  useWrite((v: { doc_file_id: string; copies: number; note: string | null }) => supabase.from("doc_print_requests").insert(v));
 export const useUpdatePrintRequest = () =>
   useWrite((v: { id: string; copies?: number; note?: string | null }) => {
     const { id, ...patch } = v;
