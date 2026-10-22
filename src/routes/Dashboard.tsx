@@ -278,7 +278,10 @@ function DeptClassroomSection({
               ) : (
                 <ol className="space-y-2">
                   {openSubject.lessons.map((l, i) => (
-                    <li key={l.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                    <li
+                      key={l.id}
+                      className={cn("rounded-2xl border bg-card p-4 shadow-sm", l.file ? "border-success" : "border-border")}
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <div className="text-sm font-bold">
                           {i + 1}. {l.name}
