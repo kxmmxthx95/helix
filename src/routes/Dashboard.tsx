@@ -19,6 +19,7 @@ import type { OverviewLesson } from "@/hooks/useDeptClassroomOverview";
 import { useCurrentTerm } from "@/hooks/useAcademicTerms";
 import {
   useDeptClassroomOverview,
+  hiddenSubjectKey,
   useHiddenOverviewSubjects,
   useSetHiddenOverviewSubjects,
 } from "@/hooks/useDeptClassroomOverview";
@@ -197,19 +198,7 @@ function DeptClassroomSection({
   );
   const { data: hiddenIds = [] } = useHiddenOverviewSubjects(profileId);
   const [settingsRoomId, setSettingsRoomId] = useState("");
-  const rooms = allRooms.map((r) => ({ ...r, subjects: r.subjects.filter((s) => !hiddenIds.includes(s.id)) }));
-  // One entry per subject name; a name spans one subject row per grade level (ids), hidden together.
-  const groups = [
-    ...allRooms
-      .flatMap((r) => r.subjects.map((s) => ({ id: s.id, name: s.name, areaId: s.areaId, grade: r.gradeCode })))
-      .reduce((m, s) => {
-        const g = m.get(s.name) ?? { name: s.name, code: "", areaId: s.areaId, ids: new Set<string>(), grades: new Set<string>() };
-        g.ids.add(s.id);
-        g.grades.add(s.grade);
-        return m.set(s.name, g);
-      }, new Map<string, SubjectGroup>())
-      .values(),
-  ].sort((a, b) => a.name.localeCompare(b.name, "th"));
+  const rooms = allRooms.map((r) => ({ ...r, subjects: r.subjects.filter((s) => !hiddenIds.includes(hiddenSubjectKey(r.id, s.id))) }));
   const [roomId, setRoomId] = useState("");
   const settingsRoom = allRooms.find((r) => r.id === settingsRoomId);
   const open = rooms.find((r) => r.id === roomId);
@@ -385,21 +374,14 @@ function DeptClassroomSection({
         onClose={() => setSettingsRoomId("")}
         profileId={profileId}
         roomName={settingsRoom?.name ?? ""}
-        // This room's subjects (its own code and grade); ids span every grade of the name so hiding applies everywhere.
-        // One entry per name: a room can hold two subject rows with the same name.
+        classroomId={settingsRoom?.id ?? ""}
+        // This room's subjects only. One entry per name: a room can hold two subject rows with the same name.
         groups={[
-          ...new Map(
-            (settingsRoom?.subjects ?? []).map((s) => [
-              s.name,
-              {
-                name: s.name,
-                code: s.code,
-                areaId: s.areaId,
-                ids: groups.find((g) => g.name === s.name)?.ids ?? new Set([s.id]),
-                grades: new Set([settingsRoom!.gradeCode]),
-              },
-            ]),
-          ).values(),
+          ...(settingsRoom?.subjects ?? []).reduce((m, s) => {
+            const g = m.get(s.name) ?? { name: s.name, code: s.code, areaId: s.areaId, ids: new Set<string>(), grades: new Set([settingsRoom!.gradeCode]) };
+            g.ids.add(s.id);
+            return m.set(s.name, g);
+          }, new Map<string, SubjectGroup>()).values(),
         ]}
         hiddenIds={hiddenIds}
       />
@@ -704,6 +686,7 @@ function VisibleSubjectsSheet({
   onClose,
   profileId,
   roomName,
+  classroomId,
   groups,
   hiddenIds,
 }: {
@@ -711,6 +694,7 @@ function VisibleSubjectsSheet({
   onClose: () => void;
   profileId: string;
   roomName: string;
+  classroomId: string;
   groups: SubjectGroup[];
   hiddenIds: string[];
 }) {
@@ -721,7 +705,7 @@ function VisibleSubjectsSheet({
   const toast = useToast();
   const colors = useSubjectColors([]); // hue from กลุ่มสาระ only
   // A name counts as hidden when any of its subject rows is hidden.
-  const isShown = (g: SubjectGroup) => ![...g.ids].some((id) => hiddenIds.includes(id));
+  const isShown = (g: SubjectGroup) => ![...g.ids].some((id) => hiddenIds.includes(hiddenSubjectKey(classroomId, id)));
 
   // Start from the saved state each time the drawer opens.
   useEffect(() => {
@@ -756,7 +740,7 @@ function VisibleSubjectsSheet({
       g.ids.forEach((id) => (shownNames.has(g.name) ? show : hide).add(id));
     }
     save.mutate(
-      { hide: [...hide], show: [...show] },
+      { classroomId, hide: [...hide], show: [...show] },
       { onSuccess: onClose, onError: () => toast("บันทึกไม่สำเร็จ", "error") },
     );
   }
@@ -772,7 +756,7 @@ function VisibleSubjectsSheet({
         }
       }}
       title="วิชาที่จะแสดง"
-      description={`วิชาของ ${roomName} ในเทอมล่าสุด · การซ่อนมีผลกับทุกห้อง (เฉพาะคุณ)`}
+      description={`วิชาของ ${roomName} ในเทอมล่าสุด · การซ่อนมีผลเฉพาะห้องนี้ (เฉพาะคุณ)`}
       footer={
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs text-muted-foreground">
