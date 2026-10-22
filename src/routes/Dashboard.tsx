@@ -9,7 +9,7 @@ import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions }
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
 import { STARTING_SCORE, summarizeBehaviorScore, useBehaviorRecords } from "@/hooks/useBehaviorRecords";
 import { BookIcon, BuildingIcon, CheckboxIcon, ChevronForward, DocumentTextIcon, LinkIcon, PrintIcon, Search, SettingsOutlineIcon, SquareIcon, UploadOutlineIcon } from "@/components/icons";
-import { DOC_ACCEPT, findOrCreateDocLesson, useUploadDocFile } from "@/hooks/useDocuments";
+import { DOC_ACCEPT, findOrCreateDocLesson, useDeleteDocFile, useUploadDocFile } from "@/hooks/useDocuments";
 import { useAddPrintRequest, usePrintRequests } from "@/hooks/useDocPrint";
 import { openDocFile, useLinkPlanLessonFile, useUnlinkPlanLessonFile } from "@/hooks/usePlan";
 import { DocPicker } from "@/routes/CurriculumMap";
@@ -422,6 +422,7 @@ function LessonDocActions({
   const [printing, setPrinting] = useState(false);
   const link = useLinkPlanLessonFile();
   const unlink = useUnlinkPlanLessonFile();
+  const deleteFile = useDeleteDocFile();
   const qc = useQueryClient();
   const toast = useToast();
   const refresh = () => qc.invalidateQueries({ queryKey: ["dept_classroom_overview"] });
@@ -451,6 +452,21 @@ function LessonDocActions({
         onClose={() => setPicking(false)}
         title={lesson.name}
         files={lesson.files}
+        // Only your own uploads can be deleted for good (the DB also lets subject writers; this is a UI guard).
+        canDelete={(c) => c.uploadedBy === profileId}
+        onDelete={async (c) => {
+          try {
+            await deleteFile.mutateAsync({ id: c.id, file_path: c.filePath });
+            await Promise.all(
+              [["plan"], ["dept_classroom_overview"], ["doc_print_requests"]].map((queryKey) => qc.invalidateQueries({ queryKey })),
+            );
+            toast("ลบไฟล์แล้ว");
+            return true;
+          } catch {
+            toast("ลบไฟล์ไม่สำเร็จ", "error");
+            return false;
+          }
+        }}
         onApply={async (add, remove) => {
           try {
             await Promise.all([

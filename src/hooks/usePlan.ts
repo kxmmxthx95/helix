@@ -222,6 +222,8 @@ export type DocFileChoice = {
   id: string;
   title: string;
   fileName: string;
+  filePath: string;
+  uploadedBy: string | null;
   /** "รหัส ชื่อวิชา" / grade code / บทเรียน — "" when the document's lesson is not readable. */
   subjectLabel: string;
   gradeCode: string;
@@ -239,7 +241,7 @@ export function useDocFileChoices(enabled: boolean) {
     queryFn: async (): Promise<DocFileChoice[]> => {
       const { data, error } = await supabase
         .from("doc_files")
-        .select("id, title, file_name, doc_lessons(name, grade_levels(code), subjects(code, name_th, department_id, learning_area_id))")
+        .select("id, title, file_name, file_path, uploaded_by, doc_lessons(name, grade_levels(code), subjects(code, name_th, department_id, learning_area_id))")
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;
@@ -247,12 +249,16 @@ export function useDocFileChoices(enabled: boolean) {
         id: string;
         title: string;
         file_name: string;
+        file_path: string;
+        uploaded_by: string | null;
         doc_lessons: { name: string; grade_levels: { code: string } | null; subjects: { code: string; name_th: string; department_id: string; learning_area_id: string } | null } | null;
       };
       return (data as unknown as Raw[]).map((f) => ({
         id: f.id,
         title: f.title,
         fileName: f.file_name,
+        filePath: f.file_path,
+        uploadedBy: f.uploaded_by,
         subjectLabel: f.doc_lessons?.subjects ? `${f.doc_lessons.subjects.code} ${f.doc_lessons.subjects.name_th}` : "",
         gradeCode: f.doc_lessons?.grade_levels?.code ?? "",
         lessonName: f.doc_lessons?.name ?? "",
