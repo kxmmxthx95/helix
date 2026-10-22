@@ -565,6 +565,8 @@ export type PlanTopic = {
 /** Link from a ผังการเรียน หัวข้อ to an uploaded document. See migration 0089. */
 export type PlanTopicFile = { id: string; topic_id: string; doc_file_id: string; created_at: string };
 export type PlanLessonSubject = { id: string; lesson_id: string; subject_id: string; created_at: string };
+/** Subjects a user hid from the dept dashboard classroom cards (migration 0097). */
+export type DeptOverviewHiddenSubject = { profile_id: string; subject_id: string; created_at: string };
 export type PlanLessonFile = { id: string; lesson_id: string; doc_file_id: string; created_at: string };
 
 /** KG หัวข้อการประเมินพัฒนาการ, grouped under one of the 4 fixed domains. */
@@ -1531,6 +1533,7 @@ export type Database = {
       plan_subjects: Table<PlanSubject, InsertOf<PlanSubject, "color" | "icon">>;
       plan_lessons: Table<PlanLesson, InsertOf<PlanLesson, "sort_order">>;
       plan_lesson_subjects: Table<PlanLessonSubject, InsertOf<PlanLessonSubject, never>>;
+      dept_overview_hidden_subjects: Table<DeptOverviewHiddenSubject, InsertOf<DeptOverviewHiddenSubject, "created_at">>;
       plan_lesson_files: Table<PlanLessonFile, InsertOf<PlanLessonFile, never>>;
       plan_topic_files: Table<PlanTopicFile, InsertOf<PlanTopicFile, never>>;
       plan_topics: Table<PlanTopic, InsertOf<PlanTopic, "sort_order">>;

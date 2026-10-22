@@ -45,7 +45,7 @@ Schema/migration → types/client → UI. Use project skills `supabase` and `sup
 
 ## Layout
 
-See `.cursor/rules/helix-layout.mdc`. Phone/tablet = bottom tabs; desktop `lg+` = sidebar. Content column `max-w-6xl`.
+See `.cursor/rules/helix-layout.mdc`. Phone/tablet = bottom tabs; desktop `lg+` = sidebar. Content column `max-w-screen-2xl`.
 
 ## Done check
 

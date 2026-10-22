@@ -1,12 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Skeleton, Spinner } from "@/components/ui";
+import { Button, Card, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions } from "@/hooks/useAssignments";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
 import { STARTING_SCORE, summarizeBehaviorScore, useBehaviorRecords } from "@/hooks/useBehaviorRecords";
+import { BookIcon, BuildingIcon, CheckboxIcon, ChevronForward, Search, SettingsIcon, SquareIcon } from "@/components/icons";
+import { useSubjectColors } from "@/hooks/useSubjectColors";
+import { useCurrentTerm } from "@/hooks/useAcademicTerms";
+import {
+  useDeptClassroomOverview,
+  useHiddenOverviewSubjects,
+  useSetHiddenOverviewSubjects,
+} from "@/hooks/useDeptClassroomOverview";
 import { useClockIn, useClockOut, useMyTimeClock } from "@/hooks/useTimeClock";
 import {
   useCancelStudentLeaveRequest,
@@ -20,7 +28,8 @@ import {
   type StudentLeaveStatus,
   type Student,
 } from "@/lib/database.types";
-import { useRoleSubtitle } from "@/hooks/useProfiles";
+import { useDepartments, useRoleSubtitle } from "@/hooks/useProfiles";
+import { gradeShortLabel } from "@/lib/gradeLevels";
 import { cn, todayIso } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
 import { bangkokTime } from "@/routes/TimeTracking";
@@ -81,22 +90,33 @@ export function Dashboard() {
   const { data: children = [] } = useMyChildren(isParent ? (profile?.id ?? null) : null);
   const { data: schoolSettings } = useSchoolSettings();
   const students = [...(myStudent ? [myStudent] : []), ...children];
+  const isDeptOverview = profile?.roles.some((r) => r === "dept_director" || r === "super_admin") ?? false;
   const showClockWidget =
     !!profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r));
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
-      <div>
-        <h1 className="font-heading text-lg font-semibold leading-snug">
-          {greeting()}{profile && `, ${profileFullName(profile)}`}
-        </h1>
-        {profile && <p className="text-xs leading-snug text-muted-foreground">{roleSubtitle}</p>}
-      </div>
+    <div className={cn("space-y-6", !isDeptOverview && "mx-auto max-w-xl")}>
+      {!isDeptOverview && (
+        <div>
+          <h1 className="font-heading text-lg font-semibold leading-snug">
+            {greeting()}{profile && `, ${profileFullName(profile)}`}
+          </h1>
+          {profile && <p className="text-xs leading-snug text-muted-foreground">{roleSubtitle}</p>}
+        </div>
+      )}
 
       {showClockWidget && profile && (
         <Card>
           <QuickClockSection profileId={profile.id} departmentId={profile.department_id} />
         </Card>
+      )}
+
+      {profile && isDeptOverview && (
+        <DeptClassroomSection
+          profileId={profile.id}
+          departmentId={profile.department_id}
+          pickDepartment={profile.roles.includes("super_admin")}
+        />
       )}
 
       {profile &&
@@ -144,6 +164,343 @@ function SeeAll({ to }: { to: string }) {
     <Button variant="ghost" size="sm" className="-mr-2 text-accent" onClick={() => navigate(to)}>
       ดูทั้งหมด
     </Button>
+  );
+}
+
+/** role="dept_director" (own department) / "super_admin" (picks one) — ห้อง → วิชา → บทเรียน/หัวข้อย่อย of the latest term. */
+function DeptClassroomSection({
+  profileId,
+  departmentId,
+  pickDepartment,
+}: {
+  profileId: string;
+  departmentId: string | null;
+  pickDepartment: boolean;
+}) {
+  const { data: departments = [] } = useDepartments();
+  const [picked, setPicked] = useState("");
+  const deptId = (pickDepartment ? picked || departments[0]?.id : departmentId) ?? null;
+  const { data: term, isLoading: termLoading } = useCurrentTerm(deptId);
+  // teaching_assignments.term is only set for SEC (migration 0017).
+  const isSec = departments.find((d) => d.id === deptId)?.code === "SEC";
+  const { data: allRooms = [], isLoading, isError, refetch } = useDeptClassroomOverview(
+    deptId,
+    term?.academicYear ?? null,
+    isSec ? (term?.term ?? null) : null,
+  );
+  const { data: hiddenIds = [] } = useHiddenOverviewSubjects(profileId);
+  const [settingsRoomId, setSettingsRoomId] = useState("");
+  const rooms = allRooms.map((r) => ({ ...r, subjects: r.subjects.filter((s) => !hiddenIds.includes(s.id)) }));
+  // One entry per subject name; a name spans one subject row per grade level (ids), hidden together.
+  const groups = [
+    ...allRooms
+      .flatMap((r) => r.subjects.map((s) => ({ id: s.id, name: s.name, areaId: s.areaId, grade: r.gradeCode })))
+      .reduce((m, s) => {
+        const g = m.get(s.name) ?? { name: s.name, areaId: s.areaId, ids: new Set<string>(), grades: new Set<string>() };
+        g.ids.add(s.id);
+        g.grades.add(s.grade);
+        return m.set(s.name, g);
+      }, new Map<string, SubjectGroup>())
+      .values(),
+  ].sort((a, b) => a.name.localeCompare(b.name, "th"));
+  const [roomId, setRoomId] = useState("");
+  const settingsRoom = allRooms.find((r) => r.id === settingsRoomId);
+  const open = rooms.find((r) => r.id === roomId);
+  const loading = termLoading || isLoading;
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className={SECTION_TITLE}>
+          ห้องเรียน{term && ` · ปีการศึกษา ${term.academicYear}${isSec ? ` ภาคเรียน ${term.term}` : ""}`}
+        </h2>
+        <div className="flex items-center gap-2">
+          {pickDepartment && (
+            <Select
+              aria-label="แผนก"
+              className="w-auto"
+              value={deptId ?? ""}
+              onChange={(e) => {
+                setPicked(e.target.value);
+                setRoomId("");
+              }}
+            >
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </Select>
+          )}
+        </div>
+      </div>
+      {loading && <Skeleton className="h-10 w-full" />}
+      {isError && <LoadError onRetry={() => void refetch()} />}
+      {!loading && !isError && rooms.length === 0 && (
+        <p className="text-sm text-muted-foreground">ยังไม่มีห้องเรียนที่มีรายวิชาในเทอมล่าสุด</p>
+      )}
+      {open ? (
+        <div className="space-y-3">
+          <Button size="sm" variant="ghost" onClick={() => setRoomId("")}>
+            <ChevronForward className="h-3 w-3 rotate-180" /> ห้องเรียนทั้งหมด
+          </Button>
+          <h3 className="text-base font-bold">{open.name}</h3>
+          {open.subjects.length === 0 && <p className="text-sm text-muted-foreground">ไม่มีวิชาที่แสดง</p>}
+          <ul className="space-y-2">
+            {open.subjects.map((s) => (
+              <li key={s.id}>
+                <details className="rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
+                  <summary className="cursor-pointer text-sm font-bold">
+                    {s.name}
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      {s.teachers.length > 0 && ` · ${s.teachers.join(", ")}`} · {s.lessons.length} บทเรียน
+                    </span>
+                  </summary>
+                  {s.lessons.length === 0 ? (
+                    <p className="mt-2 text-xs text-muted-foreground">ยังไม่มีบทเรียนในผังการเรียน</p>
+                  ) : (
+                    <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
+                      {s.lessons.map((l) => (
+                        <li key={l.id}>
+                          {l.name}
+                          {l.topics.length > 0 && (
+                            <ul className="list-disc pl-5 text-xs text-muted-foreground">
+                              {l.topics.map((t) => (
+                                <li key={t.id}>{t.name}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </details>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {rooms.map((room) => {
+            const lessons = room.subjects.flatMap((s) => s.lessons);
+            return (
+              <div
+                key={room.id}
+                className="relative flex flex-col rounded-2xl border border-border bg-card shadow-sm hover:shadow-md"
+              >
+                <button type="button" onClick={() => setRoomId(room.id)} className="flex flex-col gap-3 p-4 text-left">
+                  <div className="flex min-w-0 items-start gap-3 pr-8">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                      <BuildingIcon className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-bold">{room.name}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {room.subjects.length} วิชา · {lessons.length} บท · {lessons.reduce((n, l) => n + l.topics.length, 0)} หัวข้อ
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-auto flex justify-end pt-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-foreground">
+                      <ChevronForward className="h-3.5 w-3.5" />
+                    </span>
+                  </div>
+                </button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="absolute right-2 top-2"
+                  aria-label={`ตั้งค่าวิชาที่จะแสดง ${room.name}`}
+                  onClick={() => setSettingsRoomId(room.id)}
+                >
+                  <SettingsIcon className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <VisibleSubjectsSheet
+        open={!!settingsRoom}
+        onClose={() => setSettingsRoomId("")}
+        profileId={profileId}
+        roomName={settingsRoom?.name ?? ""}
+        groups={groups.filter((g) => settingsRoom?.subjects.some((s) => s.name === g.name))}
+        hiddenIds={hiddenIds}
+      />
+    </section>
+  );
+}
+
+type SubjectGroup = { name: string; areaId: string | null; ids: Set<string>; grades: Set<string> };
+type ShownFilter = "all" | "on" | "off";
+
+/** Choose which subjects the overview shows (ticked = shown); same drawer shape as ติดแท็กรายวิชา in CurriculumMap. */
+function VisibleSubjectsSheet({
+  open,
+  onClose,
+  profileId,
+  roomName,
+  groups,
+  hiddenIds,
+}: {
+  open: boolean;
+  onClose: () => void;
+  profileId: string;
+  roomName: string;
+  groups: SubjectGroup[];
+  hiddenIds: string[];
+}) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<ShownFilter>("all");
+  const [shownNames, setShownNames] = useState<Set<string>>(new Set());
+  const save = useSetHiddenOverviewSubjects(profileId);
+  const toast = useToast();
+  const colors = useSubjectColors([]); // hue from กลุ่มสาระ only
+  // A name counts as hidden when any of its subject rows is hidden.
+  const isShown = (g: SubjectGroup) => ![...g.ids].some((id) => hiddenIds.includes(id));
+
+  // Start from the saved state each time the drawer opens.
+  useEffect(() => {
+    if (open) setShownNames(new Set(groups.filter(isShown).map((g) => g.name)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-seed on open only, not on every refetch
+  }, [open]);
+
+  const q = search.trim().toLowerCase();
+  const shown = groups
+    .filter((g) => !q || g.name.toLowerCase().includes(q))
+    .filter((g) => filter === "all" || (filter === "on") === shownNames.has(g.name));
+  const chips: [ShownFilter, string, number][] = [
+    ["all", "ทั้งหมด", groups.length],
+    ["on", "แสดงอยู่", groups.filter((g) => shownNames.has(g.name)).length],
+    ["off", "ซ่อนอยู่", groups.filter((g) => !shownNames.has(g.name)).length],
+  ];
+  const changed = groups.some((g) => shownNames.has(g.name) !== isShown(g));
+
+  function toggle(name: string) {
+    setShownNames((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(name)) next.add(name);
+      return next;
+    });
+  }
+
+  function apply() {
+    const hide: string[] = [];
+    const show: string[] = [];
+    for (const g of groups) {
+      if (shownNames.has(g.name) === isShown(g)) continue;
+      (shownNames.has(g.name) ? show : hide).push(...g.ids);
+    }
+    save.mutate(
+      { hide, show },
+      { onSuccess: onClose, onError: () => toast("บันทึกไม่สำเร็จ", "error") },
+    );
+  }
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) {
+          setSearch("");
+          setFilter("all");
+          onClose();
+        }
+      }}
+      title="วิชาที่จะแสดง"
+      description={`วิชาของ ${roomName} ในเทอมล่าสุด · การซ่อนมีผลกับทุกห้อง (เฉพาะคุณ)`}
+      footer={
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground">
+            แสดง {shownNames.size} จาก {groups.length} วิชา
+          </p>
+          {shownNames.size < groups.length && (
+            <button
+              type="button"
+              onClick={() => setShownNames(new Set(groups.map((g) => g.name)))}
+              className="text-xs text-accent hover:underline"
+            >
+              แสดงทั้งหมด
+            </button>
+          )}
+          <div className="ml-auto flex gap-2">
+            <Button variant="outline" onClick={onClose}>
+              ยกเลิก
+            </Button>
+            <Button onClick={apply} disabled={!changed || save.isPending}>
+              {save.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหาชื่อวิชา..."
+            aria-label="ค้นหารายวิชา"
+          />
+        </div>
+        <div className="scrollbar-hidden -mx-1 flex gap-2 overflow-x-auto px-1 py-1">
+          {chips.map(([key, label, n]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key)}
+              className={cn(
+                "shrink-0 rounded-full border px-3.5 py-1.5 text-xs transition-colors",
+                filter === key
+                  ? "border-accent bg-accent/10 font-medium text-accent"
+                  : "border-transparent bg-muted text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {label} ({n})
+            </button>
+          ))}
+        </div>
+        <ul className="space-y-2">
+          {shown.map((g) => {
+            const checked = shownNames.has(g.name);
+            const grades = [...g.grades].sort();
+            return (
+              <li key={g.name}>
+                <button
+                  type="button"
+                  onClick={() => toggle(g.name)}
+                  aria-pressed={checked}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors",
+                    checked ? "border-accent/50 bg-accent/5" : "border-border hover:bg-muted/50",
+                  )}
+                >
+                  {checked ? (
+                    <CheckboxIcon className="h-5 w-5 shrink-0 text-accent" />
+                  ) : (
+                    <SquareIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", colors.shade(g.areaId))}>
+                    <BookIcon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 flex-1 font-sarabun leading-tight">
+                    <p className="truncate text-sm font-medium text-foreground">{g.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{grades.map(gradeShortLabel).join(" · ")}</p>
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+          {shown.length === 0 && (
+            <li className="py-8 text-center text-sm text-muted-foreground">ไม่พบรายวิชาที่ตรงเงื่อนไข</li>
+          )}
+        </ul>
+      </div>
+    </Sheet>
   );
 }
 
