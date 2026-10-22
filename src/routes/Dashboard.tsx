@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { Modal } from "@/components/Modal";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions } from "@/hooks/useAssignments";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
@@ -226,9 +226,9 @@ function DeptClassroomSection({
   const loading = termLoading || isLoading;
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-3 pb-12">
       <div className="flex items-center justify-between gap-2">
-        <h2 className={SECTION_TITLE}>
+        <h2 className="text-base font-bold text-foreground">
           ห้องเรียน{term && ` · ปีการศึกษา ${term.academicYear}${isSec ? ` ภาคเรียน ${term.term}` : ""}`}
         </h2>
         <div className="flex items-center gap-2">
@@ -254,7 +254,12 @@ function DeptClassroomSection({
       {loading && <Skeleton className="h-10 w-full" />}
       {isError && <LoadError onRetry={() => void refetch()} />}
       {!loading && !isError && rooms.length === 0 && (
-        <p className="text-sm text-muted-foreground">ยังไม่มีห้องเรียนที่มีรายวิชาในเทอมล่าสุด</p>
+        <EmptyState
+          className="min-h-[60vh]"
+          icon={BuildingIcon}
+          title="ยังไม่มีห้องเรียน"
+          description={pickDepartment ? "แผนกนี้ยังไม่มีห้องเรียนที่มีรายวิชาในเทอมล่าสุด ลองเลือกแผนกอื่น" : "ยังไม่มีห้องเรียนที่มีรายวิชาในเทอมล่าสุด"}
+        />
       )}
       {open ? (
         <div className="space-y-3">
@@ -315,22 +320,18 @@ function DeptClassroomSection({
                     key={s.id}
                     type="button"
                     onClick={() => setSubjectId(s.id)}
-                    className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm hover:shadow-md"
+                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
                   >
-                    <div className="flex min-w-0 items-start gap-3">
-                      {subjectTile(s.areaId)}
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-xs text-muted-foreground">{s.code}</div>
-                        <div className="truncate text-sm font-bold">{s.name}</div>
-                        <div className="truncate text-[11px] text-muted-foreground">{s.teachers.join(", ") || "ไม่ระบุครู"}</div>
-                        <div className="text-[11px] text-muted-foreground">{subjectCounts(s)}</div>
-                      </div>
+                    {subjectTile(s.areaId)}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="text-sm font-semibold text-foreground/70">{s.code}</div>
+                      <div className="line-clamp-2 text-base font-bold leading-snug text-foreground">{s.name}</div>
+                      <div className="text-sm text-foreground/80">{s.teachers.join(", ") || "ไม่ระบุครู"}</div>
+                      <div className="text-sm font-medium text-foreground/70">{subjectCounts(s)}</div>
                     </div>
-                    <div className="mt-auto flex justify-end pt-2">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-foreground">
-                        <ChevronForward className="h-3.5 w-3.5" />
-                      </span>
-                    </div>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center self-end rounded-lg bg-muted text-foreground">
+                      <ChevronForward className="h-4 w-4" />
+                    </span>
                   </button>
                 ))}
               </div>
@@ -349,28 +350,26 @@ function DeptClassroomSection({
                 <button type="button" onClick={() => {
                     setRoomId(room.id);
                     setSubjectId("");
-                  }} className="flex flex-col gap-3 p-4 text-left">
-                  <div className="flex min-w-0 items-start gap-3 pr-8">
+                  }} className="flex items-center gap-3 rounded-2xl p-4 pr-12 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
                       <BuildingIcon className="h-6 w-6" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-bold">{room.name}</div>
-                      <div className="text-[11px] text-muted-foreground">
+                      <div className="truncate text-base font-bold leading-snug text-foreground">{room.name}</div>
+                      <div className="truncate text-sm font-medium text-foreground/70">
                         {room.subjects.length} วิชา · {lessons.length} บท · {lessons.reduce((n, l) => n + l.topics.length, 0)} หัวข้อ
                       </div>
                     </div>
                   </div>
-                  <div className="mt-auto flex justify-end pt-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-foreground">
-                      <ChevronForward className="h-3.5 w-3.5" />
-                    </span>
-                  </div>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
+                    <ChevronForward className="h-4 w-4" />
+                  </span>
                 </button>
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="absolute right-2 top-2"
+                  className="absolute right-2 top-2 text-foreground/70"
                   aria-label={`ตั้งค่าวิชาที่จะแสดง ${room.name}`}
                   onClick={() => setSettingsRoomId(room.id)}
                 >
