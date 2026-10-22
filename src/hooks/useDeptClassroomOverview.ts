@@ -12,7 +12,7 @@ export type OverviewLesson = {
   name: string;
   /** Every linked document, in link order (file is null where doc_files RLS hides it). */
   files: PlanLinkedFile[];
-  file: { id: string; name: string; path: string } | null;
+  file: { linkId: string; id: string; name: string; path: string } | null;
   topics: { id: string; name: string }[] };
 export type OverviewSubject = { id: string; code: string; name: string; areaId: string | null; teachers: string[]; lessons: OverviewLesson[] };
 export type OverviewClassroom = { id: string; name: string; gradeLevelId: string; gradeCode: string; subjects: OverviewSubject[] };
@@ -88,12 +88,13 @@ export function useDeptClassroomOverview(departmentId: string | null, academicYe
                 const files = [...l.files]
                   .sort((a, b) => a.created_at.localeCompare(b.created_at))
                   .map((f) => ({ linkId: f.id, file: f.doc_files }));
-                const doc = files.find((f) => f.file)?.file;
+                const first = files.find((f) => f.file);
+                const doc = first?.file;
                 return {
                   id: l.id,
                   name: l.name,
                   files,
-                  file: doc ? { id: doc.id, name: doc.file_name, path: doc.file_path } : null,
+                  file: doc ? { linkId: first!.linkId, id: doc.id, name: doc.file_name, path: doc.file_path } : null,
                   topics: [...l.topics].sort(bySort),
                 };
               }),

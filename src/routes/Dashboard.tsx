@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { Modal } from "@/components/Modal";
@@ -8,7 +8,7 @@ import { useToast } from "@/components/Toast";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions } from "@/hooks/useAssignments";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
 import { STARTING_SCORE, summarizeBehaviorScore, useBehaviorRecords } from "@/hooks/useBehaviorRecords";
-import { BookIcon, BuildingIcon, CheckboxIcon, ChevronForward, DocumentTextIcon, LinkIcon, PrintIcon, Search, SettingsOutlineIcon, SquareIcon, UploadOutlineIcon } from "@/components/icons";
+import { BookIcon, BuildingIcon, CheckboxIcon, ChevronForward, DocumentTextIcon, LinkIcon, PrintIcon, Search, SettingsOutlineIcon, SquareIcon, TrashIcon, UploadOutlineIcon } from "@/components/icons";
 import { DOC_ACCEPT, findOrCreateDocLesson, useDeleteDocFile, useUploadDocFile } from "@/hooks/useDocuments";
 import { useAddPrintRequest, usePrintRequests } from "@/hooks/useDocPrint";
 import { openDocFile, useLinkPlanLessonFile, useUnlinkPlanLessonFile } from "@/hooks/usePlan";
@@ -420,28 +420,81 @@ function LessonDocActions({
   const [picking, setPicking] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const link = useLinkPlanLessonFile();
   const unlink = useUnlinkPlanLessonFile();
   const deleteFile = useDeleteDocFile();
   const qc = useQueryClient();
   const toast = useToast();
   const refresh = () => qc.invalidateQueries({ queryKey: ["dept_classroom_overview"] });
-  const iconButton = (label: string, onClick: () => void, icon: React.ReactNode) => (
-    <Button size="icon" variant="ghost" className="-my-1.5 shrink-0" aria-label={label} onClick={onClick}>
+
+  // Close the document menu on an outside click or Esc.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const away = (e: MouseEvent) => !menuRef.current?.contains(e.target as Node) && setMenuOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [menuOpen]);
+  const iconButton = (label: string, onClick: () => void, icon: React.ReactNode, aria?: React.AriaAttributes & { "aria-haspopup"?: "menu" }) => (
+    <Button size="icon" variant="ghost" className="-my-1.5 shrink-0" aria-label={label} onClick={onClick} {...aria}>
       {icon}
     </Button>
   );
 
   return (
     <div className="-mr-2 flex shrink-0 items-center">
-      {lesson.file &&
-        iconButton(
-          `เปิดเอกสารการสอน ${lesson.file.name}`,
-          async () => {
-            if (!(await openDocFile(lesson.file!.path))) toast("เปิดเอกสารไม่สำเร็จ", "error");
-          },
-          <DocumentTextIcon className="h-4 w-4" />,
-        )}
+      {lesson.file && (
+        <div ref={menuRef} className="relative">
+          {iconButton(
+            `เอกสารการสอน ${lesson.file.name}`,
+            () => setMenuOpen((v) => !v),
+            <DocumentTextIcon className="h-4 w-4" />,
+            { "aria-haspopup": "menu", "aria-expanded": menuOpen },
+          )}
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-xl border border-border bg-card py-1 text-sm shadow-lg"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted"
+                onClick={async () => {
+                  setMenuOpen(false);
+                  if (!(await openDocFile(lesson.file!.path))) toast("เปิดเอกสารไม่สำเร็จ", "error");
+                }}
+              >
+                <DocumentTextIcon className="h-4 w-4" /> ดูเอกสาร
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-destructive hover:bg-muted"
+                onClick={() => {
+                  setMenuOpen(false);
+                  if (!confirm(`เอาเอกสาร "${lesson.file!.name}" ออกจากบทเรียนนี้? (ไฟล์ยังอยู่ในระบบเอกสาร)`)) return;
+                  unlink.mutate(lesson.file!.linkId, {
+                    onSuccess: () => {
+                      void refresh();
+                      toast("เอาเอกสารออกแล้ว");
+                    },
+                    onError: () => toast("เอาเอกสารออกไม่สำเร็จ", "error"),
+                  });
+                }}
+              >
+                <TrashIcon className="h-4 w-4" /> ลบเอกสาร
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {lesson.file && iconButton(`ส่ง ${lesson.file.name} เข้ารายการพิมพ์`, () => setPrinting(true), <PrintIcon className="h-4 w-4" />)}
       {iconButton(`เชื่อมต่อเอกสารกับบทเรียน ${lesson.name}`, () => setPicking(true), <LinkIcon className="h-4 w-4" />)}
       {iconButton(`อัปโหลดเอกสารของบทเรียน ${lesson.name}`, () => setUploading(true), <UploadOutlineIcon className="h-4 w-4" />)}
