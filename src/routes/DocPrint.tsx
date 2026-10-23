@@ -4,7 +4,7 @@ import { AppsIcon, CheckboxIcon, DocumentTextIcon, ListIcon, MailIcon, Plus, Pri
 import { FileTile } from "@/components/FileTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, EmptyState, Input, PageFooter, Select, Skeleton, Spinner } from "@/components/ui";
+import { Button, EmptyState, Input, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
 import { useLearningAreas } from "@/hooks/useCurriculum";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 // รายการพิมพ์ — หัวหน้างานขึ้นไปเลือกเอกสารที่ครูอัปโหลดส่งให้ธุรการพิมพ์. See migration 0093.
 
 const PAGE = 20;
-const LIST_PAGE = 10; // request cards are tall, so fewer per page than the picker
+const LIST_PAGE = 10; // same page size as the ตรวจเอกสาร tab
 type Filter = "all" | "pending" | "printed";
 
 export function PrintListTab() {
@@ -50,7 +50,7 @@ export function PrintListTab() {
   ];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="page-fill">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="text-base font-bold">รายการพิมพ์</h2>
@@ -142,7 +142,9 @@ export function PrintListTab() {
           ))}
         </ul>
       )}
-      <PageFooter shown={pageRows.length} total={shown.length} page={page} pageCount={pageCount} onChange={setPage} />
+      <div className="mt-auto">
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+      </div>
 
       <EmailHistorySheet open={history} onClose={() => setHistory(false)} />
       {mayRequest && (

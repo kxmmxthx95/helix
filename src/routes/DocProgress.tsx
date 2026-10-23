@@ -913,7 +913,7 @@ export function ReviewDocsTab() {
         ),
     )
     .sort((a, b) => (sort === "newest" ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt)));
-  const { page, setPage, pageCount, pageRows } = usePagination(shown, [tab, search, sort], 20);
+  const { page, setPage, pageCount, pageRows } = usePagination(shown, [tab, search, sort], 10);
 
   const teacherCell = (id: string) => {
     const p = personById.get(id);
