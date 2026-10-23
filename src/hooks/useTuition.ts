@@ -112,6 +112,17 @@ export function useSetTuitionTermAmount() {
   });
 }
 
+export function useUpdateTuitionInvoiceAmount() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ id, amount }: { id: string; amount: number }) => {
+      const { error } = await supabase.from("tuition_invoices").update({ amount }).eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: invalidate,
+  });
+}
+
 export function useReplaceTuitionInvoiceFile() {
   const invalidate = useInvalidate();
   return useMutation({

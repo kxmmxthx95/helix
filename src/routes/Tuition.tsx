@@ -7,6 +7,7 @@ import { Button, Card, EmptyState, Field, Input, Pagination, Select, Skeleton } 
 import { useAllAcademicTerms } from "@/hooks/useAcademicTerms";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useClassroomsByDepartment, useCurrentClassroomEnrollmentsByDepartment } from "@/hooks/useStatusManagement";
+import { useFitRows } from "@/hooks/useFitRows";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useStudents, type StudentListItem } from "@/hooks/useStudents";
@@ -18,6 +19,7 @@ import {
   useRecordTuitionPayment,
   useReplaceTuitionInvoiceFile,
   useSetTuitionTermAmount,
+  useUpdateTuitionInvoiceAmount,
   useTuitionInvoices,
   useTuitionTermAmount,
   useVoidTuitionPayment,
@@ -208,6 +210,7 @@ function StaffView({ meId }: { meId: string }) {
     classroomId: classroomId || undefined,
   });
   const { data: invoices = [], isLoading: loadingInvoices } = useTuitionInvoices(termId || null);
+  const { data: termAmount } = useTuitionTermAmount(termId || null);
 
   const today = todayIso();
   const rows = useMemo(() => {
@@ -215,6 +218,7 @@ function StaffView({ meId }: { meId: string }) {
     for (const inv of invoices) byStudent.set(inv.student_id, [...(byStudent.get(inv.student_id) ?? []), inv]);
     return students.map((s) => ({
       student: s,
+      live: (byStudent.get(s.id) ?? []).filter((i) => i.status !== "cancelled"),
       ...summarizeStudent(
         (byStudent.get(s.id) ?? []).map((i) => ({ invoice: i, payments: i.tuition_payments })),
         today,
@@ -224,7 +228,9 @@ function StaffView({ meId }: { meId: string }) {
 
   const counts = STATE_ORDER.map((st) => ({ st, n: rows.filter((r) => r.state === st).length }));
   const shown = stateFilter ? rows.filter((r) => r.state === stateFilter) : rows;
-  const { page, setPage, pageCount, pageRows } = usePagination(shown, [deptId, termId, gradeId, classroomId, search, stateFilter]);
+  // Pager (py-3 + text-xs ≈ 48px) plus the gap above it.
+  const fit = useFitRows({ reserve: 60 });
+  const { page, setPage, pageCount, pageRows } = usePagination(shown, [deptId, termId, gradeId, classroomId, search, stateFilter], fit.rows);
   const gradeName = (id: string | null) => grades.find((g) => g.id === id)?.name ?? "—";
 
   return (
@@ -310,7 +316,7 @@ function StaffView({ meId }: { meId: string }) {
               </span>
             ))}
           </div>
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <div ref={fit.ref} style={{ minHeight: fit.minHeight }} className="scrollbar-hidden overflow-x-auto border-y border-border bg-card">
             <table className="w-full text-xs">
               <thead className="bg-muted text-left text-xs text-muted-foreground">
                 <tr>
@@ -326,7 +332,7 @@ function StaffView({ meId }: { meId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map(({ student: s, count, total, outstanding, state }) => (
+                {pageRows.map(({ student: s, live, count, total, outstanding, state }) => (
                   <tr
                     key={s.id}
                     tabIndex={0}
@@ -339,7 +345,9 @@ function StaffView({ meId }: { meId: string }) {
                     <td className="px-3 py-0">{gradeName(s.grade_level_id)}</td>
                     <td className="px-3 py-0">{roomOf.get(s.id) ?? "—"}</td>
                     <td className="px-3 py-0 text-right">{count}</td>
-                    <td className="px-3 py-0 text-right">{count ? formatBaht(total) : "—"}</td>
+                    <td className="px-3 py-0 text-right">
+                      <AmountCell studentId={s.id} live={live} total={total} standard={termAmount?.amount ?? null} term={term} meId={meId} today={today} />
+                    </td>
                     <td className="px-3 py-0 text-right">{count ? formatBaht(outstanding) : "—"}</td>
                     <td className="px-3 py-0">
                       <span className={cn("rounded-full px-2 py-0.5 text-[10px]", STUDENT_STATE_TONE[state])}>{STUDENT_TUITION_LABEL[state]}</span>
@@ -408,6 +416,88 @@ function StaffView({ meId }: { meId: string }) {
         />
       )}
     </div>
+  );
+}
+
+// ------------------------------------------------------ inline amount cell
+
+/**
+ * Click-to-edit "ยอดรวม". No live invoice: saving creates one (no PDF yet). One live invoice:
+ * saving edits its amount (the DB refuses anything below what is already paid). Several:
+ * read-only here — the row opens the student sheet instead.
+ */
+function AmountCell({
+  studentId,
+  live,
+  total,
+  standard,
+  term,
+  meId,
+  today,
+}: {
+  studentId: string;
+  live: TuitionInvoiceRow[];
+  total: number;
+  standard: number | null;
+  term: Pick<AcademicTerm, "id" | "academic_year" | "term_type"> | null;
+  meId: string;
+  today: string;
+}) {
+  const toast = useToast();
+  const create = useBulkCreateTuitionInvoices();
+  const update = useUpdateTuitionInvoiceAmount();
+  const [value, setValue] = useState<string | null>(null);
+  const shown = live.length ? formatBaht(total) : standard != null ? formatBaht(standard) : "—";
+  if (live.length > 1) return <>{shown}</>;
+
+  const current = live[0] ? live[0].amount : standard;
+  const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+  const done = { onSuccess: () => (toast("บันทึกยอดแล้ว"), setValue(null)), onError: (e: unknown) => toast(errMsg(e), "error") };
+
+  const save = () => {
+    const amt = Number(value);
+    if (!(amt > 0) || !term) return;
+    if (live[0]) {
+      const paid = summarizeInvoice(live[0], live[0].tuition_payments, today).paid;
+      if (amt < paid) return toast(`ยอดต้องไม่ต่ำกว่ายอดที่ชำระแล้ว (${formatBaht(paid)})`, "error");
+      update.mutate({ id: live[0].id, amount: amt }, done);
+    } else {
+      create.mutate([{ student_id: studentId, term_id: term.id, title: `ค่าเทอม ${termLabel(term)}`, amount: amt, due_date: null, created_by: meId }], done);
+    }
+  };
+
+  if (value === null)
+    return (
+      <button
+        type="button"
+        title="แก้ยอด"
+        className={cn("rounded px-1 [font-family:inherit] hover:bg-foreground/10", !live.length && "text-muted-foreground")}
+        onClick={(e) => (stop(e), setValue(current != null ? String(current) : ""))}
+        onKeyDown={stop}
+      >
+        {shown}
+      </button>
+    );
+  return (
+    <Input
+      autoFocus
+      type="number"
+      inputMode="decimal"
+      min="0"
+      step="0.01"
+      aria-label="ยอดรวม"
+      className="ml-auto h-7 w-28 text-right text-xs"
+      value={value}
+      disabled={create.isPending || update.isPending}
+      onChange={(e) => setValue(e.target.value)}
+      onClick={stop}
+      onBlur={() => !(create.isPending || update.isPending) && setValue(null)}
+      onKeyDown={(e) => {
+        stop(e);
+        if (e.key === "Enter") save();
+        if (e.key === "Escape") setValue(null);
+      }}
+    />
   );
 }
 
