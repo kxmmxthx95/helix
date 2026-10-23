@@ -174,7 +174,7 @@ export function DocProgressTab() {
   ];
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {cards.map((c) => (
           <button key={c.label} type="button" aria-pressed={statusFilter === c.status} onClick={() => setStatusFilter(c.status)} className="group text-left">

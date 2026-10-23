@@ -254,7 +254,7 @@ export function DocCoverageTab() {
   );
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative min-w-56 flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />

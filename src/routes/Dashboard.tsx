@@ -215,7 +215,7 @@ function DeptClassroomSection({
   const loading = termLoading || isLoading;
 
   return (
-    <section className="space-y-3 pb-12">
+    <section className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         {open && (
           <Button size="sm" variant="ghost" onClick={() => (openSubject ? setSubjectId("") : setRoomId(""))}>
