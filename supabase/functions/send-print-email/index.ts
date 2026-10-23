@@ -20,7 +20,11 @@ function json(body: unknown, status = 200) {
 }
 
 const BUCKET = "subject-documents";
-const MAX_BYTES = 15 * 1024 * 1024; // base64 adds ~37%; Gmail caps a message at 25MB
+const MAX_BYTES = 30 * 1024 * 1024; // mirrors the bucket's file_size_limit
+// Gmail caps a message at 25MB and base64 adds ~37%, so ~18MB is the largest real attachment.
+// Bigger files go out as a signed download link instead.
+const MAX_ATTACH_BYTES = 18 * 1024 * 1024;
+const LINK_TTL_SECONDS = 7 * 24 * 3600;
 const MAX_RECIPIENTS = 5;
 const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
 
@@ -76,7 +80,7 @@ async function handle(req: Request): Promise<Response> {
   const admin = createClient(supabaseUrl, serviceRoleKey);
   const { data: blob, error: dlError } = await admin.storage.from(BUCKET).download(file.file_path);
   if (dlError || !blob) return json({ error: "ดาวน์โหลดไฟล์ไม่สำเร็จ" }, 500);
-  if (blob.size > MAX_BYTES) return json({ error: "ไฟล์ใหญ่เกิน 15MB ส่งทางอีเมลไม่ได้" }, 400);
+  if (blob.size > MAX_BYTES) return json({ error: "ไฟล์ใหญ่เกิน 30MB ส่งทางอีเมลไม่ได้" }, 400);
 
   const { data: me } = await admin.from("profiles").select("first_name, last_name").eq("id", caller.id).maybeSingle();
   const sender = me ? `${me.first_name} ${me.last_name}` : "ผู้ใช้ระบบ";
@@ -84,6 +88,14 @@ async function handle(req: Request): Promise<Response> {
 
   const lines = [`ไฟล์: ${file.title}`, `จำนวน: ${r.copies} ชุด`];
   if (r.note) lines.push(`หมายเหตุ: ${r.note}`);
+  const asLink = blob.size > MAX_ATTACH_BYTES;
+  if (asLink) {
+    const { data: signed, error: signError } = await admin.storage
+      .from(BUCKET)
+      .createSignedUrl(file.file_path, LINK_TTL_SECONDS, { download: file.file_name });
+    if (signError || !signed) return json({ error: "สร้างลิงก์ดาวน์โหลดไม่สำเร็จ" }, 500);
+    lines.push(`ไฟล์ใหญ่เกินกว่าจะแนบ ดาวน์โหลดได้ที่ (ลิงก์หมดอายุใน 7 วัน): ${signed.signedUrl}`);
+  }
   lines.push("", `ส่งโดย ${sender} (Helix)`);
 
   const transport = nodemailer.createTransport({
@@ -113,13 +125,15 @@ async function handle(req: Request): Promise<Response> {
       to,
       subject: `ขอให้พิมพ์เอกสาร: ${file.title} (${r.copies} ชุด)`,
       text: lines.join("\n"),
-      attachments: [
-        {
-          filename: file.file_name,
-          content: new Uint8Array(await blob.arrayBuffer()),
-          contentType: blob.type || "application/octet-stream",
-        },
-      ],
+      attachments: asLink
+        ? []
+        : [
+            {
+              filename: file.file_name,
+              content: new Uint8Array(await blob.arrayBuffer()),
+              contentType: blob.type || "application/octet-stream",
+            },
+          ],
     });
   } catch (e) {
     await record("failed", (e as Error).message.slice(0, 500));
