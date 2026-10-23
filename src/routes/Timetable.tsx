@@ -118,7 +118,7 @@ export function Timetable() {
 
   if (isStudent) {
     return myClassroom ? (
-      <div className="space-y-4 pb-8">
+      <div className="space-y-4">
         <div className="flex items-center gap-2">
         {splitsByTerm && (
           <div className="inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
@@ -172,7 +172,7 @@ export function Timetable() {
   }
 
   return (
-    <div className="page-fill shrink-0 pb-8">
+    <div className="page-fill shrink-0">
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <Select
           className="h-8 w-auto min-w-[10rem] shrink-0"

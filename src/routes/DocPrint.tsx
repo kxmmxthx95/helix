@@ -4,8 +4,9 @@ import { AppsIcon, CheckboxIcon, DocumentTextIcon, ListIcon, MailIcon, Plus, Pri
 import { FileTile } from "@/components/FileTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, EmptyState, Input, Select, Skeleton, Spinner } from "@/components/ui";
+import { Button, EmptyState, Input, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
 import { useLearningAreas } from "@/hooks/useCurriculum";
+import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import {
   useAddPrintRequests,
@@ -27,6 +28,7 @@ import { cn } from "@/lib/utils";
 // รายการพิมพ์ — หัวหน้างานขึ้นไปเลือกเอกสารที่ครูอัปโหลดส่งให้ธุรการพิมพ์. See migration 0093.
 
 const PAGE = 20;
+const LIST_PAGE = 10; // same page size as the ตรวจเอกสาร tab
 type Filter = "all" | "pending" | "printed";
 
 export function PrintListTab() {
@@ -36,11 +38,10 @@ export function PrintListTab() {
   const [filter, setFilter] = useState<Filter>("pending");
   const [adding, setAdding] = useState(false);
   const [history, setHistory] = useState(false);
-  const [limit, setLimit] = useState(PAGE);
   const [view, setView] = useState<"card" | "table">("card");
-  useEffect(() => setLimit(PAGE), [filter]);
 
   const shown = requests.filter((r) => filter === "all" || r.status === filter);
+  const { page, setPage, pageCount, pageRows } = usePagination(shown, [filter], LIST_PAGE);
   const count = (s: Filter) => requests.filter((r) => s === "all" || r.status === s).length;
   const chips: [Filter, string][] = [
     ["pending", "รอพิมพ์"],
@@ -49,7 +50,7 @@ export function PrintListTab() {
   ];
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="page-fill">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="text-base font-bold">รายการพิมพ์</h2>
@@ -128,7 +129,7 @@ export function PrintListTab() {
               </tr>
             </thead>
             <tbody>
-              {shown.slice(0, limit).map((r) => (
+              {pageRows.map((r) => (
                 <RequestTableRow key={r.id} request={r} mayRequest={mayRequest} />
               ))}
             </tbody>
@@ -136,16 +137,14 @@ export function PrintListTab() {
         </div>
       ) : (
         <ul className="space-y-2">
-          {shown.slice(0, limit).map((r) => (
+          {pageRows.map((r) => (
             <RequestRow key={r.id} request={r} mayRequest={mayRequest} />
           ))}
         </ul>
       )}
-      {shown.length > limit && (
-        <Button variant="outline" className="w-full" onClick={() => setLimit((n) => n + PAGE)}>
-          แสดงเพิ่ม (เหลือ {shown.length - limit} รายการ)
-        </Button>
-      )}
+      <div className="mt-auto">
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+      </div>
 
       <EmailHistorySheet open={history} onClose={() => setHistory(false)} />
       {mayRequest && (

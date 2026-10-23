@@ -174,7 +174,7 @@ export function DocProgressTab() {
   ];
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
         {cards.map((c) => (
           <button key={c.label} type="button" aria-pressed={statusFilter === c.status} onClick={() => setStatusFilter(c.status)} className="group text-left">
@@ -913,7 +913,7 @@ export function ReviewDocsTab() {
         ),
     )
     .sort((a, b) => (sort === "newest" ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt)));
-  const { page, setPage, pageCount, pageRows } = usePagination(shown, [tab, search, sort], 20);
+  const { page, setPage, pageCount, pageRows } = usePagination(shown, [tab, search, sort], 10);
 
   const teacherCell = (id: string) => {
     const p = personById.get(id);

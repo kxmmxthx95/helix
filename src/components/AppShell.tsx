@@ -854,7 +854,7 @@ function AppShellInner() {
         )}
 
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges]">
-          <div className="mx-auto flex min-h-full w-full max-w-screen-2xl flex-1 flex-col px-shell pb-[max(2rem,env(safe-area-inset-bottom))]">
+          <div className="mx-auto flex min-h-full w-full max-w-screen-2xl flex-1 flex-col px-shell pb-[max(3rem,env(safe-area-inset-bottom))]">
             <header
               className={cn(
                 "sticky top-0 z-20 hidden h-12 shrink-0 items-center bg-background dark:bg-muted lg:relative lg:flex",
