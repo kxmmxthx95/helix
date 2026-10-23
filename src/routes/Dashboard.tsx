@@ -654,7 +654,7 @@ function UploadDialog({
           <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-input px-3 py-6 text-center transition-colors hover:bg-muted/50 focus-within:border-ring">
             <UploadOutlineIcon className="h-6 w-6 text-muted-foreground" />
             <span className="max-w-full truncate text-sm font-medium">{file ? file.name : "เลือกไฟล์"}</span>
-            <span className="text-xs text-muted-foreground">PDF, Word, PowerPoint, Excel หรือรูปภาพ ไม่เกิน 20 MB</span>
+            <span className="text-xs text-muted-foreground">PDF, Word, PowerPoint, Excel หรือรูปภาพ ไม่เกิน 30 MB</span>
             <input
               type="file"
               accept={DOC_ACCEPT}

@@ -79,7 +79,7 @@ export function useUploadDocTaskFile() {
       title: string;
     }) => {
       if (!DOC_MIME_TYPES.includes(file.type)) throw new Error("ชนิดไฟล์ไม่รองรับ");
-      if (file.size > DOC_MAX_BYTES) throw new Error("ไฟล์ใหญ่เกิน 20 MB");
+      if (file.size > DOC_MAX_BYTES) throw new Error("ไฟล์ใหญ่เกิน 30 MB");
       const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : "";
       const path = `tasks/${taskId}/${teacherId}/${crypto.randomUUID()}${ext}`;
       const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });

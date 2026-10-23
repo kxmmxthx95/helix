@@ -980,7 +980,7 @@ function UploadDocForm({ onClose, tree, preset }: { onClose: () => void; tree: D
           ))}
         </Select>
       </Field>
-      <Field label="ไฟล์ (PDF, Word, PowerPoint, Excel, รูปภาพ — ไม่เกิน 20 MB)" required>
+      <Field label="ไฟล์ (PDF, Word, PowerPoint, Excel, รูปภาพ — ไม่เกิน 30 MB)" required>
         <input
           type="file"
           accept={DOC_ACCEPT}
