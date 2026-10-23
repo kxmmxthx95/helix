@@ -1,21 +1,27 @@
 import { useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { FileUp, Plus } from "@/components/icons";
+import { FileUp, Plus, SettingsIcon } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Pagination, Select, Skeleton } from "@/components/ui";
-import { useAcademicTerms } from "@/hooks/useAcademicTerms";
+import { useAllAcademicTerms } from "@/hooks/useAcademicTerms";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
+import { useClassroomsByDepartment, useCurrentClassroomEnrollmentsByDepartment } from "@/hooks/useStatusManagement";
+import { useFitRows } from "@/hooks/useFitRows";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useStudents, type StudentListItem } from "@/hooks/useStudents";
 import {
   tuitionInvoiceFileUrl,
+  useBulkCreateTuitionInvoices,
   useCancelTuitionInvoice,
   useCreateTuitionInvoice,
   useRecordTuitionPayment,
   useReplaceTuitionInvoiceFile,
+  useSetTuitionTermAmount,
+  useUpdateTuitionInvoiceAmount,
   useTuitionInvoices,
+  useTuitionTermAmount,
   useVoidTuitionPayment,
   type TuitionInvoiceRow,
 } from "@/hooks/useTuition";
@@ -62,6 +68,7 @@ function InvoiceCard({
   const toast = useToast();
   const { paid, balance, state } = summarizeInvoice(inv, inv.tuition_payments, todayIso());
   const openFile = () =>
+    inv.file_path &&
     tuitionInvoiceFileUrl(inv.file_path).then(
       (url) => window.open(url, "_blank", "noopener"),
       (e) => toast(errMsg(e), "error"),
@@ -84,9 +91,13 @@ function InvoiceCard({
       <p className="text-xs">
         ยอด {formatBaht(inv.amount)} · ชำระแล้ว {formatBaht(paid)} · คงเหลือ {formatBaht(balance)}
       </p>
-      <button className="font-ui text-xs underline" onClick={() => void openFile()}>
-        ดูไฟล์ใบแจ้งหนี้ (PDF)
-      </button>
+      {inv.file_path ? (
+        <button className="font-ui text-xs underline" onClick={() => void openFile()}>
+          ดูไฟล์ใบแจ้งหนี้ (PDF)
+        </button>
+      ) : (
+        <p className="text-xs text-muted-foreground">ยังไม่มีไฟล์ใบแจ้งหนี้</p>
+      )}
       {inv.tuition_payments.map((p) => (
         <p key={p.id} className={cn("text-xs text-muted-foreground", p.voided_at && "line-through")}>
           ใบเสร็จ #{p.receipt_no} · {p.paid_at} · {PAYMENT_METHOD_LABEL[p.method]} · {formatBaht(p.amount)}
@@ -149,29 +160,57 @@ function ParentView() {
 // ------------------------------------------------------------------- staff
 
 const STATE_ORDER: StudentTuitionState[] = ["none", "overdue", "unpaid", "paid"];
+const STUDENT_STATE_TONE: Record<StudentTuitionState, string> = {
+  none: "bg-muted text-muted-foreground",
+  unpaid: "bg-warning/15 text-warning",
+  overdue: "bg-destructive/15 text-destructive",
+  paid: "bg-success/15 text-success",
+};
 
 function StaffView({ meId }: { meId: string }) {
   const [deptId, setDeptId] = useState("");
-  const [termId, setTermId] = useState("");
+  // Pick order: term → department → grade. A term is one row per department, so the
+  // picker holds the year/type "key" and the row for the chosen department is resolved below.
+  const [termKey, setTermKey] = useState("");
   const [gradeId, setGradeId] = useState("");
+  const [classroomId, setClassroomId] = useState("");
   const [search, setSearch] = useState("");
   const [stateFilter, setStateFilter] = useState<StudentTuitionState | "">("");
   const [open, setOpen] = useState<StudentListItem | null>(null);
+  const [amountOpen, setAmountOpen] = useState(false);
   // Row upload icon: the PDF picked there opens that student's sheet straight on the new-invoice form.
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const pickInput = useRef<HTMLInputElement>(null);
   const pickFor = useRef<StudentListItem | null>(null);
 
   const { data: departments = [] } = useDepartments();
-  const { data: terms = [] } = useAcademicTerms(deptId || null);
+  const { data: allTerms = [] } = useAllAcademicTerms();
+  const keyOf = (t: Pick<AcademicTerm, "academic_year" | "term_type">) => `${t.academic_year}:${t.term_type}`;
+  const termOptions = useMemo(() => {
+    const m = new Map<string, AcademicTerm>();
+    for (const t of allTerms) if (!m.has(keyOf(t))) m.set(keyOf(t), t);
+    return [...m.values()];
+  }, [allTerms]);
+  const deptsWithTerm = new Set(allTerms.filter((t) => keyOf(t) === termKey).map((t) => t.department_id));
+  const term = allTerms.find((t) => t.department_id === deptId && keyOf(t) === termKey) ?? null;
+  const termId = term?.id ?? "";
   const { data: grades = [] } = useGradeLevels(deptId || null);
+  const { data: deptClassrooms = [] } = useClassroomsByDepartment(deptId || null);
+  const { data: enrollments = [] } = useCurrentClassroomEnrollmentsByDepartment(deptId || null);
+  const classrooms = deptClassrooms.filter((c) => c.grade_level_id === gradeId);
+  const roomOf = useMemo(() => {
+    const name = new Map(deptClassrooms.map((c) => [c.id, c.name]));
+    return new Map(enrollments.map((e) => [e.student_id, name.get(e.classroom_id) ?? "—"]));
+  }, [deptClassrooms, enrollments]);
   const { data: students = [], isLoading: loadingStudents } = useStudents({
     search,
     departmentId: deptId,
     status: "studying",
     gradeLevelId: gradeId || undefined,
+    classroomId: classroomId || undefined,
   });
   const { data: invoices = [], isLoading: loadingInvoices } = useTuitionInvoices(termId || null);
+  const { data: termAmount } = useTuitionTermAmount(termId || null);
 
   const today = todayIso();
   const rows = useMemo(() => {
@@ -179,6 +218,7 @@ function StaffView({ meId }: { meId: string }) {
     for (const inv of invoices) byStudent.set(inv.student_id, [...(byStudent.get(inv.student_id) ?? []), inv]);
     return students.map((s) => ({
       student: s,
+      live: (byStudent.get(s.id) ?? []).filter((i) => i.status !== "cancelled"),
       ...summarizeStudent(
         (byStudent.get(s.id) ?? []).map((i) => ({ invoice: i, payments: i.tuition_payments })),
         today,
@@ -186,41 +226,61 @@ function StaffView({ meId }: { meId: string }) {
     }));
   }, [students, invoices, today]);
 
-  const counts = STATE_ORDER.map((st) => ({ st, n: rows.filter((r) => r.state === st).length }));
   const shown = stateFilter ? rows.filter((r) => r.state === stateFilter) : rows;
-  const { page, setPage, pageCount, pageRows } = usePagination(shown, [deptId, termId, gradeId, search, stateFilter]);
+  // Pager (py-3 + text-xs ≈ 48px) plus the gap above it.
+  const fit = useFitRows({ reserve: 60 });
+  const { page, setPage, pageCount, pageRows } = usePagination(shown, [deptId, termId, gradeId, classroomId, search, stateFilter], fit.rows);
   const gradeName = (id: string | null) => grades.find((g) => g.id === id)?.name ?? "—";
 
   return (
-    <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(6,minmax(0,1fr))_auto]">
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ค้นหาชื่อหรือรหัสนักเรียน" aria-label="ค้นหา" disabled={!deptId} />
+          <Select
+            value={termKey}
+            onChange={(e) => {
+              setTermKey(e.target.value);
+              setDeptId("");
+              setGradeId("");
+              setClassroomId("");
+            }}
+            aria-label="ภาคเรียน"
+            placeholder="เลือกภาคเรียน"
+          >
+            {termOptions.map((t) => (
+              <option key={keyOf(t)} value={keyOf(t)}>
+                {termLabel(t)}
+              </option>
+            ))}
+          </Select>
           <Select
             value={deptId}
             onChange={(e) => {
               setDeptId(e.target.value);
-              setTermId("");
               setGradeId("");
+              setClassroomId("");
             }}
             aria-label="แผนก"
             placeholder="เลือกแผนก"
+            disabled={!termKey}
           >
-            {departments.map((d) => (
+            {departments.filter((d) => deptsWithTerm.has(d.id)).map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
               </option>
             ))}
           </Select>
-          <Select value={termId} onChange={(e) => setTermId(e.target.value)} aria-label="ภาคเรียน" placeholder="เลือกภาคเรียน" disabled={!deptId}>
-            {terms.map((t) => (
-              <option key={t.id} value={t.id}>
-                {termLabel(t)}
-              </option>
-            ))}
-          </Select>
-          <Select value={gradeId} onChange={(e) => setGradeId(e.target.value)} aria-label="ชั้น" placeholder="ทุกชั้น" disabled={!deptId}>
+          <Select value={gradeId} onChange={(e) => (setGradeId(e.target.value), setClassroomId(""))} aria-label="ชั้น" placeholder="ทุกชั้น" disabled={!deptId}>
             {grades.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
+              </option>
+            ))}
+          </Select>
+          <Select value={classroomId} onChange={(e) => setClassroomId(e.target.value)} aria-label="ห้องเรียน" placeholder="ทุกห้อง" disabled={!gradeId}>
+            {classrooms.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </Select>
@@ -231,33 +291,31 @@ function StaffView({ meId }: { meId: string }) {
               </option>
             ))}
           </Select>
-        <div className="sm:col-span-2 lg:col-span-4">
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ค้นหาชื่อหรือรหัสนักเรียน" aria-label="ค้นหา" disabled={!deptId} />
-        </div>
+        <Button variant="ghost" aria-label="ตั้งค่ายอดเงินค่าเทอม" title="ตั้งค่ายอดเงินค่าเทอม" disabled={!termId} onClick={() => setAmountOpen(true)}>
+          <SettingsIcon className="size-4" />
+        </Button>
       </div>
 
       {!deptId || !termId ? (
-        <EmptyState title="เลือกแผนกและภาคเรียน" description="เพื่อดูรายชื่อนักเรียนและใบแจ้งหนี้ค่าเทอม" />
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="เลือกแผนกและภาคเรียน" description="เพื่อดูรายชื่อนักเรียนและใบแจ้งหนี้ค่าเทอม" />
+        </div>
       ) : loadingStudents || loadingInvoices ? (
         <Skeleton className="h-24 w-full" />
       ) : rows.length === 0 ? (
-        <EmptyState title="ไม่พบนักเรียน" description="ไม่พบนักเรียนที่กำลังศึกษาตามเงื่อนไขที่เลือก" />
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="ไม่พบนักเรียน" description="ไม่พบนักเรียนที่กำลังศึกษาตามเงื่อนไขที่เลือก" />
+        </div>
       ) : (
         <>
-          <div className="flex flex-wrap gap-2 text-xs">
-            {counts.map(({ st, n }) => (
-              <span key={st} className={cn("rounded-full border border-border px-3 py-1", st === "overdue" && n > 0 && "text-destructive")}>
-                {STUDENT_TUITION_LABEL[st]} {n}
-              </span>
-            ))}
-          </div>
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <div ref={fit.ref} style={{ minHeight: fit.minHeight }} className="scrollbar-hidden overflow-x-auto border-y border-border bg-card">
             <table className="w-full text-xs">
               <thead className="bg-muted text-left text-xs text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">รหัส</th>
                   <th className="px-3 py-2 font-medium">ชื่อ-นามสกุล</th>
                   <th className="px-3 py-2 font-medium">ชั้น</th>
+                  <th className="px-3 py-2 font-medium">ห้อง</th>
                   <th className="px-3 py-2 text-right font-medium">ใบแจ้งหนี้</th>
                   <th className="px-3 py-2 text-right font-medium">ยอดรวม</th>
                   <th className="px-3 py-2 text-right font-medium">ค้างชำระ</th>
@@ -266,7 +324,7 @@ function StaffView({ meId }: { meId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map(({ student: s, count, total, outstanding, state }) => (
+                {pageRows.map(({ student: s, live, count, total, outstanding, state }) => (
                   <tr
                     key={s.id}
                     tabIndex={0}
@@ -277,11 +335,14 @@ function StaffView({ meId }: { meId: string }) {
                     <td className="px-3 py-0">{s.student_code}</td>
                     <td className="px-3 py-0">{nameOf(s)}</td>
                     <td className="px-3 py-0">{gradeName(s.grade_level_id)}</td>
+                    <td className="px-3 py-0">{roomOf.get(s.id) ?? "—"}</td>
                     <td className="px-3 py-0 text-right">{count}</td>
-                    <td className="px-3 py-0 text-right">{count ? formatBaht(total) : "—"}</td>
+                    <td className="px-3 py-0 text-right">
+                      <AmountCell studentId={s.id} live={live} total={total} standard={termAmount?.amount ?? null} term={term} meId={meId} today={today} />
+                    </td>
                     <td className="px-3 py-0 text-right">{count ? formatBaht(outstanding) : "—"}</td>
-                    <td className={cn("px-3 py-0 font-ui font-semibold", state === "overdue" && "text-destructive", state === "paid" && "text-accent")}>
-                      {STUDENT_TUITION_LABEL[state]}
+                    <td className="px-3 py-0">
+                      <span className={cn("rounded-full px-2 py-0.5 text-[10px]", STUDENT_STATE_TONE[state])}>{STUDENT_TUITION_LABEL[state]}</span>
                     </td>
                     <td className="px-3 py-0 text-right">
                       <button
@@ -305,6 +366,7 @@ function StaffView({ meId }: { meId: string }) {
             </table>
           </div>
           <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+          <SummaryCards rows={rows} standard={termAmount?.amount ?? null} />
         </>
       )}
 
@@ -323,6 +385,18 @@ function StaffView({ meId }: { meId: string }) {
         }}
       />
 
+      {amountOpen && (
+        <TermAmountSheet
+          termId={termId}
+          term={term}
+          meId={meId}
+          // Bulk targets: filtered students with no live invoice yet (cancelled ones don't count).
+          targets={shown.filter((r) => r.state === "none").map((r) => r.student.id)}
+          skipped={shown.filter((r) => r.state !== "none").length}
+          onClose={() => setAmountOpen(false)}
+        />
+      )}
+
       {open && (
         <StudentSheet
           key={`${open.id}:${pendingFile?.name ?? ""}`}
@@ -335,6 +409,203 @@ function StaffView({ meId }: { meId: string }) {
         />
       )}
     </div>
+  );
+}
+
+// ----------------------------------------------------------- summary cards
+
+/**
+ * Bottom-of-page totals for the students the filters select (status filter excluded). Every card
+ * is people + baht. รอชำระ / ค้างชำระ are the outstanding balance of students in that state (so
+ * they don't overlap); ชำระแล้ว counts anyone who has paid something.
+ */
+function SummaryCards({
+  rows,
+  standard,
+}: {
+  rows: { count: number; total: number; outstanding: number; state: StudentTuitionState }[];
+  standard: number | null;
+}) {
+  const sum = (f: (r: (typeof rows)[number]) => number, of = rows) => Math.round(of.reduce((s, r) => s + f(r) * 100, 0)) / 100;
+  const billed = rows.filter((r) => r.count > 0);
+  const paid = rows.filter((r) => r.total - r.outstanding > 0);
+  const unpaid = rows.filter((r) => r.state === "unpaid");
+  const overdue = rows.filter((r) => r.state === "overdue");
+  const none = rows.filter((r) => r.state === "none");
+  // Status light: green = paid, amber = waiting, red = overdue, grey = "no invoice" (matches its table badge); the total has no light.
+  const cards = [
+    { label: "ยอดเรียกเก็บรวม", people: billed.length, baht: sum((r) => r.total) },
+    { label: "ชำระแล้ว", people: paid.length, baht: sum((r) => r.total - r.outstanding), light: "bg-success" },
+    { label: "รอชำระ", people: unpaid.length, baht: sum((r) => r.outstanding, unpaid), light: "bg-warning" },
+    { label: "ค้างชำระ", people: overdue.length, baht: sum((r) => r.outstanding, overdue), light: "bg-destructive" },
+    // Nothing is owed yet — show what they would be billed at the term's standard amount.
+    { label: "ยังไม่มีใบแจ้งหนี้", people: none.length, baht: standard != null ? Math.round(standard * none.length * 100) / 100 : null, light: "bg-muted-foreground/40" },
+  ];
+  return (
+    <div data-fit-reserve className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      {cards.map((c) => (
+        <Card key={c.label} className="space-y-1 px-4 py-3">
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {c.light && <span aria-hidden className={cn("size-2 rounded-full", c.light)} />}
+            {c.label}
+          </p>
+          <p className="font-ui text-lg font-semibold">{c.baht != null ? formatBaht(c.baht) : "—"}</p>
+          <p className="text-xs text-muted-foreground">{c.people} คน</p>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ------------------------------------------------------ inline amount cell
+
+/**
+ * Click-to-edit "ยอดรวม". No live invoice: saving creates one (no PDF yet). One live invoice:
+ * saving edits its amount (the DB refuses anything below what is already paid). Several:
+ * read-only here — the row opens the student sheet instead.
+ */
+function AmountCell({
+  studentId,
+  live,
+  total,
+  standard,
+  term,
+  meId,
+  today,
+}: {
+  studentId: string;
+  live: TuitionInvoiceRow[];
+  total: number;
+  standard: number | null;
+  term: Pick<AcademicTerm, "id" | "academic_year" | "term_type"> | null;
+  meId: string;
+  today: string;
+}) {
+  const toast = useToast();
+  const create = useBulkCreateTuitionInvoices();
+  const update = useUpdateTuitionInvoiceAmount();
+  const [value, setValue] = useState<string | null>(null);
+  const shown = live.length ? formatBaht(total) : standard != null ? formatBaht(standard) : "—";
+  if (live.length > 1) return <>{shown}</>;
+
+  const current = live[0] ? live[0].amount : standard;
+  const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+  const done = { onSuccess: () => (toast("บันทึกยอดแล้ว"), setValue(null)), onError: (e: unknown) => toast(errMsg(e), "error") };
+
+  const save = () => {
+    const amt = Number(value);
+    if (!(amt > 0) || !term) return;
+    if (live[0]) {
+      const paid = summarizeInvoice(live[0], live[0].tuition_payments, today).paid;
+      if (amt < paid) return toast(`ยอดต้องไม่ต่ำกว่ายอดที่ชำระแล้ว (${formatBaht(paid)})`, "error");
+      update.mutate({ id: live[0].id, amount: amt }, done);
+    } else {
+      create.mutate([{ student_id: studentId, term_id: term.id, title: `ค่าเทอม ${termLabel(term)}`, amount: amt, due_date: null, created_by: meId }], done);
+    }
+  };
+
+  if (value === null)
+    return (
+      <button
+        type="button"
+        title="แก้ยอด"
+        className={cn("rounded px-1 [font-family:inherit] hover:bg-foreground/10", !live.length && "text-muted-foreground")}
+        onClick={(e) => (stop(e), setValue(current != null ? String(current) : ""))}
+        onKeyDown={stop}
+      >
+        {shown}
+      </button>
+    );
+  return (
+    <Input
+      autoFocus
+      type="number"
+      inputMode="decimal"
+      min="0"
+      step="0.01"
+      aria-label="ยอดรวม"
+      className="ml-auto h-7 w-28 text-right text-xs"
+      value={value}
+      disabled={create.isPending || update.isPending}
+      onChange={(e) => setValue(e.target.value)}
+      onClick={stop}
+      onBlur={() => !(create.isPending || update.isPending) && setValue(null)}
+      onKeyDown={(e) => {
+        stop(e);
+        if (e.key === "Enter") save();
+        if (e.key === "Escape") setValue(null);
+      }}
+    />
+  );
+}
+
+// ------------------------------------------------------- term amount sheet
+
+function TermAmountSheet({
+  termId,
+  term,
+  meId,
+  targets,
+  skipped,
+  onClose,
+}: {
+  termId: string;
+  term: Pick<AcademicTerm, "academic_year" | "term_type"> | null;
+  meId: string;
+  targets: string[];
+  skipped: number;
+  onClose: () => void;
+}) {
+  const toast = useToast();
+  const { data: saved } = useTuitionTermAmount(termId);
+  const setAmount = useSetTuitionTermAmount();
+  const bulk = useBulkCreateTuitionInvoices();
+  const [value, setValue] = useState<string | null>(null);
+  const shown = value ?? (saved ? String(saved.amount) : "");
+  const amt = Number(shown);
+
+  const save = () =>
+    setAmount.mutate(
+      { term_id: termId, amount: amt, updated_by: meId },
+      { onSuccess: () => (toast("บันทึกยอดค่าเทอมแล้ว"), setValue(null)), onError: (e) => toast(errMsg(e), "error") },
+    );
+
+  const createAll = () => {
+    if (!saved || !window.confirm(`สร้างใบแจ้งหนี้ ${targets.length} ใบ ยอด ${formatBaht(saved.amount)} บาท\nข้าม ${skipped} คน (มีใบแจ้งหนี้แล้ว)`)) return;
+    bulk.mutate(
+      targets.map((student_id) => ({
+        student_id,
+        term_id: termId,
+        title: `ค่าเทอม ${termLabel(term)}`,
+        amount: saved.amount,
+        due_date: null,
+        created_by: meId,
+      })),
+      { onSuccess: () => (toast(`สร้างใบแจ้งหนี้ ${targets.length} ใบแล้ว`), onClose()), onError: (e) => toast(errMsg(e), "error") },
+    );
+  };
+
+  return (
+    <Sheet open onOpenChange={(o) => !o && onClose()} title="ยอดเงินค่าเทอม" description={termLabel(term)} closable>
+      <div className="space-y-4">
+        <Field label="ยอดมาตรฐานต่อภาคเรียน (บาท)" required>
+          <Input type="number" inputMode="decimal" min="0" step="0.01" value={shown} onChange={(e) => setValue(e.target.value)} />
+        </Field>
+        <p className="text-xs text-muted-foreground">ใช้เติมยอดในฟอร์มสร้างใบแจ้งหนี้ ใบที่สร้างไปแล้วไม่เปลี่ยน</p>
+        <Button onClick={save} disabled={!(amt > 0) || setAmount.isPending}>
+          บันทึก
+        </Button>
+        <div className="space-y-2 border-t border-border pt-4">
+          <p className="text-xs">
+            นักเรียนตามตัวกรอง: สร้างได้ {targets.length} คน · ข้าม {skipped} คน (มีใบแจ้งหนี้แล้ว)
+          </p>
+          <Button variant="ghost" onClick={createAll} disabled={!saved || value !== null || targets.length === 0 || bulk.isPending}>
+            สร้างใบแจ้งหนี้ให้นักเรียนที่กรองอยู่
+          </Button>
+          {!saved && <p className="text-xs text-muted-foreground">บันทึกยอดก่อนจึงจะสร้างใบแจ้งหนี้ได้</p>}
+        </div>
+      </div>
+    </Sheet>
   );
 }
 
@@ -427,7 +698,10 @@ function NewInvoiceForm({ initialFile, studentId, termId, meId, onDone }: { init
   const toast = useToast();
   const create = useCreateTuitionInvoice();
   const [title, setTitle] = useState("ค่าเล่าเรียน");
-  const [amount, setAmount] = useState("");
+  const { data: termAmount } = useTuitionTermAmount(termId);
+  const [typed, setTyped] = useState<string | null>(null);
+  const amount = typed ?? (termAmount ? String(termAmount.amount) : "");
+  const setAmount = setTyped;
   const [due, setDue] = useState("");
   const [file, setFile] = useState<File | null>(initialFile);
   const amt = Number(amount);

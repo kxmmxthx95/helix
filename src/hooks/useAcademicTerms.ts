@@ -25,6 +25,22 @@ export function useAcademicTerms(departmentId: string | null) {
   return useQuery(termsQuery(departmentId));
 }
 
+/** Every department's terms (RLS limits the rows) — for pickers that choose the term before the department. */
+export function useAllAcademicTerms() {
+  return useQuery({
+    queryKey: ["academic_terms", "all"] as const,
+    queryFn: async (): Promise<AcademicTerm[]> => {
+      const { data, error } = await supabase
+        .from("academic_terms")
+        .select("*")
+        .order("academic_year", { ascending: false })
+        .order("term_type");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export type CurrentTerm = { academicYear: number; term: 1 | 2 };
 
 const TERM_ORDER: Record<AcademicTerm["term_type"], number> = { term1: 1, term2: 2, summer: 3 };
