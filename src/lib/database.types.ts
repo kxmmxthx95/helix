@@ -1207,6 +1207,7 @@ export type TuitionInvoice = {
 
 // Default amount per term (0101): pre-fills the new-invoice form and drives bulk create.
 export type TuitionTermAmount = {
+  id: string; // audit trail only (0102); term_id is the key
   term_id: string;
   amount: number;
   updated_by: string;
@@ -1514,7 +1515,7 @@ export type Database = {
       behavior_records: Table<BehaviorRecord, InsertOf<BehaviorRecord, never>>;
       behavior_categories: Table<BehaviorCategory, InsertOf<BehaviorCategory, "severity">>;
       tuition_invoices: Table<TuitionInvoice, InsertOf<TuitionInvoice, "due_date" | "status">>;
-      tuition_term_amounts: Table<TuitionTermAmount, Omit<TuitionTermAmount, "updated_at">>;
+      tuition_term_amounts: Table<TuitionTermAmount, Omit<TuitionTermAmount, "id" | "updated_at">>;
       tuition_payments: Table<
         TuitionPayment,
         InsertOf<TuitionPayment, "receipt_no" | "paid_at" | "note" | "voided_at" | "void_reason">
