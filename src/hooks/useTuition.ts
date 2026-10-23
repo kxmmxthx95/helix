@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AcademicTerm, Student, TuitionInvoice, TuitionPayment, TuitionPaymentMethod } from "@/lib/database.types";
+import type { AcademicTerm, Student, TuitionInvoice, TuitionPayment, TuitionPaymentMethod, TuitionTermAmount } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
 // ค่าเทอม — see migration 0095. RLS decides what each role sees: org-wide
@@ -74,6 +74,41 @@ export function useCreateTuitionInvoice() {
       if (error) throw error;
     },
     onSettled: invalidate,
+  });
+}
+
+/** Bulk create (migration 0101): no PDF yet — the invoice reads "ยังไม่มีไฟล์" until one is attached. */
+export function useBulkCreateTuitionInvoices() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (drafts: Omit<TuitionInvoiceDraft, "file_path">[]) => {
+      const { error } = await supabase.from("tuition_invoices").insert(drafts.map((d) => ({ ...d, file_path: null })));
+      if (error) throw error;
+    },
+    onSettled: invalidate,
+  });
+}
+
+export function useTuitionTermAmount(termId: string | null) {
+  return useQuery({
+    queryKey: ["tuition_term_amounts", termId],
+    enabled: !!termId,
+    queryFn: async (): Promise<TuitionTermAmount | null> => {
+      const { data, error } = await supabase.from("tuition_term_amounts").select("*").eq("term_id", termId!).maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useSetTuitionTermAmount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (row: { term_id: string; amount: number; updated_by: string }) => {
+      const { error } = await supabase.from("tuition_term_amounts").upsert(row);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["tuition_term_amounts"] }),
   });
 }
 

@@ -1198,9 +1198,18 @@ export type TuitionInvoice = {
   amount: number;
   due_date: string | null;
   status: "open" | "cancelled";
-  file_path: string;
+  // null for bulk-created invoices until a PDF is attached (0101).
+  file_path: string | null;
   created_by: string;
   created_at: string;
+  updated_at: string;
+};
+
+// Default amount per term (0101): pre-fills the new-invoice form and drives bulk create.
+export type TuitionTermAmount = {
+  term_id: string;
+  amount: number;
+  updated_by: string;
   updated_at: string;
 };
 
@@ -1505,6 +1514,7 @@ export type Database = {
       behavior_records: Table<BehaviorRecord, InsertOf<BehaviorRecord, never>>;
       behavior_categories: Table<BehaviorCategory, InsertOf<BehaviorCategory, "severity">>;
       tuition_invoices: Table<TuitionInvoice, InsertOf<TuitionInvoice, "due_date" | "status">>;
+      tuition_term_amounts: Table<TuitionTermAmount, Omit<TuitionTermAmount, "updated_at">>;
       tuition_payments: Table<
         TuitionPayment,
         InsertOf<TuitionPayment, "receipt_no" | "paid_at" | "note" | "voided_at" | "void_reason">
