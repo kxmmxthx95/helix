@@ -1322,7 +1322,7 @@ function UploadTaskFileSheet({ task, onClose }: { task: DocTask | null; onClose:
       }
     >
       <form id="upload-task-file" onSubmit={submit} className="space-y-4">
-        <Field label="ไฟล์ (PDF, Word, PowerPoint, Excel, รูปภาพ — ไม่เกิน 20 MB)" required>
+        <Field label="ไฟล์ (PDF, Word, PowerPoint, Excel, รูปภาพ — ไม่เกิน 30 MB)" required>
           <input
             type="file"
             accept={DOC_ACCEPT}

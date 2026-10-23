@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const signOut = useCallback(async () => {
+    const wasStudent = profile?.roles.includes("student") ?? false;
     await supabase.auth.signOut();
     setProfile(null);
     setMyStudent(null);
@@ -79,7 +80,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       /* ignore private mode */
     }
     setViewAsRoleState(null);
-  }, []);
+    // Gate renders StudentLogin only on this path; students must land there.
+    if (wasStudent) window.location.replace("/student-login");
+  }, [profile]);
 
   const setViewAsRole = useCallback(
     (role: Role | null) => {

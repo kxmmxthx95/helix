@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 // Own catalog (not practice_lessons). See migration 0071.
 
 const BUCKET = "subject-documents";
-export const DOC_MAX_BYTES = 20 * 1024 * 1024;
+export const DOC_MAX_BYTES = 30 * 1024 * 1024;
 /** Mirrors the bucket's allowed_mime_types — checked client-side for a friendly error before upload. */
 export const DOC_ACCEPT =
   ".pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg,.webp,.gif";
@@ -184,7 +184,7 @@ export function useUploadDocFile() {
       onProgress?: (pct: number) => void;
     }) => {
       if (!DOC_MIME_TYPES.includes(file.type)) throw new Error("ชนิดไฟล์ไม่รองรับ");
-      if (file.size > DOC_MAX_BYTES) throw new Error("ไฟล์ใหญ่เกิน 20 MB");
+      if (file.size > DOC_MAX_BYTES) throw new Error("ไฟล์ใหญ่เกิน 30 MB");
       // Storage keys must be ASCII-safe; the original name is kept in file_name.
       const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")).toLowerCase() : "";
       const path = `${lessonId}/${crypto.randomUUID()}${ext}`;
