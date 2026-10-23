@@ -226,7 +226,6 @@ function StaffView({ meId }: { meId: string }) {
     }));
   }, [students, invoices, today]);
 
-  const counts = STATE_ORDER.map((st) => ({ st, n: rows.filter((r) => r.state === st).length }));
   const shown = stateFilter ? rows.filter((r) => r.state === stateFilter) : rows;
   // Pager (py-3 + text-xs ≈ 48px) plus the gap above it.
   const fit = useFitRows({ reserve: 60 });
@@ -309,13 +308,6 @@ function StaffView({ meId }: { meId: string }) {
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap gap-2 text-xs">
-            {counts.map(({ st, n }) => (
-              <span key={st} className={cn("rounded-full border border-border px-3 py-1", st === "overdue" && n > 0 && "text-destructive")}>
-                {STUDENT_TUITION_LABEL[st]} {n}
-              </span>
-            ))}
-          </div>
           <div ref={fit.ref} style={{ minHeight: fit.minHeight }} className="scrollbar-hidden overflow-x-auto border-y border-border bg-card">
             <table className="w-full text-xs">
               <thead className="bg-muted text-left text-xs text-muted-foreground">
@@ -374,6 +366,7 @@ function StaffView({ meId }: { meId: string }) {
             </table>
           </div>
           <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+          <SummaryCards rows={rows} standard={termAmount?.amount ?? null} />
         </>
       )}
 
@@ -415,6 +408,51 @@ function StaffView({ meId }: { meId: string }) {
           onClose={() => (setOpen(null), setPendingFile(null))}
         />
       )}
+    </div>
+  );
+}
+
+// ----------------------------------------------------------- summary cards
+
+/**
+ * Bottom-of-page totals for the students the filters select (status filter excluded). Every card
+ * is people + baht. รอชำระ / ค้างชำระ are the outstanding balance of students in that state (so
+ * they don't overlap); ชำระแล้ว counts anyone who has paid something.
+ */
+function SummaryCards({
+  rows,
+  standard,
+}: {
+  rows: { count: number; total: number; outstanding: number; state: StudentTuitionState }[];
+  standard: number | null;
+}) {
+  const sum = (f: (r: (typeof rows)[number]) => number, of = rows) => Math.round(of.reduce((s, r) => s + f(r) * 100, 0)) / 100;
+  const billed = rows.filter((r) => r.count > 0);
+  const paid = rows.filter((r) => r.total - r.outstanding > 0);
+  const unpaid = rows.filter((r) => r.state === "unpaid");
+  const overdue = rows.filter((r) => r.state === "overdue");
+  const none = rows.filter((r) => r.state === "none");
+  // Status light: green = paid, amber = waiting, red = overdue, grey = "no invoice" (matches its table badge); the total has no light.
+  const cards = [
+    { label: "ยอดเรียกเก็บรวม", people: billed.length, baht: sum((r) => r.total) },
+    { label: "ชำระแล้ว", people: paid.length, baht: sum((r) => r.total - r.outstanding), light: "bg-success" },
+    { label: "รอชำระ", people: unpaid.length, baht: sum((r) => r.outstanding, unpaid), light: "bg-warning" },
+    { label: "ค้างชำระ", people: overdue.length, baht: sum((r) => r.outstanding, overdue), light: "bg-destructive" },
+    // Nothing is owed yet — show what they would be billed at the term's standard amount.
+    { label: "ยังไม่มีใบแจ้งหนี้", people: none.length, baht: standard != null ? Math.round(standard * none.length * 100) / 100 : null, light: "bg-muted-foreground/40" },
+  ];
+  return (
+    <div data-fit-reserve className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      {cards.map((c) => (
+        <Card key={c.label} className="space-y-1 px-4 py-3">
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {c.light && <span aria-hidden className={cn("size-2 rounded-full", c.light)} />}
+            {c.label}
+          </p>
+          <p className="font-ui text-lg font-semibold">{c.baht != null ? formatBaht(c.baht) : "—"}</p>
+          <p className="text-xs text-muted-foreground">{c.people} คน</p>
+        </Card>
+      ))}
     </div>
   );
 }
