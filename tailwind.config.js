@@ -46,6 +46,7 @@ export default {
         sans: ["Inter", "Sarabun", "system-ui", "-apple-system", "sans-serif"],
         heading: ["Inter", "Noto Sans Thai", "system-ui", "-apple-system", "sans-serif"],
         ui: ["Sukhumvit Set", "SukhumvitSet", "Prompt", "Noto Sans Thai", "system-ui", "-apple-system", "sans-serif"],
+        game: ["Mali", "Prompt", "Sukhumvit Set", "Noto Sans Thai", "system-ui", "sans-serif"],
         sarabun: ["Sarabun", "system-ui", "-apple-system", "sans-serif"],
       },
       keyframes: {

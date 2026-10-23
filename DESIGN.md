@@ -105,7 +105,7 @@ Helix back-office reads like a registry kept after hours: dark, exact, and unhur
 
 Density is high on purpose: 32px controls, 12px label text, 10px captions. Hierarchy comes from weight, tone, and spacing, not from size or color. Glass (blur + translucency) is reserved for things that float above content; it is never the page itself.
 
-The student portal is a deliberate second world. It switches on `.theme-game` and becomes pastel pink, rounded, and chunky. It is a separate skin, not a theme toggle, and it never leaks into staff screens.
+The student portal is a deliberate second world. It switches on `.theme-game` and becomes a pink-and-violet fantasy-castle world: painted 9-slice frames, glowing edges, rounded display type (Mali). It is a separate skin, not a theme toggle, and it never leaks into staff screens.
 
 **Key Characteristics:**
 - Off-black shell (#141414), near-black cards (#0a0a0a), 1px hairlines. No pure #000 shell.
@@ -139,6 +139,7 @@ Neutral-led and cool. One blue accent, three status hues, and a pink game skin t
 - **Caution Amber** (#f6b23c): warnings.
 
 ### Student game skin (`.theme-game`)
+- Painted frames live in `public/game/` (spec: `docs/game-art-spec.md`); CSS fallbacks in `FRAMES` keep the skin intact without art.
 - **Game Blush** (#fff0f7) page, **Game Pink** (#ee2b8c) primary, **Game Plum** (#2f163b) text and borders, **Game Violet** (#8a2eb8) accent. Light only; `.dark` is overridden.
 
 Hex values above are rounded from the HSL tokens in `src/index.css`, which remain the source of truth.
