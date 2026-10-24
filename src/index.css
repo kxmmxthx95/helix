@@ -396,3 +396,31 @@
   padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
   padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
 }
+
+/* Student island home: CSS-only sky (no background image). Wide = darker sides around the portrait column. */
+.game-sky-wide {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 0.18), transparent 60%),
+    linear-gradient(180deg, #8c7bd8 0%, #b57fd0 50%, #d77aa9 100%);
+}
+.game-sky {
+  background:
+    radial-gradient(ellipse 70% 40% at 50% 38%, rgb(255 255 255 / 0.5), transparent 70%),
+    radial-gradient(circle at 15% 12%, rgb(255 255 255 / 0.35), transparent 25%),
+    radial-gradient(circle at 88% 70%, rgb(255 214 240 / 0.45), transparent 30%),
+    linear-gradient(180deg, #b9acf6 0%, #d6a8ef 42%, #f4a8d2 78%, #f79cc0 100%);
+}
+/* Chunky game lettering: white fill, navy outline via stacked shadows (works without paint-order). */
+.game-outline {
+  color: #fff;
+  text-shadow:
+    -1.5px -1.5px 0 #1f2150, 1.5px -1.5px 0 #1f2150, -1.5px 1.5px 0 #1f2150, 1.5px 1.5px 0 #1f2150,
+    0 3px 0 #1f2150;
+}
+.game-outline-lg {
+  color: #fff;
+  text-shadow:
+    -2.5px -2.5px 0 #1f2150, 2.5px -2.5px 0 #1f2150, -2.5px 2.5px 0 #1f2150, 2.5px 2.5px 0 #1f2150,
+    0 -2.5px 0 #1f2150, 0 2.5px 0 #1f2150, -2.5px 0 0 #1f2150, 2.5px 0 0 #1f2150,
+    0 5px 0 #1f2150;
+}
