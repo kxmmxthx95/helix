@@ -2,17 +2,13 @@
 
 Drop files in `public/game/` as `.webp` (transparent where noted). Missing file = CSS fallback in `src/components/game/parts.tsx` (`FRAMES`). Keep this table in sync with `FRAMES`. Images are user-generated from the prompts below; code ships with CSS fallbacks, so the portal works with no art at all.
 
-**Tone:** the island redesign uses a purple-pink CSS gradient with navy translucent HUD and bars and a yellow BATTLE button. Frames `hud`, `panel`, `sign` are currently LIGHT (cream stone, gold trim, rose-pink accents); text on them turns plum once the file loads. `button` and `title` keep their plum text colour. Frames may be restyled navy by the island redesign.
+**Tone:** purple-pink CSS gradient, navy translucent HUD and bars, yellow BATTLE button. Only the route window frame (`panel`) takes painted art; everything else is CSS.
 
 Frames are 9-slice (`border-image`): corners stay fixed, edges and centre stretch. Draw at 2x for retina.
 
 | File | Used for | Suggested size | Slice (px) | Rendered border (CSS px) | Notes |
 |---|---|---|---|---|---|
-| `frame-hud.webp` | Top status panel on home | 256x256 | 40 | 20 | Dark purple glass look; centre is filled |
 | `frame-panel.webp` | Wrapper card of every inner page | 192x192 | 32 | 16 | Light parchment centre (text is dark on it) |
-| `frame-sign.webp` | Side menu signs, name plate, back button | 128x128 | 24 | 12 | Small; must work at ~72x80 and ~36x36 |
-| `frame-button.webp` | Main "ดูงาน" button | 192x192 | 32 | 16 | Gold; text is dark plum |
-| `frame-title.webp` | Window title strip (gold/cream) | 128x64 | 24 | 8 | Plum text on it |
 
 Icons (existing slots, same folder, reused by the island home):
 `nav-attendance nav-behavior nav-leave nav-calendar nav-practice nav-documents tab-assignments tab-exams tab-timetable tab-profile` (webp, square, ~96px). `nav-practice` and `nav-documents` are not drawn yet.
