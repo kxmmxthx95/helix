@@ -39,7 +39,7 @@ async function currentClassroomFor(studentId: string): Promise<{ classroomId: st
   return row ? { classroomId: row.classroom_id, academicYear: row.academic_year } : null;
 }
 
-export type MyAssignment = ScoreItem & { subjectCode: string; subjectName: string };
+export type MyAssignment = ScoreItem & { subjectId: string | null; subjectCode: string; subjectName: string };
 
 /** Cross-subject to-do list for one student (self or a parent's child) — grilled: no per-class stream, one combined list. */
 export function useMyAssignments(studentId: string | null) {
@@ -52,7 +52,7 @@ export function useMyAssignments(studentId: string | null) {
       const { data, error } = await supabase
         .from("score_items")
         .select(
-          "*, teaching_assignment:teaching_assignments!inner(classroom_id, academic_year, subject:subjects(code, name_th))",
+          "*, teaching_assignment:teaching_assignments!inner(classroom_id, academic_year, subject:subjects(id, code, name_th))",
         )
         .eq("teaching_assignment.classroom_id", classroom.classroomId)
         .eq("teaching_assignment.academic_year", classroom.academicYear)
@@ -60,9 +60,10 @@ export function useMyAssignments(studentId: string | null) {
         .lte("publish_at", new Date().toISOString())
         .order("due_date", { ascending: true, nullsFirst: false });
       if (error) throw error;
-      type Row = ScoreItem & { teaching_assignment: { subject: { code: string; name_th: string } | null } };
+      type Row = ScoreItem & { teaching_assignment: { subject: { id: string; code: string; name_th: string } | null } };
       return (data as unknown as Row[]).map(({ teaching_assignment, ...row }) => ({
         ...row,
+        subjectId: teaching_assignment.subject?.id ?? null,
         subjectCode: teaching_assignment.subject?.code ?? "—",
         subjectName: teaching_assignment.subject?.name_th ?? "—",
       }));
