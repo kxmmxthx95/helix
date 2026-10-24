@@ -45,7 +45,7 @@ export function useArt(name: string) {
 
 /**
  * Art slots in public/game/frame-{kind}.webp. `slice` = 9-slice cut in image px, `width` = rendered border in CSS px.
- * Keep in sync with docs/game-art-spec.md. `bar` is a repeat-x strip, not a 9-slice.
+ * Keep in sync with docs/game-art-spec.md.
  */
 export const FRAMES = {
   hud: {
@@ -72,18 +72,16 @@ export const FRAMES = {
     fallback:
       "rounded-2xl border-2 border-[#fff3b0] bg-gradient-to-b from-[#ffd95a] to-[#ff9f3d] shadow-[0_5px_0_#b0207a,0_0_16px_rgba(255,200,61,0.5)]",
   },
-  tab: {
+  title: {
     slice: 24,
-    width: 10,
-    fallback: "rounded-2xl border-2 border-white/60 bg-gradient-to-b from-[#ff8fc0] to-[#ee2b8c] shadow-[0_0_12px_rgba(255,143,192,0.6)]",
+    width: 8,
+    fallback: "rounded-t-2xl border-b-2 border-[#b0207a] bg-gradient-to-b from-[#fff3b0] to-[#ffc83d]",
   },
-  bar: { slice: 0, width: 0, fallback: "border-t-2 border-white/25 bg-gradient-to-b from-[#9c2a86] to-[#4a1466]" },
 } as const;
 
 export type FrameKind = keyof typeof FRAMES;
 
 export function frameStyle(kind: FrameKind): CSSProperties {
-  if (kind === "bar") return { backgroundImage: "url(/game/frame-bar.webp)", backgroundRepeat: "repeat-x", backgroundSize: "auto 100%" };
   const { slice, width } = FRAMES[kind];
   return { borderStyle: "solid", borderWidth: width, borderImage: `url(/game/frame-${kind}.webp) ${slice} fill / ${width}px / 0 stretch` };
 }

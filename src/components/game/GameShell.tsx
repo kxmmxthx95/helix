@@ -1,57 +1,20 @@
 import { useEffect } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { GameFrame, GameIcon, FRAMES, frameStyle, useArt } from "@/components/game/parts";
-import {
-  ChevronBack,
-  ClipboardIcon,
-  CloudOff,
-  DocumentTextIcon,
-  GraduationCap,
-  HomeIcon,
-  TimetableIcon,
-} from "@/components/icons";
+import { MENU } from "@/components/game/GameHud";
+import { GameFrame } from "@/components/game/parts";
+import { CloudOff, X } from "@/components/icons";
 import { MobileHeaderProvider } from "@/components/MobileHeaderSlot";
 import { useOutboxSync } from "@/hooks/useOutboxSync";
 import { ROLE_LABEL } from "@/lib/roles";
-import { cn } from "@/lib/utils";
-
-const TABS = [
-  { to: "/", name: "tab-home", label: "หน้าหลัก", icon: HomeIcon },
-  { to: "/assignments", name: "tab-assignments", label: "งาน", icon: ClipboardIcon },
-  { to: "/exams", name: "tab-exams", label: "สอบ", icon: DocumentTextIcon },
-  { to: "/timetable", name: "tab-timetable", label: "ตารางเรียน", icon: TimetableIcon },
-  { to: "/profile", name: "tab-profile", label: "โปรไฟล์", icon: GraduationCap },
-] as const;
-
-function TabLink({ to, name, label, icon }: (typeof TABS)[number]) {
-  const art = useArt("frame-tab");
-  return (
-    <NavLink
-      to={to}
-      end={to === "/"}
-      style={({ isActive }) => (isActive && art ? frameStyle("tab") : undefined)}
-      className={({ isActive }) =>
-        cn(
-          "tappable flex flex-col items-center gap-0.5 py-1 font-game text-[10px] font-bold text-white",
-          isActive ? !art && FRAMES.tab.fallback : "opacity-80",
-        )
-      }
-    >
-      <GameIcon name={name} fallback={icon} className="h-9 w-9 drop-shadow" />
-      {label}
-    </NavLink>
-  );
-}
 
 const TITLES: Record<string, string> = {
-  "/practice": "แบบฝึกหัด",
   "/academic-events": "ปฏิทินกิจกรรม",
   "/subjects": "คลังรายวิชา",
 };
 
 /**
- * Student-only shell (grill decision, 2026-10-06): phone-width column, game skin, bottom tab bar.
+ * Student-only shell (grill decision, 2026-10-06): phone-width column, game skin. Home = mascot + HUD quick menu; every other route is a window over it.
  * `.theme-game` goes on <html> — Sheets/Toasts portal outside this tree.
  */
 export function GameShell() {
@@ -73,7 +36,7 @@ function GameShellInner() {
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === "/";
-  const title = TABS.find((t) => t.to === location.pathname)?.label ?? TITLES[location.pathname] ?? "";
+  const title = TITLES[location.pathname] ?? MENU.find((m) => m.to === location.pathname)?.label ?? "";
 
   return (
     <div className="fixed inset-0 flex justify-center overflow-hidden overscroll-none bg-[#f3b6d4]">
@@ -87,7 +50,7 @@ function GameShellInner() {
         className="absolute inset-0 hidden h-full w-full object-cover min-[431px]:block"
         onError={(e) => (e.currentTarget.style.display = "none")}
       />
-      <div className={cn("relative flex h-full w-full max-w-[430px] flex-col overflow-hidden", isHome && "min-[431px]:landscape:max-w-none")}>
+      <div className="relative flex h-full w-full max-w-[430px] flex-col overflow-hidden min-[431px]:max-w-none">
         <img
           src="/game/bg-home.webp"
           alt=""
@@ -114,30 +77,23 @@ function GameShellInner() {
           </div>
         )}
 
-        {!isHome && (
-          <header className="relative z-10 flex h-12 shrink-0 items-center gap-2 px-3 pt-safe">
-            <GameFrame kind="sign" as="button" type="button" aria-label="กลับ" onClick={() => navigate(-1)} className="tappable flex h-9 w-9 items-center justify-center">
-              <ChevronBack className="h-3 w-3 text-white [.game-art_&]:text-[#2b0f3a]" />
+        {isHome ? null : (
+          <main className="relative z-10 flex min-h-0 flex-1 flex-col justify-center overflow-hidden px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-safe">
+            <GameFrame kind="panel" className="mx-auto flex max-h-full min-h-0 w-full max-w-3xl flex-col overflow-hidden !p-0 text-foreground">
+              <div className="flex shrink-0 items-center gap-2">
+                <GameFrame kind="title" className="flex min-h-11 flex-1 items-center px-4">
+                  <h1 className="font-game text-lg font-bold text-[#2b0f3a]">{title}</h1>
+                </GameFrame>
+                <GameFrame kind="button" as="button" type="button" aria-label="ปิดหน้าต่าง" onClick={() => navigate("/")} className="tappable mr-1 flex h-11 w-11 items-center justify-center !rounded-xl !shadow-none">
+                  <X className="h-4 w-4 text-[#2b0f3a]" />
+                </GameFrame>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
+                <Outlet />
+              </div>
             </GameFrame>
-            <p className="font-game text-lg font-bold text-white [text-shadow:0_2px_0_rgb(43_15_58)]">{title}</p>
-          </header>
+          </main>
         )}
-
-        <main className={cn("relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-3", isHome && "pt-safe")}>
-          {isHome ? (
-            <Outlet />
-          ) : (
-            <GameFrame kind="panel" className="mb-3 p-2 text-foreground">
-              <Outlet />
-            </GameFrame>
-          )}
-        </main>
-
-        <GameFrame kind="bar" as="div" className={cn("relative z-10 grid shrink-0 grid-cols-5 gap-1 px-1 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]", isHome && "min-[431px]:landscape:hidden")} role="navigation">
-          {TABS.map((t) => (
-            <TabLink key={t.to} {...t} />
-          ))}
-        </GameFrame>
       </div>
     </div>
   );

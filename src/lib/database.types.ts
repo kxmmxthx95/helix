@@ -1578,6 +1578,16 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      student_lifetime_exp: {
+        Args: Record<string, never>;
+        Returns: {
+          sub_on_time: number;
+          sub_late: number;
+          att_present: number;
+          att_late: number;
+          behavior_points: number;
+        }[];
+      };
       review_doc_file: {
         Args: { p_file_id: string; p_status: "approved" | "returned"; p_note: string | null };
         Returns: void;

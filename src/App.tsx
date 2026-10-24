@@ -15,7 +15,6 @@ import { Practice } from "@/routes/Practice";
 import { ScoreRecording } from "@/routes/ScoreRecording";
 import { Profile } from "@/routes/Profile";
 import { Dashboard } from "@/routes/Dashboard";
-import { GameHome } from "@/routes/GameHome";
 import { Login } from "@/routes/Login";
 import { StudentLogin } from "@/routes/StudentLogin";
 import { Onboarding } from "@/routes/Onboarding";
@@ -66,7 +65,7 @@ function Gate() {
   return (
     <Routes>
       <Route element={isStudent ? <GameShell /> : <AppShell />}>
-        <Route index element={isStudent ? <GameHome /> : <Dashboard />} />
+        <Route index element={isStudent ? null : <Dashboard />} />
         <Route path="users" element={<Users />} />
         <Route path="roster" element={<Roster />} />
         <Route path="classrooms" element={<Classrooms />} />
