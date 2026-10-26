@@ -3,7 +3,7 @@ import { animate, AnimatePresence, motion, useReducedMotion, type PanInfo } from
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { GameIcon } from "@/components/game/parts";
+import { BarFill, GameIcon, useArt } from "@/components/game/parts";
 import {
   AirplaneIcon,
   AlertTriangle,
@@ -131,14 +131,26 @@ function CurrencyPill({
   alert?: boolean;
   children: React.ReactNode;
 }) {
+  const pillArt = useArt("hud-pill");
+  const plusArt = useArt("hud-plus");
   return (
     <button type="button" aria-label={label} onClick={onClick} className={cn("group flex min-h-11 min-w-0 flex-1 items-center rounded-full", FOCUS)}>
-      <span className="relative flex h-8 w-full items-center rounded-full border-2 border-[#1f2150] bg-[#1f2150]/70 pl-7 pr-1 shadow-[inset_0_2px_0_rgba(255,255,255,0.12)] transition-transform group-active:scale-95 motion-reduce:transition-none">
+      <span
+        style={pillArt ? { backgroundImage: "url(/game/hud-pill.webp)", backgroundSize: "100% 100%" } : undefined}
+        className={cn(
+          "relative flex h-8 w-full items-center pl-7 pr-1 transition-transform group-active:scale-95 motion-reduce:transition-none",
+          !pillArt && "rounded-full border-2 border-[#1f2150] bg-[#1f2150]/70 shadow-[inset_0_2px_0_rgba(255,255,255,0.12)]",
+        )}
+      >
         <GameIcon name={iconName} fallback={icon} className="absolute -left-1.5 top-1/2 h-9 w-9 -translate-y-1/2 text-[#ffd23f] drop-shadow-[0_2px_0_#1f2150]" />
         <span className="game-outline min-w-0 flex-1 truncate text-center font-game text-sm font-bold tabular-nums">{children}</span>
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#7ee06b] to-[#3fae2f] shadow-[0_2px_0_#1f6d16]" aria-hidden>
-          <Plus className="h-3.5 w-3.5 text-white" />
-        </span>
+        {plusArt ? (
+          <img src="/game/hud-plus.webp" alt="" draggable={false} className="h-5 w-5 shrink-0" aria-hidden />
+        ) : (
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#7ee06b] to-[#3fae2f] shadow-[0_2px_0_#1f6d16]" aria-hidden>
+            <Plus className="h-3.5 w-3.5 text-white" />
+          </span>
+        )}
         {alert && (
           <span className="absolute -right-1 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-[#ff3b5c] text-[10px] font-black leading-none text-white" aria-hidden>
             !
@@ -227,6 +239,8 @@ export function GameHud() {
   const { profile, myStudent } = useAuth();
   const navigate = useNavigate();
   const reduce = useReducedMotion();
+  const trackArt = useArt("hud-bar-track");
+  const avatarArt = useArt("hud-avatar-frame");
   const [panel, setPanel] = useState<Panel | null>(null);
   const [battle, setBattle] = useState<MyAssignment | null>(null);
 
@@ -328,22 +342,36 @@ export function GameHud() {
       {/* ===== Top HUD ===== */}
       <header className="relative z-20 shrink-0 px-3 pt-2">
         <div className={cn("grid grid-cols-[auto_1fr] items-center gap-x-2.5 gap-y-1 rounded-2xl px-2.5 py-2", NAVY)}>
-          <div className="row-span-1 rounded-xl border-[3px] border-[#ffd23f] bg-gradient-to-b from-[#ffe58a] to-[#e0a21a] p-0.5 shadow-[0_3px_0_#8a5a00]">
-            {profile && <Avatar name={profileFullName(profile)} src={avatarUrl(profile)} className="h-11 w-11 rounded-lg ring-0" />}
-          </div>
+          {avatarArt ? (
+            <div className="relative row-span-1 h-[3.75rem] w-[3.75rem]">
+              {profile && (
+                <div className="absolute inset-[15%] overflow-hidden rounded-lg">
+                  <Avatar name={profileFullName(profile)} src={avatarUrl(profile)} className="h-full w-full rounded-none ring-0" />
+                </div>
+              )}
+              <img src="/game/hud-avatar-frame.webp" alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full" />
+            </div>
+          ) : (
+            <div className="row-span-1 rounded-xl border-[3px] border-[#ffd23f] bg-gradient-to-b from-[#ffe58a] to-[#e0a21a] p-0.5 shadow-[0_3px_0_#8a5a00]">
+              {profile && <Avatar name={profileFullName(profile)} src={avatarUrl(profile)} className="h-11 w-11 rounded-lg ring-0" />}
+            </div>
+          )}
           <div className="min-w-0">
             <p className="game-outline truncate font-game text-base font-bold leading-tight">{name}</p>
             <div className="mt-1 flex items-center gap-1.5" role="progressbar" aria-label={`EXP เลเวล ${lvl.level}`} aria-valuemin={0} aria-valuemax={lvl.span} aria-valuenow={lvl.into}>
               <span className="game-outline shrink-0 rounded-md border-2 border-[#1f2150] bg-gradient-to-b from-[#ff6fb5] to-[#d62f86] px-1.5 font-game text-xs font-bold leading-5">
                 Lv.{lvl.level}
               </span>
-              <div className="relative h-4 min-w-0 flex-1 overflow-hidden rounded-full border-2 border-[#1f2150] bg-[#1f2150]/70">
-                <motion.div
-                  className="h-full rounded-full bg-gradient-to-b from-[#9ff7ff] to-[#2fb4e8] shadow-[inset_0_2px_0_rgba(255,255,255,0.5)]"
-                  initial={false}
-                  animate={{ width: `${(lvl.into / lvl.span) * 100}%` }}
-                  transition={reduce ? { duration: 0 } : { duration: 0.8, ease: "easeOut" }}
-                />
+              <div className={cn("relative min-w-0 flex-1", trackArt ? "h-6" : "h-4 overflow-hidden rounded-full border-2 border-[#1f2150] bg-[#1f2150]/70")}>
+                {trackArt && <img src="/game/hud-bar-track.webp" alt="" draggable={false} className="absolute inset-0 h-full w-full" />}
+                <div className={cn("absolute", trackArt ? "inset-y-[24%] left-[9%] right-[9%]" : "inset-0")}>
+                  <BarFill
+                    name="hud-bar-fill-exp"
+                    ratio={lvl.into / lvl.span}
+                    fallback="bg-gradient-to-b from-[#9ff7ff] to-[#2fb4e8] shadow-[inset_0_2px_0_rgba(255,255,255,0.5)]"
+                    transition={reduce ? { duration: 0 } : { duration: 0.8, ease: "easeOut" }}
+                  />
+                </div>
                 <span className="game-outline absolute inset-0 flex items-center justify-center font-game text-[10px] font-bold leading-none tabular-nums">
                   {lvl.into}/{lvl.span}
                 </span>
@@ -382,11 +410,12 @@ export function GameHud() {
             aria-valuemax={100}
             aria-valuenow={Math.round(termPct)}
           >
-            <motion.div
-              className="h-full rounded-full bg-gradient-to-b from-[#a8f07a] to-[#3fb52f] shadow-[inset_0_2px_0_rgba(255,255,255,0.55)]"
-              initial={reduce ? false : { width: 0 }}
-              animate={{ width: `${termPct}%` }}
+            <BarFill
+              name="hud-bar-fill-energy"
+              ratio={termPct / 100}
+              fallback="bg-gradient-to-b from-[#a8f07a] to-[#3fb52f] shadow-[inset_0_2px_0_rgba(255,255,255,0.55)]"
               transition={{ duration: 1, ease: "easeOut" }}
+              from0={!reduce}
             />
             <span className="game-outline absolute inset-0 flex items-center justify-center font-game text-xs font-bold">
               {termLabel} · ผ่านไป {Math.round(termPct)}%
@@ -450,7 +479,7 @@ export function GameHud() {
                 transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
                 className={cn(!island && !islandsLoading && "opacity-80", islandsLoading && "animate-pulse motion-reduce:animate-none")}
               >
-                <IslandArt key={island?.areaCode ?? "other"} code={island?.areaCode ?? "other"} className="aspect-square h-[min(17rem,30dvh,64vw)]" />
+                <IslandArt key={island?.areaCode ?? "other"} code={island?.areaCode ?? "other"} className="aspect-square h-[min(24rem,42dvh,80vw)]" />
               </motion.div>
             </motion.div>
           </AnimatePresence>
@@ -470,10 +499,10 @@ export function GameHud() {
               aria-valuemax={island.total}
               aria-valuenow={island.submitted}
             >
-              <motion.div
-                className="h-full rounded-full bg-gradient-to-b from-[#ffe58a] to-[#ffb43d] shadow-[inset_0_2px_0_rgba(255,255,255,0.55)]"
-                initial={false}
-                animate={{ width: `${doneRatio * 100}%` }}
+              <BarFill
+                name="hud-bar-fill-exp"
+                ratio={doneRatio}
+                fallback="bg-gradient-to-b from-[#ffe58a] to-[#ffb43d] shadow-[inset_0_2px_0_rgba(255,255,255,0.55)]"
                 transition={reduce ? { duration: 0 } : { duration: 0.6, ease: "easeOut" }}
               />
               <span className="game-outline absolute inset-0 flex items-center justify-center font-game text-xs font-bold">

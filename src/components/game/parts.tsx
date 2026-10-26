@@ -1,3 +1,4 @@
+import { motion, type Transition } from "framer-motion";
 import { useEffect, useState, type CSSProperties, type HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +40,38 @@ export function useArt(name: string) {
     };
   }, [name]);
   return ok;
+}
+
+/** Progress fill: public/game/{name}.webp revealed left to right, or a CSS gradient (`fallback`) until the file exists. Fills its parent. */
+export function BarFill({
+  name,
+  ratio,
+  fallback,
+  transition,
+  from0,
+}: {
+  name: string;
+  ratio: number;
+  fallback: string;
+  transition: Transition;
+  from0?: boolean;
+}) {
+  const ok = useArt(name);
+  const pct = Math.max(0, Math.min(1, ratio)) * 100;
+  if (!ok) {
+    return <motion.div className={cn("h-full rounded-full", fallback)} initial={from0 ? { width: 0 } : false} animate={{ width: `${pct}%` }} transition={transition} />;
+  }
+  return (
+    <motion.img
+      src={`/game/${name}.webp`}
+      alt=""
+      draggable={false}
+      className="h-full w-full object-fill"
+      initial={from0 ? { clipPath: "inset(0 100% 0 0)" } : false}
+      animate={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
+      transition={transition}
+    />
+  );
 }
 
 /**

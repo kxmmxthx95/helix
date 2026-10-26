@@ -57,6 +57,26 @@ Per file (full prompt = prefix + theme):
 **island-other** (also the fallback)
 > Stylized 3D render of a small floating island, casual mobile game art, soft bright lighting, saturated colors, chunky shapes, turquoise water base wrapping the island, isometric 3/4 view, transparent background, no text, no characters. Theme: plain grassy island with a single tree.
 
+## Island colour theme
+
+Each learning area has its own island and water palette so subjects read apart at a glance. Add this line to the end of any island prompt:
+
+> Colour theme: the grass and foliage are [LAND], the water (including the translucent underwater base) is [WATER]. Keep the overall style, lighting and composition identical.
+
+| Island | LAND | WATER |
+|---|---|---|
+| thai | warm golden-green grass, terracotta and gold accents | warm turquoise-teal |
+| math | cool mint grass, violet and lilac crystals | violet-blue |
+| science | lime-green grass, orange and red volcanic rock | emerald green |
+| social | olive-green grass, sandstone and ochre ruins | deep sapphire blue |
+| health_pe | fresh bright green grass, white and red track markings | bright aqua cyan |
+| art | pastel pink and yellow grass, rainbow splashes | magenta-pink to purple gradient |
+| career | autumn yellow-green grass, copper and steel gears | amber-orange |
+| foreign_lang | soft blue-green grass, cream stone | sky blue with a hint of lavender |
+| other | classic green grass, grey-brown rocks | classic turquoise |
+
+Generic island (`island-other`): "small floating island, grassy top, two palm trees, mossy rocks, small sandy beach and wooden dock" + the colour line above.
+
 ## HUD icons
 
 Square 96x96, transparent background, exported as `.webp`. Used by the top HUD currency slots and the map and BATTLE buttons.
