@@ -657,9 +657,7 @@ function AppShellInner() {
                       cn(
                         "font-ui tappable flex items-center rounded-lg text-xs font-semibold transition-colors",
                         collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2",
-                        isActive
-                          ? "bg-foreground/10 text-accent"
-                          : "text-foreground",
+                        isActive ? "bg-background dark:bg-muted text-foreground" : "text-foreground",
                       )
                     }
                   >
