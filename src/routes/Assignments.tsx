@@ -157,7 +157,7 @@ function AssignmentCard({
   );
 }
 
-function SubmitSheet({
+export function SubmitSheet({
   item,
   student,
   scoreInfo,

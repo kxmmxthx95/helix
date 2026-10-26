@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { ChevronBack, Plus, X } from "@/components/icons";
@@ -592,12 +593,34 @@ function StudentExams() {
   );
 }
 
+/** Joinable right now: inside the window and attempts left. */
+export function isExamOpen(e: AvailableExam, now = new Date()) {
+  return now >= new Date(e.opens_at) && now <= new Date(e.closes_at) && e.my_attempts < e.max_attempts;
+}
+
+/** Subject ids with at least one joinable exam for this student — for the home island screen. */
+export function useOpenExamSubjectIds(studentId: string | null) {
+  const { data: classroom } = useMyCurrentClassroom(studentId);
+  const { data: exams = [] } = useAvailableExams(studentId, classroom?.classroomId ?? null, classroom?.academicYear ?? null);
+  return useMemo(() => new Set(exams.filter((e) => isExamOpen(e)).map((e) => e.subject_id)), [exams]);
+}
+
 function ExamList({ student, onOpen }: { student: Student; onOpen: (s: AvailableExam) => void }) {
   const { data: classroom } = useMyCurrentClassroom(student.id);
-  const { data: exams = [], isLoading } = useAvailableExams(
+  const { data: allExams = [], isLoading } = useAvailableExams(
     student.id,
     classroom?.classroomId ?? null,
     classroom?.academicYear ?? null,
+  );
+  const [params, setParams] = useSearchParams();
+  const subjectCode = params.get("subject");
+  const { data: subjects = [] } = useSubjectsByIds(subjectCode ? [...new Set(allExams.map((e) => e.subject_id))] : []);
+  const subjectId = subjects.find((s) => s.code === subjectCode)?.id;
+  const exams = subjectCode ? allExams.filter((e) => e.subject_id === subjectId) : allExams;
+  const clearFilter = subjectCode && (
+    <button type="button" onClick={() => setParams({})} className="tappable mb-2 rounded-full bg-foreground/10 px-3 py-1.5 text-xs font-medium">
+      {subjectCode} ✕ ดูทั้งหมด
+    </button>
   );
 
   if (isLoading) {
@@ -618,12 +641,19 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
     );
   }
   if (exams.length === 0) {
-    return <EmptyState title="ไม่มีข้อสอบ" description="ยังไม่มีการเปิดสอบสำหรับห้องนี้" />;
+    return (
+      <>
+        {clearFilter}
+        <EmptyState title="ไม่มีข้อสอบ" description="ยังไม่มีการเปิดสอบสำหรับห้องนี้" />
+      </>
+    );
   }
 
   const now = new Date();
   return (
-    <ul className="space-y-2">
+    <>
+      {clearFilter}
+      <ul className="space-y-2">
       {exams.map((e) => {
         const opens = new Date(e.opens_at);
         const closes = new Date(e.closes_at);
@@ -644,6 +674,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
         );
       })}
     </ul>
+    </>
   );
 }
 
