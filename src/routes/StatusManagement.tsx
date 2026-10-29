@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Plus, Search } from "@/components/icons";
+import { ChevronForward, Plus, Search } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { Button, Card, EmptyState, Field, Input, Pagination, Select, Spinner, Switch } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
@@ -41,13 +41,20 @@ const STATUS_LABEL: Record<StudentStatus, string> = {
   dropped: "พ้นสภาพ",
 };
 
+const STATUS_DOT: Record<StudentStatus, string> = {
+  studying: "bg-success",
+  transferred: "bg-warning",
+  graduated: "bg-accent",
+  dropped: "bg-destructive",
+};
+
 type SubTab = "promote" | "classroom" | "status" | "transfer";
 
-const SUB_TABS: { key: SubTab; label: string }[] = [
-  { key: "promote", label: "เลื่อนชั้นประจำปี" },
-  { key: "classroom", label: "จัดห้องเรียน" },
-  { key: "status", label: "เปลี่ยนสถานะ" },
-  { key: "transfer", label: "รับย้ายเข้า" },
+const SUB_TABS: { key: SubTab; label: string; hint: string }[] = [
+  { key: "promote", label: "เลื่อนชั้นประจำปี", hint: "ย้ายนักเรียนทั้งชั้นขึ้นชั้นถัดไปเมื่อสิ้นปีการศึกษา" },
+  { key: "classroom", label: "จัดห้องเรียน", hint: "สร้างห้อง จัดนักเรียนเข้าห้อง และกำหนดครูประจำชั้น" },
+  { key: "status", label: "เปลี่ยนสถานะ", hint: "เปลี่ยนสถานะนักเรียนหลายคนพร้อมกัน เช่น ย้ายออก จบการศึกษา" },
+  { key: "transfer", label: "รับย้ายเข้า", hint: "บันทึกนักเรียนที่ย้ายเข้ามาและติดตามสถานะการรับ" },
 ];
 
 export function StatusManagement() {
@@ -70,10 +77,10 @@ export function StatusManagement() {
 
   return (
     <div className="page-fill">
-      <div className="grid shrink-0 grid-cols-3 gap-2">
+      <div className="toolbar shrink-0">
         {departments.length > 0 && (
           <Select
-            className="min-w-0"
+            className="min-w-0 sm:w-56"
             value={pickedDept}
             onChange={(e) => setPickedDept(e.target.value)}
             aria-label="แผนก"
@@ -88,24 +95,9 @@ export function StatusManagement() {
               ))}
           </Select>
         )}
-
-        <Select
-          className="min-w-0"
-          value={subTab}
-          onChange={(e) => setSubTab(e.target.value as SubTab)}
-          aria-label="เมนูจัดการสถานภาพ"
-          placeholder="เลือกเมนู"
-        >
-          {SUB_TABS.map((t) => (
-            <option key={t.key} value={t.key}>
-              {t.label}
-            </option>
-          ))}
-        </Select>
-
-        {subTab ? (
+        {subTab && (
           <Select
-            className="min-w-0"
+            className="min-w-0 sm:w-44"
             value={pickedGrade}
             onChange={(e) => setPickedGrade(e.target.value)}
             aria-label="ชั้น"
@@ -118,10 +110,34 @@ export function StatusManagement() {
               </option>
             ))}
           </Select>
-        ) : (
-          <div className="min-w-0" aria-hidden />
         )}
       </div>
+
+      {pickedDept && (
+        <div
+          role="tablist"
+          aria-label="เมนูจัดการสถานภาพ"
+          className="flex shrink-0 gap-1 overflow-x-auto rounded-xl bg-secondary p-1 [scrollbar-width:none]"
+        >
+          {SUB_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={subTab === t.key}
+              onClick={() => setSubTab(t.key)}
+              className={cn(
+                "tappable min-h-9 flex-1 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium transition-colors",
+                subTab === t.key
+                  ? "bg-card text-foreground shadow-thumb"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {!pickedDept && (
         <div className="flex flex-1 items-center justify-center">
@@ -129,8 +145,26 @@ export function StatusManagement() {
         </div>
       )}
       {pickedDept && !subTab && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {SUB_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setSubTab(t.key)}
+              className="tappable flex min-w-0 items-center gap-3 rounded-xl bg-card p-4 text-left shadow-card transition-shadow hover:shadow-float focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="text-[15px] font-semibold">{t.label}</div>
+                <div className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{t.hint}</div>
+              </div>
+              <ChevronForward className="h-4 w-4 shrink-0 text-accent" />
+            </button>
+          ))}
+        </div>
+      )}
+      {pickedDept && subTab && subTab !== "transfer" && !pickedGrade && (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="เลือกเมนู" description="เลือกเมนูด้านบนเพื่อดำเนินการต่อ" />
+          <EmptyState title="เลือกชั้น" description="เลือกชั้นด้านบนเพื่อดำเนินการต่อ" />
         </div>
       )}
 
@@ -927,21 +961,24 @@ function BulkStatusPanel({
                         <td className="px-3 py-0 font-medium">{s.prefix ?? "—"}</td>
                         <td className="px-3 py-0 font-medium">{name}</td>
                         <td className="px-3 py-0">
-                          <Select
-                            className="h-6 min-w-[7rem] px-1.5 text-[10px]"
-                            aria-label={`สถานะของ ${name}`}
-                            value={s.status}
-                            disabled={pendingId === s.id || bulkSet.isPending}
-                            onChange={(e) =>
-                              changeOne(s.id, name, e.target.value as StudentStatus, s.status)
-                            }
-                          >
-                            {(Object.keys(STATUS_LABEL) as StudentStatus[]).map((st) => (
-                              <option key={st} value={st}>
-                                {STATUS_LABEL[st]}
-                              </option>
-                            ))}
-                          </Select>
+                          <span className="flex items-center gap-1.5">
+                            <span className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[s.status])} />
+                            <Select
+                              className="h-6 min-w-[7rem] px-1.5 text-[10px]"
+                              aria-label={`สถานะของ ${name}`}
+                              value={s.status}
+                              disabled={pendingId === s.id || bulkSet.isPending}
+                              onChange={(e) =>
+                                changeOne(s.id, name, e.target.value as StudentStatus, s.status)
+                              }
+                            >
+                              {(Object.keys(STATUS_LABEL) as StudentStatus[]).map((st) => (
+                                <option key={st} value={st}>
+                                  {STATUS_LABEL[st]}
+                                </option>
+                              ))}
+                            </Select>
+                          </span>
                         </td>
                       </tr>
                     );

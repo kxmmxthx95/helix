@@ -14,10 +14,12 @@ export type OverviewLesson = {
   files: PlanLinkedFile[];
   file: { linkId: string; id: string; name: string; path: string } | null;
   topics: { id: string; name: string }[] };
-export type OverviewSubject = { id: string; code: string; name: string; areaId: string | null; teachers: string[]; lessons: OverviewLesson[] };
+/** One teacher with the fields avatarUrl() needs. */
+export type OverviewTeacher = { name: string; avatar_path: string | null; updated_at: string };
+export type OverviewSubject = { id: string; code: string; name: string; areaId: string | null; teachers: string[]; teacherList: OverviewTeacher[]; lessons: OverviewLesson[] };
 export type OverviewClassroom = { id: string; name: string; gradeLevelId: string; gradeCode: string; subjects: OverviewSubject[] };
 
-type Teacher = { prefix: string | null; first_name: string; last_name: string };
+type Teacher = { prefix: string | null; first_name: string; last_name: string; avatar_path: string | null; updated_at: string };
 type AssignmentRow = {
   subject_id: string;
   subject: { code: string; name_th: string; learning_area_id: string | null };
@@ -46,7 +48,7 @@ export function useDeptClassroomOverview(departmentId: string | null, academicYe
       let q = supabase
         .from("teaching_assignments")
         .select(
-          "subject_id, subject:subjects!inner(code, name_th, learning_area_id), teacher:profiles(prefix, first_name, last_name), classroom:classrooms!inner(id, name, grade_level:grade_levels!inner(id, code, name, sort_order, department_id))",
+          "subject_id, subject:subjects!inner(code, name_th, learning_area_id), teacher:profiles(prefix, first_name, last_name, avatar_path, updated_at), classroom:classrooms!inner(id, name, grade_level:grade_levels!inner(id, code, name, sort_order, department_id))",
         )
         .eq("classroom.grade_level.department_id", departmentId!)
         .eq("classroom.is_active", true)
@@ -80,6 +82,7 @@ export function useDeptClassroomOverview(departmentId: string | null, academicYe
             name: r.subject.name_th,
             areaId: r.subject.learning_area_id,
             teachers: [],
+            teacherList: [],
             lessons: tags
               .filter((t) => t.subject_id === r.subject_id && t.lesson.grade_level_id === c.grade_level.id)
               .map((t) => t.lesson)
@@ -100,7 +103,11 @@ export function useDeptClassroomOverview(departmentId: string | null, academicYe
               }),
           };
         room.subjects.set(r.subject_id, subject);
-        if (r.teacher) subject.teachers.push(profileFullName(r.teacher));
+        if (r.teacher) {
+          const name = profileFullName(r.teacher);
+          subject.teachers.push(name);
+          subject.teacherList.push({ name, avatar_path: r.teacher.avatar_path, updated_at: r.teacher.updated_at });
+        }
       }
 
       return [...rooms.entries()]

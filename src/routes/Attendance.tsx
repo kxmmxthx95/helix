@@ -3,7 +3,7 @@ import { SlidersHorizontal } from "@/components/icons";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { useMobileHeaderEnd } from "@/components/MobileHeaderSlot";
-import { Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
+import { Avatar, Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { useAcademicEvents } from "@/hooks/useAcademicTerms";
 import {
@@ -24,7 +24,9 @@ import {
   useSetStudentLeaveStatus,
   type PendingStudentLeaveRequest,
 } from "@/hooks/useStudentLeave";
-import type { AttendanceRecord, AttendanceStatus, Student } from "@/lib/database.types";
+import type { AttendanceRecord, AttendanceStatus } from "@/lib/database.types";
+import { avatarUrl } from "@/hooks/useAvatar";
+import type { StudentListItem } from "@/hooks/useStudents";
 import { canManage, isOrgWide, isSelfScoped } from "@/lib/roles";
 import { cn, todayIso } from "@/lib/utils";
 
@@ -44,6 +46,14 @@ export const STATUS_STYLE: Record<AttendanceStatus, string> = {
   absent: "bg-red-400 text-red-950 ring-1 ring-red-700 dark:bg-red-950 dark:text-red-300 dark:ring-red-800",
   leave:
     "bg-slate-300 text-slate-800 ring-1 ring-slate-500 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600",
+};
+
+/** Selected segment in the row check-in control — soft tint of the status colour (tokens flip in dark mode). */
+const SEGMENT_STYLE: Record<AttendanceStatus, string> = {
+  present: "bg-success/15 text-success ring-1 ring-inset ring-success/40",
+  late: "bg-warning/15 text-warning ring-1 ring-inset ring-warning/40",
+  absent: "bg-destructive/15 text-destructive ring-1 ring-inset ring-destructive/40",
+  leave: "bg-fill-strong text-foreground ring-1 ring-inset ring-border",
 };
 
 const MONTH_NAMES = Array.from({ length: 12 }, (_, i) =>
@@ -568,7 +578,7 @@ function CheckInGrid({
   classroomId: string;
   classroomLabel: string;
   date: string;
-  roster: Student[];
+  roster: StudentListItem[];
   existing: AttendanceRecord[];
   recorderId: string;
   markAllRef: MutableRefObject<(() => void) | null>;
@@ -587,6 +597,7 @@ function CheckInGrid({
   );
 
   const remaining = roster.filter((s) => !marks.get(s.id)?.status).length;
+  const counts = STATUS_ORDER.map((st) => [st, roster.filter((s) => marks.get(s.id)?.status === st).length] as const);
 
   markAllRef.current = () => {
     setMarks(new Map(roster.map((s) => [s.id, { status: "present" as AttendanceStatus, note: "" }])));
@@ -632,17 +643,20 @@ function CheckInGrid({
 
   function statusButtons(studentId: string, mark: { status: AttendanceStatus | null; note: string }) {
     return (
-      <div className="grid grid-cols-4 gap-1 sm:flex sm:justify-center sm:gap-2">
+      <div
+        role="group"
+        aria-label="สถานะการเข้าเรียน"
+        className="grid grid-cols-4 gap-0.5 rounded-lg bg-secondary p-0.5 sm:w-60"
+      >
         {STATUS_ORDER.map((st) => (
           <button
             key={st}
             type="button"
+            aria-pressed={mark.status === st}
             onClick={() => setStatus(studentId, st)}
             className={cn(
-              "tappable inline-flex h-7 shrink-0 items-center justify-center rounded-full text-[10px] font-medium sm:w-7",
-              mark.status === st
-                ? STATUS_STYLE[st]
-                : "bg-muted text-muted-foreground hover:bg-muted/70",
+              "tappable inline-flex h-9 items-center justify-center rounded-md text-[13px] font-medium transition-colors sm:h-8",
+              mark.status === st ? SEGMENT_STYLE[st] : "text-muted-foreground hover:text-foreground",
             )}
           >
             {STATUS_LABEL[st]}
@@ -661,7 +675,8 @@ function CheckInGrid({
           const noteOpen = Boolean(mark.status && mark.status !== "present");
           return (
             <li key={s.id} className="rounded-xl bg-card p-3 shadow-card">
-              <div className="flex min-w-0 items-start gap-2">
+              <div className="flex min-w-0 items-center gap-3">
+                <Avatar name={name} src={s.profile ? avatarUrl(s.profile) : null} className="h-10 w-10 text-xs" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{name}</p>
                   <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{s.student_code}</p>
@@ -689,13 +704,12 @@ function CheckInGrid({
 
       <div className="table-panel hidden lg:flex">
         <div className="table-panel-scroll">
-          <table className="w-full table-fixed text-xs">
-            <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+          <table className="w-full table-fixed text-[13px]">
+            <thead className="sticky top-0 z-10 text-left text-xs">
               <tr>
-                <th className="w-24 px-3 py-2 font-medium">รหัสนักเรียน</th>
-                <th className="w-48 px-3 py-2 font-medium">รายชื่อ</th>
-                <th className="w-36 px-3 py-2 text-center font-medium">สถานะ</th>
-                <th className="px-3 py-2 text-center font-medium">หมายเหตุ</th>
+                <th className="w-72 px-4 py-3">นักเรียน</th>
+                <th className="w-72 px-4 py-3">สถานะ</th>
+                <th className="px-4 py-3">หมายเหตุ</th>
               </tr>
             </thead>
             <tbody>
@@ -704,17 +718,24 @@ function CheckInGrid({
                 const mark = marks.get(s.id) ?? { status: null, note: "" };
                 const noteOpen = Boolean(mark.status && mark.status !== "present");
                 return (
-                  <tr key={s.id} className="border-t border-border">
-                    <td className="px-3 py-2">{s.student_code}</td>
-                    <td className="truncate px-3 py-2 font-medium">{name}</td>
-                    <td className="px-3 py-2">{statusButtons(s.id, mark)}</td>
-                    <td className="px-3 py-2">
+                  <tr key={s.id} className="h-14 border-t border-border first:border-t-0">
+                    <td className="px-4 py-0">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Avatar name={name} src={s.profile ? avatarUrl(s.profile) : null} className="h-9 w-9 text-xs" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{name}</p>
+                          <p className="font-mono text-xs tabular-nums text-muted-foreground">{s.student_code}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-0">{statusButtons(s.id, mark)}</td>
+                    <td className="px-4 py-0">
                       <Input
                         value={mark.note}
                         onChange={(e) => setNote(s.id, e.target.value)}
                         placeholder="หมายเหตุ (ถ้ามี)"
                         disabled={!noteOpen}
-                        className={cn("h-7 text-[10px]", !noteOpen && "invisible")}
+                        className={cn("h-8 text-xs", !noteOpen && "invisible")}
                         aria-label={`หมายเหตุของ ${name}`}
                         tabIndex={noteOpen ? undefined : -1}
                       />
@@ -727,9 +748,20 @@ function CheckInGrid({
         </div>
       </div>
       <div className="flex shrink-0 items-center justify-between gap-2">
-        <span className="text-xs text-muted-foreground">
-          {remaining === 0 ? `ครบ ${roster.length} คน` : `เหลืออีก ${remaining} คน`}
-        </span>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+          <span className="text-[13px] font-medium tabular-nums">
+            {remaining === 0 ? `ครบ ${roster.length} คน` : `เหลืออีก ${remaining} คน`}
+          </span>
+          <span className="flex flex-wrap items-center gap-1.5">
+            {counts
+              .filter(([, n]) => n > 0)
+              .map(([st, n]) => (
+                <span key={st} className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums", SEGMENT_STYLE[st])}>
+                  {STATUS_LABEL[st]} {n}
+                </span>
+              ))}
+          </span>
+        </div>
         <Button onClick={submit} disabled={remaining > 0 || save.isPending}>
           {save.isPending ? <Spinner className="h-3 w-3" /> : "บันทึกเช็คชื่อ"}
         </Button>

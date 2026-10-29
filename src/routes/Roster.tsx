@@ -36,7 +36,7 @@ import type {
   StudentStatus,
 } from "@/lib/database.types";
 import { canManage, canManageUsers, isOrgWide, STUDENT_PREFIXES } from "@/lib/roles";
-import { gradeShortLabel } from "@/lib/gradeLevels";
+import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 
 const EMPTY: StudentFilters = { search: "", departmentId: "", status: "studying", gradeLevelId: "", classroomId: "" };
 
@@ -238,11 +238,35 @@ export function Roster() {
   const activeFilterCount = [filters.departmentId, filters.status, filters.gradeLevelId, filters.classroomId].filter(
     Boolean,
   ).length;
+  // Nothing searched or filtered yet (only the default status) → show the prompt, not the full roster.
+  const hasSearch =
+    filters.search.trim() !== "" ||
+    filters.departmentId !== EMPTY.departmentId ||
+    filters.gradeLevelId !== EMPTY.gradeLevelId ||
+    filters.classroomId !== EMPTY.classroomId ||
+    filters.status !== EMPTY.status;
 
   const filterGradeLevels = filters.departmentId
     ? allGradeLevels.filter((g) => g.department_id === filters.departmentId)
     : allGradeLevels;
   const { data: filterClassrooms = [] } = useClassrooms(filters.gradeLevelId || null);
+  const filterChips = [
+    filters.departmentId && {
+      key: "dept",
+      label: deptName.get(filters.departmentId) ?? "แผนก",
+      clear: () => setFilters({ ...filters, departmentId: "", gradeLevelId: "", classroomId: "" }),
+    },
+    filters.gradeLevelId && {
+      key: "grade",
+      label: gradeLevelName.get(filters.gradeLevelId) ?? "ชั้น",
+      clear: () => setFilters({ ...filters, gradeLevelId: "", classroomId: "" }),
+    },
+    filters.classroomId && {
+      key: "room",
+      label: filterClassrooms.find((c) => c.id === filters.classroomId)?.name ?? "ห้อง",
+      clear: () => setFilters({ ...filters, classroomId: "" }),
+    },
+  ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
 
   return (
     <div className="page-fill">
@@ -287,18 +311,41 @@ export function Roster() {
             <Button variant="outline" size="icon" className="shrink-0" onClick={() => setImportOpen(true)} aria-label="นำเข้า CSV">
               <Upload className="h-3 w-3" />
             </Button>
-            <Button size="icon" className="shrink-0" onClick={() => setEditing("new")} aria-label="เพิ่มนักเรียน">
+            <Button className="shrink-0" onClick={() => setEditing("new")} aria-label="เพิ่มนักเรียน">
               <Plus className="h-3 w-3" />
+              <span className="hidden sm:inline">เพิ่มนักเรียน</span>
             </Button>
           </>
         )}
       </div>
 
-      {isLoading && (
+
+      {filterChips.length > 0 && (
+        <div className="toolbar -mt-1 shrink-0 text-[13px]">
+          {filterChips.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              onClick={c.clear}
+              className="tappable inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
+              aria-label={`ล้างตัวกรอง ${c.label}`}
+            >
+              {c.label}
+              <X className="h-2.5 w-2.5" />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!hasSearch && (
+        <EmptyState title="ค้นหานักเรียน" description="พิมพ์ชื่อหรือรหัสนักเรียน หรือเลือกตัวกรองเพื่อแสดงรายชื่อ" />
+      )}
+
+      {hasSearch && isLoading && (
         <div className="space-y-2" role="status" aria-label="กำลังโหลด">
           <ul className="space-y-2 lg:hidden">
             {[0, 1, 2].map((i) => (
-              <li key={i} className="rounded-xl border border-border bg-card p-3.5 shadow-sm">
+              <li key={i} className="rounded-xl bg-card p-3.5 shadow-card">
                 <div className="flex items-start gap-3">
                   <Skeleton className="h-11 w-11 shrink-0 rounded-full" />
                   <div className="min-w-0 flex-1 space-y-1.5">
@@ -310,7 +357,7 @@ export function Roster() {
             ))}
           </ul>
 
-          <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
+          <div className="table-panel hidden lg:flex"><div className="table-panel-scroll">
             <table className="w-full text-xs">
               <thead className="bg-muted text-left text-xs text-muted-foreground">
                 <tr>
@@ -326,7 +373,7 @@ export function Roster() {
               </thead>
               <tbody>
                 {[0, 1, 2, 3, 4].map((i) => (
-                  <tr key={i} className="h-[40px] border-t border-border">
+                  <tr key={i} className="h-14 border-t border-border first:border-t-0">
                     <td className="px-3 py-0"><Skeleton className="h-3 w-12" /></td>
                     <td className="px-3 py-0"><Skeleton className="h-3 w-10" /></td>
                     <td className="px-3 py-0"><Skeleton className="h-3 w-32" /></td>
@@ -341,17 +388,17 @@ export function Roster() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </div></div>
         </div>
       )}
 
       {error && <Card className="shrink-0 text-sm text-destructive">โหลดข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง</Card>}
 
-      {rows && rows.length === 0 && (
+      {hasSearch && rows && rows.length === 0 && (
         <EmptyState title="ไม่พบข้อมูล" description="ไม่พบนักเรียนตามเงื่อนไขที่เลือก" />
       )}
 
-      {rows && rows.length > 0 && (
+      {hasSearch && rows && rows.length > 0 && (
         <div className="space-y-2">
           <ul className="space-y-2 lg:hidden">
             {pageRows.map((row) => {
@@ -372,8 +419,8 @@ export function Roster() {
                   }}
                   className={
                     mayView
-                      ? "rounded-xl border border-border bg-card p-3.5 shadow-sm transition-colors active:bg-muted"
-                      : "rounded-xl border border-border bg-card p-3.5 shadow-sm"
+                      ? "rounded-xl bg-card p-3.5 shadow-card transition-colors active:bg-muted"
+                      : "rounded-xl bg-card p-3.5 shadow-card"
                   }
                 >
                   <div className="flex items-start gap-3">
@@ -398,12 +445,17 @@ export function Roster() {
                       </div>
                       <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
                         <span className="truncate text-xs text-muted-foreground">{row.student_code}</span>
+                        {row.grade_level_id && gradeLevelName.get(row.grade_level_id) && (
+                          <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${levelTone(gradeLevelName.get(row.grade_level_id))}`}>
+                            {gradeLevelName.get(row.grade_level_id)}
+                          </span>
+                        )}
                         {gender && (
                           <span
                             className={
                               gender === "ชาย"
-                                ? "inline-flex shrink-0 items-center rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-500"
-                                : "inline-flex shrink-0 items-center rounded-full bg-pink-500/15 px-2 py-0.5 text-[10px] font-medium text-pink-500"
+                                ? "inline-flex shrink-0 items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                                : "inline-flex shrink-0 items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
                             }
                           >
                             {gender}
@@ -467,104 +519,123 @@ export function Roster() {
             })}
           </ul>
 
-          <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
-            <table className="w-full text-xs">
-              <thead className="bg-muted text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">รหัส</th>
-                  <th className="px-3 py-2 font-medium">คำนำหน้า</th>
-                  <th className="px-3 py-2 font-medium">ชื่อ-นามสกุล</th>
-                  <th className="px-3 py-2 font-medium">แผนก</th>
-                  <th className="px-3 py-2 font-medium">ชั้น</th>
-                  <th className="px-3 py-2 font-medium">สถานะ</th>
-                  {mayManageUsers && <th className="px-3 py-2 font-medium">บัญชี</th>}
-                  {mayEdit && <th className="px-3 py-2 font-medium" />}
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((row) => (
-                  <tr
-                    key={row.id}
-                    onClick={() => mayView && setEditing(row)}
-                    className={
-                      mayView
-                        ? "h-[40px] cursor-pointer border-t border-border active:bg-muted"
-                        : "h-[40px] border-t border-border"
-                    }
-                  >
-                    <td className="px-3 py-0 text-xs">{row.student_code}</td>
-                    <td className="px-3 py-0">{row.prefix ?? "—"}</td>
-                    <td className="px-3 py-0 font-medium">
-                      {row.first_name} {row.last_name}
-                    </td>
-                    <td className="px-3 py-0">
-                      {deptName.get(row.department_id) ?? "—"}
-                    </td>
-                    <td className="px-3 py-0">
-                      {row.grade_level_id ? gradeLevelName.get(row.grade_level_id) ?? "—" : "—"}
-                    </td>
-                    <td className="px-3 py-0">
-                      <span className="flex items-center gap-1.5">
-                        <span
-                          className={
-                            row.status === "studying"
-                              ? "size-2 rounded-full bg-success"
-                              : "size-2 rounded-full bg-muted-foreground"
-                          }
-                        />
-                        <span className="text-xs">
-                          {STATUS_LABEL[row.status]}
-                        </span>
-                      </span>
-                    </td>
-                    {mayManageUsers && (
-                      <td className="px-3 py-0">
-                        {row.profile_id ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] text-blue-500">
-                            <CheckmarkCircleIcon className="size-3" />
-                            มีบัญชีแล้ว
-                          </span>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCreatingLoginFor(row);
-                            }}
-                          >
-                            <KeyIcon className="h-3 w-3" />
-                            สร้างบัญชี
-                          </Button>
-                        )}
-                      </td>
-                    )}
-                    {mayEdit && (
-                      <td className="px-3 py-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label="ลบนักเรียน"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (
-                              confirm(
-                                `ลบ "${row.first_name} ${row.last_name}" ถาวร? ข้อมูลผู้ปกครอง, ประวัติลงทะเบียน, และการจัดห้องของนักเรียนคนนี้จะถูกลบไปด้วยทั้งหมด กู้คืนไม่ได้`,
-                              )
-                            ) {
-                              deleteStudent.mutate(row.id);
-                            }
-                          }}
-                          disabled={deleteStudent.isPending}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </td>
-                    )}
+          <div className="table-panel hidden lg:flex">
+            <div className="table-panel-scroll">
+              <table className="w-full text-[13px]">
+                <thead className="text-left text-xs">
+                  <tr>
+                    <th className="px-4 py-3">นักเรียน</th>
+                    <th className="px-4 py-3">แผนก</th>
+                    <th className="px-4 py-3">ชั้น</th>
+                    <th className="px-4 py-3">สถานะ</th>
+                    {mayManageUsers && <th className="px-4 py-3">บัญชี</th>}
+                    {mayEdit && <th className="w-14 px-4 py-3" />}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {pageRows.map((row) => {
+                    const fullName = `${row.first_name} ${row.last_name}`;
+                    return (
+                      <tr
+                        key={row.id}
+                        onClick={() => mayView && setEditing(row)}
+                        className={
+                          mayView
+                            ? "h-14 cursor-pointer border-t border-border first:border-t-0"
+                            : "h-14 border-t border-border first:border-t-0"
+                        }
+                      >
+                        <td className="px-4 py-0">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Avatar
+                              name={fullName}
+                              src={row.profile ? avatarUrl(row.profile) : null}
+                              className="h-9 w-9 text-xs"
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">
+                                {row.prefix && <span className="font-normal text-muted-foreground">{row.prefix} </span>}
+                                {fullName}
+                              </p>
+                              <p className="font-mono text-xs tabular-nums text-muted-foreground">{row.student_code}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-0 text-muted-foreground">{deptName.get(row.department_id) ?? "—"}</td>
+                        <td className="px-4 py-0">
+                          <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${levelTone(row.grade_level_id ? gradeLevelName.get(row.grade_level_id) : undefined)}`}>
+                            {row.grade_level_id ? (gradeLevelName.get(row.grade_level_id) ?? "—") : "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-0">
+                          <span
+                            className={
+                              row.status === "studying"
+                                ? "inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success"
+                                : "inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                            }
+                          >
+                            <span
+                              className={
+                                row.status === "studying"
+                                  ? "size-1.5 rounded-full bg-success"
+                                  : "size-1.5 rounded-full bg-muted-foreground"
+                              }
+                            />
+                            {STATUS_LABEL[row.status]}
+                          </span>
+                        </td>
+                        {mayManageUsers && (
+                          <td className="px-4 py-0">
+                            {row.profile_id ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
+                                <CheckmarkCircleIcon className="size-3.5" />
+                                มีบัญชีแล้ว
+                              </span>
+                            ) : (
+                              <Button
+                                variant="tinted"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCreatingLoginFor(row);
+                                }}
+                              >
+                                <KeyIcon className="h-3 w-3" />
+                                สร้างบัญชี
+                              </Button>
+                            )}
+                          </td>
+                        )}
+                        {mayEdit && (
+                          <td className="px-4 py-0 text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-destructive"
+                              aria-label="ลบนักเรียน"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (
+                                  confirm(
+                                    `ลบ "${row.first_name} ${row.last_name}" ถาวร? ข้อมูลผู้ปกครอง, ประวัติลงทะเบียน, และการจัดห้องของนักเรียนคนนี้จะถูกลบไปด้วยทั้งหมด กู้คืนไม่ได้`,
+                                  )
+                                ) {
+                                  deleteStudent.mutate(row.id);
+                                }
+                              }}
+                              disabled={deleteStudent.isPending}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
           <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </div>

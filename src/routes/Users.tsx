@@ -67,6 +67,15 @@ const roleCombinable = (held: Role[], next: Role) =>
 const primaryRole = (roles: Role[]): Role | "" =>
   roles.includes("super_admin") ? "super_admin" : roles.includes("parent") ? "parent" : (roles[0] ?? "");
 
+/** Role badge tint (soft fill, readable text) — admin accent, management violet, self-scoped accounts neutral. */
+function roleTone(r: Role): string {
+  if (r === "super_admin") return "bg-accent-soft text-accent";
+  if (r === "director" || r === "dept_director" || r === "dept_head")
+    return "bg-violet-500/15 text-violet-700 dark:text-violet-300";
+  if (r === "student" || r === "parent") return "bg-secondary text-muted-foreground";
+  return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
+}
+
 export function Users() {
   const { profile: me } = useAuth();
   const [filters, setFilters] = useState<ProfileFilters>(EMPTY);
@@ -99,8 +108,8 @@ export function Users() {
   ).length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
+    <div className="page-fill">
+      <div className="toolbar">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -130,8 +139,9 @@ export function Users() {
             <Button variant="outline" size="icon" className="shrink-0" onClick={() => setImporting(true)} aria-label="นำเข้า CSV">
               <Upload className="h-3 w-3" />
             </Button>
-            <Button size="icon" className="shrink-0" onClick={() => setCreating(true)} aria-label="เพิ่มผู้ใช้งาน">
+            <Button className="shrink-0" onClick={() => setCreating(true)} aria-label="เพิ่มผู้ใช้งาน">
               <Plus className="h-3 w-3" />
+              <span className="hidden sm:inline">เพิ่มผู้ใช้งาน</span>
             </Button>
           </>
         )}
@@ -141,7 +151,7 @@ export function Users() {
         <div role="status" aria-label="กำลังโหลด" className="space-y-2">
           <ul className="space-y-2 lg:hidden">
             {[0, 1, 2, 3, 4].map((i) => (
-              <li key={i} className="rounded-lg border border-border p-3">
+              <li key={i} className="rounded-xl bg-card p-3.5 shadow-card">
                 <div className="flex items-start gap-3">
                   <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
                   <div className="min-w-0 flex-1 space-y-1.5">
@@ -154,43 +164,43 @@ export function Users() {
             ))}
           </ul>
 
-          <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
-            <table className="w-full text-xs">
-              <thead className="bg-muted text-left text-xs text-muted-foreground">
+          <div className="table-panel hidden lg:flex"><div className="table-panel-scroll">
+            <table className="w-full text-[13px]">
+              <thead className="text-left text-xs">
                 <tr>
-                  <th className="px-3 py-2 font-medium">ชื่อ</th>
-                  <th className="px-3 py-2 font-medium">สิทธิ์</th>
-                  <th className="px-3 py-2 font-medium">ตำแหน่ง</th>
-                  <th className="px-3 py-2 font-medium">แผนก</th>
-                  <th className="px-3 py-2 font-medium">สถานะ</th>
+                  <th className="px-4 py-3">ชื่อ</th>
+                  <th className="px-4 py-3">สิทธิ์</th>
+                  <th className="px-4 py-3">ตำแหน่ง</th>
+                  <th className="px-4 py-3">แผนก</th>
+                  <th className="px-4 py-3">สถานะ</th>
                 </tr>
               </thead>
               <tbody>
                 {[0, 1, 2, 3, 4].map((i) => (
-                  <tr key={i} className="border-t border-border">
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2.5">
-                        <Skeleton className="h-7 w-7 shrink-0 rounded-full" />
+                  <tr key={i} className="h-14 border-t border-border first:border-t-0">
+                    <td className="px-4 py-0">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
                         <Skeleton className="h-3 w-28" />
                       </div>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-16" />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-20" />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-16" />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-4 w-12 rounded-full" />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </div></div>
         </div>
       )}
 
@@ -227,8 +237,8 @@ export function Users() {
                     }}
                     className={
                       mayManage
-                        ? "rounded-lg border border-border p-3 active:bg-muted"
-                        : "rounded-lg border border-border p-3"
+                        ? "rounded-xl bg-card p-3.5 shadow-card active:bg-muted"
+                        : "rounded-xl bg-card p-3.5 shadow-card"
                     }
                   >
                     <div className="flex items-start gap-3">
@@ -304,16 +314,16 @@ export function Users() {
             })}
           </ul>
 
-          <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
-            <table className="w-full text-xs">
-              <thead className="bg-muted text-left text-xs text-muted-foreground">
+          <div className="table-panel hidden lg:flex"><div className="table-panel-scroll">
+            <table className="w-full text-[13px]">
+              <thead className="text-left text-xs">
                 <tr>
-                  <th className="px-3 py-2 font-medium">ชื่อ</th>
-                  <th className="px-3 py-2 font-medium">สิทธิ์</th>
-                  <th className="px-3 py-2 font-medium">ตำแหน่ง</th>
-                  <th className="px-3 py-2 font-medium">แผนก</th>
-                  <th className="px-3 py-2 font-medium">สถานะ</th>
-                  {mayManage && <th className="w-10 px-3 py-2 font-medium" />}
+                  <th className="px-4 py-3">ชื่อ</th>
+                  <th className="px-4 py-3">สิทธิ์</th>
+                  <th className="px-4 py-3">ตำแหน่ง</th>
+                  <th className="px-4 py-3">แผนก</th>
+                  <th className="px-4 py-3">สถานะ</th>
+                  {mayManage && <th className="w-14 px-4 py-3" />}
                 </tr>
               </thead>
               <tbody>
@@ -323,30 +333,39 @@ export function Users() {
                     onClick={() => mayManage && setEditing(row)}
                     className={
                       mayManage
-                        ? "cursor-pointer border-t border-border active:bg-muted"
-                        : "border-t border-border"
+                        ? "h-14 cursor-pointer border-t border-border first:border-t-0"
+                        : "h-14 border-t border-border first:border-t-0"
                     }
                   >
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar name={profileFullName(row)} src={avatarUrl(row)} className="h-7 w-7 shrink-0 text-[10px]" />
+                    <td className="px-4 py-0">
+                      <div className="flex items-center gap-3">
+                        <Avatar name={profileFullName(row)} src={avatarUrl(row)} className="h-9 w-9 shrink-0 text-xs" />
                         <div className="min-w-0">
-                          <p className="truncate font-medium">{profileFullName(row)}</p>
+                          <p className="truncate text-sm font-medium">{profileFullName(row)}</p>
                           <p className="truncate text-xs text-muted-foreground">{row.email}</p>
                         </div>
                       </div>
                     </td>
                     {/* dept_head shows via the ตำแหน่ง column instead — same filter the edit form uses (pickEditable). */}
-                    <td className="px-3 py-2">{roleLabels(row.roles.filter((r) => r !== "dept_head"))}</td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-4 py-0"><div className="flex flex-wrap gap-1">
+                        {row.roles
+                          .filter((r) => r !== "dept_head")
+                          .map((r) => (
+                            <span key={r} className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${roleTone(r)}`}>
+                              {ROLE_LABEL[r]}
+                            </span>
+                          ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-0 text-muted-foreground">
                       {row.positionTitleIds.length
                         ? row.positionTitleIds.map((id) => titleName.get(id) ?? "—").join(", ")
                         : "—"}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="px-4 py-0 text-muted-foreground">
                       {row.department_id ? (deptName.get(row.department_id) ?? "—") : "ทุกแผนก"}
                     </td>
-                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-0" onClick={(e) => e.stopPropagation()}>
                       {mayManage ? (
                         <Switch
                           size="sm"
@@ -370,10 +389,11 @@ export function Users() {
                       )}
                     </td>
                     {mayManage && (
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-0">
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="text-muted-foreground hover:text-destructive"
                           aria-label="ลบผู้ใช้งาน"
                           disabled={row.id === me?.id || deleteUser.isPending}
                           onClick={(e) => {
@@ -400,7 +420,7 @@ export function Users() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </div></div>
           <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </div>
       )}

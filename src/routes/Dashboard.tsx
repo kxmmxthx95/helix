@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { Modal } from "@/components/Modal";
 import { Sheet } from "@/components/Sheet";
-import { Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
+import { Avatar, Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions } from "@/hooks/useAssignments";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
@@ -15,7 +15,7 @@ import { openDocFile, useLinkPlanLessonFile, useUnlinkPlanLessonFile } from "@/h
 import { DocPicker } from "@/routes/CurriculumMap";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
-import type { OverviewLesson } from "@/hooks/useDeptClassroomOverview";
+import type { OverviewLesson, OverviewTeacher } from "@/hooks/useDeptClassroomOverview";
 import { useCurrentTerm } from "@/hooks/useAcademicTerms";
 import {
   useDeptClassroomOverview,
@@ -37,7 +37,8 @@ import {
   type Student,
 } from "@/lib/database.types";
 import { useDepartments, useRoleSubtitle } from "@/hooks/useProfiles";
-import { gradeShortLabel } from "@/lib/gradeLevels";
+import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
+import { avatarUrl } from "@/hooks/useAvatar";
 import { cn, todayIso } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
 import { bangkokTime } from "@/routes/TimeTracking";
@@ -175,6 +176,39 @@ function SeeAll({ to }: { to: string }) {
   );
 }
 
+/** Badge tint deepens with the count: low / mid / high by the two cut-offs. */
+function countTone(n: number, [mid, high]: [number, number]): string {
+  if (n >= high) return "bg-accent/35 text-foreground";
+  if (n >= mid) return "bg-accent/20 text-foreground";
+  return "bg-accent/10 text-foreground";
+}
+const LESSON_CUTS: [number, number] = [4, 6];
+const TOPIC_CUTS: [number, number] = [11, 21];
+
+/** Overlapping teacher photos (initials fallback) + names; wraps nothing, truncates long names. */
+function TeacherStack({ teachers, className }: { teachers: OverviewTeacher[]; className?: string }) {
+  const list = teachers.filter((t, i) => teachers.findIndex((x) => x.name === t.name) === i);
+  if (list.length === 0) return <span className={cn("text-[13px] text-foreground/70", className)}>ไม่ระบุครู</span>;
+  const shown = list.slice(0, 3);
+  return (
+    <div className={cn("flex min-w-0 items-center gap-2", className)}>
+      <div className="flex shrink-0 -space-x-1.5">
+        {shown.map((t) => (
+          <Avatar key={t.name} name={t.name} src={avatarUrl(t)} className="h-6 w-6 text-[9px] ring-2 ring-card" />
+        ))}
+        {list.length > shown.length && (
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-[10px] font-medium text-muted-foreground ring-2 ring-card">
+            +{list.length - shown.length}
+          </span>
+        )}
+      </div>
+      <span className="min-w-0 truncate text-[13px] font-medium text-foreground" title={list.map((t) => t.name).join(", ")}>
+        {list.map((t) => t.name).join(", ")}
+      </span>
+    </div>
+  );
+}
+
 /** role="dept_director" (own department) / "super_admin" (picks one) — ห้อง → วิชา → บทเรียน/หัวข้อย่อย of the latest term. */
 function DeptClassroomSection({
   profileId,
@@ -210,13 +244,16 @@ function DeptClassroomSection({
       <BookIcon className="h-6 w-6" />
     </div>
   );
-  const subjectCounts = (s: { lessons: { topics: unknown[] }[] }) =>
-    `${s.lessons.length} บท · ${s.lessons.reduce((n, l) => n + l.topics.length, 0)} หัวข้อ`;
   const loading = termLoading || isLoading;
 
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-2">
+        {!open && !loading && rooms.length > 0 && (
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold">ห้องเรียน</h2>
+          </div>
+        )}
         {open && (
           <Button size="sm" variant="ghost" onClick={() => (openSubject ? setSubjectId("") : setRoomId(""))}>
             <ChevronForward className="h-3 w-3 rotate-180" /> {openSubject ? open.name : "ห้องเรียนทั้งหมด"}
@@ -256,14 +293,25 @@ function DeptClassroomSection({
         <div className="space-y-3">
           {openSubject ? (
             <>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4 rounded-xl bg-card p-4 shadow-card">
                 {subjectTile(openSubject.areaId)}
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs text-muted-foreground">{openSubject.code}</div>
-                  <h3 className="truncate text-base font-bold">{openSubject.name}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    {openSubject.teachers.join(", ") || "ไม่ระบุครู"} · {subjectCounts(openSubject)}
-                  </p>
+                  <div className="font-mono text-xs tabular-nums text-muted-foreground">{openSubject.code}</div>
+                  <h3 className="text-lg font-semibold leading-snug">{openSubject.name}</h3>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-muted-foreground">
+                    <TeacherStack teachers={openSubject.teacherList} />
+                    <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums", countTone(openSubject.lessons.length, LESSON_CUTS))}>
+                      {openSubject.lessons.length} บท
+                    </span>
+                    <span
+                      className={cn(
+                        "rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums",
+                        countTone(openSubject.lessons.reduce((n, l) => n + l.topics.length, 0), TOPIC_CUTS),
+                      )}
+                    >
+                      {openSubject.lessons.reduce((n, l) => n + l.topics.length, 0)} หัวข้อ
+                    </span>
+                  </div>
                 </div>
               </div>
               {openSubject.lessons.length === 0 ? (
@@ -273,26 +321,45 @@ function DeptClassroomSection({
                   {openSubject.lessons.map((l, i) => (
                     <li
                       key={l.id}
-                      className={cn("rounded-2xl border bg-card p-4 shadow-sm", l.file ? "border-success" : "border-border")}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="text-sm font-bold">
-                          {i + 1}. {l.name}
-                        </div>
-                        <LessonDocActions
-                          lesson={l}
-                          profileId={profileId}
-                          subjectId={openSubject.id}
-                          gradeLevelId={open.gradeLevelId}
-                        />
-                      </div>
-                      {l.topics.length > 0 && (
-                        <ul className="mt-2 list-disc space-y-0.5 pl-9 text-xs text-muted-foreground">
-                          {l.topics.map((t) => (
-                            <li key={t.id}>{t.name}</li>
-                          ))}
-                        </ul>
+                      className={cn(
+                        "flex gap-3 rounded-xl bg-card p-4 shadow-card",
+                        l.file && "ring-1 ring-inset ring-success/50",
                       )}
+                    >
+                      <span
+                        className={cn(
+                          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold tabular-nums",
+                          l.file ? "bg-success/15 text-success" : "bg-secondary text-muted-foreground",
+                        )}
+                      >
+                        {i + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 pt-0.5">
+                            <div className="text-[15px] font-semibold leading-snug">{l.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {l.topics.length} หัวข้อ{l.file ? " · แนบเอกสารแล้ว" : ""}
+                            </div>
+                          </div>
+                          <LessonDocActions
+                            lesson={l}
+                            profileId={profileId}
+                            subjectId={openSubject.id}
+                            gradeLevelId={open.gradeLevelId}
+                          />
+                        </div>
+                        {l.topics.length > 0 && (
+                          <ul className="mt-3 grid gap-x-6 gap-y-1.5 border-t border-border pt-3 text-[13px] text-muted-foreground sm:grid-cols-2 xl:grid-cols-3">
+                            {l.topics.map((t) => (
+                              <li key={t.id} className="flex min-w-0 items-baseline gap-2">
+                                <span className="size-1 shrink-0 translate-y-[-2px] rounded-full bg-muted-foreground/60" />
+                                <span className="min-w-0">{t.name}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                     </li>
                   ))}
                 </ol>
@@ -300,7 +367,10 @@ function DeptClassroomSection({
             </>
           ) : (
             <>
-              <h3 className="text-base font-bold">{open.name}</h3>
+              <div className="min-w-0">
+                <h3 className="text-lg font-semibold">{open.name}</h3>
+                <p className="text-[13px] text-muted-foreground">{open.subjects.length} รายวิชาในเทอมล่าสุด</p>
+              </div>
               {open.subjects.length === 0 && <p className="text-sm text-muted-foreground">ไม่มีวิชาที่แสดง</p>}
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 {open.subjects.map((s) => (
@@ -308,18 +378,34 @@ function DeptClassroomSection({
                     key={s.id}
                     type="button"
                     onClick={() => setSubjectId(s.id)}
-                    className="flex items-center gap-3 rounded-xl bg-card p-4 text-left shadow-card transition-shadow hover:shadow-float focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+                    className="tappable flex min-w-0 flex-col gap-4 rounded-xl bg-card p-4 text-left shadow-card transition-shadow hover:shadow-float focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
                   >
-                    {subjectTile(s.areaId)}
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="text-sm font-semibold text-foreground/70">{s.code}</div>
-                      <div className="line-clamp-2 text-base font-bold leading-snug text-foreground">{s.name}</div>
-                      <div className="text-sm text-foreground/80">{s.teachers.join(", ") || "ไม่ระบุครู"}</div>
-                      <div className="text-sm font-medium text-foreground/70">{subjectCounts(s)}</div>
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", colors.shade(s.areaId))}>
+                        <BookIcon className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-mono text-xs tabular-nums text-muted-foreground">{s.code}</div>
+                        <div className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">{s.name}</div>
+                      </div>
                     </div>
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center self-end rounded-lg bg-muted text-foreground">
-                      <ChevronForward className="h-4 w-4" />
-                    </span>
+                    <TeacherStack teachers={s.teacherList} />
+                    <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-3 text-xs">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        <span className={cn("rounded-full px-2.5 py-0.5 font-medium tabular-nums", countTone(s.lessons.length, LESSON_CUTS))}>
+                          {s.lessons.length} บท
+                        </span>
+                        <span
+                          className={cn(
+                            "rounded-full px-2.5 py-0.5 font-medium tabular-nums",
+                            countTone(s.lessons.reduce((n, l) => n + l.topics.length, 0), TOPIC_CUTS),
+                          )}
+                        >
+                          {s.lessons.reduce((n, l) => n + l.topics.length, 0)} หัวข้อ
+                        </span>
+                      </span>
+                      <ChevronForward className="h-3.5 w-3.5 shrink-0 text-accent" />
+                    </div>
                   </button>
                 ))}
               </div>
@@ -335,29 +421,43 @@ function DeptClassroomSection({
                 key={room.id}
                 className="relative flex flex-col rounded-xl bg-card shadow-card transition-shadow hover:shadow-float"
               >
-                <button type="button" onClick={() => {
+                <button
+                  type="button"
+                  onClick={() => {
                     setRoomId(room.id);
                     setSubjectId("");
-                  }} className="flex h-full min-h-32 items-center gap-3 rounded-xl p-4 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-                      <BuildingIcon className="h-6 w-6" />
+                  }}
+                  className="tappable flex h-full w-full min-w-0 flex-col gap-4 rounded-xl p-4 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+                >
+                  <div className="flex min-w-0 items-center gap-3 pr-9">
+                    <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", levelTone(room.name))}>
+                      <BuildingIcon className="h-5 w-5" />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="line-clamp-2 pr-10 text-base font-bold leading-snug text-foreground">{room.name}</div>
-                      <div className="mt-1 truncate text-sm font-medium text-foreground/70">
-                        {room.subjects.length} วิชา · {lessons.length} บท · {lessons.reduce((n, l) => n + l.topics.length, 0)} หัวข้อ
-                      </div>
+                    <div className="min-w-0 flex-1 truncate text-base font-semibold text-foreground" title={room.name}>
+                      {room.name}
                     </div>
                   </div>
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center self-end rounded-lg bg-muted text-foreground">
-                    <ChevronForward className="h-4 w-4" />
+                  <dl className="grid grid-cols-3 gap-2 rounded-lg bg-muted px-3 py-2.5">
+                    {[
+                      ["วิชา", room.subjects.length],
+                      ["บท", lessons.length],
+                      ["หัวข้อ", lessons.reduce((n, l) => n + l.topics.length, 0)],
+                    ].map(([label, n]) => (
+                      <div key={label} className="min-w-0">
+                        <dd className="text-xl font-semibold leading-tight tabular-nums text-foreground">{n}</dd>
+                        <dt className="text-xs text-muted-foreground">{label}</dt>
+                      </div>
+                    ))}
+                  </dl>
+                  <span className="flex items-center justify-between text-[13px] font-medium text-accent">
+                    ดูรายวิชา
+                    <ChevronForward className="h-3.5 w-3.5" />
                   </span>
                 </button>
                 <Button
                   size="icon"
                   variant="ghost"
-                  className="absolute right-2 top-2 text-foreground/70"
+                  className="absolute right-2 top-2 text-muted-foreground"
                   aria-label={`ตั้งค่าวิชาที่จะแสดง ${room.name}`}
                   onClick={() => setSettingsRoomId(room.id)}
                 >
