@@ -46,14 +46,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               exit={{ opacity: 0, y: 8, scale: 0.96 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
               className={cn(
-                "glass pointer-events-auto flex max-w-sm items-start gap-2 rounded-xl border px-3 py-2 text-xs shadow-lg",
-                t.variant === "success" ? "border-success/30" : "border-destructive/30",
+                "glass pointer-events-auto flex max-w-sm items-start gap-2.5 rounded-lg px-3.5 py-2.5 text-sm font-medium leading-5 shadow-float",
               )}
             >
               {t.variant === "success" ? (
-                <CheckmarkCircleIcon className="h-4 w-4 shrink-0 text-success" />
+                <CheckmarkCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-success" />
               ) : (
-                <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
               )}
               <span className="whitespace-pre-line">{t.message}</span>
             </motion.div>

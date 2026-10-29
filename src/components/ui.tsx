@@ -3,23 +3,31 @@ import { forwardRef, useState, type ComponentType, type ReactNode } from "react"
 import { BarChartIcon, ChevronBack, ChevronForward, EyeIcon, EyeOffIcon, X } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
+/**
+ * Helix design system (Vercel × iOS). One `default` (black/white) button per view; `accent` for the
+ * blue confirm; `secondary` gray fill for everything else; `destructive` is red text on a soft red
+ * tint (iOS style) so it reads in both themes. Heights: 32px on desktop, 40px touch target below md.
+ */
 const button = cva(
-  "tappable inline-flex items-center justify-center gap-2 rounded-lg text-sm font-medium outline-none ring-offset-background transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+  "tappable inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg font-medium outline-none ring-offset-background transition-[background-color,opacity,transform] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-40",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:opacity-90",
+        default: "bg-primary text-primary-foreground hover:opacity-85",
         accent: "bg-accent text-accent-foreground hover:opacity-90",
-        outline: "border border-border bg-transparent hover:bg-muted",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-fill-strong",
+        tinted: "bg-accent-soft text-accent hover:brightness-95",
+        outline: "border border-input bg-card hover:bg-muted",
         ghost: "hover:bg-muted",
-        destructive: "bg-destructive text-destructive-foreground hover:opacity-90",
+        plain: "px-1.5 text-accent hover:opacity-80",
+        destructive: "bg-destructive/10 text-destructive hover:bg-destructive/15",
       },
       size: {
-        default: "h-8 px-2.5 text-xs",
-        sm: "h-8 px-2 text-xs",
-        xs: "h-6 px-1.5 text-[10px]",
-        lg: "h-8 px-3 text-xs",
-        icon: "h-8 w-8",
+        default: "ui-control h-8 px-3 text-[13px]",
+        sm: "ui-control h-8 px-2.5 text-[13px]",
+        xs: "h-6 px-1.5 text-[11px]",
+        lg: "ui-control h-10 px-4 text-sm font-semibold",
+        icon: "ui-control-icon h-8 w-8",
       },
     },
     defaultVariants: { variant: "default", size: "default" },
@@ -46,7 +54,7 @@ export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTML
         value={value}
         inputMode={isDate ? "none" : inputMode}
         className={cn(
-          "flex h-8 w-full rounded-lg border border-input bg-background px-2.5 text-xs outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring disabled:opacity-50",
+          "ui-control flex h-8 w-full min-w-0 rounded-md border border-input bg-card px-3 text-base outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground/80 hover:border-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/20 disabled:opacity-50 md:text-[13px]",
           isDate && "ui-date pr-8",
           isDate && (value === "" || value === undefined) && "ui-date-empty",
           className,
@@ -109,7 +117,7 @@ export const Select = forwardRef<
     ref={ref}
     value={value}
     className={cn(
-      "ui-select h-8 w-full rounded-lg border border-input bg-background px-2.5 pr-8 text-xs outline-none focus-visible:border-ring disabled:opacity-50",
+      "ui-select ui-control h-8 w-full min-w-0 rounded-md border border-input bg-card px-3 pr-8 text-base outline-none transition-[border-color,box-shadow] hover:border-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/20 disabled:opacity-50 md:text-[13px]",
       placeholder != null && (value === "" || value === undefined) && "ui-select-placeholder",
       className,
     )}
@@ -228,11 +236,11 @@ export function BuddhistDateSelect({
   );
 }
 
-/** Glass surface — bottom nav, cards and sheets only (grill decision). */
+/** Surface card — solid `card` fill with the Vercel border-shadow, 14px corners. */
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("glass rounded-xl border border-border p-4 text-card-foreground", className)}
+      className={cn("min-w-0 rounded-xl bg-card p-4 text-card-foreground shadow-card md:p-5", className)}
       {...props}
     />
   );
@@ -251,8 +259,8 @@ export function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block space-y-1">
-      <span className="font-ui text-xs font-medium">
+    <label className="block min-w-0 space-y-1.5">
+      <span className="font-ui text-[13px] font-medium leading-[18px]">
         {label}
         {required && (
           <span className="text-destructive" aria-hidden>
@@ -307,13 +315,13 @@ export function PageFooter({ shown, total, page, pageCount, onChange }: { shown:
   if (total === 0) return null;
   // First, last and the pages around the current one; gaps become an ellipsis.
   const pages = [...new Set([1, page - 1, page, page + 1, pageCount])].filter((n) => n >= 1 && n <= pageCount).sort((a, b) => a - b);
-  const btn = "flex h-9 min-w-9 items-center justify-center rounded-lg border border-border px-2 text-sm hover:bg-muted disabled:pointer-events-none disabled:opacity-40";
+  const btn = "tappable flex h-9 min-w-9 items-center justify-center rounded-lg px-2 font-mono text-[13px] tabular-nums text-foreground hover:bg-muted disabled:pointer-events-none disabled:opacity-40";
   return (
-    <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
-      <span>
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 text-[13px] text-muted-foreground">
+      <span className="min-w-0">
         แสดง {shown} จาก {total} รายการ
       </span>
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <button type="button" aria-label="หน้าก่อนหน้า" className={btn} disabled={page <= 1} onClick={() => onChange(page - 1)}>
           <ChevronBack className="h-4 w-4" />
         </button>
@@ -323,7 +331,7 @@ export function PageFooter({ shown, total, page, pageCount, onChange }: { shown:
             <button
               type="button"
               aria-current={n === page ? "page" : undefined}
-              className={cn(btn, n === page && "border-accent bg-accent/10 font-semibold text-accent")}
+              className={cn(btn, n === page && "bg-secondary font-semibold")}
               onClick={() => onChange(n)}
             >
               {n}
@@ -402,7 +410,7 @@ export function Avatar({ name, src, className }: { name: string; src?: string | 
   return (
     <div
       className={cn(
-        "flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent/20 text-[11px] font-semibold tracking-wide text-accent ring-1 ring-accent/25",
+        "flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary text-[11px] font-semibold tracking-wide text-muted-foreground",
         className,
       )}
       aria-hidden
@@ -435,16 +443,16 @@ export function Switch({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        "relative inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
-        sm ? "h-4 w-7" : "h-5 w-9",
-        checked ? "bg-accent" : "bg-input",
+        "relative inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-ios focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-40",
+        sm ? "h-6 w-10" : "h-[31px] w-[51px]",
+        checked ? "bg-accent" : "bg-fill-strong",
       )}
     >
       <span
         className={cn(
-          "pointer-events-none block rounded-full bg-background shadow-lg ring-0 transition-transform",
-          sm ? "h-3 w-3" : "h-4 w-4",
-          checked ? (sm ? "translate-x-3" : "translate-x-4") : "translate-x-0",
+          "pointer-events-none block rounded-full bg-white shadow-thumb ring-0 transition-transform duration-200 ease-ios",
+          sm ? "h-5 w-5" : "h-[27px] w-[27px]",
+          checked ? (sm ? "translate-x-4" : "translate-x-5") : "translate-x-0",
         )}
       />
     </button>
@@ -457,9 +465,9 @@ export function CloseButton({ onClick }: { onClick: () => void }) {
       type="button"
       aria-label="ปิด"
       onClick={onClick}
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-border"
+      className="tappable flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-fill-strong text-muted-foreground transition-colors hover:text-foreground"
     >
-      <X className="h-4 w-4" />
+      <X className="h-3.5 w-3.5" />
     </button>
   );
 }
@@ -476,13 +484,13 @@ export function FormSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-3 rounded-2xl border border-border bg-muted/40 p-3">
-      <div className="flex items-center gap-2.5">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-background text-muted-foreground">
+    <section className="min-w-0 space-y-3 rounded-xl bg-card p-4 shadow-card">
+      <div className="flex items-center gap-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
           {icon}
         </span>
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold leading-tight">{title}</h3>
+          <h3 className="font-heading text-[15px] font-semibold leading-tight">{title}</h3>
           {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </div>
       </div>

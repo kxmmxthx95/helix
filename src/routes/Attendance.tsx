@@ -463,7 +463,7 @@ function CheckInPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="toolbar shrink-0">
         <Input
           type="date"
           value={date}
@@ -660,14 +660,18 @@ function CheckInGrid({
           const mark = marks.get(s.id) ?? { status: null, note: "" };
           const noteOpen = Boolean(mark.status && mark.status !== "present");
           return (
-            <li key={s.id} className="relative rounded-lg border border-border p-3">
-              {classroomLabel && (
-                <span className="absolute right-3 top-3 shrink-0 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] text-blue-500">
-                  {classroomLabel}
-                </span>
-              )}
-              <p className="truncate pr-14 text-sm font-medium">{name}</p>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">{s.student_code}</p>
+            <li key={s.id} className="rounded-xl bg-card p-3 shadow-card">
+              <div className="flex min-w-0 items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{name}</p>
+                  <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{s.student_code}</p>
+                </div>
+                {classroomLabel && (
+                  <span className="max-w-[45%] shrink-0 truncate rounded-md bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">
+                    {classroomLabel}
+                  </span>
+                )}
+              </div>
               <div className="mt-2">{statusButtons(s.id, mark)}</div>
               {noteOpen && (
                 <Input
@@ -767,7 +771,7 @@ function SummaryPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="toolbar shrink-0">
         <Select
           className="w-32 min-w-0"
           value={String(month)}

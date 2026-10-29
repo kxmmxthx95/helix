@@ -114,7 +114,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-border bg-card p-5">
+    <section className="space-y-4 rounded-xl bg-card shadow-card p-5">
       <div className="flex items-center gap-3">
         <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", tint)}>
           <Icon className="h-5 w-5" />
@@ -358,7 +358,7 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
         update.mutate(form, { onSuccess: () => toast("บันทึกสำเร็จ") });
       }}
     >
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-5">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-card shadow-card p-5">
         <div className="flex items-center gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-muted">
             <LibraryIcon className="h-7 w-7" />
@@ -723,7 +723,7 @@ function AcademicTermsCard({
         key={t.id}
         onClick={() => setEditing(t)}
         className={cn(
-          "cursor-pointer gap-4 rounded-2xl border border-border bg-card p-4 hover:bg-muted/40",
+          "cursor-pointer gap-4 rounded-xl bg-card shadow-card p-4 hover:bg-muted/40",
           view === "list" ? "grid items-center md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.5fr)_auto_auto]" : "flex flex-col",
         )}
       >
@@ -1020,7 +1020,7 @@ function LeaveTypesCard() {
       {rows.length === 0 ? (
         <EmptyState title="ไม่พบประเภทการลา" description="ลองเปลี่ยนคำค้นหา" />
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+        <div className="overflow-x-auto rounded-xl bg-card shadow-card">
           <table className="w-full min-w-[40rem] text-sm">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
@@ -1384,7 +1384,7 @@ function SalaryGradesCard() {
       {rows.length === 0 ? (
         <EmptyState title="ไม่พบระดับเงินเดือน" description="ลองเปลี่ยนคำค้นหา" />
       ) : view === "list" ? (
-        <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+        <div className="overflow-x-auto rounded-xl bg-card shadow-card">
           <table className="w-full min-w-[36rem] text-sm">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
@@ -1422,7 +1422,7 @@ function SalaryGradesCard() {
             <div
               key={g.id}
               onClick={() => setEditing(g)}
-              className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-card p-4 hover:bg-muted/50"
+              className="flex cursor-pointer items-start gap-3 rounded-xl bg-card shadow-card p-4 hover:bg-muted/50"
             >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-medium">
                 {firstIndex + i + 1}

@@ -5,56 +5,80 @@
 @import "katex/dist/katex.min.css";
 
 @layer base {
+  /* Helix design system — Vercel (Geist) × Apple iOS. Source of truth: the Helix Design System artifact
+     (tokens.json). Light and dark are designed equally; ThemeProvider follows the OS by default. */
   :root {
-    /* Vercel / Geist light */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 4%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 4%;
-    --primary: 0 0% 4%;
+    --shell: 240 24% 95.9%;            /* #f2f2f7 frame + sidebar behind the main pane */
+    --background: 0 0% 100%;           /* #ffffff main pane */
+    --foreground: 0 0% 3.9%;           /* #0a0a0a ink */
+    --card: 0 0% 100%;                 /* #ffffff surface (cards, table panels) */
+    --card-foreground: 0 0% 3.9%;
+    --raised: 0 0% 100%;               /* #ffffff surface-raised (drawers, dialogs, menus) */
+    --primary: 0 0% 3.9%;              /* Vercel black button */
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 4%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 40%;
-    --accent: 212 100% 48%;
+    --secondary: 240 9% 93.5%;         /* #ededf0 fill: secondary buttons, segmented track */
+    --secondary-foreground: 0 0% 3.9%;
+    --muted: 240 10% 96.1%;            /* #f4f4f6 subtle fill: hover rows, table head */
+    --muted-foreground: 240 2% 41%;    /* #66666b ink-secondary, >=4.5:1 on white/muted */
+    --fill-strong: 240 10% 90%;        /* #e3e3e8 pressed / fill on fill */
+    --accent: 210 100% 40%;            /* #0066cc the one tint */
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 100% 47%;
+    --accent-soft: 210 70% 94%;        /* tinted button / selected row ground */
+    --destructive: 354 100% 42.2%;     /* #d70015 */
     --destructive-foreground: 0 0% 100%;
-    --success: 130 41% 46%;
-    --warning: 38 91% 55%;
-    --border: 0 0% 82%;
-    --input: 0 0% 82%;
-    --ring: 212 100% 48%;
-    --radius: 0.5rem;
-    /* Glass surfaces — bottom nav + cards/modals only */
+    --success: 135 59% 30%;            /* #1f7a35 */
+    --warning: 27 100% 34.9%;          /* #b25000 */
+    --border: 240 11% 90.8%;           /* #e5e5ea separator (decorative hairlines) */
+    --input: 240 2% 56.7%;             /* #8e8e93 border-control, >=3:1 on white */
+    --ring: 210 100% 40%;
+    --radius: 0.625rem;                /* 10px: rounded-lg; md 8px; sm 6px */
     --glass: 0 0% 100%;
     --glass-alpha: 0.72;
+    --shadow-card: 0 0 0 1px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
+    --shadow-float: 0 0 0 1px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.1);
+    --shadow-drawer: 0 0 0 1px rgb(0 0 0 / 0.06), 0 20px 50px rgb(0 0 0 / 0.18), 0 2px 8px rgb(0 0 0 / 0.08);
+    --shadow-thumb: 0 3px 8px rgb(0 0 0 / 0.15), 0 1px 1px rgb(0 0 0 / 0.06);
+    --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .dark {
-    /* Off-black shell (not pure #000) */
-    --background: 0 0% 8%;
-    --foreground: 0 0% 93%;
-    --card: 0 0% 4%;
-    --card-foreground: 0 0% 93%;
-    --primary: 0 0% 93%;
-    --primary-foreground: 0 0% 4%;
-    --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 93%;
-    --muted: 0 0% 10%;
-    --muted-foreground: 0 0% 63%;
-    --accent: 212 100% 52%;
+    --shell: 0 0% 0%;                  /* #000000 */
+    --background: 0 0% 3.9%;           /* #0a0a0a */
+    --foreground: 0 0% 92.9%;          /* #ededed */
+    --card: 240 3% 11.4%;              /* #1c1c1e */
+    --card-foreground: 0 0% 92.9%;
+    --raised: 240 2% 17.6%;            /* #2c2c2e — higher layers lift lighter, as on iOS */
+    --primary: 0 0% 92.9%;
+    --primary-foreground: 0 0% 3.9%;
+    --secondary: 240 2% 17.6%;         /* #2c2c2e */
+    --secondary-foreground: 0 0% 92.9%;
+    --muted: 240 3% 14.1%;             /* #232325 */
+    --muted-foreground: 240 3% 69%;    /* #aeaeb2 */
+    --fill-strong: 240 2% 23.1%;       /* #3a3a3c */
+    --accent: 210 100% 44.5%;          /* #0071e3 fills (white text 4.7:1); text uses the lighter tint below */
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 91% 55%;
+    --accent-soft: 212 36% 13.5%;      /* #16212e */
+    --destructive: 3 100% 61.4%;       /* #ff453a */
     --destructive-foreground: 0 0% 100%;
-    --success: 130 45% 52%;
-    --warning: 38 91% 60%;
-    --border: 0 0% 16%;
-    --input: 0 0% 16%;
-    --ring: 212 100% 52%;
-    --glass: 0 0% 4%;
+    --success: 135 64% 50.4%;          /* #30d158 */
+    --warning: 36 100% 52%;            /* #ff9f0a */
+    --border: 240 2% 22.4%;            /* #38383a */
+    --input: 240 2% 46.7%;             /* #757579 */
+    --ring: 211 100% 62%;              /* #3d9bff */
+    --glass: 240 3% 11.4%;
     --glass-alpha: 0.72;
+    --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.06);
+    --shadow-float: 0 0 0 1px rgb(255 255 255 / 0.1), 0 8px 24px rgb(0 0 0 / 0.6);
+    --shadow-drawer: 0 0 0 1px rgb(255 255 255 / 0.08), 0 20px 50px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.3);
+  }
+
+  /* Accent as text/outline in dark: #0071e3 is only 3.6:1 on #1c1c1e, so text, borders and rings
+     re-point --accent to #3d9bff on that element only (fills keep #0071e3). */
+  .dark .text-accent,
+  .dark .border-accent,
+  .dark .ring-accent,
+  .dark .decoration-accent {
+    --accent: 211 100% 62%;
   }
 
   /* Student game skin (GameShell sets this on <html>). Light-only: `.dark` is overridden too. */
@@ -78,6 +102,10 @@
     --radius: 1rem;
     --glass: 40 100% 97%;
     --glass-alpha: 0.95;
+    --shell: 320 50% 93%;
+    --raised: 40 100% 97%;
+    --fill-strong: 320 45% 88%;
+    --accent-soft: 280 60% 94%;
   }
 
   * {
@@ -93,13 +121,14 @@
   /* The app shells are fixed to the viewport; if iOS Safari leaves a strip below them
      (toolbar collapse), it should blend with the shell instead of flashing white. */
   html {
-    @apply bg-muted dark:bg-background;
+    background-color: hsl(var(--shell));
   }
 
   body {
     @apply bg-background text-foreground antialiased;
-    /* Latin: Inter · Thai body: Sarabun */
-    font-family: Inter, Sarabun, system-ui, sans-serif;
+    /* Latin: Geist · Thai: SF/Sukhumvit on Apple, Noto Sans Thai elsewhere */
+    font-family: Geist, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Sukhumvit Set", "Noto Sans Thai", system-ui, sans-serif;
+    font-feature-settings: "cv11", "ss01";
     /* Kill the web tells: no rubber-band, no tap flash, no accidental select */
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
@@ -108,7 +137,7 @@
     -webkit-touch-callout: none;
   }
 
-  /* Headings keep the previous Thai stack */
+  /* Headings: same family, display cut on Apple */
   h1,
   h2,
   h3,
@@ -116,20 +145,16 @@
   h5,
   h6,
   .empty-state-title {
-    font-family: Inter, "Noto Sans Thai", system-ui, sans-serif;
+    font-family: Geist, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Sukhumvit Set", "Noto Sans Thai", system-ui, sans-serif;
+    letter-spacing: -0.01em;
   }
 
-  /* Controls: Sukhumvit on Apple · Prompt elsewhere (same foundry, webfont-safe) */
+  /* Controls share the body family (Geist + system Thai) */
   button,
   select,
-  input[type="search"] {
-    font-family: "Sukhumvit Set", SukhumvitSet, Prompt, "Noto Sans Thai", system-ui, sans-serif;
-  }
-
-  /* Sidebar nav + labels */
-  .glass-sidebar,
-  .glass-sidebar a {
-    font-family: "Sukhumvit Set", SukhumvitSet, Prompt, "Noto Sans Thai", system-ui, sans-serif;
+  input,
+  textarea {
+    font-family: inherit;
   }
 
   /* Text the user genuinely needs to copy stays selectable */
@@ -262,17 +287,8 @@
 
   /* Side drawer — floats off all edges, solid card fill (not glass) */
   .drawer-float {
-    background-color: hsl(var(--card));
-    border: 1px solid hsl(var(--border));
-    box-shadow:
-      0 20px 50px rgb(0 0 0 / 0.18),
-      0 2px 8px rgb(0 0 0 / 0.08);
-  }
-
-  .dark .drawer-float {
-    box-shadow:
-      0 20px 50px rgb(0 0 0 / 0.55),
-      0 2px 8px rgb(0 0 0 / 0.3);
+    background-color: hsl(var(--raised));
+    box-shadow: var(--shadow-drawer);
   }
 
   /* Frosted panel — login / focal overlays (flat, no gradient) */
@@ -288,7 +304,32 @@
 
   /* Every tappable surface sinks under the finger */
   .tappable {
-    @apply transition-transform duration-100 active:scale-95;
+    transition: transform 120ms var(--ease-ios);
+  }
+  .tappable:active {
+    transform: scale(0.97);
+  }
+
+  /* Toolbar row above tables/lists: wraps instead of overflowing or overlapping on narrow screens.
+     Give the flexible child (search, title) `min-w-0 flex-1`; fixed controls wrap to the next line. */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  /* Touch-sized controls on phones/tablets (iOS 44pt target, 40px here); desktop keeps the dense 32px.
+     Call sites that ask for a tiny control (h-6/h-7) keep it. */
+  @media (max-width: 767px) {
+    .ui-control:not([class*="h-6"]):not([class*="h-7"]) {
+      min-height: 2.5rem;
+    }
+    .ui-control-icon:not([class*="h-6"]):not([class*="h-7"]) {
+      min-height: 2.5rem;
+      min-width: 2.5rem;
+    }
   }
 
   /* Scroll without a visible scrollbar (Sheet body, etc.) */
@@ -315,32 +356,32 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 2.75rem;
-    height: 2.75rem;
+    width: 3rem;
+    height: 3rem;
     margin-bottom: 1rem;
-    border-radius: 0.75rem;
-    border: 1px solid hsl(var(--border));
-    background-color: hsl(var(--card));
-    color: hsl(var(--foreground));
+    border-radius: 0.875rem;
+    background-color: hsl(var(--secondary));
+    color: hsl(var(--muted-foreground));
   }
 
   .empty-state-title {
-    font-size: 0.9375rem;
-    font-weight: 700;
+    font-size: 1.0625rem;
+    line-height: 1.5rem;
+    font-weight: 600;
     letter-spacing: -0.01em;
     color: hsl(var(--foreground));
   }
 
   .empty-state-description {
     margin-top: 0.25rem;
-    max-width: 20rem;
-    font-size: 0.8125rem;
-    line-height: 1.4;
+    max-width: 22rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
     color: hsl(var(--muted-foreground));
   }
 
   .empty-state-action {
-    margin-top: 1rem;
+    margin-top: 1.25rem;
   }
 
   /* Table panel that fills remaining viewport below page chrome */
@@ -350,9 +391,26 @@
     flex: 1 1 auto;
     flex-direction: column;
     overflow: hidden;
-    border-radius: 0.5rem;
-    border: 1px solid hsl(var(--border));
+    border-radius: 0.875rem;
     background-color: hsl(var(--card));
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Table head inside a panel: no fill, hairline under, secondary label colour (Vercel). */
+  .table-panel thead {
+    background-color: hsl(var(--card)) !important;
+    box-shadow: inset 0 -1px 0 hsl(var(--border));
+  }
+  .table-panel thead th {
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+    white-space: nowrap;
+  }
+  .table-panel tbody tr {
+    transition: background-color 120ms;
+  }
+  .table-panel tbody tr:hover {
+    background-color: hsl(var(--muted));
   }
 
   .table-panel-scroll {

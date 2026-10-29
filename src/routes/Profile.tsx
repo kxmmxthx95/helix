@@ -88,7 +88,7 @@ export function Profile() {
     <div className="mx-auto grid w-full max-w-6xl gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
       <input ref={setAvatarInput} type="file" accept="image/*" className="hidden" onChange={onAvatarChosen} />
 
-      <aside className="h-fit overflow-hidden rounded-2xl border border-border bg-card">
+      <aside className="h-fit overflow-hidden rounded-xl bg-card shadow-card">
         <div className="h-28 bg-gradient-to-br from-accent/25 via-accent/10 to-purple-300/30" />
         <div className="-mt-14 flex flex-col items-center px-4 pb-4 text-center">
           <div className="relative">
@@ -148,7 +148,7 @@ export function Profile() {
         )}
       </aside>
 
-      <section className="min-w-0 space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
+      <section className="min-w-0 space-y-4 rounded-xl bg-card shadow-card p-4 sm:p-5">
         {section === "personal" && (
           <>
             <SectionHeader icon={<ProfileIcon className="h-6 w-6" />} title="ข้อมูลส่วนตัว" description="ข้อมูลจะแสดงในระบบสำหรับการติดต่อและเอกสารทางราชการ">

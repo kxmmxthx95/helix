@@ -502,7 +502,7 @@ function LessonTable({
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="toolbar shrink-0">
         <Button size="sm" variant="ghost" onClick={onBack}>
           <ChevronForward className="h-3 w-3 rotate-180" /> {subject.name_th}
         </Button>
@@ -614,7 +614,7 @@ function TopicTable({
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="toolbar shrink-0">
         <Button size="sm" variant="ghost" onClick={onBack}>
           <ChevronForward className="h-3 w-3 rotate-180" />{" "}
           {lesson?.name ?? "เนื้อหาย่อย"}
@@ -723,7 +723,7 @@ function TopicSetsTable({
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="toolbar shrink-0">
         <Button size="sm" variant="ghost" onClick={onBack}>
           <ChevronForward className="h-3 w-3 rotate-180" /> {topic.name}
         </Button>
@@ -1016,7 +1016,7 @@ function SetDetail({ set, onBack }: { set: PracticeSet; onBack: () => void }) {
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="toolbar shrink-0">
         <Button
           size="icon"
           variant="ghost"

@@ -618,12 +618,12 @@ function SubjectPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex shrink-0 items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{cohortName}</span>
+      <div className="toolbar shrink-0">
+        <span className="min-w-0 flex-1 basis-40 truncate text-sm font-medium">{cohortName}</span>
         {visible.length > 0 && (
           <Input
             type="search"
-            className="w-48 shrink-0"
+            className="w-full sm:w-48 sm:shrink-0"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ค้นหารหัสหรือชื่อวิชา..."
@@ -643,7 +643,7 @@ function SubjectPanel({
         )}
         {splitsByTerm && (
           <Select
-            className="w-auto min-w-[10rem] shrink-0"
+            className="w-auto min-w-[9rem] shrink-0"
             value={String(term)}
             onChange={(e) => setTerm(Number(e.target.value) as 1 | 2)}
             aria-label="ภาคเรียน"

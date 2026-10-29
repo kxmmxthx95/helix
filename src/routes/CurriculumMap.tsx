@@ -290,7 +290,7 @@ function SubjectList({
               key={s.id}
               type="button"
               onClick={() => onOpen(s.id)}
-              className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm hover:shadow-md"
+              className="group flex flex-col gap-3 rounded-xl bg-card p-4 text-left shadow-card transition-shadow hover:shadow-float"
             >
               <div className="flex min-w-0 items-start gap-3">
                 <SubjectTile subject={s} />
@@ -697,7 +697,7 @@ function LessonCard({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm">
+    <div className="rounded-xl bg-card shadow-card">
       <div className="flex items-center gap-3 p-3">
         <button
           type="button"

@@ -43,18 +43,18 @@ export function Modal({
       }}
       onClick={(e) => e.target === ref.current && onOpenChange(false)}
       className={cn(
-        "drawer-float m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-2xl p-0 text-foreground backdrop:bg-black/50 backdrop:backdrop-blur-sm open:flex open:flex-col",
+        "drawer-float m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-2xl p-0 text-foreground backdrop:bg-black/35 backdrop:backdrop-blur-[2px] dark:backdrop:bg-black/60 open:flex open:flex-col",
         className,
       )}
     >
-      <div className="shrink-0 border-b border-border px-4 pb-3 pt-4">
-        <h2 id="modal-title" className="font-heading text-base font-semibold">
+      <div className="shrink-0 border-b border-border px-5 pb-3 pt-5">
+        <h2 id="modal-title" className="font-heading text-[17px] font-semibold leading-6 tracking-[-0.01em]">
           {title}
         </h2>
-        {description && <p className="font-sarabun text-xs text-muted-foreground">{description}</p>}
+        {description && <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">{description}</p>}
       </div>
-      <div className="scrollbar-hidden flex-1 overflow-y-auto overscroll-contain px-4 py-4">{children}</div>
-      {footer && <div className="shrink-0 border-t border-border px-4 py-3">{footer}</div>}
+      <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
+      {footer && <div className="shrink-0 border-t border-border px-5 py-3">{footer}</div>}
     </dialog>
   );
 }

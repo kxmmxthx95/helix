@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Drawer } from "vaul";
-import { ContractIcon, ExpandIcon, X } from "@/components/icons";
-import { Button } from "@/components/ui";
+import { ContractIcon, ExpandIcon } from "@/components/icons";
+import { Button, CloseButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -52,19 +52,19 @@ export function Sheet({
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange} direction={side}>
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
+        <Drawer.Overlay className="fixed inset-0 z-40 bg-black/35 backdrop-blur-[2px] dark:bg-black/60" />
         <Drawer.Content
           className={cn(
-            "drawer-float fixed inset-y-2 z-50 flex w-[calc(100%-1rem)] flex-col overflow-hidden rounded-2xl outline-none",
-            effectiveWide === "full" ? "" : effectiveWide ? "max-w-2xl" : "max-w-sm",
+            "drawer-float fixed inset-y-2 z-50 flex w-[calc(100%-1rem)] flex-col overflow-hidden rounded-2xl text-foreground outline-none",
+            effectiveWide === "full" ? "" : effectiveWide ? "max-w-2xl" : "max-w-[24rem]",
             side === "left" ? "left-2" : "right-2",
             className,
           )}
         >
-          <div className="shrink-0 border-b border-border px-3 pb-3 pt-3">
-            <div className="flex items-center gap-2">
-              {icon && <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">{icon}</div>}
-              <Drawer.Title className="font-heading min-w-0 flex-1 truncate text-base font-semibold">{title}</Drawer.Title>
+          <div className="shrink-0 border-b border-border px-4 pb-3 pt-4">
+            <div className="flex min-w-0 items-center gap-3">
+              {icon && <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">{icon}</div>}
+              <Drawer.Title className="font-heading min-w-0 flex-1 truncate text-[17px] font-semibold leading-6 tracking-[-0.01em]">{title}</Drawer.Title>
               {resizable && (
                 <Button
                   size="icon"
@@ -76,14 +76,10 @@ export function Sheet({
                 </Button>
               )}
               {headerEnd}
-              {closable && (
-                <Button size="icon" variant="outline" aria-label="ปิด" onClick={() => onOpenChange(false)}>
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              )}
+              {closable && <CloseButton onClick={() => onOpenChange(false)} />}
             </div>
             {description ? (
-              <Drawer.Description className="font-sarabun text-xs text-muted-foreground">
+              <Drawer.Description className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">
                 {description}
               </Drawer.Description>
             ) : (
@@ -93,15 +89,15 @@ export function Sheet({
           </div>
           <div
             className={cn(
-              "scrollbar-hidden flex-1 overflow-y-auto overscroll-contain px-3 pt-3",
-              footer ? "pb-3" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]",
+              "scrollbar-hidden min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-4",
+              footer ? "pb-4" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]",
               bodyClassName,
             )}
           >
             {children}
           </div>
           {footer ? (
-            <div className="shrink-0 border-t border-border px-3 pt-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+            <div className="shrink-0 border-t border-border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
               {footer}
             </div>
           ) : null}

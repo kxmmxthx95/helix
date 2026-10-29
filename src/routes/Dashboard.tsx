@@ -308,7 +308,7 @@ function DeptClassroomSection({
                     key={s.id}
                     type="button"
                     onClick={() => setSubjectId(s.id)}
-                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+                    className="flex items-center gap-3 rounded-xl bg-card p-4 text-left shadow-card transition-shadow hover:shadow-float focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
                   >
                     {subjectTile(s.areaId)}
                     <div className="min-w-0 flex-1 space-y-1">
@@ -333,18 +333,18 @@ function DeptClassroomSection({
             return (
               <div
                 key={room.id}
-                className="relative flex flex-col rounded-2xl border border-border bg-card shadow-sm hover:shadow-md"
+                className="relative flex flex-col rounded-xl bg-card shadow-card transition-shadow hover:shadow-float"
               >
                 <button type="button" onClick={() => {
                     setRoomId(room.id);
                     setSubjectId("");
-                  }} className="flex h-full min-h-32 items-center gap-3 rounded-2xl p-4 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
+                  }} className="flex h-full min-h-32 items-center gap-3 rounded-xl p-4 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground">
                   <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
                       <BuildingIcon className="h-6 w-6" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="line-clamp-2 pr-6 text-base font-bold leading-snug text-foreground">{room.name}</div>
+                      <div className="line-clamp-2 pr-10 text-base font-bold leading-snug text-foreground">{room.name}</div>
                       <div className="mt-1 truncate text-sm font-medium text-foreground/70">
                         {room.subjects.length} วิชา · {lessons.length} บท · {lessons.reduce((n, l) => n + l.topics.length, 0)} หัวข้อ
                       </div>

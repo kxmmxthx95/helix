@@ -408,7 +408,7 @@ function DocBrowser({
               key={s.id}
               type="button"
               onClick={() => setOpenId(s.id)}
-              className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm hover:shadow-md"
+              className="group flex flex-col gap-3 rounded-xl bg-card p-4 text-left shadow-card transition-shadow hover:shadow-float"
             >
               <div className="flex min-w-0 items-start gap-3">
                 <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", colors.shade(s.learning_area_id))}>
@@ -1075,7 +1075,7 @@ function LessonRow({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm">
+    <div className="rounded-xl bg-card shadow-card">
       <div
         className="flex cursor-pointer items-center gap-3 p-3"
         onClick={(e) => {

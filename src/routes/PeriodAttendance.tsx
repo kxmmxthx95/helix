@@ -145,7 +145,7 @@ function PeriodCheckInPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="toolbar shrink-0">
         <Input
           type="date"
           value={date}
@@ -372,7 +372,7 @@ function PeriodCheckInGrid({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="toolbar shrink-0">
         <button
           type="button"
           onClick={onBack}

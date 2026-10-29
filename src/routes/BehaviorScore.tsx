@@ -131,7 +131,7 @@ export function BehaviorScore() {
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="toolbar shrink-0">
         {showScopeFilters && (
           <div className="hidden flex-1 grid-cols-4 gap-2 lg:grid">
             <Select

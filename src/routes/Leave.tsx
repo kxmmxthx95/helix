@@ -51,8 +51,8 @@ export function Leave() {
 
   return (
     <div className="page-fill">
-      <div className="flex items-center gap-2">
-        <Select className="w-48" value={view} onChange={(e) => setView(e.target.value as LeaveView)}>
+      <div className="toolbar">
+        <Select className="min-w-0 flex-1 sm:w-48 sm:flex-none" value={view} onChange={(e) => setView(e.target.value as LeaveView)}>
           <option value="mine">คำขอลาของฉัน</option>
           {mayApprove && <option value="approvals">คำขอลา</option>}
         </Select>
@@ -63,7 +63,7 @@ export function Leave() {
         )}
         {view === "approvals" && (
           <Select
-            className="ml-auto w-40 shrink-0"
+            className="ml-auto w-36 shrink-0 sm:w-40"
             value={approvalStatus}
             onChange={(e) => setApprovalStatus(e.target.value as LeaveStatus | "")}
             aria-label="สถานะคำขอ"

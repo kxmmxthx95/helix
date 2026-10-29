@@ -495,7 +495,7 @@ export function MyDocTasksTab() {
             <SummaryCard tone="destructive" icon={<X className="h-5 w-5" />} label="เกินกำหนด" value={count("overdue")} percent={pct(count("overdue"))} />
           </div>
 
-          <section className="space-y-3 rounded-2xl border border-border bg-card p-4">
+          <section className="space-y-3 rounded-xl bg-card shadow-card p-4">
             <h3 className="text-sm font-bold">ความคืบหน้ารายประเภทเอกสาร</h3>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
               {byType.map((t) => {
@@ -525,7 +525,7 @@ export function MyDocTasksTab() {
           </section>
         </div>
 
-        <section className="space-y-2 rounded-2xl border border-border bg-card p-4">
+        <section className="space-y-2 rounded-xl bg-card shadow-card p-4">
           <h3 className="text-sm font-bold">งานที่ต้องดำเนินการ</h3>
           {upcoming.length === 0 ? (
             <p className="py-6 text-center text-xs text-muted-foreground">ส่งครบทุกงานแล้ว</p>
@@ -552,7 +552,7 @@ export function MyDocTasksTab() {
         </section>
       </div>
 
-      <section className="space-y-3 rounded-2xl border border-border bg-card p-4">
+      <section className="space-y-3 rounded-xl bg-card shadow-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div role="tablist" aria-label="สถานะงาน" className="flex flex-wrap gap-4">
             {tabs.map((t) => (

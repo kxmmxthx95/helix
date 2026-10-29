@@ -372,7 +372,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="toolbar shrink-0">
         <Button size="icon" variant="ghost" onClick={onBack} aria-label="ย้อนกลับ">
           <ChevronBack className="h-4 w-4" />
         </Button>

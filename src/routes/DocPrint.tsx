@@ -494,7 +494,7 @@ const lessonLineOf = (r: PrintRequestRow) =>
 function RequestRow({ request: r, mayRequest }: { request: PrintRequestRow; mayRequest: boolean }) {
   const st = useRequestRow(r);
   return (
-    <li className="rounded-2xl border border-border bg-card p-4">
+    <li className="rounded-xl bg-card shadow-card p-4">
       <div className="flex items-center gap-4">
         <FileTile fileName={r.file?.file_name ?? ""} className="h-12 w-12" />
         <div className="min-w-0 flex-1 space-y-1 font-sarabun">

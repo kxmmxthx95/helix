@@ -409,8 +409,8 @@ const SIDEBAR_KEY = "helix-sidebar-collapsed";
 
 const navDrawerLink = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "font-ui tappable flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors",
-    isActive ? "bg-foreground/10 text-accent" : "text-foreground",
+    "group font-ui tappable flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-[15px] font-medium transition-colors",
+    isActive ? "bg-card text-foreground shadow-card" : "text-foreground hover:bg-foreground/5",
   );
 
 /**
@@ -527,9 +527,9 @@ function AppShellInner() {
 
   const sidebarActionClass = (active = false) =>
     cn(
-      "font-ui tappable flex items-center rounded-lg text-xs font-semibold transition-colors",
-      collapsed ? "justify-center px-0 py-2.5 w-full" : "gap-3 px-3 py-2 w-full",
-      active ? "bg-foreground/10 text-accent" : "text-foreground",
+      "group font-ui tappable flex items-center rounded-lg text-[13px] font-medium transition-colors",
+      collapsed ? "justify-center px-0 py-2.5 w-full" : "gap-3 px-2.5 py-2 w-full",
+      active ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
     );
 
   const themeButton = (
@@ -615,7 +615,7 @@ function AppShellInner() {
         collapsed ? "lg:gap-0" : "lg:gap-2",
       )}
     >
-      <div className="absolute inset-0 z-0 bg-muted dark:bg-background" aria-hidden />
+      <div className="absolute inset-0 z-0 bg-shell" aria-hidden />
 
       {/* Desktop sidebar toggle — fixed at header slot (p-2 + px-3) whether expanded or collapsed */}
       <div className="pointer-events-none absolute left-3 top-4 z-20 hidden lg:block">
@@ -625,8 +625,8 @@ function AppShellInner() {
       {/* Desktop sidebar — w-0 when collapsed; toggle stays in the slot above. */}
       <aside
         className={cn(
-          "font-ui bg-muted dark:bg-background relative z-10 hidden shrink-0 flex-col overflow-hidden transition-[width] duration-200 lg:flex",
-          collapsed ? "w-0" : "w-56",
+          "font-ui bg-shell relative z-10 hidden shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-ios lg:flex",
+          collapsed ? "w-0" : "w-60",
         )}
       >
         <div className="flex h-12 shrink-0 items-center px-3">
@@ -644,9 +644,9 @@ function AppShellInner() {
               {collapsed ? (
                 <div className="mx-2 mb-2 border-t border-border/60" />
               ) : (
-                <p className="px-1 pb-1.5 text-xs font-semibold text-muted-foreground">{section}</p>
+                <p className="px-2.5 pb-1.5 text-xs font-medium text-muted-foreground">{section}</p>
               )}
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-0.5">
                 {items.map(({ to, label, icon: Icon }) => (
                   <NavLink
                     key={to}
@@ -655,15 +655,15 @@ function AppShellInner() {
                     title={label}
                     className={({ isActive }) =>
                       cn(
-                        "font-ui tappable flex items-center rounded-lg text-xs font-semibold transition-colors",
-                        collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-3 py-2",
+                        "group font-ui tappable flex items-center rounded-lg text-[13px] font-medium transition-colors",
+                        collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-2.5 py-2",
                         isActive
-                          ? "bg-foreground/10 text-accent"
-                          : "text-foreground",
+                          ? "bg-card text-foreground shadow-card"
+                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                       )
                     }
                   >
-                    <Icon className="h-3 w-3 shrink-0" />
+                    <Icon className="h-4 w-4 shrink-0 group-aria-[current=page]:text-accent" />
                     {!collapsed && <span className="truncate">{label}</span>}
                   </NavLink>
                 ))}
@@ -710,7 +710,7 @@ function AppShellInner() {
                 title="ตั้งค่าระบบ"
                 className={sidebarActionClass(location.pathname === "/settings")}
               >
-                <SettingsIcon className="h-3 w-3 shrink-0" />
+                <SettingsIcon className="h-4 w-4 shrink-0" />
                 {!collapsed && <span className="truncate">ตั้งค่าระบบ</span>}
               </button>
             )}
@@ -722,11 +722,11 @@ function AppShellInner() {
               className={sidebarActionClass()}
             >
               {preference === "system" ? (
-                <Monitor className="h-3 w-3 shrink-0" />
+                <Monitor className="h-4 w-4 shrink-0" />
               ) : preference === "dark" ? (
-                <Sun className="h-3 w-3 shrink-0" />
+                <Sun className="h-4 w-4 shrink-0" />
               ) : (
-                <Moon className="h-3 w-3 shrink-0" />
+                <Moon className="h-4 w-4 shrink-0" />
               )}
               {!collapsed && <span className="truncate">{themeLabel}</span>}
             </button>
@@ -737,7 +737,7 @@ function AppShellInner() {
               title="ออกจากระบบ"
               className={sidebarActionClass()}
             >
-              <LogOut className="h-3.5 w-3.5 shrink-0" />
+              <LogOut className="h-4 w-4 shrink-0" />
               {!collapsed && <span className="truncate">ออกจากระบบ</span>}
             </button>
           </div>
@@ -746,7 +746,7 @@ function AppShellInner() {
       {avatarInput}
 
       {/* Main pane */}
-      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden bg-background dark:bg-muted max-lg:rounded-none max-lg:shadow-none lg:rounded-2xl lg:shadow-[0_1px_2px_rgba(0,0,0,0.06),0_2px_8px_rgba(0,0,0,0.08)]">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden bg-background max-lg:rounded-none max-lg:shadow-none lg:rounded-2xl lg:shadow-card">
         <header
           className={cn(
             "glass sticky top-0 z-20 shrink-0 pt-safe lg:hidden",
@@ -757,7 +757,7 @@ function AppShellInner() {
           <div className="flex h-12 items-center gap-2 px-shell">
             {menuButton}
             {!isStudentHome && (
-              <p className="font-heading min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
+              <p className="font-heading min-w-0 flex-1 truncate text-[17px] font-semibold tracking-[-0.01em] text-foreground">
                 {pageTitle}
               </p>
             )}
@@ -810,8 +810,8 @@ function AppShellInner() {
           <nav className="flex flex-col gap-4">
             {tabSections.map(({ section, items }) => (
               <div key={section}>
-                <p className="px-1 pb-1.5 text-xs font-semibold text-muted-foreground">{section}</p>
-                <div className="flex flex-col gap-1.5">
+                <p className="px-3 pb-1.5 text-[13px] font-medium text-muted-foreground">{section}</p>
+                <div className="flex flex-col gap-0.5">
                   {items.map(({ to, label, icon: Icon }) => (
                     <NavLink
                       key={to}
@@ -820,7 +820,7 @@ function AppShellInner() {
                       onClick={() => setNavOpen(false)}
                       className={navDrawerLink}
                     >
-                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                      <Icon className="h-[18px] w-[18px] shrink-0 text-muted-foreground group-aria-[current=page]:text-accent" />
                       <span className="truncate">{label}</span>
                     </NavLink>
                   ))}
@@ -857,12 +857,12 @@ function AppShellInner() {
           <div className="mx-auto flex min-h-full w-full max-w-screen-2xl flex-1 flex-col px-shell pb-[max(3rem,env(safe-area-inset-bottom))]">
             <header
               className={cn(
-                "sticky top-0 z-20 hidden h-12 shrink-0 items-center bg-background dark:bg-muted lg:flex",
-                !isStudentHome && "border-b border-border/60",
+                "sticky top-0 z-20 hidden h-12 shrink-0 items-center bg-background/80 backdrop-blur-xl backdrop-saturate-150 lg:flex",
+                !isStudentHome && "border-b border-border",
               )}
             >
               {!isStudentHome && (
-                <p className="font-heading pointer-events-none absolute inset-x-0 truncate text-center text-sm font-semibold text-foreground">
+                <p className="font-heading pointer-events-none absolute inset-x-0 truncate text-center text-[15px] font-semibold tracking-[-0.01em] text-foreground">
                   {pageTitle}
                 </p>
               )}

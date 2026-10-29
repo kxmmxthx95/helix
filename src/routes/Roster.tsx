@@ -246,7 +246,7 @@ export function Roster() {
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="toolbar shrink-0">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
           <Input
