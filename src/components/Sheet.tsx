@@ -87,9 +87,11 @@ export function Sheet({
               <Drawer.Description className="sr-only">{title}</Drawer.Description>
             )}
           </div>
+          {/* Vertical scroll only: no-drag stops Vaul turning a finger drag here into a horizontal frame drag; pan-y blocks sideways panning. */}
           <div
+            data-vaul-no-drag
             className={cn(
-              "scrollbar-hidden min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-4",
+              "scrollbar-hidden min-h-0 flex-1 touch-pan-y overflow-y-auto overflow-x-hidden overscroll-contain px-4 pt-4",
               footer ? "pb-4" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]",
               bodyClassName,
             )}
