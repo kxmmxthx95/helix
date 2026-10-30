@@ -133,6 +133,14 @@ const TRANSFER_STATUS_STYLE: Record<DutyTransferStatus, string> = {
 
 type View = "assign" | "mine" | "requests" | "summary" | "points";
 
+const VIEW_TABS: { key: View; label: string }[] = [
+  { key: "mine", label: "เวรของฉัน" },
+  { key: "assign", label: "จัดตารางเวร" },
+  { key: "requests", label: "คำขอโอนเวร" },
+  { key: "summary", label: "สรุปรายเดือน" },
+  { key: "points", label: "จุดเวร" },
+];
+
 export function DutyRoster() {
   const { profile } = useAuth();
   const now = new Date();
@@ -150,18 +158,35 @@ export function DutyRoster() {
 
   return (
     <div className="page-fill">
-      <div className="flex flex-wrap items-center gap-2">
-        <Select className="w-48" value={view} onChange={(e) => setView(e.target.value as View)}>
-          <option value="mine">เวรของฉัน</option>
-          {mayManage && <option value="assign">จัดตารางเวร</option>}
-          {mayManage && <option value="requests">คำขอโอนเวร</option>}
-          {mayManage && <option value="summary">สรุปรายเดือน</option>}
-          {canDept && <option value="points">จุดเวร</option>}
-        </Select>
+      <div
+        role="tablist"
+        aria-label="มุมมองตารางเวร"
+        className="flex shrink-0 gap-6 overflow-x-auto border-b border-border [scrollbar-width:none]"
+      >
+        {VIEW_TABS.filter((t) => (t.key === "mine" ? true : t.key === "points" ? canDept : mayManage)).map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={view === t.key}
+            onClick={() => setView(t.key)}
+            className={cn(
+              "-mb-px h-11 shrink-0 whitespace-nowrap border-b-2 px-0.5 text-sm font-medium transition-colors",
+              view === t.key
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="toolbar shrink-0 empty:hidden">
         {view === "summary" && mayManage && <MonthYearPicker value={monthValue} onChange={setMonthValue} className="ml-auto w-40" />}
         {mayManage && orgWide && (view === "assign" || view === "summary") && (
           <Select
-            className={cn("w-48", view === "assign" && "ml-auto")}
+            className={cn("w-full sm:w-48", view === "assign" && "sm:ml-auto")}
             value={departmentId}
             onChange={(e) => setDepartmentId(e.target.value)}
             placeholder="ทุกแผนก"
@@ -181,7 +206,7 @@ export function DutyRoster() {
         )}
         {view === "requests" && mayManage && (
           <Select
-            className="ml-auto w-48"
+            className="w-full sm:ml-auto sm:w-48"
             value={requestStatus}
             onChange={(e) => setRequestStatus(e.target.value as DutyTransferStatus | "")}
           >
@@ -273,13 +298,13 @@ function PointsView({ creating, onCreatingChange }: { creating: boolean; onCreat
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
-        <table className="w-full text-xs">
-          <thead className="bg-muted text-left text-xs text-muted-foreground">
+      <div className="table-panel"><div className="table-panel-scroll">
+        <table className="w-full text-[13px]">
+          <thead className="text-left text-xs">
             <tr>
-              <th className="px-3 py-2 font-medium">ชื่อจุดเวร</th>
-              <th className="px-3 py-2 font-medium">โหมด</th>
-              <th className="px-3 py-2 font-medium">สถานะ</th>
+              <th className="px-4 py-3">ชื่อจุดเวร</th>
+              <th className="px-4 py-3">โหมด</th>
+              <th className="px-4 py-3">สถานะ</th>
             </tr>
           </thead>
           <tbody>
@@ -289,16 +314,16 @@ function PointsView({ creating, onCreatingChange }: { creating: boolean; onCreat
                 onClick={() => setEditing(p)}
                 className={cn("cursor-pointer border-t border-border hover:bg-muted/50", !p.active && "text-muted-foreground")}
               >
-                <td className="px-3 py-2 font-medium">{p.name}</td>
-                <td className="px-3 py-2 text-muted-foreground">
+                <td className="px-4 py-3 font-medium">{p.name}</td>
+                <td className="px-4 py-3 text-muted-foreground">
                   {p.mode === "fixed" ? `ประจำ: ${nameById.get(p.fixed_staff_id ?? "") ?? "—"}` : "หมุนเวียน"}
                 </td>
-                <td className="px-3 py-2">{p.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}</td>
+                <td className="px-4 py-3">{p.active ? "เปิดใช้งาน" : "ปิดใช้งาน"}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+      </div></div>
       {sheets}
     </div>
   );
@@ -490,44 +515,90 @@ function WeeklyTemplateEditor({ departmentId, createdBy }: { departmentId: strin
     );
   }
 
+  const cellSelect = (staffId: string, wd: number) => {
+    const cell = cellByKey.get(`${staffId}|${wd}`);
+    return (
+      <Select
+        className={cn("h-8 w-full min-w-[6.5rem] text-xs", cell && "border-transparent bg-accent-soft font-medium text-accent")}
+        aria-label={`เวรวัน${WEEKDAY_LABELS[wd]}`}
+        value={cell?.duty_point_id ?? ""}
+        onChange={(e) => handleChange(staffId, wd, e.target.value)}
+      >
+        <option value="">ไม่มีเวร</option>
+        {rotatingPoints.map((point) => (
+          <option key={point.id} value={point.id}>
+            {point.name}
+          </option>
+        ))}
+      </Select>
+    );
+  };
+  const assignedCount = (staffId: string) => WEEKDAY_ORDER.filter((wd) => cellByKey.has(`${staffId}|${wd}`)).length;
+
   return (
     <div className="space-y-2">
-      {staff.map((p) => (
-        <Card key={p.id} className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Avatar name={nameById.get(p.id) ?? p.id} src={avatarUrl(p)} className="h-7 w-7 shrink-0 text-[10px]" />
-            <div className="text-xs font-medium leading-tight">
-              <p>{`${p.prefix ?? ""}${p.first_name}`}</p>
-              <p>{p.last_name}</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-7 gap-2">
-            {WEEKDAY_ORDER.map((wd) => {
-              const cell = cellByKey.get(`${p.id}|${wd}`);
-              return (
-                <div key={wd} className="flex flex-col gap-1">
-                  <span className="flex items-center gap-1 font-ui text-[10px] font-medium text-foreground">
+      <p className="text-[13px] text-muted-foreground">
+        {staff.length} คน · {rotatingPoints.length} จุดเวรหมุนเวียน · เลือกจุดเวรในช่องวันเพื่อมอบหมาย
+      </p>
+
+      <div className="table-panel hidden xl:flex">
+        <div className="table-panel-scroll">
+          <table className="w-full text-[13px]">
+            <thead className="sticky top-0 z-10 text-left text-xs">
+              <tr>
+                <th className="w-56 px-4 py-3">ครู</th>
+                {WEEKDAY_ORDER.map((wd) => (
+                  <th key={wd} className="px-2 py-3">
                     {WEEKDAY_LABELS[wd]}
-                    {cell && <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />}
-                  </span>
-                  <Select
-                    className="w-full"
-                    value={cell?.duty_point_id ?? ""}
-                    onChange={(e) => handleChange(p.id, wd, e.target.value)}
-                  >
-                    <option value="">ไม่มีเวร</option>
-                    {rotatingPoints.map((point) => (
-                      <option key={point.id} value={point.id}>
-                        {point.name}
-                      </option>
-                    ))}
-                  </Select>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {staff.map((p) => (
+                <tr key={p.id} className="h-14 border-t border-border first:border-t-0">
+                  <td className="px-4 py-0">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Avatar name={nameById.get(p.id) ?? p.id} src={avatarUrl(p)} className="h-9 w-9 shrink-0 text-xs" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{`${p.prefix ?? ""}${p.first_name} ${p.last_name}`}</p>
+                        <p className="text-xs tabular-nums text-muted-foreground">{assignedCount(p.id)} วัน/สัปดาห์</p>
+                      </div>
+                    </div>
+                  </td>
+                  {WEEKDAY_ORDER.map((wd) => (
+                    <td key={wd} className="px-2 py-0">
+                      {cellSelect(p.id, wd)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="space-y-2 xl:hidden">
+        {staff.map((p) => (
+          <Card key={p.id} className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Avatar name={nameById.get(p.id) ?? p.id} src={avatarUrl(p)} className="h-9 w-9 shrink-0 text-xs" />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{`${p.prefix ?? ""}${p.first_name} ${p.last_name}`}</p>
+                <p className="text-xs tabular-nums text-muted-foreground">{assignedCount(p.id)} วัน/สัปดาห์</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {WEEKDAY_ORDER.map((wd) => (
+                <div key={wd} className="flex min-w-0 flex-col gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">{WEEKDAY_LABELS[wd]}</span>
+                  {cellSelect(p.id, wd)}
                 </div>
-              );
-            })}
-          </div>
-        </Card>
-      ))}
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
@@ -632,14 +703,14 @@ function MineView({ profileId }: { profileId: string }) {
           </div>
         )}
         {!isLoading && rows.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
-            <table className="w-full text-xs">
-              <thead className="bg-muted text-left text-xs text-muted-foreground">
+          <div className="table-panel"><div className="table-panel-scroll">
+            <table className="w-full text-[13px]">
+              <thead className="text-left text-xs">
                 <tr>
-                  <th className="px-3 py-2 font-medium">วันที่</th>
-                  <th className="px-3 py-2 font-medium">จุดเวร</th>
-                  <th className="px-3 py-2 font-medium">การโอนเวร</th>
-                  <th className="px-3 py-2 font-medium" />
+                  <th className="px-4 py-3">วันที่</th>
+                  <th className="px-4 py-3">จุดเวร</th>
+                  <th className="px-4 py-3">การโอนเวร</th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
@@ -649,16 +720,16 @@ function MineView({ profileId }: { profileId: string }) {
                   const canRequest = !openReq && a.date >= todayIso() && (a.id !== null || a.source === "fixed");
                   return (
                     <tr key={`${a.duty_point_id}-${a.date}`} className="border-t border-border">
-                      <td className="px-3 py-2 text-muted-foreground tabular-nums">{a.date}</td>
-                      <td className="px-3 py-2 font-medium">{pointName(a.duty_point_id)}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3 text-muted-foreground tabular-nums">{a.date}</td>
+                      <td className="px-4 py-3 font-medium">{pointName(a.duty_point_id)}</td>
+                      <td className="px-4 py-3">
                         {req && (
                           <span className={cn("rounded-full px-2 py-0.5 text-[10px]", TRANSFER_STATUS_STYLE[req.status])}>
                             {TRANSFER_STATUS_LABEL[req.status]}
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3">
                         {canRequest && (
                           <Button
                             size="sm"
@@ -690,7 +761,7 @@ function MineView({ profileId }: { profileId: string }) {
                 })}
               </tbody>
             </table>
-          </div>
+          </div></div>
         )}
       </div>
 
@@ -789,31 +860,31 @@ function RequestsView({ status }: { status: DutyTransferStatus | "" }) {
         </div>
       )}
       {requests.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
-          <table className="w-full min-w-[42rem] text-xs">
-            <thead className="bg-muted text-left text-xs text-muted-foreground">
+        <div className="table-panel"><div className="table-panel-scroll">
+          <table className="w-full min-w-[42rem] text-[13px]">
+            <thead className="text-left text-xs">
               <tr>
-                <th className="px-3 py-2 font-medium">ผู้ขอโอน</th>
-                <th className="px-3 py-2 font-medium">ผู้รับเวร</th>
-                <th className="px-3 py-2 font-medium">จุดเวร</th>
-                <th className="px-3 py-2 font-medium">วันที่</th>
-                <th className="px-3 py-2 font-medium">สถานะ</th>
-                <th className="px-3 py-2 font-medium" />
+                <th className="px-4 py-3">ผู้ขอโอน</th>
+                <th className="px-4 py-3">ผู้รับเวร</th>
+                <th className="px-4 py-3">จุดเวร</th>
+                <th className="px-4 py-3">วันที่</th>
+                <th className="px-4 py-3">สถานะ</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {requests.map((r) => (
                 <tr key={r.id} className="border-t border-border">
-                  <td className="px-3 py-2 font-medium">{nameById.get(r.requester_id) ?? "—"}</td>
-                  <td className="px-3 py-2 font-medium">{nameById.get(r.target_staff_id) ?? "—"}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{pointName(r.duty_point_id)}</td>
-                  <td className="px-3 py-2 text-muted-foreground tabular-nums">{r.date}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3 font-medium">{nameById.get(r.requester_id) ?? "—"}</td>
+                  <td className="px-4 py-3 font-medium">{nameById.get(r.target_staff_id) ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{pointName(r.duty_point_id)}</td>
+                  <td className="px-4 py-3 text-muted-foreground tabular-nums">{r.date}</td>
+                  <td className="px-4 py-3">
                     <span className={cn("rounded-full px-2 py-0.5 text-[10px]", TRANSFER_STATUS_STYLE[r.status])}>
                       {TRANSFER_STATUS_LABEL[r.status]}
                     </span>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-3">
                     {r.status === "pending_admin" && (
                       <div className="flex gap-2">
                         <Button size="sm" disabled={decide.isPending} onClick={() => decide.mutate({ id: r.id, approve: true })}>
@@ -834,7 +905,7 @@ function RequestsView({ status }: { status: DutyTransferStatus | "" }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </div></div>
       )}
     </div>
   );
@@ -881,12 +952,12 @@ function SummaryView({ departmentId, monthValue }: { departmentId: string; month
         </div>
       )}
       {counts.size > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
-          <table className="w-full text-xs">
-            <thead className="bg-muted text-left text-xs text-muted-foreground">
+        <div className="table-panel"><div className="table-panel-scroll">
+          <table className="w-full text-[13px]">
+            <thead className="text-left text-xs">
               <tr>
-                <th className="px-3 py-2 font-medium">ชื่อ</th>
-                <th className="px-3 py-2 text-right font-medium">จำนวนครั้งเข้าเวร</th>
+                <th className="px-4 py-3">ชื่อ</th>
+                <th className="px-4 py-3 text-right font-medium">จำนวนครั้งเข้าเวร</th>
               </tr>
             </thead>
             <tbody>
@@ -894,13 +965,13 @@ function SummaryView({ departmentId, monthValue }: { departmentId: string; month
                 .sort((a, b) => b[1] - a[1])
                 .map(([staffId, count]) => (
                   <tr key={staffId} className="border-t border-border">
-                    <td className="px-3 py-2 font-medium">{nameById.get(staffId) ?? "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{count}</td>
+                    <td className="px-4 py-3 font-medium">{nameById.get(staffId) ?? "—"}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{count}</td>
                   </tr>
                 ))}
             </tbody>
           </table>
-        </div>
+        </div></div>
       )}
     </div>
   );
