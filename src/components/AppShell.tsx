@@ -409,7 +409,7 @@ const SIDEBAR_KEY = "helix-sidebar-collapsed";
 
 const navDrawerLink = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "group font-ui tappable flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-[15px] font-medium transition-colors",
+    "group font-ui tappable flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-[15px] font-semibold transition-colors",
     isActive ? "bg-card text-foreground shadow-card" : "text-foreground hover:bg-foreground/5",
   );
 
@@ -527,7 +527,7 @@ function AppShellInner() {
 
   const sidebarActionClass = (active = false) =>
     cn(
-      "group font-ui tappable flex items-center rounded-lg text-[13px] font-medium transition-colors",
+      "group font-ui tappable flex items-center rounded-lg text-[13px] font-semibold transition-colors",
       collapsed ? "justify-center px-0 py-2.5 w-full" : "gap-3 px-2.5 py-2 w-full",
       active ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
     );
@@ -655,7 +655,7 @@ function AppShellInner() {
                     title={label}
                     className={({ isActive }) =>
                       cn(
-                        "group font-ui tappable flex items-center rounded-lg text-[13px] font-medium transition-colors",
+                        "group font-ui tappable flex items-center rounded-lg text-[13px] font-semibold transition-colors",
                         collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-2.5 py-2",
                         isActive
                           ? "bg-card text-foreground shadow-card"
@@ -857,7 +857,7 @@ function AppShellInner() {
           <div className="mx-auto flex min-h-full w-full max-w-screen-2xl flex-1 flex-col px-shell pb-[max(3rem,env(safe-area-inset-bottom))]">
             <header
               className={cn(
-                "sticky top-0 z-20 hidden h-12 shrink-0 items-center bg-background/80 backdrop-blur-xl backdrop-saturate-150 lg:flex",
+                "sticky top-0 z-20 hidden h-12 shrink-0 items-center bg-background lg:flex",
                 !isStudentHome && "border-b border-border",
               )}
             >

@@ -2,13 +2,16 @@ import {
   CalendarIcon,
   CallIcon,
   CameraIcon,
+  CheckmarkCircleIcon,
   Plus,
   ProfileIcon,
   Search,
   ShieldIcon,
   SlidersHorizontal,
+  TimeIcon,
   TrashIcon,
   Upload,
+  Users as UsersIcon,
   X,
 } from "@/components/icons";
 import { useEffect, useRef, useMemo, useState } from "react";
@@ -52,6 +55,7 @@ import { profileFullName } from "@/lib/database.types";
 import { blobToBase64, compressImage } from "@/lib/image";
 import { passwordFromDob } from "@/lib/password";
 import { canManageUsers, isOrgWide, PREFIXES, ROLE_LABEL, ROLES, STUDENT_PREFIXES, roleLabels, type Role } from "@/lib/roles";
+import { StatCard } from "@/routes/Classrooms";
 import { pickAddress } from "@/routes/Roster";
 import { CloseButton, FormSection } from "@/components/ui";
 
@@ -108,7 +112,7 @@ export function Users() {
   ).length;
 
   return (
-    <div className="page-fill">
+    <div className="page-fill page-flush min-h-0 shrink-0 pb-5">
       <div className="toolbar">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -491,6 +495,15 @@ export function Users() {
       </Sheet>
 
       <EditUserSheet profile={editing} onClose={() => setEditing(null)} />
+      {rows && (
+        <div className="mt-auto grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4">
+          <StatCard tone="accent" icon={<UsersIcon className="h-5 w-5" />} label="ทั้งหมด" value={rows.length} unit="คน" />
+          <StatCard tone="success" icon={<CheckmarkCircleIcon className="h-5 w-5" />} label="ใช้งานอยู่" value={rows.filter((r) => r.is_active).length} unit="คน" />
+          <StatCard tone="warning" icon={<TimeIcon className="h-5 w-5" />} label="ปิดใช้งาน" value={rows.filter((r) => !r.is_active).length} unit="คน" />
+          <StatCard tone="muted" icon={<UsersIcon className="h-5 w-5" />} label="นักเรียน" value={rows.filter((r) => r.roles.includes("student")).length} unit="คน" />
+        </div>
+      )}
+
       <CreateUserSheet open={creating} onClose={() => setCreating(false)} />
       <ImportUsersSheet open={importing} onOpenChange={setImporting} />
     </div>

@@ -101,16 +101,6 @@ export function TeachingLoad() {
   return (
     <div className="page-fill">
       <div className="flex shrink-0 flex-wrap items-center gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent/10 text-accent">
-          <BookIcon className="h-6 w-6" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="font-heading text-xl font-semibold">ภาระงานสอน</h2>
-          <p className="text-xs text-muted-foreground">
-            จัดการภาระงานสอนของครู แสดงรายวิชาที่รับผิดชอบและจำนวนคาบตามภาคเรียน
-          </p>
-        </div>
-
         {orgWide && departments.length > 0 && (
           <Select
             className="w-auto min-w-[10rem]"

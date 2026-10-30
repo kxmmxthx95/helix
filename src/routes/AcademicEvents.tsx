@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { BuildingIcon, CalendarIcon, ChevronBack, ChevronForward, DownloadIcon, InfoIcon, Plus } from "@/components/icons";
+import { BuildingIcon, CalendarIcon, CheckmarkCircleIcon, ChevronBack, ChevronForward, DownloadIcon, InfoIcon, Plus } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, Field, FormSection, Input, Select, Skeleton, Spinner } from "@/components/ui";
@@ -8,11 +8,14 @@ import {
   useAcademicEvents,
   useDeleteAcademicEvent,
   useSaveAcademicEvent,
+  useAcademicTerms,
   useSyncHolidays,
   type AcademicEventDraft,
   type AcademicEventRow,
 } from "@/hooks/useAcademicTerms";
+import { useAttendanceRange } from "@/hooks/useAttendance";
 import { useDepartments } from "@/hooks/useProfiles";
+import { useStudentByProfile } from "@/hooks/useStudents";
 import type { AcademicEventType } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -83,6 +86,36 @@ const startOfWeek = (d: Date) => addDays(d, -d.getDay());
 const withMonth = (d: Date, year: number, month: number) =>
   new Date(year, month, Math.min(d.getDate(), new Date(year, month + 1, 0).getDate()));
 const shortDate = (iso: string) => fromISODate(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+
+const ATTEND_GOAL = 100;
+
+/** Student-only: distinct days present/late in the term containing today, against ATTEND_GOAL. */
+function AttendanceDaysBadge() {
+  const { profile: me } = useAuth();
+  const { data: student } = useStudentByProfile(me?.id ?? null);
+  const { data: terms = [] } = useAcademicTerms(me?.department_id ?? null);
+  const today = toISODate(new Date());
+  const term = terms.find((t) => t.start_date && t.end_date && t.start_date <= today && today <= t.end_date);
+  const { data: records } = useAttendanceRange({
+    studentId: term ? student?.id : null,
+    startDate: term?.start_date ?? "",
+    endDate: term?.end_date ?? "",
+  });
+  if (!student || !term || !records) return null;
+  const days = new Set(records.filter((r) => r.status === "present" || r.status === "late").map((r) => r.date)).size;
+  const done = days >= ATTEND_GOAL;
+  return (
+    <span
+      className={cn(
+        "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium",
+        done ? "bg-success/15 text-success" : "bg-muted text-muted-foreground",
+      )}
+    >
+      {done && <CheckmarkCircleIcon className="h-3.5 w-3.5" />}
+      มาเรียน {days} / {ATTEND_GOAL} วัน
+    </span>
+  );
+}
 
 export function AcademicEvents() {
   const { profile: me } = useAuth();
@@ -244,6 +277,8 @@ export function AcademicEvents() {
               <Skeleton className="h-4 w-4 rounded-full" />
             </span>
           )}
+
+          <AttendanceDaysBadge />
 
           <div role="tablist" aria-label="มุมมอง" className="ml-auto flex rounded-xl border border-border bg-card p-0.5">
             {(Object.keys(VIEW_LABEL) as CalView[]).map((v) => (

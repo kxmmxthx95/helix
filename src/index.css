@@ -428,6 +428,11 @@
     padding-bottom: 2rem;
   }
 
+  /* Page that owns its bottom gutter (stat cards pinned to the bottom): drop <main>'s own bottom padding so short and long pages end the same distance from the edge. */
+  main > div:has(.page-flush) {
+    padding-bottom: 0 !important;
+  }
+
   @media (min-width: 1024px) {
     .page-fill {
       min-height: calc(100dvh - 7.5rem);

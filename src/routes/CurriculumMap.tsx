@@ -244,11 +244,6 @@ function SubjectList({
         </form>
       )}
 
-      <div>
-        <h2 className="text-base font-bold">รายวิชาทั้งหมด</h2>
-        <p className="text-xs text-muted-foreground">เลือกวิชาเพื่อดูบทเรียนและหัวข้อของแต่ละชั้น</p>
-      </div>
-
       {shown.length === 0 ? (
         <EmptyState
           title="ไม่พบรายวิชา"
@@ -294,14 +289,12 @@ function SubjectList({
             >
               <div className="flex min-w-0 items-start gap-3">
                 <SubjectTile subject={s} />
-                <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <div className="truncate text-sm font-bold">{s.name}</div>
                   <div className="text-[11px] text-muted-foreground">
                     {s.lessonCount} บท · {s.topicCount} หัวข้อ
                   </div>
-                  <div className="mt-2">
-                    <GradeBadges grades={gradeOf(s)} />
-                  </div>
+                  <GradeBadges grades={gradeOf(s)} />
                 </div>
               </div>
               <div className="mt-auto flex justify-end pt-2">

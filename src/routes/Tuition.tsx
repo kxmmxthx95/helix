@@ -442,7 +442,7 @@ function SummaryCards({
     { label: "ยังไม่มีใบแจ้งหนี้", people: none.length, baht: standard != null ? Math.round(standard * none.length * 100) / 100 : null, light: "bg-muted-foreground/40" },
   ];
   return (
-    <div data-fit-reserve className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+    <div data-fit-reserve className="-mb-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
       {cards.map((c) => (
         <Card key={c.label} className="space-y-1 px-4 py-3">
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">

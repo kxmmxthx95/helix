@@ -112,14 +112,7 @@ export function Classrooms() {
   }
 
   return (
-    <div className="page-fill">
-      <div className="grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4">
-        <StatCard tone="accent" icon={<BookIcon className="h-5 w-5" />} label="ทั้งหมด" value={scoped.length} unit="ห้องเรียน" />
-        <StatCard tone="success" icon={<CheckmarkCircleIcon className="h-5 w-5" />} label="กำลังใช้งาน" value={activeCount} unit="ห้องเรียน" />
-        <StatCard tone="warning" icon={<TimeIcon className="h-5 w-5" />} label="ปิดใช้งาน" value={scoped.length - activeCount} unit="ห้องเรียน" />
-        <StatCard tone="muted" icon={<Users className="h-5 w-5" />} label="จำนวนนักเรียนรวม" value={totalStudents} unit="คน" />
-      </div>
-
+    <div className="page-fill page-flush min-h-0 shrink-0 pb-5">
       <div className="flex shrink-0 flex-wrap gap-2">
         {orgWide && (
           <Select
@@ -343,6 +336,13 @@ export function Classrooms() {
         </div>
       )}
 
+      <div className="mt-auto grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4">
+        <StatCard tone="accent" icon={<BookIcon className="h-5 w-5" />} label="ทั้งหมด" value={scoped.length} unit="ห้องเรียน" />
+        <StatCard tone="success" icon={<CheckmarkCircleIcon className="h-5 w-5" />} label="กำลังใช้งาน" value={activeCount} unit="ห้องเรียน" />
+        <StatCard tone="warning" icon={<TimeIcon className="h-5 w-5" />} label="ปิดใช้งาน" value={scoped.length - activeCount} unit="ห้องเรียน" />
+        <StatCard tone="muted" icon={<Users className="h-5 w-5" />} label="จำนวนนักเรียนรวม" value={totalStudents} unit="คน" />
+      </div>
+
       <HomeroomSheet
         open={!!homeroomClassroom}
         onClose={() => setHomeroomClassroomId("")}
@@ -359,7 +359,7 @@ export function Classrooms() {
   );
 }
 
-function StatCard({
+export function StatCard({
   tone,
   icon,
   label,

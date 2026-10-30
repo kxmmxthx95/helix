@@ -25,7 +25,7 @@ export function useFitRows({ reserve, min = 5, initial = 20 }: { reserve: number
       const gap = parent ? parseFloat(getComputedStyle(parent).rowGap) || 0 : 0;
       const extra = [...(parent?.children ?? [])]
         .filter((c) => c.hasAttribute("data-fit-reserve"))
-        .reduce((sum, c) => sum + c.getBoundingClientRect().height + gap, 0);
+        .reduce((sum, c) => sum + c.getBoundingClientRect().height + gap + (parseFloat(getComputedStyle(c).marginBottom) || 0), 0);
       const rows = Math.max(min, Math.floor((main.clientHeight - top - pad - reserve - extra - head) / row));
       setFit((f) => (f.rows === rows ? f : { rows, minHeight: head + rows * row }));
     };
