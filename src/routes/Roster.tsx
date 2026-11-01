@@ -6,10 +6,9 @@ import { ImportSheet } from "@/components/ImportSheet";
 import { Modal } from "@/components/Modal";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Avatar, AvatarCard, BuddhistDateSelect, Card, EmptyState, Field, FormSection, Input, Pagination, Select, SheetFormContext, Skeleton, Spinner, Switch } from "@/components/ui";
+import { Button, Avatar, AvatarCard, BuddhistDateSelect, Card, EmptyState, Field, FormSection, Input, Select, SheetFormContext, Skeleton, Spinner, Switch } from "@/components/ui";
 import { avatarUrl, studentAvatarUrl } from "@/hooks/useAvatar";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
-import { usePagination } from "@/hooks/usePagination";
 import { useClassrooms } from "@/hooks/useStatusManagement";
 import { useDepartments, useInviteUsers, type InviteOutcome, type UserInvite } from "@/hooks/useProfiles";
 import { addressOptions, useZipRows } from "@/lib/thaiAddress";
@@ -278,7 +277,6 @@ export function Roster() {
   const mayView = mayEdit || (me?.roles.includes("teacher") ?? false);
   const mayManageUsers = me ? canManageUsers(me.roles) : false;
   const deleteStudent = useDeleteStudent();
-  const { page, setPage, pageCount, pageRows } = usePagination(rows ?? [], [filters]);
 
   const activeFilterCount = [filters.departmentId, filters.status, filters.gradeLevelId, filters.classroomId].filter(
     Boolean,
@@ -295,26 +293,9 @@ export function Roster() {
     ? allGradeLevels.filter((g) => g.department_id === filters.departmentId)
     : allGradeLevels;
   const { data: filterClassrooms = [] } = useClassrooms(filters.gradeLevelId || null);
-  const filterChips = [
-    filters.departmentId && {
-      key: "dept",
-      label: deptName.get(filters.departmentId) ?? "แผนก",
-      clear: () => setFilters({ ...filters, departmentId: "", gradeLevelId: "", classroomId: "" }),
-    },
-    filters.gradeLevelId && {
-      key: "grade",
-      label: gradeLevelName.get(filters.gradeLevelId) ?? "ชั้น",
-      clear: () => setFilters({ ...filters, gradeLevelId: "", classroomId: "" }),
-    },
-    filters.classroomId && {
-      key: "room",
-      label: filterClassrooms.find((c) => c.id === filters.classroomId)?.name ?? "ห้อง",
-      clear: () => setFilters({ ...filters, classroomId: "" }),
-    },
-  ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
 
   return (
-    <div className="page-fill">
+    <div className="page-fill page-flush min-h-0 pb-5 lg:h-[calc(100dvh-7.5rem)]">
       <div className="toolbar shrink-0">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -364,24 +345,6 @@ export function Roster() {
         )}
       </div>
 
-
-      {filterChips.length > 0 && (
-        <div className="toolbar -mt-1 shrink-0 text-[13px]">
-          {filterChips.map((c) => (
-            <button
-              key={c.key}
-              type="button"
-              onClick={c.clear}
-              className="tappable inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground"
-              aria-label={`ล้างตัวกรอง ${c.label}`}
-            >
-              {c.label}
-              <X className="h-2.5 w-2.5" />
-            </button>
-          ))}
-        </div>
-      )}
-
       {!hasSearch && (
         <EmptyState title="ค้นหานักเรียน" description="พิมพ์ชื่อหรือรหัสนักเรียน หรือเลือกตัวกรองเพื่อแสดงรายชื่อ" />
       )}
@@ -402,7 +365,7 @@ export function Roster() {
             ))}
           </ul>
 
-          <div className="table-panel hidden lg:flex"><div className="table-panel-scroll">
+          <div className="table-panel hidden rounded-none border-t border-border shadow-none lg:flex"><div className="table-panel-scroll">
             <table className="w-full text-xs">
               <thead className="bg-muted text-left text-xs text-muted-foreground">
                 <tr>
@@ -444,9 +407,9 @@ export function Roster() {
       )}
 
       {hasSearch && rows && rows.length > 0 && (
-        <div className="space-y-2">
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
           <ul className="space-y-2 lg:hidden">
-            {pageRows.map((row) => {
+            {rows.map((row) => {
               const gender = studentGender(row.prefix);
               const fullName = `${row.first_name} ${row.last_name}`;
               return (
@@ -564,7 +527,7 @@ export function Roster() {
             })}
           </ul>
 
-          <div className="table-panel hidden lg:flex">
+          <div className="table-panel hidden rounded-none border-t border-border shadow-none lg:flex">
             <div className="table-panel-scroll">
               <table className="w-full text-[13px]">
                 <thead className="text-left text-xs">
@@ -578,7 +541,7 @@ export function Roster() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((row) => {
+                  {rows.map((row) => {
                     const fullName = `${row.first_name} ${row.last_name}`;
                     return (
                       <tr
@@ -599,7 +562,7 @@ export function Roster() {
                             />
                             <div className="min-w-0">
                               <p className="truncate text-sm font-medium">
-                                {row.prefix && <span className="font-normal text-muted-foreground">{row.prefix} </span>}
+                                {row.prefix && `${row.prefix} `}
                                 {fullName}
                               </p>
                               <p className="font-mono text-xs tabular-nums text-muted-foreground">{row.student_code}</p>
@@ -682,11 +645,10 @@ export function Roster() {
               </table>
             </div>
           </div>
-          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </div>
       )}
 
-      <Sheet
+      <Modal
         open={filtersOpen}
         onOpenChange={setFiltersOpen}
         title="ตัวกรอง"
@@ -705,7 +667,7 @@ export function Roster() {
           </div>
         }
       >
-        <div className="space-y-4">
+        <FormSection>
           {me && isOrgWide(me.roles) && (
             <Field label="แผนก">
               <Select
@@ -768,8 +730,8 @@ export function Roster() {
               ))}
             </Select>
           </Field>
-        </div>
-      </Sheet>
+        </FormSection>
+      </Modal>
 
       <EditStudentSheet target={editing} onClose={() => setEditing(null)} />
       <ImportSheet open={importOpen} onOpenChange={setImportOpen} />

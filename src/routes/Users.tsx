@@ -27,7 +27,6 @@ import {
   EmptyState,
   Field,
   Input,
-  Pagination,
   PasswordInput,
   Select,
   Skeleton,
@@ -36,7 +35,6 @@ import {
 } from "@/components/ui";
 import { avatarUrl, useRemoveAvatar, useUploadAvatar } from "@/hooks/useAvatar";
 import { useLearningAreas } from "@/hooks/useCurriculum";
-import { usePagination } from "@/hooks/usePagination";
 import {
   useDeleteUser,
   useDepartments,
@@ -91,7 +89,6 @@ export function Users() {
   const { data: departments = [] } = useDepartments();
   const { data: positionTitles = [] } = usePositionTitles();
   const { data: rows, isLoading, error } = useProfiles(filters);
-  const { page, setPage, pageCount, pageRows } = usePagination(rows ?? [], [filters]);
   const deleteUser = useDeleteUser();
   const toast = useToast();
   const updateUser = useUpdateProfile();
@@ -112,7 +109,7 @@ export function Users() {
   ).length;
 
   return (
-    <div className="page-fill page-flush min-h-0 shrink-0 pb-5">
+    <div className="page-fill page-flush min-h-0 shrink-0 pb-5 lg:h-[calc(100dvh-7.5rem)]">
       <div className="toolbar">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -217,9 +214,9 @@ export function Users() {
       )}
 
       {rows && rows.length > 0 && (
-        <div className="space-y-2">
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
           <ul className="space-y-2 lg:hidden">
-            {pageRows.map((row) => {
+            {rows.map((row) => {
               const name = profileFullName(row);
               const rolesText = roleLabels(row.roles.filter((r) => r !== "dept_head"));
               const titlesText = row.positionTitleIds.length
@@ -256,7 +253,7 @@ export function Users() {
                           <div onClick={(e) => e.stopPropagation()}>
                             {mayManage ? (
                               <Switch
-                                size="sm"
+                                size="xs"
                                 checked={row.is_active}
                                 disabled={updateUser.isPending}
                                 label={row.is_active ? "ใช้งาน" : "ปิด"}
@@ -318,7 +315,7 @@ export function Users() {
             })}
           </ul>
 
-          <div className="table-panel hidden lg:flex"><div className="table-panel-scroll">
+          <div className="table-panel hidden rounded-none border-t border-border shadow-none lg:flex"><div className="table-panel-scroll">
             <table className="w-full text-[13px]">
               <thead className="text-left text-xs">
                 <tr>
@@ -331,7 +328,7 @@ export function Users() {
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map((row) => (
+                {rows.map((row) => (
                   <tr
                     key={row.id}
                     onClick={() => mayManage && setEditing(row)}
@@ -372,7 +369,7 @@ export function Users() {
                     <td className="px-4 py-0" onClick={(e) => e.stopPropagation()}>
                       {mayManage ? (
                         <Switch
-                          size="sm"
+                          size="xs"
                           checked={row.is_active}
                           disabled={updateUser.isPending}
                           label={row.is_active ? "ใช้งาน" : "ปิด"}
@@ -425,7 +422,6 @@ export function Users() {
               </tbody>
             </table>
           </div></div>
-          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </div>
       )}
 

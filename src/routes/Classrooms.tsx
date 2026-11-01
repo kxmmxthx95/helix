@@ -114,6 +114,16 @@ export function Classrooms() {
   return (
     <div className="page-fill page-flush min-h-0 shrink-0 pb-5">
       <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="relative min-w-40 flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-8"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหาห้องเรียน..."
+            aria-label="ค้นหาห้องเรียน"
+          />
+        </div>
         {orgWide && (
           <Select
             className="w-auto min-w-36"
@@ -132,7 +142,14 @@ export function Classrooms() {
             ))}
           </Select>
         )}
-        <Select className="w-auto min-w-32" value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)} aria-label="ระดับชั้น">
+        <Select
+          className="w-auto min-w-32"
+          value={gradeFilter}
+          onChange={(e) => setGradeFilter(e.target.value)}
+          disabled={!departmentId}
+          aria-label="ระดับชั้น"
+          title={departmentId ? undefined : "เลือกแผนกก่อน"}
+        >
           <option value="">ทุกระดับชั้น</option>
           {gradeLevels.map((g) => (
             <option key={g.id} value={g.id}>
@@ -140,16 +157,6 @@ export function Classrooms() {
             </option>
           ))}
         </Select>
-        <div className="relative min-w-40 flex-1">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-8"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาห้องเรียน..."
-            aria-label="ค้นหาห้องเรียน"
-          />
-        </div>
         <Select
           className="w-auto min-w-28"
           value={statusFilter}
