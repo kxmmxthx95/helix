@@ -17,7 +17,7 @@ import { useAttendanceRange } from "@/hooks/useAttendance";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useStudentByProfile } from "@/hooks/useStudents";
 import type { AcademicEventType } from "@/lib/database.types";
-import { canManage, isOrgWide } from "@/lib/roles";
+import { canManage, isOrgWide, isSelfScoped } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const EVENT_TYPE_LABEL: Record<AcademicEventType, string> = {
@@ -125,6 +125,7 @@ export function AcademicEvents() {
   const toast = useToast();
   const orgWide = me ? isOrgWide(me.roles) : false;
   const mayEdit = me ? canManage(me.roles) : false;
+  const isStudent = me ? isSelfScoped(me.roles) : false;
 
   const [focus, setFocus] = useState(() => new Date());
   const [view, setView] = useState<CalView>("month");
@@ -233,12 +234,13 @@ export function AcademicEvents() {
     );
   }
 
+  const isWeekend = (day: Date) => day.getDay() === 0 || day.getDay() === 6;
   const canCreateOn = (day: Date) => mayEdit && day.getDay() !== 0 && day.getDay() !== 6;
   const years = Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i);
 
   return (
     <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={cn("flex flex-wrap items-center gap-2", isStudent && "justify-center")}>
           <Button variant="outline" size="icon" onClick={() => go(-1)} aria-label="ก่อนหน้า">
             <ChevronBack className="h-4 w-4" />
           </Button>
@@ -278,8 +280,9 @@ export function AcademicEvents() {
             </span>
           )}
 
-          <AttendanceDaysBadge />
+          {!isStudent && <AttendanceDaysBadge />}
 
+          {!isStudent && (
           <div role="tablist" aria-label="มุมมอง" className="ml-auto flex rounded-xl border border-border bg-card p-0.5">
             {(Object.keys(VIEW_LABEL) as CalView[]).map((v) => (
               <button
@@ -297,6 +300,7 @@ export function AcademicEvents() {
               </button>
             ))}
           </div>
+          )}
           {orgWide && (
             <Button
               variant="outline"
@@ -320,12 +324,12 @@ export function AcademicEvents() {
           )}
         </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[1fr_20rem]">
+      <div className={cn("grid items-start gap-4", !isStudent && "lg:grid-cols-[1fr_20rem]")}>
       <div className="min-w-0 space-y-4">
         {view === "month" && (
           <div className="font-sarabun grid grid-cols-7 overflow-hidden rounded-2xl border-l border-t border-border bg-card">
-            {WEEKDAY_LABEL.map((w) => (
-              <div key={w} className="border-b border-r border-border py-2.5 text-center text-xs font-semibold">
+            {WEEKDAY_LABEL.map((w, i) => (
+              <div key={w} className={cn("border-b border-r border-border py-2.5 text-center text-xs font-semibold", (i === 0 || i === 6) && "bg-muted/40 text-muted-foreground")}>
                 {w}
               </div>
             ))}
@@ -342,6 +346,7 @@ export function AcademicEvents() {
                   className={cn(
                     "flex min-h-28 flex-col gap-1 border-b border-r border-border p-1.5 text-xs",
                     !inMonth && "text-muted-foreground/60",
+                    isWeekend(day) && "bg-muted/40 text-muted-foreground",
                     isToday && "bg-muted/60",
                     canCreate && "cursor-pointer hover:bg-muted/50",
                   )}
@@ -382,7 +387,7 @@ export function AcademicEvents() {
               const canCreate = canCreateOn(day);
               return (
                 <div key={iso} className="min-w-0">
-                  <div className="border-b border-r border-border py-2 text-center text-xs">
+                  <div className={cn("border-b border-r border-border py-2 text-center text-xs", isWeekend(day) && "bg-muted/40 text-muted-foreground")}>
                     <div className="font-semibold">{WEEKDAY_LABEL[day.getDay()]}</div>
                     <span
                       className={cn(
@@ -397,6 +402,7 @@ export function AcademicEvents() {
                     onClick={() => canCreate && setCreating(iso)}
                     className={cn(
                       "min-h-72 space-y-1 border-b border-r border-border p-1.5",
+                      isWeekend(day) && "bg-muted/40",
                       isToday && "bg-muted/60",
                       canCreate && "cursor-pointer hover:bg-muted/50",
                     )}
@@ -438,6 +444,7 @@ export function AcademicEvents() {
         )}
       </div>
 
+      {!isStudent && (
       <aside className="space-y-4">
         <Card className="space-y-2.5">
           <p className="text-sm font-semibold">ตัวกรองกิจกรรม</p>
@@ -477,6 +484,7 @@ export function AcademicEvents() {
           {upcoming.map(eventRow)}
         </Card>
       </aside>
+      )}
       </div>
 
       <EventSheet

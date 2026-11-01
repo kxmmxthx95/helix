@@ -118,7 +118,7 @@ export function Timetable() {
 
   if (isStudent) {
     return myClassroom ? (
-      <div className="space-y-4">
+      <div className="page-fill">
         <TimetableExportSheet
           open={exportOpen}
           onOpenChange={setExportOpen}
@@ -1211,11 +1211,11 @@ function TimetableGrid({
   }
 
   return (
-    <div className="space-y-2">
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
-      <table className="w-full min-w-[48rem] table-fixed border-collapse text-xs">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+    <div className="min-h-0 flex-1 overflow-x-auto rounded-xl border border-border bg-card">
+      <table className="h-full w-full min-w-[48rem] table-fixed border-collapse text-xs">
         <thead className="bg-muted text-muted-foreground">
-          <tr>
+          <tr className="h-12">
             <th className="w-28 px-2 py-3 text-center font-medium">คาบ / เวลา</th>
             {days.map((d) => (
               <th key={d} className="border-l border-border px-2 py-3 text-center font-medium">
@@ -1232,7 +1232,7 @@ function TimetableGrid({
 
             if (first && allBreak) {
               return (
-                <tr key={periodNo} className="border-t border-border bg-muted/60">
+                <tr key={periodNo} className="h-10 border-t border-border bg-muted/60">
                   <td colSpan={days.length + 1} className="px-2 py-2 text-center text-muted-foreground">
                     <span className="inline-flex items-center gap-2">
                       <RestaurantIcon className="h-3.5 w-3.5" />
@@ -1276,7 +1276,7 @@ function TimetableGrid({
                   return (
                     <td
                       key={day}
-                      className={cn("border-l border-border p-1 transition-colors", canDrop && overKey === cellKey && "bg-accent/15")}
+                      className={cn("h-px border-l border-border p-0.5 transition-colors", canDrop && overKey === cellKey && "bg-accent/15")}
                       onDragOver={(ev) => {
                         if (!canDrop) return;
                         ev.preventDefault();
@@ -1301,7 +1301,7 @@ function TimetableGrid({
                         );
                       }}
                     >
-                      <div className="space-y-1">
+                      <div className="flex h-full flex-col gap-0.5">
                         {cellEntries.map((e) => {
                           const subjectId = e.teaching_assignment.subject_id;
                           return (
@@ -1318,7 +1318,7 @@ function TimetableGrid({
                                 setOverKey(null);
                               }}
                               className={cn(
-                                "relative space-y-0.5 rounded-lg px-2.5 py-2 leading-snug",
+                                "relative flex flex-1 flex-col justify-center gap-0.5 rounded-lg px-2.5 py-2 leading-snug",
                                 mayEdit && "cursor-grab transition-shadow hover:shadow-md active:cursor-grabbing",
                                 drag?.id === e.id && "opacity-40",
                                 styling.gradient(subjectId, e.teaching_assignment.classroom_id),
@@ -1383,7 +1383,7 @@ function TimetableGrid({
                         ) : (
                           cellEntries.length === 0 &&
                           !ghostAt.has(cellKey) && (
-                            <p className="py-4 text-center text-muted-foreground">—</p>
+                            <p className="flex flex-1 items-center justify-center py-4 text-muted-foreground">—</p>
                           )
                         )}
                       </div>
