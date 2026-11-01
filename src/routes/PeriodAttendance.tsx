@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronBack } from "@/components/icons";
 import { Button, Card, EmptyState, Input, Skeleton, Spinner } from "@/components/ui";
@@ -89,7 +90,8 @@ function PeriodCheckInPanel({
   recorderId: string;
 }) {
   const [date, setDate] = useState(todayIso());
-  const [openEntryId, setOpenEntryId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [openEntryId, setOpenEntryId] = useState<string | null>(searchParams.get("entry")); // deep link from the teacher home
 
   const { data: departments = [] } = useDepartments();
   const department = departments.find((d) => d.id === departmentId);

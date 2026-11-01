@@ -42,6 +42,7 @@ import { avatarUrl } from "@/hooks/useAvatar";
 import { cn, todayIso } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
 import { bangkokTime } from "@/routes/TimeTracking";
+import { TeacherHome } from "@/routes/TeacherHome";
 
 const LEAVE_STATUS_LABEL: Record<StudentLeaveStatus, string> = {
   pending: "รออนุมัติ",
@@ -99,13 +100,16 @@ export function Dashboard() {
   const { data: children = [] } = useMyChildren(isParent ? (profile?.id ?? null) : null);
   const { data: schoolSettings } = useSchoolSettings();
   const students = [...(myStudent ? [myStudent] : []), ...children];
+  const isTeacher = profile?.roles.includes("teacher") ?? false;
   const isDeptOverview = profile?.roles.some((r) => r === "dept_director" || r === "super_admin") ?? false;
   const showClockWidget =
     !!profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r));
 
+  if (profile && isTeacher && !isDeptOverview) return <TeacherHome me={profile} />;
+
   return (
     <div className={cn("space-y-6", !isDeptOverview && "mx-auto max-w-xl")}>
-      {!isDeptOverview && (
+      {!isDeptOverview && !isTeacher && (
         <div>
           <h1 className="font-heading text-lg font-semibold leading-snug">
             {greeting()}{profile && `, ${profileFullName(profile)}`}
@@ -952,7 +956,7 @@ function VisibleSubjectsSheet({
 }
 
 /** Quick access to the full workspace at /time-tracking (history, ขอออกนอกโรงเรียน, approvals). */
-function QuickClockSection({ profileId, departmentId }: { profileId: string; departmentId: string | null }) {
+export function QuickClockSection({ profileId, departmentId }: { profileId: string; departmentId: string | null }) {
   const toast = useToast();
   const date = todayIso();
   const { data: record, isLoading, isError, refetch } = useMyTimeClock(profileId, date);

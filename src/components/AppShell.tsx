@@ -457,8 +457,8 @@ function AppShellInner() {
   const avatarSrc = profile ? avatarUrl(profile) : null;
   const maySeeSettings = !!profile && (isOrgWide(profile.roles) || isDeptHead(profile.roles));
   const { data: schoolSettings } = useSchoolSettings();
-  // Student homepage is deliberately blank (see Dashboard.tsx) — no title text, no header divider there.
-  const isStudentHome = !!profile && profile.roles.includes("student") && location.pathname === "/";
+  // Student and teacher homepages carry no title text or header divider (see Dashboard.tsx).
+  const isStudentHome = !!profile && (profile.roles.includes("student") || profile.roles.includes("teacher")) && location.pathname === "/";
 
   const pickAvatar = () => avatarFileRef.current?.click();
   const onAvatarChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {

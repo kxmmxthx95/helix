@@ -954,7 +954,7 @@ function TeacherWorkspace({
   );
 }
 
-function TeacherTimetable({
+export function TeacherTimetable({
   departmentId,
   teacherId,
   academicYear,
