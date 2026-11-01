@@ -1,16 +1,18 @@
 import { AlertTriangle, CallIcon, CheckmarkCircleIcon, HomeIcon, KeyIcon, ProfileIcon, ShieldIcon, Users as UsersIcon, Plus, Search, SlidersHorizontal, Upload, X } from "@/components/icons";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
+import { MapPicker } from "@/components/MapPicker";
 import { ImportSheet } from "@/components/ImportSheet";
 import { Modal } from "@/components/Modal";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Avatar, Card, CloseButton, EmptyState, Field, FormSection, Input, Pagination, Select, SheetFormContext, Skeleton, Spinner } from "@/components/ui";
-import { avatarUrl } from "@/hooks/useAvatar";
+import { Button, Avatar, AvatarCard, BuddhistDateSelect, Card, CloseButton, EmptyState, Field, FormSection, Input, Pagination, Select, SheetFormContext, Skeleton, Spinner } from "@/components/ui";
+import { avatarUrl, studentAvatarUrl } from "@/hooks/useAvatar";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
 import { useClassrooms } from "@/hooks/useStatusManagement";
 import { useDepartments, useInviteUsers, type InviteOutcome, type UserInvite } from "@/hooks/useProfiles";
+import { addressOptions, useZipRows } from "@/lib/thaiAddress";
 import { passwordFromNationalId } from "@/lib/password";
 import { cn } from "@/lib/utils";
 import {
@@ -48,6 +50,22 @@ const STATUS_LABEL: Record<StudentStatus, string> = {
   graduated: "จบการศึกษา",
   dropped: "พ้นสภาพ",
 };
+
+const STATUS_DOT: Record<StudentStatus, string> = {
+  studying: "bg-success",
+  transferred: "bg-warning",
+  graduated: "bg-accent",
+  dropped: "bg-destructive",
+};
+
+/** Whole years and leftover months between an ISO birth date and `today`; null for an unset or future date. */
+export function ageFromBirthDate(iso: string | null, today = new Date()): { years: number; months: number } | null {
+  if (!iso) return null;
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  let months = (today.getFullYear() - y) * 12 + (today.getMonth() + 1 - m);
+  if (today.getDate() < d) months -= 1;
+  return months < 0 ? null : { years: Math.floor(months / 12), months: months % 12 };
+}
 
 /** Derive เพศ from Thai student name title (no separate gender column). */
 function studentGender(prefix: string | null): "ชาย" | "หญิง" | null {
@@ -121,72 +139,79 @@ export function AddressInputs({
   required?: (keyof AddressFields)[];
 }) {
   const isRequired = (k: keyof AddressFields) => required.includes(k);
+  const rows = useZipRows(value.postal_code);
+  const provinces = rows ? addressOptions(rows, 0, []) : [];
+  const districts = rows ? addressOptions(rows, 1, [value.province]) : [];
+  const subdistricts = rows ? addressOptions(rows, 2, [value.province, value.district]) : [];
+
+  // Only one choice left at a level → take it, so a postcode alone fills as much as it can.
+  useEffect(() => {
+    if (!rows) return;
+    const patch: Partial<AddressFields> = {};
+    if (!value.province && provinces.length === 1) patch.province = provinces[0];
+    if (!value.district && districts.length === 1 && (value.province || patch.province)) patch.district = districts[0];
+    if (!value.subdistrict && subdistricts.length === 1 && (value.district || patch.district)) patch.subdistrict = subdistricts[0];
+    if (Object.keys(patch).length) onChange(patch);
+  });
+
+  const placeholder = rows === null ? "กำลังโหลด…" : "เลือก";
+  // A value saved before this picker existed (free text) stays selectable instead of silently vanishing.
+  const withCurrent = (options: string[], current: string | null) =>
+    current && !options.includes(current) ? [current, ...options] : options;
+  const picker = (label: string, key: "province" | "district" | "subdistrict", options: string[], clears: (keyof AddressFields)[]) => (
+    <Field label={label}>
+      <Select
+        value={value[key] ?? ""}
+        onChange={(e) =>
+          onChange({ [key]: e.target.value || null, ...Object.fromEntries(clears.map((k) => [k, null])) })
+        }
+        placeholder={placeholder}
+        required={isRequired(key)}
+        disabled={rows === null || (options.length === 0 && !value[key])}
+      >
+        {withCurrent(options, value[key]).map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </Select>
+    </Field>
+  );
+
   return (
     <div className="space-y-3">
+      {(["house_no", "village_no", "alley", "road"] as const).map((k) => (
+        <div key={k} className="grid grid-cols-1 gap-3">
+          <Field label={{ house_no: "บ้านเลขที่", village_no: "หมู่ที่", alley: "ตรอก/ซอย", road: "ถนน" }[k]}>
+            <Input
+              value={value[k] ?? ""}
+              onChange={(e) => onChange({ [k]: e.target.value || null })}
+              required={isRequired(k)}
+            />
+          </Field>
+        </div>
+      ))}
       <div className="grid grid-cols-1 gap-3">
-        <Field label="บ้านเลขที่">
-          <Input
-            value={value.house_no ?? ""}
-            onChange={(e) => onChange({ house_no: e.target.value || null })}
-            required={isRequired("house_no")}
-          />
-        </Field>
-        <Field label="หมู่ที่">
-          <Input
-            value={value.village_no ?? ""}
-            onChange={(e) => onChange({ village_no: e.target.value || null })}
-            required={isRequired("village_no")}
-          />
-        </Field>
-      </div>
-      <div className="grid grid-cols-1 gap-3">
-        <Field label="ตรอก/ซอย">
-          <Input
-            value={value.alley ?? ""}
-            onChange={(e) => onChange({ alley: e.target.value || null })}
-            required={isRequired("alley")}
-          />
-        </Field>
-        <Field label="ถนน">
-          <Input
-            value={value.road ?? ""}
-            onChange={(e) => onChange({ road: e.target.value || null })}
-            required={isRequired("road")}
-          />
-        </Field>
-      </div>
-      <div className="grid grid-cols-1 gap-3">
-        <Field label="ตำบล/แขวง">
-          <Input
-            value={value.subdistrict ?? ""}
-            onChange={(e) => onChange({ subdistrict: e.target.value || null })}
-            required={isRequired("subdistrict")}
-          />
-        </Field>
-        <Field label="อำเภอ/เขต">
-          <Input
-            value={value.district ?? ""}
-            onChange={(e) => onChange({ district: e.target.value || null })}
-            required={isRequired("district")}
-          />
-        </Field>
-      </div>
-      <div className="grid grid-cols-1 gap-3">
-        <Field label="จังหวัด">
-          <Input
-            value={value.province ?? ""}
-            onChange={(e) => onChange({ province: e.target.value || null })}
-            required={isRequired("province")}
-          />
-        </Field>
         <Field label="รหัสไปรษณีย์">
           <Input
+            inputMode="numeric"
+            maxLength={5}
             value={value.postal_code ?? ""}
-            onChange={(e) => onChange({ postal_code: e.target.value || null })}
+            onChange={(e) =>
+              onChange({
+                postal_code: e.target.value.replace(/\D/g, "").slice(0, 5) || null,
+                province: null,
+                district: null,
+                subdistrict: null,
+              })
+            }
             required={isRequired("postal_code")}
           />
         </Field>
       </div>
+      <div className="grid grid-cols-1 gap-3">{picker("จังหวัด", "province", provinces, ["district", "subdistrict"])}</div>
+      <div className="grid grid-cols-1 gap-3">{picker("อำเภอ/เขต", "district", districts, ["subdistrict"])}</div>
+      <div className="grid grid-cols-1 gap-3">{picker("ตำบล/แขวง", "subdistrict", subdistricts, [])}</div>
     </div>
   );
 }
@@ -428,7 +453,7 @@ export function Roster() {
                   <div className="flex items-start gap-3">
                     <Avatar
                       name={fullName}
-                      src={row.profile ? avatarUrl(row.profile) : null}
+                      src={studentAvatarUrl(row) ?? (row.profile ? avatarUrl(row.profile) : null)}
                       className="h-11 w-11 text-sm"
                     />
                     <div className="min-w-0 flex-1">
@@ -551,7 +576,7 @@ export function Roster() {
                           <div className="flex min-w-0 items-center gap-3">
                             <Avatar
                               name={fullName}
-                              src={row.profile ? avatarUrl(row.profile) : null}
+                              src={studentAvatarUrl(row) ?? (row.profile ? avatarUrl(row.profile) : null)}
                               className="h-9 w-9 text-xs"
                             />
                             <div className="min-w-0">
@@ -743,7 +768,7 @@ export function Roster() {
 type StudentTab = "general" | "contact" | "health" | "guardian";
 const STUDENT_TABS: { key: StudentTab; label: string }[] = [
   { key: "general", label: "ข้อมูลทั่วไป" },
-  { key: "contact", label: "ติดต่อ/ที่อยู่" },
+  { key: "contact", label: "ที่อยู่" },
   { key: "health", label: "สุขภาพ" },
   { key: "guardian", label: "ผู้ปกครอง" },
 ];
@@ -773,6 +798,9 @@ function blankDraft(departmentId: string): StudentDraft {
     chronic_disease: null,
     drug_allergy: null,
     food_allergy: null,
+    date_of_birth: null,
+    latitude: null,
+    longitude: null,
   };
 }
 
@@ -792,6 +820,15 @@ export function EditStudentSheet({
   const save = useSaveStudent();
   const [draft, setDraft] = useState<StudentDraft | null>(null);
   const [tab, setTab] = useState<StudentTab>("general");
+  // Picked photo, applied on save (the student id of a new row doesn't exist yet); "remove" clears the stored one.
+  const [avatar, setAvatar] = useState<File | "remove" | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (!(avatar instanceof File)) return setAvatarPreview(null);
+    const url = URL.createObjectURL(avatar);
+    setAvatarPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [avatar]);
 
   const isNew = target === "new";
   // Teachers can open a row to view it (mayView in the parent) but can't
@@ -814,6 +851,7 @@ export function EditStudentSheet({
   function close() {
     setDraft(null);
     setTab("general");
+    setAvatar(null);
     onClose();
   }
 
@@ -831,7 +869,7 @@ export function EditStudentSheet({
       return;
     }
     save.mutate(
-      { ...current, ...(isNew ? {} : { id: (target as Student).id }) },
+      { ...current, ...(isNew ? {} : { id: (target as Student).id }), avatar: avatar ?? undefined },
       {
         onSuccess: () => toast("บันทึกข้อมูลนักเรียนสำเร็จ"),
         onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
@@ -878,8 +916,16 @@ export function EditStudentSheet({
           {/* Panels stay mounted (hidden) so the draft and the single form survive tab switches; an invalid required field jumps back to the first tab. */}
           <form id="edit-student" onSubmit={submit} onInvalidCapture={() => setTab("general")} className="space-y-4">
           <fieldset disabled={readOnly} className="space-y-4">
-            <div hidden={tab !== "general"}>
-            <FormSection icon={<ProfileIcon className="h-4 w-4" />} title="ข้อมูลทั่วไป" description="ข้อมูลพื้นฐานของนักเรียน">
+            <div hidden={tab !== "general"} className="space-y-4">
+            {!readOnly && (
+              <AvatarCard
+                name={`${current.first_name} ${current.last_name}`.trim()}
+                src={avatar === "remove" ? null : (avatarPreview ?? (isNew ? null : studentAvatarUrl(target as Student)))}
+                onPick={setAvatar}
+                onRemove={() => setAvatar("remove")}
+              />
+            )}
+            <FormSection icon={<ProfileIcon className="h-4 w-4" />}>
                 <Field label="รหัสนักเรียน">
                   <Input
                     value={current.student_code}
@@ -901,6 +947,24 @@ export function EditStudentSheet({
                     title="เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก"
                   />
                 </Field>
+
+                <Field label="วันเดือนปีเกิด">
+                  <BuddhistDateSelect
+                    key={isNew ? "new" : (target as Student).id}
+                    value={current.date_of_birth ?? ""}
+                    onChange={(v) => setDraft({ ...current, date_of_birth: v || null })}
+                  />
+                </Field>
+
+                <div className="flex items-center justify-between gap-4 text-sm leading-5">
+                  <span>อายุ</span>
+                  <span className="text-muted-foreground">
+                    {(() => {
+                      const age = ageFromBirthDate(current.date_of_birth);
+                      return age ? `${age.years} ปี ${age.months} เดือน` : "—";
+                    })()}
+                  </span>
+                </div>
 
                 <Field label="คำนำหน้า">
                   <Select
@@ -967,7 +1031,10 @@ export function EditStudentSheet({
                       ))}
                     </Select>
                   </Field>
-                  <Field label="สถานะ">
+                  <Field
+                    label="สถานะ"
+                    valueStart={<span aria-hidden className={cn("size-2 shrink-0 rounded-full", STATUS_DOT[current.status])} />}
+                  >
                     <Select
                       value={current.status}
                       onChange={(e) => setDraft({ ...current, status: e.target.value as StudentStatus })}
@@ -982,10 +1049,8 @@ export function EditStudentSheet({
                 </div>
 
             </FormSection>
-            </div>
 
-            <div hidden={tab !== "contact"} className="space-y-4">
-            <FormSection icon={<CallIcon className="h-4 w-4" />} title="ข้อมูลติดต่อ">
+            <FormSection icon={<CallIcon className="h-4 w-4" />}>
                 <Field label="เบอร์โทรศัพท์">
                   <Input
                     type="tel"
@@ -1003,14 +1068,24 @@ export function EditStudentSheet({
                 </Field>
 
             </FormSection>
+            </div>
 
-            <FormSection icon={<HomeIcon className="h-4 w-4" />} title="ที่อยู่">
+            <div hidden={tab !== "contact"} className="space-y-4">
+            <FormSection icon={<HomeIcon className="h-4 w-4" />}>
               <AddressInputs value={current} onChange={(patch) => setDraft({ ...current, ...patch })} />
+            </FormSection>
+
+            <FormSection>
+              <MapPicker
+                value={current.latitude !== null && current.longitude !== null ? { lat: current.latitude, lng: current.longitude } : null}
+                onChange={(p) => setDraft({ ...current, latitude: p?.lat ?? null, longitude: p?.lng ?? null })}
+                disabled={readOnly}
+              />
             </FormSection>
             </div>
 
             <div hidden={tab !== "health"}>
-            <FormSection icon={<ShieldIcon className="h-4 w-4" />} title="สุขภาพ">
+            <FormSection icon={<ShieldIcon className="h-4 w-4" />}>
                 <Field label="หมู่เลือด">
                   <Select
                     value={current.blood_type ?? ""}
@@ -1056,7 +1131,7 @@ export function EditStudentSheet({
           </form>
 
           <div hidden={tab !== "guardian"}>
-          <FormSection icon={<UsersIcon className="h-4 w-4" />} title="ผู้ปกครอง">
+          <FormSection icon={<UsersIcon className="h-4 w-4" />}>
             <fieldset disabled={readOnly} className="space-y-4">
               <Field label="สถานภาพครอบครัว">
                 <Select
@@ -1135,6 +1210,9 @@ function pickDraft(s: Student): StudentDraft {
     chronic_disease: s.chronic_disease,
     drug_allergy: s.drug_allergy,
     food_allergy: s.food_allergy,
+    date_of_birth: s.date_of_birth,
+    latitude: s.latitude,
+    longitude: s.longitude,
   };
 }
 

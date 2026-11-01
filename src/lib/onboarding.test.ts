@@ -28,6 +28,10 @@ const complete: Student = {
   chronic_disease: "ไม่มี",
   drug_allergy: "ไม่มี",
   food_allergy: "ไม่มี",
+  date_of_birth: null,
+  avatar_path: null,
+  latitude: null,
+  longitude: null,
   created_at: "",
   updated_at: "",
 };

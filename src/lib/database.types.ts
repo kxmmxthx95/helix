@@ -183,6 +183,9 @@ export type Student = {
   id: string;
   student_code: string;
   national_id: string | null;
+  date_of_birth: string | null; // ISO yyyy-mm-dd (ค.ศ.)
+  /** Object path in the avatars bucket — students/<id>, see migration 0105. */
+  avatar_path: string | null;
   prefix: string | null;
   first_name: string;
   last_name: string;
@@ -200,6 +203,8 @@ export type Student = {
   district: string | null; // อำเภอ/เขต
   province: string | null;
   postal_code: string | null;
+  latitude: number | null; // home location picked on the map
+  longitude: number | null;
   family_status: string | null; // สถานภาพครอบครัว — free text like prefix
   blood_type: BloodType | null;
   chronic_disease: string | null;
@@ -1362,6 +1367,10 @@ export type Database = {
           | "status"
           | "profile_id"
           | "national_id"
+          | "avatar_path"
+          | "date_of_birth"
+          | "latitude"
+          | "longitude"
           | "prefix"
           | "grade_level_id"
           | "phone"

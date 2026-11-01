@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Profile, Student, StudentStatus } from "@/lib/database.types";
+import { compressImage } from "@/lib/image";
 import { supabase } from "@/lib/supabase";
 
 export type StudentFilters = {
@@ -25,6 +26,7 @@ export type StudentDraft = Pick<
   | "grade_level_id"
   | "status"
   | "national_id"
+  | "date_of_birth"
   | "phone"
   | "email"
   | "house_no"
@@ -35,6 +37,8 @@ export type StudentDraft = Pick<
   | "district"
   | "province"
   | "postal_code"
+  | "latitude"
+  | "longitude"
   | "family_status"
   | "blood_type"
   | "chronic_disease"
@@ -119,11 +123,25 @@ export function useSaveStudent() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...draft }: StudentDraft & { id?: string }) => {
-      const { error } = id
-        ? await supabase.from("students").update(draft).eq("id", id)
-        : await supabase.from("students").insert(draft);
+    // `avatar`: a File to upload after the row is saved, "remove" to clear it, undefined to leave it alone.
+    mutationFn: async ({ id, avatar, ...draft }: StudentDraft & { id?: string; avatar?: File | "remove" }) => {
+      const { data, error } = id
+        ? await supabase.from("students").update(draft).eq("id", id).select("id").single()
+        : await supabase.from("students").insert(draft).select("id").single();
       if (error) throw error;
+      if (!avatar) return;
+      if (avatar === "remove") {
+        const { error: rmErr } = await supabase.from("students").update({ avatar_path: null }).eq("id", data.id);
+        if (rmErr) throw rmErr;
+        return;
+      }
+      const path = `students/${data.id}`;
+      const { error: upErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, await compressImage(avatar), { upsert: true, contentType: "image/jpeg" });
+      if (upErr) throw upErr;
+      const { error: pathErr } = await supabase.from("students").update({ avatar_path: path }).eq("id", data.id);
+      if (pathErr) throw pathErr;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["students"] }),
   });

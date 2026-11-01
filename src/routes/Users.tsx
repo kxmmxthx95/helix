@@ -1,7 +1,6 @@
 import {
   CalendarIcon,
   CallIcon,
-  CameraIcon,
   CheckmarkCircleIcon,
   Plus,
   ProfileIcon,
@@ -14,13 +13,14 @@ import {
   Users as UsersIcon,
   X,
 } from "@/components/icons";
-import { useEffect, useRef, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportUsersSheet } from "@/components/ImportUsersSheet";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import {
   Avatar,
+  AvatarCard,
   Button,
   BuddhistDateSelect,
   Card,
@@ -624,59 +624,6 @@ function RolePicker({
         </div>
       </Field>
     </>
-  );
-}
-
-function AvatarCard({
-  name,
-  src,
-  busy,
-  onPick,
-  onRemove,
-}: {
-  name: string;
-  src: string | null;
-  busy?: boolean;
-  onPick: (file: File) => void;
-  onRemove: () => void;
-}) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  return (
-    <section className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 p-3">
-      <div className="relative shrink-0">
-        <Avatar name={name} src={src} className="h-16 w-16 text-xl" />
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => fileRef.current?.click()}
-          aria-label={src ? "เปลี่ยนรูป" : "เลือกรูป"}
-          className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background shadow-sm"
-        >
-          {busy ? <Spinner className="h-3.5 w-3.5" /> : <CameraIcon className="h-3.5 w-3.5" />}
-        </button>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">รูปโปรไฟล์</p>
-        <p className="text-xs text-muted-foreground">รองรับไฟล์ JPG, PNG ขนาดไม่เกิน 2MB</p>
-      </div>
-      {src && (
-        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onRemove}>
-          <TrashIcon className="h-3.5 w-3.5" />
-          ลบรูป
-        </Button>
-      )}
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (file) onPick(file);
-        }}
-      />
-    </section>
   );
 }
 

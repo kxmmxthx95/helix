@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { cloneElement, createContext, forwardRef, isValidElement, useContext, useState, type ComponentType, type ReactNode } from "react";
-import { BarChartIcon, ChevronBack, ChevronForward, EyeIcon, EyeOffIcon, X } from "@/components/icons";
+import { cloneElement, createContext, forwardRef, isValidElement, useContext, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { BarChartIcon, CameraIcon, TrashIcon, ChevronBack, ChevronForward, EyeIcon, EyeOffIcon, X } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 /**
@@ -253,11 +253,14 @@ export const SheetFormContext = createContext(false);
 
 export function Field({
   label,
+  valueStart,
   error,
   required,
   children,
 }: {
-  label: string;
+  label: React.ReactNode;
+  /** Small adornment (e.g. a status dot) placed just before the value; the value then hugs its content. */
+  valueStart?: React.ReactNode;
   error?: string;
   /** Shows a red * after the label — purely visual, doesn't set HTML required on children. */
   required?: boolean;
@@ -286,13 +289,15 @@ export function Field({
           </span>
           <span
             className={cn(
-              "block min-w-0 flex-1",
+              "min-w-0 flex-1",
+              valueStart ? "flex items-center justify-end gap-2 [&_select]:w-auto [&_select]:[field-sizing:content]" : "block",
               "[&_input]:h-8 [&_input]:border-transparent [&_input]:bg-transparent [&_input]:px-0 [&_input]:text-right [&_input]:shadow-none [&_input]:hover:border-transparent",
               "[&_input:focus-visible]:border-transparent [&_input:focus-visible]:ring-0",
               "[&_select]:h-8 [&_select]:border-transparent [&_select]:bg-transparent [&_select]:pl-0 [&_select]:text-right [&_select]:shadow-none [&_select]:[text-align-last:right] [&_select]:hover:border-transparent",
               "[&_select:focus-visible]:border-transparent [&_select:focus-visible]:ring-0",
             )}
           >
+            {valueStart}
             {children.type === Input && !(children.props as { placeholder?: string }).placeholder
               ? cloneElement(children as React.ReactElement<{ placeholder?: string }>, { placeholder: "ระบุ" })
               : children}
@@ -460,6 +465,60 @@ export function Avatar({ name, src, className }: { name: string; src?: string | 
   );
 }
 
+/** Photo tile with pick / remove controls — the caller decides when the file is actually uploaded. */
+export function AvatarCard({
+  name,
+  src,
+  busy,
+  onPick,
+  onRemove,
+}: {
+  name: string;
+  src: string | null;
+  busy?: boolean;
+  onPick: (file: File) => void;
+  onRemove: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  return (
+    <section className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 p-3">
+      <div className="relative shrink-0">
+        <Avatar name={name} src={src} className="h-16 w-16 text-xl" />
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => fileRef.current?.click()}
+          aria-label={src ? "เปลี่ยนรูป" : "เลือกรูป"}
+          className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background shadow-sm"
+        >
+          {busy ? <Spinner className="h-3.5 w-3.5" /> : <CameraIcon className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold">รูปโปรไฟล์</p>
+        <p className="text-xs text-muted-foreground">รองรับไฟล์ JPG, PNG ขนาดไม่เกิน 2MB</p>
+      </div>
+      {src && (
+        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onRemove}>
+          <TrashIcon className="h-3.5 w-3.5" />
+          ลบรูป
+        </Button>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) onPick(file);
+        }}
+      />
+    </section>
+  );
+}
+
 export function Switch({
   checked,
   onChange,
@@ -522,15 +581,15 @@ export function FormSection({
   children,
 }: {
   icon?: React.ReactNode;
-  title: string;
+  title?: string;
   description?: string;
   children: React.ReactNode;
 }) {
   return (
     <section className="min-w-0">
-      <h3 className="font-heading mb-2 px-0.5 text-[15px] font-semibold leading-tight">{title}</h3>
+      {title && <h3 className="font-heading mb-2 px-0.5 text-[15px] font-semibold leading-tight">{title}</h3>}
       <FormRowsContext.Provider value>
-        <div className="min-w-0 divide-y divide-border overflow-hidden rounded-xl bg-card shadow-card [&>*]:px-4 [&>*]:py-3 [&>.grid]:!grid-cols-1 [&>.grid]:gap-0 [&>.grid]:divide-y [&>.grid]:divide-border [&>.grid]:!p-0 [&>.grid>*]:px-4 [&>.grid>*]:py-3">
+        <div className="min-w-0 overflow-hidden rounded-xl bg-muted [&>*+*]:relative [&>*+*]:before:absolute [&>*+*]:before:inset-x-4 [&>*+*]:before:top-0 [&>*+*]:before:h-px [&>*+*]:before:bg-border [&>*]:px-4 [&>*]:py-2 [&>.grid]:!grid-cols-1 [&>.grid]:gap-0 [&>.grid>*+*]:relative [&>.grid>*+*]:before:absolute [&>.grid>*+*]:before:inset-x-4 [&>.grid>*+*]:before:top-0 [&>.grid>*+*]:before:h-px [&>.grid>*+*]:before:bg-border [&>.grid]:!p-0 [&>.grid>*]:px-4 [&>.grid>*]:py-2">
           {children}
         </div>
       </FormRowsContext.Provider>

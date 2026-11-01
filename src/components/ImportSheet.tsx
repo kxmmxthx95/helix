@@ -80,6 +80,9 @@ export function resolveStudentRow(
       chronic_disease: null,
       drug_allergy: null,
       food_allergy: null,
+      date_of_birth: null,
+      latitude: null,
+      longitude: null,
     },
   };
 }

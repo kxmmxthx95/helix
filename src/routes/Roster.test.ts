@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitLoginEligibility } from "@/routes/Roster";
+import { ageFromBirthDate, splitLoginEligibility } from "@/routes/Roster";
 import type { Student } from "@/lib/database.types";
 
 function student(overrides: Partial<Student>): Student {
@@ -29,6 +29,10 @@ function student(overrides: Partial<Student>): Student {
     chronic_disease: null,
     drug_allergy: null,
     food_allergy: null,
+    date_of_birth: null,
+    avatar_path: null,
+    latitude: null,
+    longitude: null,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     ...overrides,
@@ -54,5 +58,19 @@ describe("splitLoginEligibility", () => {
   it("excludes a student who already has an account, even without skipping them", () => {
     const s = student({ id: "s4", national_id: "1234567890123", profile_id: "profile-1" });
     expect(splitLoginEligibility([s])).toEqual({ ready: [], skipped: [] });
+  });
+});
+
+describe("ageFromBirthDate", () => {
+  const today = new Date(2026, 10, 1); // 1 Nov 2026
+
+  it("counts whole years and months, not yet reaching the day of month", () => {
+    expect(ageFromBirthDate("2015-08-02", today)).toEqual({ years: 11, months: 2 });
+    expect(ageFromBirthDate("2015-11-01", today)).toEqual({ years: 11, months: 0 });
+  });
+
+  it("returns null when unset or in the future", () => {
+    expect(ageFromBirthDate(null, today)).toBeNull();
+    expect(ageFromBirthDate("2027-01-01", today)).toBeNull();
   });
 });

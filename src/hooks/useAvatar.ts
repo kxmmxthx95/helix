@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Profile } from "@/lib/database.types";
+import type { Profile, Student } from "@/lib/database.types";
 import { compressImage } from "@/lib/image";
 import { supabase } from "@/lib/supabase";
 
@@ -42,4 +42,11 @@ export function avatarUrl(profile: Pick<Profile, "avatar_path" | "updated_at">):
   if (!profile.avatar_path) return null;
   const { data } = supabase.storage.from("avatars").getPublicUrl(profile.avatar_path);
   return `${data.publicUrl}?v=${encodeURIComponent(profile.updated_at)}`;
+}
+
+/** Student photo (students/<id> in the avatars bucket), cache-busted like avatarUrl. */
+export function studentAvatarUrl(student: Pick<Student, "avatar_path" | "updated_at">): string | null {
+  if (!student.avatar_path) return null;
+  const { data } = supabase.storage.from("avatars").getPublicUrl(student.avatar_path);
+  return `${data.publicUrl}?v=${encodeURIComponent(student.updated_at)}`;
 }
