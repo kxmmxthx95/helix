@@ -16,8 +16,8 @@ import { levelTone } from "@/lib/gradeLevels";
 import { cn } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
 
-const STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent", "leave"];
-const SEGMENT_STYLE: Record<AttendanceStatus, string> = {
+export const STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent", "leave"];
+export const SEGMENT_STYLE: Record<AttendanceStatus, string> = {
   present: "bg-success/15 text-success ring-1 ring-inset ring-success/40",
   late: "bg-warning/15 text-warning ring-1 ring-inset ring-warning/40",
   absent: "bg-destructive/15 text-destructive ring-1 ring-inset ring-destructive/40",

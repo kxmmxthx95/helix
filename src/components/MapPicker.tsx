@@ -82,7 +82,7 @@ export function MapPicker({
           zoom: value ? 16 : 6,
           streetViewControl: false,
           mapTypeControl: false,
-          fullscreenControl: false,
+          fullscreenControl: true,
         });
         marker.current = new maps.Marker({ map: map.current, position: value, draggable: !disabled });
         circle.current = new maps.Circle({

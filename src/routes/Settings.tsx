@@ -294,14 +294,13 @@ function SchoolSettingsCard() {
           {STAFF_ROLES.map((role) => {
             const meta = ROLE_ICON[role];
             return (
-              <label key={role} className="flex items-center gap-3 py-2.5 text-sm">
-                {meta && (
-                  <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", meta.tint)}>
-                    <meta.icon className="h-4 w-4" />
-                  </span>
-                )}
+              <label key={role} className="flex items-center gap-2.5 py-1.5 text-sm">
+                <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", meta?.tint)}>
+                  {meta && <meta.icon className="h-3.5 w-3.5" />}
+                </span>
                 <span className="flex-1 font-medium">{ROLE_LABEL[role]}</span>
                 <Switch
+                  size="sm"
                   checked={form.time_tracking_roles.includes(role)}
                   label={ROLE_LABEL[role]}
                   onChange={(checked) =>

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { motion, useReducedMotion } from "framer-motion";
 import { profileFullName, type ProfileWithRoles } from "@/lib/database.types";
 import { ChevronForward, PaletteIcon } from "@/components/icons";
 import { Modal } from "@/components/Modal";
@@ -26,6 +25,7 @@ import { supabase } from "@/lib/supabase";
 import { cn, todayIso } from "@/lib/utils";
 import { AssemblyAttendanceSheet } from "@/routes/AssemblyAttendanceSheet";
 import { QuickClockSection } from "@/routes/Dashboard";
+import { PeriodDaySheet, type DayPeriod } from "@/routes/PeriodDaySheet";
 import { bangkokTime } from "@/routes/TimeTracking";
 import { TeacherTimetable } from "@/routes/Timetable";
 
@@ -106,6 +106,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const [timetableOpen, setTimetableOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [assemblyOpen, setAssemblyOpen] = useState(false);
+  const [periodsOpen, setPeriodsOpen] = useState(false);
   const setLeaveStatus = useSetStudentLeaveStatus();
   const toast = useToast();
   const { data: clock, isLoading: loadingClock } = useMyTimeClock(me.id, today);
@@ -205,23 +206,39 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
       const iso = addDays(today, offset);
       const day = weekdayOf(iso);
       if (isHoliday(iso)) continue;
-      const first = entries
+      const dayTimed = entries
         .filter((e) => e.day_of_week === day)
         .sort((a, b) => a.period_no - b.period_no)
         .flatMap((e) => {
           const slot = periods.find((p) => p.day_of_week === day && p.period_no === e.period_no && p.period_type === "teaching");
           return slot ? [{ entry: e, start: toMin(slot.start_time), end: toMin(slot.end_time), startText: hhmm(slot.start_time), endText: hhmm(slot.end_time) }] : [];
-        })
-        .find((t) => offset > 0 || t.end > nowMin);
+        });
+      const first = dayTimed.find((t) => offset > 0 || t.end > nowMin);
       if (!first) continue;
-      const ordinal = periods.filter((p) => p.day_of_week === day && p.period_type === "teaching" && p.period_no <= first.entry.period_no).length;
+      const ordinalOf = (periodNo: number) =>
+        periods.filter((p) => p.day_of_week === day && p.period_type === "teaching" && p.period_no <= periodNo).length;
+      const ordinal = ordinalOf(first.entry.period_no);
       const label =
         offset === 0
           ? first.start <= nowMin
             ? "กำลังสอน"
             : "คาบถัดไป"
           : `${offset === 1 ? "พรุ่งนี้" : DAY_NAME[day]} · คาบ ${ordinal}`;
-      return { ...first, label };
+      // The sheet lists the whole day, not just the next period.
+      const dayPeriods: DayPeriod[] = dayTimed.map((t) => {
+        const sub = subjectOf(t.entry.teaching_assignment.subject_id);
+        return {
+          entryId: t.entry.id,
+          classroomId: t.entry.teaching_assignment.classroom_id,
+          ordinal: ordinalOf(t.entry.period_no),
+          time: `${t.startText}–${t.endText}`,
+          subjectCode: sub?.code ?? "—",
+          subjectName: sub?.name_th ?? "—",
+          room: roomLabel(t.entry.teaching_assignment.classroom_id),
+          gradient: styleOf(t.entry).gradient,
+        };
+      });
+      return { ...first, label, iso, dayPeriods };
     }
     return null;
   })();
@@ -413,7 +430,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                     },
                   ]
                 : []),
-              { title: "เช็คชื่อรายคาบ", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", flip: true },
+              { title: "เช็คชื่อรายคาบ", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", sheet: true },
               {
                 title: "ใบลารออนุมัติ",
                 text: pendingLeave.length > 0 ? `มี ${pendingLeave.length} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง",
@@ -448,34 +465,26 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                 </>
               );
               const cls = "flex h-full items-center gap-3 rounded-2xl bg-muted/70 p-4 text-left transition-colors hover:bg-muted";
-              if ("flip" in t && upNext) {
+              if ("sheet" in t && upNext) {
                 const sub = subjectOf(upNext.entry.teaching_assignment.subject_id);
                 return (
-                  <FlipTile
+                  <button
                     key={t.title}
-                    front={
-                      <Link to={t.to ?? "/period-attendance"} className={cls}>
-                        {body}
-                      </Link>
-                    }
-                    back={
-                      <Link
-                        to={`/period-attendance?entry=${upNext.entry.id}`}
-                        className={cn("flex h-full items-center gap-3 rounded-2xl p-4 text-left", styleOf(upNext.entry).gradient)}
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-xs font-medium opacity-70">{upNext.label}</span>
-                          <span className="block truncate text-[15px] font-semibold">{sub?.name_th ?? "—"}</span>
-                          <span className="block truncate text-sm opacity-80">
-                            {sub?.code} · {roomLabel(upNext.entry.teaching_assignment.classroom_id)} · {upNext.startText}–{upNext.endText}
-                          </span>
-                        </span>
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-current">
-                          <ChevronForward className="h-4 w-4" />
-                        </span>
-                      </Link>
-                    }
-                  />
+                    type="button"
+                    onClick={() => setPeriodsOpen(true)}
+                    className={cn("flex h-full items-center gap-3 rounded-2xl p-4 text-left", styleOf(upNext.entry).gradient)}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-medium opacity-70">{upNext.label}</span>
+                      <span className="block truncate text-[15px] font-semibold">{sub?.name_th ?? "—"}</span>
+                      <span className="block truncate text-sm opacity-80">
+                        {sub?.code} · {roomLabel(upNext.entry.teaching_assignment.classroom_id)} · {upNext.startText}–{upNext.endText}
+                      </span>
+                    </span>
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-current">
+                      <ChevronForward className="h-4 w-4" />
+                    </span>
+                  </button>
                 );
               }
               return "onClick" in t ? (
@@ -620,6 +629,16 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           </section>
         )}
       </div>
+      {upNext && (
+        <PeriodDaySheet
+          open={periodsOpen}
+          onOpenChange={setPeriodsOpen}
+          date={upNext.iso}
+          periods={upNext.dayPeriods}
+          academicYear={academicYear}
+          recorderId={me.id}
+        />
+      )}
       <AssemblyAttendanceSheet
         open={assemblyOpen}
         onOpenChange={setAssemblyOpen}
@@ -692,34 +711,6 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           </div>
         )}
       </Modal>
-    </div>
-  );
-}
-
-/** Two faces of one tile; flips about the horizontal axis every few seconds, paused while hovered or when motion is reduced. */
-function FlipTile({ front, back }: { front: React.ReactNode; back: React.ReactNode }) {
-  const [flipped, setFlipped] = useState(false);
-  const [paused, setPaused] = useState(false);
-  const reduce = useReducedMotion();
-  useEffect(() => {
-    if (reduce || paused) return;
-    const t = setInterval(() => setFlipped((f) => !f), 5000);
-    return () => clearInterval(t);
-  }, [reduce, paused]);
-
-  const face = "h-full [grid-area:1/1] [backface-visibility:hidden] [-webkit-backface-visibility:hidden]";
-  return (
-    <div className="h-full [perspective:1000px]" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-      <motion.div
-        className="grid h-full [transform-style:preserve-3d]"
-        animate={{ rotateX: flipped ? 180 : 0 }}
-        transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
-      >
-        <div className={cn(face, flipped && "pointer-events-none")}>{front}</div>
-        <div className={cn(face, !flipped && "pointer-events-none")} style={{ transform: "rotateX(180deg)" }}>
-          {back}
-        </div>
-      </motion.div>
     </div>
   );
 }
