@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { forwardRef, useState, type ComponentType, type ReactNode } from "react";
+import { cloneElement, createContext, forwardRef, isValidElement, useContext, useState, type ComponentType, type ReactNode } from "react";
 import { BarChartIcon, ChevronBack, ChevronForward, EyeIcon, EyeOffIcon, X } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
@@ -246,6 +246,11 @@ export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
   );
 }
 
+/** True inside a FormSection card: simple Input/Select fields render as label-left / value-right rows. */
+const FormRowsContext = createContext(false);
+/** True inside a Sheet body: loose Input/Select fields become `.form-row` rows that merge into grouped cards (see index.css). */
+export const SheetFormContext = createContext(false);
+
 export function Field({
   label,
   error,
@@ -258,16 +263,51 @@ export function Field({
   required?: boolean;
   children: React.ReactNode;
 }) {
+  const inRows = useContext(FormRowsContext);
+  const inSheet = useContext(SheetFormContext);
+  const star = required && (
+    <span className="text-destructive" aria-hidden>
+      {" "}
+      *
+    </span>
+  );
+  const simple =
+    isValidElement(children) &&
+    (children.type === Input || children.type === Select) &&
+    !(children.props as { multiple?: boolean }).multiple;
+
+  if ((inRows || inSheet) && simple) {
+    return (
+      <label className={cn("block min-w-0", !inRows && "form-row")}>
+        <span className="flex min-w-0 items-center gap-4">
+          <span className="w-[42%] shrink-0 text-sm leading-5">
+            {label}
+            {star}
+          </span>
+          <span
+            className={cn(
+              "block min-w-0 flex-1",
+              "[&_input]:h-8 [&_input]:border-transparent [&_input]:bg-transparent [&_input]:px-0 [&_input]:text-right [&_input]:shadow-none [&_input]:hover:border-transparent",
+              "[&_input:focus-visible]:border-transparent [&_input:focus-visible]:ring-0",
+              "[&_select]:h-8 [&_select]:border-transparent [&_select]:bg-transparent [&_select]:pl-0 [&_select]:text-right [&_select]:shadow-none [&_select]:[text-align-last:right] [&_select]:hover:border-transparent",
+              "[&_select:focus-visible]:border-transparent [&_select:focus-visible]:ring-0",
+            )}
+          >
+            {children.type === Input && !(children.props as { placeholder?: string }).placeholder
+              ? cloneElement(children as React.ReactElement<{ placeholder?: string }>, { placeholder: "ระบุ" })
+              : children}
+          </span>
+        </span>
+        {error && <span className="mt-1 block text-right text-xs text-destructive">{error}</span>}
+      </label>
+    );
+  }
+
   return (
     <label className="block min-w-0 space-y-1.5">
       <span className="font-ui text-[13px] font-medium leading-[18px]">
         {label}
-        {required && (
-          <span className="text-destructive" aria-hidden>
-            {" "}
-            *
-          </span>
-        )}
+        {star}
       </span>
       {children}
       {error && <span className="block text-xs text-destructive">{error}</span>}
@@ -472,29 +512,28 @@ export function CloseButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+/**
+ * Grouped form block: small heading above a bordered card whose rows are split by hairlines
+ * (iOS inset-grouped / Vercel settings style). `icon` and `description` are accepted for
+ * call-site compatibility but are no longer shown.
+ */
 export function FormSection({
-  icon,
   title,
-  description,
   children,
 }: {
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
   title: string;
   description?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="min-w-0 space-y-3 rounded-xl bg-card p-4 shadow-card">
-      <div className="flex items-center gap-3">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
-          {icon}
-        </span>
-        <div className="min-w-0">
-          <h3 className="font-heading text-[15px] font-semibold leading-tight">{title}</h3>
-          {description && <p className="text-xs text-muted-foreground">{description}</p>}
+    <section className="min-w-0">
+      <h3 className="font-heading mb-2 px-0.5 text-[15px] font-semibold leading-tight">{title}</h3>
+      <FormRowsContext.Provider value>
+        <div className="min-w-0 divide-y divide-border overflow-hidden rounded-xl bg-card shadow-card [&>*]:px-4 [&>*]:py-3 [&>.grid]:!grid-cols-1 [&>.grid]:gap-0 [&>.grid]:divide-y [&>.grid]:divide-border [&>.grid]:!p-0 [&>.grid>*]:px-4 [&>.grid>*]:py-3">
+          {children}
         </div>
-      </div>
-      {children}
+      </FormRowsContext.Provider>
     </section>
   );
 }

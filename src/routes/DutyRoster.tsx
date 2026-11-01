@@ -44,6 +44,23 @@ const MONTH_NAMES = Array.from({ length: 12 }, (_, i) =>
 const WEEKDAY_LABELS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
+// Thai day colours (Sun red, Mon yellow, Tue pink, Wed green, Thu orange, Fri blue, Sat purple).
+const DAY_DOT = [
+  "bg-red-500", "bg-yellow-400", "bg-pink-500", "bg-emerald-500", "bg-orange-500", "bg-sky-500", "bg-violet-500",
+];
+
+// One soft tone per duty point so the same post reads the same everywhere.
+const POINT_TONES = [
+  { cell: "bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-300", dot: "bg-sky-500" },
+  { cell: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300", dot: "bg-emerald-500" },
+  { cell: "bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-300", dot: "bg-amber-500" },
+  { cell: "bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-300", dot: "bg-violet-500" },
+  { cell: "bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-300", dot: "bg-rose-500" },
+  { cell: "bg-teal-100 text-teal-800 dark:bg-teal-500/20 dark:text-teal-300", dot: "bg-teal-500" },
+  { cell: "bg-orange-100 text-orange-900 dark:bg-orange-500/20 dark:text-orange-300", dot: "bg-orange-500" },
+  { cell: "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-300", dot: "bg-indigo-500" },
+];
+
 // Native <input type="month"> always shows ค.ศ. in its popup, no override
 // possible — same constraint as BuddhistDateSelect (ui.tsx), so a real
 // เดือน/ปี พ.ศ. picker needs its own small button+panel instead.
@@ -161,7 +178,7 @@ export function DutyRoster() {
       <div
         role="tablist"
         aria-label="มุมมองตารางเวร"
-        className="flex shrink-0 gap-6 overflow-x-auto border-b border-border [scrollbar-width:none]"
+        className="flex shrink-0 gap-0 overflow-x-auto border-b border-border [scrollbar-width:none]"
       >
         {VIEW_TABS.filter((t) => (t.key === "mine" ? true : t.key === "points" ? canDept : mayManage)).map((t) => (
           <button
@@ -171,7 +188,7 @@ export function DutyRoster() {
             aria-selected={view === t.key}
             onClick={() => setView(t.key)}
             className={cn(
-              "-mb-px h-11 shrink-0 whitespace-nowrap border-b-2 px-0.5 text-sm font-medium transition-colors",
+              "-mb-px h-11 min-w-fit flex-1 whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors",
               view === t.key
                 ? "border-foreground text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -515,11 +532,16 @@ function WeeklyTemplateEditor({ departmentId, createdBy }: { departmentId: strin
     );
   }
 
+  const toneOf = (pointId?: string) => {
+    const i = rotatingPoints.findIndex((pt) => pt.id === pointId);
+    return i < 0 ? null : POINT_TONES[i % POINT_TONES.length]!;
+  };
   const cellSelect = (staffId: string, wd: number) => {
     const cell = cellByKey.get(`${staffId}|${wd}`);
+    const tone = toneOf(cell?.duty_point_id);
     return (
       <Select
-        className={cn("h-8 w-full min-w-[6.5rem] text-xs", cell && "border-transparent bg-accent-soft font-medium text-accent")}
+        className={cn("h-8 w-full min-w-[6.5rem] text-xs", tone && `border-transparent font-medium ${tone.cell}`)}
         aria-label={`เวรวัน${WEEKDAY_LABELS[wd]}`}
         value={cell?.duty_point_id ?? ""}
         onChange={(e) => handleChange(staffId, wd, e.target.value)}
@@ -535,11 +557,49 @@ function WeeklyTemplateEditor({ departmentId, createdBy }: { departmentId: strin
   };
   const assignedCount = (staffId: string) => WEEKDAY_ORDER.filter((wd) => cellByKey.has(`${staffId}|${wd}`)).length;
 
+  const weekStrip = (staffId: string) => (
+    <div className="flex items-center gap-1" aria-hidden>
+      {WEEKDAY_ORDER.map((wd) => {
+        const tone = toneOf(cellByKey.get(`${staffId}|${wd}`)?.duty_point_id);
+        return <span key={wd} className={cn("h-1.5 w-4 rounded-full", tone ? tone.dot : "bg-fill-strong")} />;
+      })}
+    </div>
+  );
+  const countBadge = (staffId: string) => {
+    const n = assignedCount(staffId);
+    return (
+      <span
+        className={cn(
+          "rounded-full px-2 py-0.5 text-xs font-medium tabular-nums",
+          n === 0 ? "bg-muted text-muted-foreground" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300",
+        )}
+      >
+        {n} วัน/สัปดาห์
+      </span>
+    );
+  };
+  const dayHead = (wd: number) => (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={cn("h-2 w-2 rounded-full", DAY_DOT[wd])} />
+      {WEEKDAY_LABELS[wd]}
+    </span>
+  );
+
   return (
-    <div className="space-y-2">
-      <p className="text-[13px] text-muted-foreground">
-        {staff.length} คน · {rotatingPoints.length} จุดเวรหมุนเวียน · เลือกจุดเวรในช่องวันเพื่อมอบหมาย
-      </p>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <p className="text-[13px] text-muted-foreground">
+          {staff.length} คน · เลือกจุดเวรในช่องวันเพื่อมอบหมาย
+        </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {rotatingPoints.map((pt, i) => (
+            <span key={pt.id} className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium", POINT_TONES[i % POINT_TONES.length]!.cell)}>
+              <span className={cn("h-1.5 w-1.5 rounded-full", POINT_TONES[i % POINT_TONES.length]!.dot)} />
+              {pt.name}
+            </span>
+          ))}
+        </div>
+      </div>
 
       <div className="table-panel hidden xl:flex">
         <div className="table-panel-scroll">
@@ -549,20 +609,23 @@ function WeeklyTemplateEditor({ departmentId, createdBy }: { departmentId: strin
                 <th className="w-56 px-4 py-3">ครู</th>
                 {WEEKDAY_ORDER.map((wd) => (
                   <th key={wd} className="px-2 py-3">
-                    {WEEKDAY_LABELS[wd]}
+                    {dayHead(wd)}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {staff.map((p) => (
-                <tr key={p.id} className="h-14 border-t border-border first:border-t-0">
+                <tr key={p.id} className="h-16 border-t border-border first:border-t-0">
                   <td className="px-4 py-0">
                     <div className="flex min-w-0 items-center gap-3">
                       <Avatar name={nameById.get(p.id) ?? p.id} src={avatarUrl(p)} className="h-9 w-9 shrink-0 text-xs" />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{`${p.prefix ?? ""}${p.first_name} ${p.last_name}`}</p>
-                        <p className="text-xs tabular-nums text-muted-foreground">{assignedCount(p.id)} วัน/สัปดาห์</p>
+                        <div className="mt-1 flex items-center gap-2">
+                          {countBadge(p.id)}
+                          {weekStrip(p.id)}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -585,13 +648,16 @@ function WeeklyTemplateEditor({ departmentId, createdBy }: { departmentId: strin
               <Avatar name={nameById.get(p.id) ?? p.id} src={avatarUrl(p)} className="h-9 w-9 shrink-0 text-xs" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{`${p.prefix ?? ""}${p.first_name} ${p.last_name}`}</p>
-                <p className="text-xs tabular-nums text-muted-foreground">{assignedCount(p.id)} วัน/สัปดาห์</p>
+                <div className="mt-1 flex items-center gap-2">
+                  {countBadge(p.id)}
+                  {weekStrip(p.id)}
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {WEEKDAY_ORDER.map((wd) => (
                 <div key={wd} className="flex min-w-0 flex-col gap-1">
-                  <span className="text-xs font-medium text-muted-foreground">{WEEKDAY_LABELS[wd]}</span>
+                  <span className="text-xs font-medium text-muted-foreground">{dayHead(wd)}</span>
                   {cellSelect(p.id, wd)}
                 </div>
               ))}

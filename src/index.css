@@ -488,3 +488,26 @@
     0 -2.5px 0 #1f2150, 0 2.5px 0 #1f2150, -2.5px 0 0 #1f2150, 2.5px 0 0 #1f2150,
     0 5px 0 #1f2150;
 }
+
+
+/* Loose form rows inside a Sheet: consecutive rows merge into one inset-grouped card. */
+.form-row {
+  padding: 0.75rem 1rem;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+}
+.form-row + .form-row {
+  margin-top: -1px !important;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.form-row:has(+ .form-row) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+/* Fields laid out side by side (grid-cols-2/3/4) stack into one grouped card instead. */
+.grid:has(> .form-row) {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 0 !important;
+}

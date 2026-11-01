@@ -554,7 +554,7 @@ export function MyDocTasksTab() {
 
       <section className="space-y-3 rounded-xl bg-card shadow-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div role="tablist" aria-label="สถานะงาน" className="flex flex-wrap gap-4">
+          <div role="tablist" aria-label="สถานะงาน" className="flex w-full border-b border-border">
             {tabs.map((t) => (
               <button
                 key={t.id}
@@ -563,7 +563,7 @@ export function MyDocTasksTab() {
                 aria-selected={tab === t.id}
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  "border-b-2 pb-2 text-xs font-medium",
+                  "-mb-px flex-1 whitespace-nowrap border-b-2 px-3 pb-2 text-xs font-medium",
                   tab === t.id ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
                 )}
               >

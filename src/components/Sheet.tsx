@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Drawer } from "vaul";
 import { ContractIcon, ExpandIcon } from "@/components/icons";
-import { Button, CloseButton } from "@/components/ui";
+import { Button, CloseButton, SheetFormContext } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -61,7 +61,7 @@ export function Sheet({
             className,
           )}
         >
-          <div className="shrink-0 border-b border-border px-4 pb-3 pt-4">
+          <div className="shrink-0 border-b border-border px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
               {icon && <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">{icon}</div>}
               <Drawer.Title className="font-heading min-w-0 flex-1 truncate text-[17px] font-semibold leading-6 tracking-[-0.01em]">{title}</Drawer.Title>
@@ -78,14 +78,8 @@ export function Sheet({
               {headerEnd}
               {closable && <CloseButton onClick={() => onOpenChange(false)} />}
             </div>
-            {description ? (
-              <Drawer.Description className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">
-                {description}
-              </Drawer.Description>
-            ) : (
-              // Vaul warns without a description; keep it for screen readers.
-              <Drawer.Description className="sr-only">{title}</Drawer.Description>
-            )}
+            {/* Description is kept for screen readers only; the header shows just the title. */}
+            <Drawer.Description className="sr-only">{description ?? title}</Drawer.Description>
           </div>
           {/* Vertical scroll only: no-drag stops Vaul turning a finger drag here into a horizontal frame drag; pan-y blocks sideways panning. */}
           <div
@@ -96,7 +90,7 @@ export function Sheet({
               bodyClassName,
             )}
           >
-            {children}
+            <SheetFormContext.Provider value>{children}</SheetFormContext.Provider>
           </div>
           {footer ? (
             <div className="shrink-0 border-t border-border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
