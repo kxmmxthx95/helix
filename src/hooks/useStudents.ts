@@ -124,16 +124,16 @@ export function useSaveStudent() {
 
   return useMutation({
     // `avatar`: a File to upload after the row is saved, "remove" to clear it, undefined to leave it alone.
-    mutationFn: async ({ id, avatar, ...draft }: StudentDraft & { id?: string; avatar?: File | "remove" }) => {
+    mutationFn: async ({ id, avatar, ...draft }: StudentDraft & { id?: string; avatar?: File | "remove" }): Promise<string> => {
       const { data, error } = id
         ? await supabase.from("students").update(draft).eq("id", id).select("id").single()
         : await supabase.from("students").insert(draft).select("id").single();
       if (error) throw error;
-      if (!avatar) return;
+      if (!avatar) return data.id;
       if (avatar === "remove") {
         const { error: rmErr } = await supabase.from("students").update({ avatar_path: null }).eq("id", data.id);
         if (rmErr) throw rmErr;
-        return;
+        return data.id;
       }
       const path = `students/${data.id}`;
       const { error: upErr } = await supabase.storage
@@ -142,6 +142,7 @@ export function useSaveStudent() {
       if (upErr) throw upErr;
       const { error: pathErr } = await supabase.from("students").update({ avatar_path: path }).eq("id", data.id);
       if (pathErr) throw pathErr;
+      return data.id;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["students"] }),
   });

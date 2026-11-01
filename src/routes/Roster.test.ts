@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ageFromBirthDate, splitLoginEligibility } from "@/routes/Roster";
+import { ageFromBirthDate, splitLoginEligibility, studentErrors } from "@/routes/Roster";
 import type { Student } from "@/lib/database.types";
 
 function student(overrides: Partial<Student>): Student {
@@ -72,5 +72,21 @@ describe("ageFromBirthDate", () => {
   it("returns null when unset or in the future", () => {
     expect(ageFromBirthDate(null, today)).toBeNull();
     expect(ageFromBirthDate("2027-01-01", today)).toBeNull();
+  });
+});
+
+describe("studentErrors", () => {
+  const ok = {
+    student_code: "1001", prefix: "นาย", first_name: "ก", last_name: "ข", department_id: "d1", grade_level_id: "g1",
+    national_id: null, phone: null, email: null, date_of_birth: null,
+  } as unknown as Parameters<typeof studentErrors>[0];
+
+  it("accepts a complete draft", () => {
+    expect(studentErrors(ok)).toEqual({});
+  });
+
+  it("flags missing required fields and malformed optional ones", () => {
+    const e = studentErrors({ ...ok, student_code: " ", prefix: null, grade_level_id: null, national_id: "123", phone: "12", email: "x@" });
+    expect(Object.keys(e).sort()).toEqual(["email", "grade_level_id", "national_id", "phone", "prefix", "student_code"]);
   });
 });

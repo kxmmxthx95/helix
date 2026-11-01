@@ -291,9 +291,13 @@ export function Field({
             className={cn(
               "min-w-0 flex-1",
               valueStart ? "flex items-center justify-end gap-2 [&_select]:w-auto [&_select]:[field-sizing:content]" : "block",
-              "[&_input]:h-8 [&_input]:border-transparent [&_input]:bg-transparent [&_input]:px-0 [&_input]:text-right [&_input]:shadow-none [&_input]:hover:border-transparent",
+              "[&_input]:h-7 [&_input]:border-transparent [&_input]:bg-transparent [&_input]:px-0 [&_input]:text-right [&_input]:shadow-none [&_input]:hover:border-transparent",
               "[&_input:focus-visible]:border-transparent [&_input:focus-visible]:ring-0",
-              "[&_select]:h-8 [&_select]:border-transparent [&_select]:bg-transparent [&_select]:pl-0 [&_select]:text-right [&_select]:shadow-none [&_select]:[text-align-last:right] [&_select]:hover:border-transparent",
+              // Values read lighter than their labels (iOS settings rows); focus and open dropdown stay full strength.
+              "[&_input]:text-muted-foreground [&_select]:text-muted-foreground [&_input:focus]:text-foreground [&_option]:text-foreground",
+              // Number inputs reserve room for spin buttons, which pushes the right-aligned value off the edge.
+              "[&_input[type=number]]:[-moz-appearance:textfield] [&_input[type=number]::-webkit-inner-spin-button]:appearance-none [&_input[type=number]::-webkit-outer-spin-button]:appearance-none",
+              "[&_select]:h-7 [&_select]:border-transparent [&_select]:bg-transparent [&_select]:pl-0 [&_select]:text-right [&_select]:shadow-none [&_select]:[text-align-last:right] [&_select]:hover:border-transparent",
               "[&_select:focus-visible]:border-transparent [&_select:focus-visible]:ring-0",
             )}
           >
@@ -589,7 +593,7 @@ export function FormSection({
     <section className="min-w-0">
       {title && <h3 className="font-heading mb-2 px-0.5 text-[15px] font-semibold leading-tight">{title}</h3>}
       <FormRowsContext.Provider value>
-        <div className="min-w-0 overflow-hidden rounded-xl bg-muted [&>*+*]:relative [&>*+*]:before:absolute [&>*+*]:before:inset-x-4 [&>*+*]:before:top-0 [&>*+*]:before:h-px [&>*+*]:before:bg-border [&>*]:px-4 [&>*]:py-2 [&>.grid]:!grid-cols-1 [&>.grid]:gap-0 [&>.grid>*+*]:relative [&>.grid>*+*]:before:absolute [&>.grid>*+*]:before:inset-x-4 [&>.grid>*+*]:before:top-0 [&>.grid>*+*]:before:h-px [&>.grid>*+*]:before:bg-border [&>.grid]:!p-0 [&>.grid>*]:px-4 [&>.grid>*]:py-2">
+        <div className="min-w-0 overflow-hidden rounded-xl bg-muted [&>*+*]:relative [&>*+*]:before:absolute [&>*+*]:before:inset-x-4 [&>*+*]:before:top-0 [&>*+*]:before:h-px [&>*+*]:before:bg-border [&>*]:px-4 [&>*]:py-1.5 [&>*:last-child:has(textarea)]:pb-4 [&>.grid]:!grid-cols-1 [&>.grid]:gap-0 [&>.grid>*+*]:relative [&>.grid>*+*]:before:absolute [&>.grid>*+*]:before:inset-x-4 [&>.grid>*+*]:before:top-0 [&>.grid>*+*]:before:h-px [&>.grid>*+*]:before:bg-border [&>.grid]:!p-0 [&>.grid>*]:px-4 [&>.grid>*]:py-1.5">
           {children}
         </div>
       </FormRowsContext.Provider>

@@ -74,11 +74,40 @@ Helix pairs **Vercel's precision** — Geist type, hairlines, neutral surfaces, 
 
 - **Button** variants: `default` (primary), `accent`, `secondary`, `tinted`, `outline`, `ghost`, `plain`, `destructive`; sizes `default`/`sm` 32px (40px touch), `xs` 24px, `lg` 40px, `icon`. Press scales to 97%.
 - **Input / Select**: `card` fill, `input` border (≥3:1), focus = accent border + 3px accent halo. Native selects and date pickers stay native.
-- **Card**: solid `card`, `shadow-card`, 14px corners, 16/20px padding. **FormSection**: same surface with an icon tile.
+- **Card**: solid `card`, `shadow-card`, 14px corners, 16/20px padding. **FormSection**: grouped form card, see Forms & overlays.
 - **Switch**: iOS 51×31, on = `accent`, off = `fill-strong`.
-- **Sheet** (`Sheet.tsx`, vaul): the floating side drawer — inset 8px, 20px corners, `raised` fill, `shadow-drawer`, icon tile on `accent-soft`, round close button. **Modal**: centered dialog with the same surface.
+- **Sheet** (`Sheet.tsx`, vaul): the floating side drawer — inset 8px, 20px corners, `raised` fill, `shadow-drawer`. **Modal** (`Modal.tsx`, native `<dialog>`): centered dialog with the same surface. When to use which, and what goes inside: Forms & overlays.
 - **Table panels** (`.table-panel`): `card` + `shadow-card`, head without fill (hairline under, `muted-foreground` labels), row hover `muted`.
 - **Empty state**: 48px `secondary` icon tile, 17px title, 14px description.
+
+## Forms & overlays
+
+**Sheet or Modal**
+- A form that adds or edits one record (the student form, new or existing), and any short confirm / few-field form: **Modal** (centered, one task, nothing behind it to consult).
+- Viewing details beside the list, tables, file imports, long lists, side tools: **Sheet** (side drawer; `wide` / `"full"` for tables). The list stays visible behind it.
+- Both: title only in the header (the description is `sr-only`), body scrolls, actions in a footer. Header and footer use matching padding (header `pt-5 pb-3`, footer `pt-3 pb-5` in Modal). Modal is `max-w-md` by default, `max-w-lg` for long forms.
+
+**FormSection** (grouped rows, iOS inset-grouped)
+- Surface `muted` with 14px corners and no shadow, on the white overlay. Rows are separated by 1px `border` hairlines inset 16px from both edges, never full width.
+- Rows are label left, value right, about 40px tall (the input inside is 28px and borderless). Labels use `foreground`; values use `muted-foreground` and go back to `foreground` while the field is focused (dropdown options stay `foreground`). Empty text fields read "ระบุ", empty selects show their placeholder. Number inputs hide the spin buttons so the value stays flush right.
+- The heading above a card is optional (`title`); omit it when a tab or sheet title already names the group. A card whose last row is a textarea gets extra bottom padding.
+- Wide controls (date selects, map, textarea) stack under their label instead of splitting the row. A status uses a leading coloured dot: green studying, orange transferred, accent graduated, red dropped.
+- Applies to every `FormSection` user (Roster, Users, AcademicEvents) and to `Field` inside any Sheet; the address block in Profile and Onboarding follows the same rows.
+
+**Tabs**
+- **Underline tabs with an icon** switch the *section* of one record (student form: ข้อมูลทั่วไป / ที่อยู่ / สุขภาพ / ผู้ปกครอง). Equal-width, semibold, 2px `foreground` underline on the active tab. When the tab row itself is narrower than 26rem (phone, or inside a Sheet) only the icon shows; the label stays for screen readers and as a tooltip.
+- **Segmented control** switches the *view or filter* of the same data (2–4 short options).
+
+**Validation** (standard for new or edited forms; older forms move over when touched)
+- Mark required fields with a red `*` after the label. Turn off the browser's own validation (`noValidate`) and validate in code with one pure function per form (see `studentErrors` in `Roster.tsx`).
+- Show inline red messages under the field only after the first save attempt, and clear each as it becomes valid. A failed save jumps to the tab holding the first error and shows a toast with the count. Errors that sit in another section use a toast with the reason instead.
+- Optional fields are checked only when filled (13-digit national ID, 9–10 digit phone, email shape, birth date not in the future).
+
+**Form building blocks**
+- **AvatarCard**: 64px round photo with a camera button and remove action; the file uploads when the form is saved, not on pick.
+- **MapPicker**: Google map (click or drag a pin) plus a coordinates field that accepts a pasted "lat, lng". Without a Maps key only the field and an open-in-Maps link show.
+- **AddressInputs**: house number, moo, soi, road, then postcode, then province, district, subdistrict as selects narrowed by the postcode. A level with one choice fills itself; changing the postcode clears the levels below it. Older free-text values stay selectable.
+- **Guardian cards** (father, mother, guardian): three separate cards. A toggle pair on the guardian card ("ผู้ปกครองคือบิดา / มารดา") reuses the father's or mother's data and hides the guardian's own fields.
 
 ## Don'ts
 

@@ -6,7 +6,7 @@ import { ImportSheet } from "@/components/ImportSheet";
 import { Modal } from "@/components/Modal";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Avatar, AvatarCard, BuddhistDateSelect, Card, CloseButton, EmptyState, Field, FormSection, Input, Pagination, Select, SheetFormContext, Skeleton, Spinner } from "@/components/ui";
+import { Button, Avatar, AvatarCard, BuddhistDateSelect, Card, EmptyState, Field, FormSection, Input, Pagination, Select, SheetFormContext, Skeleton, Spinner, Switch } from "@/components/ui";
 import { avatarUrl, studentAvatarUrl } from "@/hooks/useAvatar";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
@@ -22,7 +22,6 @@ import {
   useSaveStudentContact,
   useSetPrimaryContact,
   useStudentContacts,
-  type StudentContactDraft,
 } from "@/hooks/useStudentContacts";
 import {
   useDeleteStudent,
@@ -65,6 +64,25 @@ export function ageFromBirthDate(iso: string | null, today = new Date()): { year
   let months = (today.getFullYear() - y) * 12 + (today.getMonth() + 1 - m);
   if (today.getDate() < d) months -= 1;
   return months < 0 ? null : { years: Math.floor(months / 12), months: months % 12 };
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const phoneOk = (v: string) => /^\d{9,10}$/.test(v.replace(/[\s-]/g, ""));
+
+/** Field-level problems of a student draft, keyed by column; empty when it can be saved. */
+export function studentErrors(d: StudentDraft): Partial<Record<keyof StudentDraft, string>> {
+  const e: Partial<Record<keyof StudentDraft, string>> = {};
+  if (!d.student_code.trim()) e.student_code = "กรอกรหัสนักเรียน";
+  if (d.national_id && !/^\d{13}$/.test(d.national_id)) e.national_id = "ต้องเป็นตัวเลข 13 หลัก";
+  if (d.date_of_birth && !ageFromBirthDate(d.date_of_birth)) e.date_of_birth = "วันเกิดไม่ถูกต้อง";
+  if (!d.prefix) e.prefix = "เลือกคำนำหน้า";
+  if (!d.first_name.trim()) e.first_name = "กรอกชื่อ";
+  if (!d.last_name.trim()) e.last_name = "กรอกนามสกุล";
+  if (!d.department_id) e.department_id = "เลือกแผนก";
+  if (!d.grade_level_id) e.grade_level_id = "เลือกชั้น";
+  if (d.phone && !phoneOk(d.phone)) e.phone = "เบอร์โทรต้องเป็นตัวเลข 9-10 หลัก";
+  if (d.email && !EMAIL_RE.test(d.email)) e.email = "อีเมลไม่ถูกต้อง";
+  return e;
 }
 
 /** Derive เพศ from Thai student name title (no separate gender column). */
@@ -766,11 +784,11 @@ export function Roster() {
 }
 
 type StudentTab = "general" | "contact" | "health" | "guardian";
-const STUDENT_TABS: { key: StudentTab; label: string }[] = [
-  { key: "general", label: "ข้อมูลทั่วไป" },
-  { key: "contact", label: "ที่อยู่" },
-  { key: "health", label: "สุขภาพ" },
-  { key: "guardian", label: "ผู้ปกครอง" },
+const STUDENT_TABS: { key: StudentTab; label: string; icon: typeof ProfileIcon }[] = [
+  { key: "general", label: "ข้อมูลทั่วไป", icon: ProfileIcon },
+  { key: "contact", label: "ที่อยู่", icon: HomeIcon },
+  { key: "health", label: "สุขภาพ", icon: ShieldIcon },
+  { key: "guardian", label: "ผู้ปกครอง", icon: UsersIcon },
 ];
 
 function blankDraft(departmentId: string): StudentDraft {
@@ -820,8 +838,12 @@ export function EditStudentSheet({
   const save = useSaveStudent();
   const [draft, setDraft] = useState<StudentDraft | null>(null);
   const [tab, setTab] = useState<StudentTab>("general");
+  const [attempted, setAttempted] = useState(false); // show field errors only after the first save attempt
   // Picked photo, applied on save (the student id of a new row doesn't exist yet); "remove" clears the stored one.
   const [avatar, setAvatar] = useState<File | "remove" | null>(null);
+  const [guardians, setGuardians] = useState<GuardianDrafts | null>(null);
+  const [guardianSource, setGuardianSource] = useState<GuardianSource | null>(null);
+  const saveGuardians = useSaveGuardians();
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   useEffect(() => {
     if (!(avatar instanceof File)) return setAvatarPreview(null);
@@ -847,9 +869,17 @@ export function EditStudentSheet({
         : pickDraft(target);
   const current = draft ?? base;
   const { data: gradeLevels = [] } = useGradeLevels(current?.department_id ?? null);
+  const loadedGuardians = useLoadedGuardians(target === null || target === "new" ? null : target.id);
+  const currentGuardians = guardians ?? loadedGuardians.drafts;
+  const currentSource = guardianSource ?? loadedGuardians.source;
+  const errors = current ? studentErrors(current) : {};
+  const err = (k: keyof StudentDraft) => (attempted ? errors[k] : undefined);
 
   function close() {
     setDraft(null);
+    setAttempted(false);
+    setGuardians(null);
+    setGuardianSource(null);
     setTab("general");
     setAvatar(null);
     onClose();
@@ -858,28 +888,35 @@ export function EditStudentSheet({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!current) return;
-    if (
-      !current.student_code.trim() ||
-      !current.prefix ||
-      !current.first_name.trim() ||
-      !current.last_name.trim() ||
-      !current.department_id ||
-      !current.grade_level_id
-    ) {
+    const invalid = Object.keys(errors);
+    if (invalid.length) {
+      setAttempted(true);
+      setTab("general");
+      toast(`กรอกข้อมูลให้ถูกต้อง (${invalid.length} ช่อง)`, "error");
       return;
     }
-    save.mutate(
-      { ...current, ...(isNew ? {} : { id: (target as Student).id }), avatar: avatar ?? undefined },
-      {
-        onSuccess: () => toast("บันทึกข้อมูลนักเรียนสำเร็จ"),
-        onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
-      },
-    );
+    const problem = guardianProblem(currentGuardians, currentSource);
+    if (problem) {
+      setTab("guardian");
+      toast(problem, "error");
+      return;
+    }
+    // Guardians are only rewritten once edited, so a slow-loading list can never be mistaken for "cleared".
+    const guardiansEdited = guardians !== null || guardianSource !== null;
+    const guardianDrafts = currentGuardians;
+    const guardianRows = loadedGuardians.rows;
+    const source = currentSource;
+    save
+      .mutateAsync({ ...current, ...(isNew ? {} : { id: (target as Student).id }), avatar: avatar ?? undefined })
+      .then(async (id) => {
+        if (guardiansEdited) await saveGuardians(id, guardianDrafts, guardianRows, source);
+        toast("บันทึกข้อมูลนักเรียนสำเร็จ");
+      })
+      .catch((err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"));
     close();
   }
 
   const title = isNew ? "เพิ่มนักเรียน" : readOnly ? "ข้อมูลนักเรียน" : "แก้ไขข้อมูลนักเรียน";
-  const description = current && !isNew ? `${current.first_name} ${current.last_name}`.trim() : undefined;
   const footer = current ? (
     <div className="flex gap-2">
       <Button type="button" variant="outline" className="flex-1" onClick={close}>
@@ -896,25 +933,28 @@ export function EditStudentSheet({
     <>
       {current && (
         <div className="space-y-4">
-          <div role="tablist" aria-label="หัวข้อข้อมูลนักเรียน" className="flex overflow-x-auto border-b border-border [scrollbar-width:none]">
+          <div role="tablist" aria-label="หัวข้อข้อมูลนักเรียน" className="flex overflow-x-auto border-b border-border [container-type:inline-size] [scrollbar-width:none]">
             {STUDENT_TABS.map((t) => (
               <button
                 key={t.key}
                 type="button"
                 role="tab"
                 aria-selected={tab === t.key}
+                title={t.label}
                 onClick={() => setTab(t.key)}
                 className={cn(
-                  "tappable -mb-px min-h-10 flex-1 whitespace-nowrap border-b-2 px-3 text-[13px] font-medium transition-colors",
+                  "tappable -mb-px flex min-h-10 flex-1 items-center justify-center gap-1.5 whitespace-nowrap border-b-2 px-3 text-[13px] font-semibold transition-colors",
                   tab === t.key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
                 )}
               >
-                {t.label}
+                <t.icon className="h-4 w-4 shrink-0" />
+                {/* Icon-only when the tab row itself is narrow (phone, or the side drawer); text stays for screen readers. */}
+                <span className="[@container(max-width:26rem)]:sr-only">{t.label}</span>
               </button>
             ))}
           </div>
-          {/* Panels stay mounted (hidden) so the draft and the single form survive tab switches; an invalid required field jumps back to the first tab. */}
-          <form id="edit-student" onSubmit={submit} onInvalidCapture={() => setTab("general")} className="space-y-4">
+          {/* Panels stay mounted (hidden) so the draft and the single form survive tab switches; a failed save jumps back to the first tab, where the invalid fields are. */}
+          <form id="edit-student" onSubmit={submit} noValidate className="space-y-4">
           <fieldset disabled={readOnly} className="space-y-4">
             <div hidden={tab !== "general"} className="space-y-4">
             {!readOnly && (
@@ -926,15 +966,14 @@ export function EditStudentSheet({
               />
             )}
             <FormSection icon={<ProfileIcon className="h-4 w-4" />}>
-                <Field label="รหัสนักเรียน">
+                <Field label="รหัสนักเรียน" required error={err("student_code")}>
                   <Input
                     value={current.student_code}
                     onChange={(e) => setDraft({ ...current, student_code: e.target.value })}
-                    required
                   />
                 </Field>
 
-                <Field label="เลขบัตรประจำตัวประชาชน">
+                <Field label="เลขบัตรประจำตัวประชาชน" error={err("national_id")}>
                   <Input
                     inputMode="numeric"
                     autoComplete="off"
@@ -942,13 +981,11 @@ export function EditStudentSheet({
                     onChange={(e) =>
                       setDraft({ ...current, national_id: e.target.value.replace(/\D/g, "").slice(0, 13) || null })
                     }
-                    pattern="[0-9]{13}"
                     maxLength={13}
-                    title="เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก"
                   />
                 </Field>
 
-                <Field label="วันเดือนปีเกิด">
+                <Field label="วันเดือนปีเกิด" error={err("date_of_birth")}>
                   <BuddhistDateSelect
                     key={isNew ? "new" : (target as Student).id}
                     value={current.date_of_birth ?? ""}
@@ -966,11 +1003,10 @@ export function EditStudentSheet({
                   </span>
                 </div>
 
-                <Field label="คำนำหน้า">
+                <Field label="คำนำหน้า" required error={err("prefix")}>
                   <Select
                     value={current.prefix ?? ""}
                     onChange={(e) => setDraft({ ...current, prefix: e.target.value || null })}
-                    required
                     placeholder="เลือกคำนำหน้า"
                   >
                     {STUDENT_PREFIXES.map((p) => (
@@ -982,29 +1018,26 @@ export function EditStudentSheet({
                 </Field>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="ชื่อ">
+                  <Field label="ชื่อ" required error={err("first_name")}>
                     <Input
                       value={current.first_name}
                       onChange={(e) => setDraft({ ...current, first_name: e.target.value })}
-                      required
                     />
                   </Field>
-                  <Field label="นามสกุล">
+                  <Field label="นามสกุล" required error={err("last_name")}>
                     <Input
                       value={current.last_name}
                       onChange={(e) => setDraft({ ...current, last_name: e.target.value })}
-                      required
                     />
                   </Field>
                 </div>
 
-                <Field label="แผนก">
+                <Field label="แผนก" required error={err("department_id")}>
                   <Select
                     value={current.department_id}
                     onChange={(e) =>
                       setDraft({ ...current, department_id: e.target.value, grade_level_id: null })
                     }
-                    required
                     placeholder="เลือกแผนก"
                     disabled={!me || !isOrgWide(me.roles)}
                   >
@@ -1017,11 +1050,10 @@ export function EditStudentSheet({
                 </Field>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="ชั้น">
+                  <Field label="ชั้น" required error={err("grade_level_id")}>
                     <Select
                       value={current.grade_level_id ?? ""}
                       onChange={(e) => setDraft({ ...current, grade_level_id: e.target.value || null })}
-                      required
                       placeholder="เลือกชั้น"
                     >
                       {gradeLevels.map((g) => (
@@ -1051,7 +1083,7 @@ export function EditStudentSheet({
             </FormSection>
 
             <FormSection icon={<CallIcon className="h-4 w-4" />}>
-                <Field label="เบอร์โทรศัพท์">
+                <Field label="เบอร์โทรศัพท์" error={err("phone")}>
                   <Input
                     type="tel"
                     value={current.phone ?? ""}
@@ -1059,7 +1091,7 @@ export function EditStudentSheet({
                   />
                 </Field>
 
-                <Field label="อีเมล">
+                <Field label="อีเมล" error={err("email")}>
                   <Input
                     type="email"
                     value={current.email ?? ""}
@@ -1148,40 +1180,26 @@ export function EditStudentSheet({
                 </Select>
               </Field>
 
-              {isNew ? (
-                <p className="text-sm text-muted-foreground">
-                  บันทึกข้อมูลนักเรียนก่อน แล้วค่อยเพิ่มผู้ปกครอง
-                </p>
-              ) : (
-                <GuardianSection
-                  studentId={(target as Student).id}
-                  studentAddress={pickAddress(current)}
-                />
-              )}
             </fieldset>
           </FormSection>
+          <fieldset disabled={readOnly || !loadedGuardians.ready} className="mt-4 space-y-4">
+            <GuardianCards
+              value={currentGuardians}
+              onChange={(slot, patch) => setGuardians({ ...currentGuardians, [slot]: { ...currentGuardians[slot], ...patch } })}
+              source={currentSource}
+              onSourceChange={setGuardianSource}
+            />
+          </fieldset>
           </div>
         </div>
       )}
     </>
   );
 
-  // New student: centered pop-up. Existing: side drawer.
-  return isNew ? (
+  return (
     <Modal open={target !== null} onOpenChange={(open) => !open && close()} title={title} footer={footer} className="max-w-lg">
       <SheetFormContext.Provider value>{body}</SheetFormContext.Provider>
     </Modal>
-  ) : (
-    <Sheet
-      open={target !== null}
-      onOpenChange={(open) => !open && close()}
-      title={title}
-      description={description}
-      headerEnd={<CloseButton onClick={close} />}
-      footer={footer}
-    >
-      {body}
-    </Sheet>
   );
 }
 
@@ -1218,330 +1236,225 @@ function pickDraft(s: Student): StudentDraft {
 
 // ------------------------------------------------------------- guardians
 
-function GuardianSection({
-  studentId,
-  studentAddress,
-}: {
-  studentId: string;
-  studentAddress: AddressFields;
-}) {
-  const { data: contacts = [] } = useStudentContacts(studentId);
-  const contactIds = useMemo(() => contacts.map((c) => c.id), [contacts]);
-  const { data: financials = [] } = useGuardianFinancials(contactIds);
-  const financialByContact = useMemo(
-    () => new Map(financials.map((f) => [f.contact_id, f])),
-    [financials],
-  );
-  const setPrimary = useSetPrimaryContact();
-  const deleteContact = useDeleteStudentContact();
-  const [editingContact, setEditingContact] = useState<StudentContact | NewContact | null>(null);
+type GuardianSlot = "father" | "mother" | "other";
+const GUARDIAN_SLOTS: { slot: GuardianSlot; title: string }[] = [
+  { slot: "father", title: "ข้อมูลบิดา" },
+  { slot: "mother", title: "ข้อมูลมารดา" },
+  { slot: "other", title: "ข้อมูลผู้ปกครอง" },
+];
 
-  if (editingContact) {
-    return (
-      <ContactForm
-        studentId={studentId}
-        studentAddress={studentAddress}
-        target={editingContact}
-        financial={"id" in editingContact ? financialByContact.get(editingContact.id) : undefined}
-        onDone={() => setEditingContact(null)}
-      />
-    );
+/** One parent / guardian as typed into the form; saved to student_contacts (+ student_guardian_financials). */
+type GuardianDraft = {
+  relationship_note: string; // only used by the "other" slot
+  prefix: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  email: string;
+  occupation: string;
+  workplace: string;
+  monthly_income: string;
+};
+type GuardianDrafts = Record<GuardianSlot, GuardianDraft>;
+
+const BLANK_GUARDIAN: GuardianDraft = {
+  relationship_note: "",
+  prefix: "",
+  first_name: "",
+  last_name: "",
+  phone: "",
+  email: "",
+  occupation: "",
+  workplace: "",
+  monthly_income: "",
+};
+const BLANK_GUARDIANS: GuardianDrafts = { father: BLANK_GUARDIAN, mother: BLANK_GUARDIAN, other: BLANK_GUARDIAN };
+const NO_ADDRESS: AddressFields = {
+  house_no: null,
+  village_no: null,
+  alley: null,
+  road: null,
+  subdistrict: null,
+  district: null,
+  province: null,
+  postal_code: null,
+};
+
+/** Who counts as the student's guardian: its own slot, or the father / mother (same data, flagged primary). */
+type GuardianSource = GuardianSlot;
+
+const guardianFilled = (g: GuardianDraft) => Object.values(g).some((v) => v.trim());
+
+/** Why a half-filled guardian can't be saved, or null. A person needs both names; "other" also needs the relationship. */
+function guardianProblem(drafts: GuardianDrafts, source: GuardianSource): string | null {
+  for (const { slot, title } of GUARDIAN_SLOTS) {
+    const g = drafts[slot];
+    if (slot === source && source !== "other" && !guardianFilled(g)) return `${title}: กรอกข้อมูลก่อน เพราะใช้เป็นข้อมูลผู้ปกครอง`;
+    if (slot === "other" && source !== "other") continue; // ignored while the guardian is a parent
+    if (!guardianFilled(g)) continue;
+    if (!g.first_name.trim() || !g.last_name.trim()) return `${title}: กรอกชื่อและนามสกุลให้ครบ`;
+    if (g.phone.trim() && !phoneOk(g.phone)) return `${title}: เบอร์โทรต้องเป็นตัวเลข 9-10 หลัก`;
+    if (g.email.trim() && !EMAIL_RE.test(g.email.trim())) return `${title}: อีเมลไม่ถูกต้อง`;
+    if (slot === "other" && !g.relationship_note.trim()) return `${title}: ระบุความสัมพันธ์`;
   }
-
-  const hasFather = contacts.some((c) => c.relationship === "father");
-  const hasMother = contacts.some((c) => c.relationship === "mother");
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">รายชื่อผู้ปกครอง</h3>
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => setEditingContact({ new: true, relationship: "other" })}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          เพิ่ม
-        </Button>
-      </div>
-
-      {(!hasFather || !hasMother) && (
-        <div className="flex gap-2">
-          {!hasFather && (
-            <button
-              type="button"
-              className="flex-1 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted"
-              onClick={() => setEditingContact({ new: true, relationship: "father" })}
-            >
-              + เพิ่มข้อมูลบิดา
-            </button>
-          )}
-          {!hasMother && (
-            <button
-              type="button"
-              className="flex-1 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-muted"
-              onClick={() => setEditingContact({ new: true, relationship: "mother" })}
-            >
-              + เพิ่มข้อมูลมารดา
-            </button>
-          )}
-        </div>
-      )}
-
-      {contacts.length === 0 && (
-        <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูลผู้ปกครอง</p>
-      )}
-
-      <ul className="divide-y divide-border">
-        {contacts.map((c) => (
-          <li key={c.id} className="flex items-center gap-2 py-2 text-sm">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span>
-                  {RELATIONSHIP_LABEL[c.relationship]}
-                  {c.relationship === "other" && c.relationship_note ? ` (${c.relationship_note})` : ""}
-                </span>
-                {c.is_primary && (
-                  <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] text-accent-foreground">
-                    หลัก
-                  </span>
-                )}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {c.prefix}
-                {c.first_name} {c.last_name} · {c.phone || "—"}
-              </div>
-            </div>
-            {!c.is_primary && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setPrimary.mutate(c.id)}
-                disabled={setPrimary.isPending}
-              >
-                ตั้งเป็นหลัก
-              </Button>
-            )}
-            <Button type="button" variant="outline" size="sm" onClick={() => setEditingContact(c)}>
-              แก้ไข
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label="ลบผู้ปกครอง"
-              onClick={() => {
-                if (confirm(`ลบข้อมูล "${c.first_name} ${c.last_name}" ออกจากรายชื่อผู้ปกครอง?`)) {
-                  deleteContact.mutate(c.id);
-                }
-              }}
-              disabled={deleteContact.isPending}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+  return null;
 }
 
-type NewContact = { new: true; relationship: GuardianRelationship };
+/** A student's saved father / mother / first other-guardian as drafts, plus the rows they came from. `ready` is false until they have loaded. */
+function useLoadedGuardians(studentId: string | null) {
+  const { data: contacts, isLoading } = useStudentContacts(studentId);
+  const contactIds = useMemo(() => (contacts ?? []).map((c) => c.id), [contacts]);
+  const { data: financials = [] } = useGuardianFinancials(contactIds);
+  const ready = !studentId || !isLoading;
+  return useMemo(() => {
+    const drafts: GuardianDrafts = { ...BLANK_GUARDIANS };
+    const rows: Partial<Record<GuardianSlot, StudentContact>> = {};
+    for (const c of contacts ?? []) {
+      if (rows[c.relationship]) continue;
+      rows[c.relationship] = c;
+      const f = financials.find((x) => x.contact_id === c.id);
+      drafts[c.relationship] = {
+        relationship_note: c.relationship_note ?? "",
+        prefix: c.prefix ?? "",
+        first_name: c.first_name,
+        last_name: c.last_name,
+        phone: c.phone ?? "",
+        email: c.email ?? "",
+        occupation: f?.occupation ?? "",
+        workplace: f?.workplace ?? "",
+        monthly_income: f?.monthly_income?.toString() ?? "",
+      };
+    }
+    const source: GuardianSource = rows.father?.is_primary ? "father" : rows.mother?.is_primary ? "mother" : "other";
+    return { drafts, rows, source, ready };
+  }, [contacts, financials, ready]);
+}
 
-function ContactForm({
-  studentId,
-  studentAddress,
-  target,
-  financial,
-  onDone,
-}: {
-  studentId: string;
-  studentAddress: AddressFields;
-  target: StudentContact | NewContact;
-  financial: { occupation: string | null; workplace: string | null; monthly_income: number | null } | undefined;
-  onDone: () => void;
-}) {
-  const isNew = !("id" in target);
-  const toast = useToast();
-  const save = useSaveStudentContact();
+/** Writes the three guardian slots after the student row exists: fill → upsert, cleared → delete. Addresses on existing rows are left as they were. */
+function useSaveGuardians() {
+  const saveContact = useSaveStudentContact();
   const saveFinancial = useSaveGuardianFinancial();
-
-  const [draft, setDraft] = useState<StudentContactDraft>(() =>
-    isNew
-      ? {
-          student_id: studentId,
-          relationship: target.relationship,
-          relationship_note: null,
-          prefix: null,
-          first_name: "",
-          last_name: "",
-          phone: null,
-          email: null,
-          house_no: null,
-          village_no: null,
-          alley: null,
-          road: null,
-          subdistrict: null,
-          district: null,
-          province: null,
-          postal_code: null,
-        }
-      : {
-          student_id: target.student_id,
-          relationship: target.relationship,
-          relationship_note: target.relationship_note,
-          prefix: target.prefix,
-          first_name: target.first_name,
-          last_name: target.last_name,
-          phone: target.phone,
-          email: target.email,
-          ...pickAddress(target),
-        },
-  );
-  const [occupation, setOccupation] = useState(financial?.occupation ?? "");
-  const [workplace, setWorkplace] = useState(financial?.workplace ?? "");
-  const [monthlyIncome, setMonthlyIncome] = useState(financial?.monthly_income?.toString() ?? "");
-  const [pending, setPending] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setPending(true);
-    try {
-      const contact = await save.mutateAsync({
-        ...draft,
-        ...(isNew ? {} : { id: (target as StudentContact).id }),
+  const deleteContact = useDeleteStudentContact();
+  const setPrimary = useSetPrimaryContact();
+  return async (
+    studentId: string,
+    drafts: GuardianDrafts,
+    rows: Partial<Record<GuardianSlot, StudentContact>>,
+    source: GuardianSource,
+  ) => {
+    const savedIds: Partial<Record<GuardianSlot, string>> = {};
+    for (const { slot } of GUARDIAN_SLOTS) {
+      const g = slot === "other" && source !== "other" ? BLANK_GUARDIAN : drafts[slot];
+      const prev = rows[slot];
+      if (!guardianFilled(g)) {
+        if (prev) await deleteContact.mutateAsync(prev.id);
+        continue;
+      }
+      const contact = await saveContact.mutateAsync({
+        ...(prev ? { id: prev.id, ...pickAddress(prev) } : NO_ADDRESS),
+        student_id: studentId,
+        relationship: slot,
+        relationship_note: slot === "other" ? g.relationship_note.trim() || null : null,
+        prefix: g.prefix || null,
+        first_name: g.first_name.trim(),
+        last_name: g.last_name.trim(),
+        phone: g.phone.trim() || null,
+        email: g.email.trim() || null,
       });
-      const hasFinancial = occupation.trim() || workplace.trim() || monthlyIncome.trim();
-      if (hasFinancial) {
+      savedIds[slot] = contact.id;
+      if (g.occupation.trim() || g.workplace.trim() || g.monthly_income.trim()) {
         await saveFinancial.mutateAsync({
           contact_id: contact.id,
-          occupation: occupation.trim() || null,
-          workplace: workplace.trim() || null,
-          monthly_income: monthlyIncome.trim() ? Number(monthlyIncome) : null,
+          occupation: g.occupation.trim() || null,
+          workplace: g.workplace.trim() || null,
+          monthly_income: g.monthly_income.trim() ? Number(g.monthly_income) : null,
         });
       }
-      toast("บันทึกข้อมูลผู้ปกครองสำเร็จ");
-      onDone();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error");
-    } finally {
-      setPending(false);
     }
-  }
+    const primaryId = savedIds[source];
+    if (primaryId) await setPrimary.mutateAsync(primaryId);
+  };
+}
 
+function GuardianCards({
+  value,
+  onChange,
+  source,
+  onSourceChange,
+}: {
+  value: GuardianDrafts;
+  onChange: (slot: GuardianSlot, patch: Partial<GuardianDraft>) => void;
+  source: GuardianSource;
+  onSourceChange: (source: GuardianSource) => void;
+}) {
   return (
-    <form onSubmit={submit} className="space-y-4">
-      <Button type="button" variant="outline" size="sm" onClick={onDone}>
-        ← กลับ
-      </Button>
-
-      <Field label="ความสัมพันธ์">
-        <Select
-          value={draft.relationship}
-          onChange={(e) =>
-            setDraft({ ...draft, relationship: e.target.value as GuardianRelationship })
-          }
-        >
-          {(Object.keys(RELATIONSHIP_LABEL) as GuardianRelationship[]).map((r) => (
-            <option key={r} value={r}>
-              {RELATIONSHIP_LABEL[r]}
-            </option>
-          ))}
-        </Select>
-      </Field>
-
-      {draft.relationship === "other" && (
-        <Field label="ระบุความสัมพันธ์">
-          <Input
-            value={draft.relationship_note ?? ""}
-            onChange={(e) => setDraft({ ...draft, relationship_note: e.target.value || null })}
-            placeholder="เช่น ปู่, ย่า, ญาติ, ผู้อุปการะ"
-            required
-          />
-        </Field>
-      )}
-
-      <Field label="คำนำหน้า">
-        <Select
-          value={draft.prefix ?? ""}
-          onChange={(e) => setDraft({ ...draft, prefix: e.target.value || null })}
-        >
-          <option value="">— ไม่ระบุ —</option>
-          <option value="นาย">นาย</option>
-          <option value="นาง">นาง</option>
-          <option value="นางสาว">นางสาว</option>
-        </Select>
-      </Field>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="ชื่อ">
-          <Input
-            value={draft.first_name}
-            onChange={(e) => setDraft({ ...draft, first_name: e.target.value })}
-            required
-          />
-        </Field>
-        <Field label="นามสกุล">
-          <Input
-            value={draft.last_name}
-            onChange={(e) => setDraft({ ...draft, last_name: e.target.value })}
-            required
-          />
-        </Field>
-      </div>
-
-      <Field label="เบอร์โทรศัพท์">
-        <Input
-          type="tel"
-          value={draft.phone ?? ""}
-          onChange={(e) => setDraft({ ...draft, phone: e.target.value || null })}
-        />
-      </Field>
-
-      <Field label="อีเมล">
-        <Input
-          type="email"
-          value={draft.email ?? ""}
-          onChange={(e) => setDraft({ ...draft, email: e.target.value || null })}
-        />
-      </Field>
-
-      <div>
-        <div className="mb-1.5 flex items-center justify-between">
-          <p className="text-xs font-medium text-muted-foreground">ที่อยู่</p>
-          <button
-            type="button"
-            className="text-xs text-accent-foreground underline"
-            onClick={() => setDraft({ ...draft, ...studentAddress })}
-          >
-            ใช้ที่อยู่เดียวกับนักเรียน
-          </button>
-        </div>
-        <AddressInputs value={draft} onChange={(patch) => setDraft({ ...draft, ...patch })} />
-      </div>
-
-      <Field label="อาชีพ">
-        <Input value={occupation} onChange={(e) => setOccupation(e.target.value)} />
-      </Field>
-
-      <Field label="สถานที่ทำงาน">
-        <Input value={workplace} onChange={(e) => setWorkplace(e.target.value)} />
-      </Field>
-
-      <Field label="เงินเดือน">
-        <Input
-          type="number"
-          min="0"
-          value={monthlyIncome}
-          onChange={(e) => setMonthlyIncome(e.target.value)}
-        />
-      </Field>
-
-      <Button type="submit" className="w-full" disabled={pending}>
-        {pending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
-      </Button>
-    </form>
+    <>
+      {GUARDIAN_SLOTS.map(({ slot, title }) => {
+        const g = value[slot];
+        const set = (patch: Partial<GuardianDraft>) => onChange(slot, patch);
+        // The guardian reuses the father's / mother's data, so its own fields would only duplicate them.
+        const sameAsParent = slot === "other" && source !== "other";
+        return (
+          <section key={slot} className="min-w-0 space-y-3">
+            <h3 className="font-heading px-0.5 text-[15px] font-semibold leading-tight">{title}</h3>
+            {slot === "other" && (
+              <FormSection>
+                {(["father", "mother"] as const).map((parent) => (
+                  <div key={parent} className="flex items-center justify-between gap-4 text-sm leading-5">
+                    <span>{parent === "father" ? "ผู้ปกครองคือบิดา" : "ผู้ปกครองคือมารดา"}</span>
+                    <Switch
+                      size="sm"
+                      checked={source === parent}
+                      onChange={(on) => onSourceChange(on ? parent : "other")}
+                      label={parent === "father" ? "ใช้ข้อมูลเดียวกับบิดา" : "ใช้ข้อมูลเดียวกับมารดา"}
+                    />
+                  </div>
+                ))}
+              </FormSection>
+            )}
+            {!sameAsParent && (
+            <FormSection>
+              {slot === "other" && (
+                <Field label="ความสัมพันธ์">
+                  <Input value={g.relationship_note} onChange={(e) => set({ relationship_note: e.target.value })} placeholder="เช่น ปู่, ย่า, ญาติ" />
+                </Field>
+              )}
+              <Field label="คำนำหน้า">
+                <Select value={g.prefix} onChange={(e) => set({ prefix: e.target.value })} placeholder="เลือกคำนำหน้า">
+                  {["นาย", "นาง", "นางสาว"].map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="ชื่อ">
+                <Input value={g.first_name} onChange={(e) => set({ first_name: e.target.value })} />
+              </Field>
+              <Field label="นามสกุล">
+                <Input value={g.last_name} onChange={(e) => set({ last_name: e.target.value })} />
+              </Field>
+              <Field label="เบอร์โทรศัพท์">
+                <Input type="tel" value={g.phone} onChange={(e) => set({ phone: e.target.value })} />
+              </Field>
+              <Field label="อีเมล">
+                <Input type="email" value={g.email} onChange={(e) => set({ email: e.target.value })} />
+              </Field>
+              <Field label="อาชีพ">
+                <Input value={g.occupation} onChange={(e) => set({ occupation: e.target.value })} />
+              </Field>
+              <Field label="สถานที่ทำงาน">
+                <Input value={g.workplace} onChange={(e) => set({ workplace: e.target.value })} />
+              </Field>
+              <Field label="เงินเดือน">
+                <Input type="number" min="0" value={g.monthly_income} onChange={(e) => set({ monthly_income: e.target.value })} />
+              </Field>
+            </FormSection>
+            )}
+          </section>
+        );
+      })}
+    </>
   );
 }
 
