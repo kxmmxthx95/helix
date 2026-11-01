@@ -41,6 +41,7 @@ import type {
 } from "@/lib/database.types";
 import { canManage, canManageUsers, isOrgWide, STUDENT_PREFIXES } from "@/lib/roles";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
+import { StatCard } from "@/routes/Classrooms";
 
 const EMPTY: StudentFilters = { search: "", departmentId: "", status: "studying", gradeLevelId: "", classroomId: "" };
 
@@ -367,7 +368,7 @@ export function Roster() {
             ))}
           </ul>
 
-          <div className="table-panel hidden rounded-none border-t border-border shadow-none lg:flex"><div className="table-panel-scroll">
+          <div className="table-panel hidden rounded-none border-t border-border shadow-none lg:flex"><div className="table-panel-scroll scrollbar-hidden">
             <table className="w-full text-xs">
               <thead className="bg-muted text-left text-xs text-muted-foreground">
                 <tr>
@@ -530,7 +531,7 @@ export function Roster() {
           </ul>
 
           <div className="table-panel hidden rounded-none border-t border-border shadow-none lg:flex">
-            <div className="table-panel-scroll">
+            <div className="table-panel-scroll scrollbar-hidden">
               <table className="w-full text-[13px]">
                 <thead className="text-left text-xs">
                   <tr>
@@ -647,6 +648,15 @@ export function Roster() {
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {hasSearch && rows && (
+        <div className="sticky bottom-0 z-10 mt-auto grid shrink-0 grid-cols-2 gap-2 bg-background pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 lg:grid-cols-4">
+          <StatCard tone="accent" icon={<UsersIcon className="h-5 w-5" />} label="ทั้งหมด" value={rows.length} unit="คน" />
+          <StatCard tone="success" icon={<CheckmarkCircleIcon className="h-5 w-5" />} label="กำลังศึกษา" value={rows.filter((r) => r.status === "studying").length} unit="คน" />
+          <StatCard tone="muted" icon={<ProfileIcon className="h-5 w-5" />} label="มีบัญชีแล้ว" value={rows.filter((r) => r.profile_id).length} unit="คน" />
+          <StatCard tone="warning" icon={<KeyIcon className="h-5 w-5" />} label="ยังไม่มีบัญชี" value={rows.filter((r) => !r.profile_id).length} unit="คน" />
         </div>
       )}
 

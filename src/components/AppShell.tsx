@@ -542,10 +542,10 @@ function AppShellInner() {
   const themeLabel =
     preference === "system" ? "ตามระบบ" : preference === "dark" ? "โหมดมืด" : "โหมดสว่าง";
 
-  const sidebarActionClass = (active = false) =>
+  const footerIconClass = (active = false) =>
     cn(
-      "group font-ui tappable flex items-center rounded-lg text-[13px] font-semibold transition-colors",
-      collapsed ? "justify-center px-0 py-2.5 w-full" : "gap-3 px-2.5 py-2 w-full",
+      "tappable flex h-10 items-center justify-center rounded-lg transition-colors",
+      collapsed ? "w-10" : "flex-1",
       active ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
     );
 
@@ -594,15 +594,6 @@ function AppShellInner() {
     <Button variant="ghost" size="icon" onClick={() => setNavOpen(true)} aria-label="เมนู" title="เมนู">
       <MenuIcon className="h-3 w-3" />
     </Button>
-  );
-
-  const userLabel = (
-    <button type="button" onClick={() => navigate("/profile")} className="min-w-0 text-left tappable">
-      <p className="truncate text-xs font-semibold leading-tight">{displayName}</p>
-      {profile && (
-        <p className="truncate text-[10px] leading-tight text-muted-foreground">{roleSubtitle}</p>
-      )}
-    </button>
   );
 
   const avatarButton = (avatarClassName?: string) => (
@@ -689,73 +680,65 @@ function AppShellInner() {
           ))}
         </nav>
 
-        <div
-          className={cn(
-            "mt-auto border-t border-border/60",
-            collapsed ? "flex flex-col items-center gap-1 px-1.5 py-2" : "px-3 py-2",
-          )}
-        >
+        <div className={cn("mt-auto flex flex-col gap-2 border-t border-border/60", collapsed ? "items-center px-1.5 py-2" : "p-3")}>
           {collapsed ? (
-            avatarButton("h-6 w-6 text-[9px]")
+            avatarButton("h-7 w-7 text-[10px]")
           ) : (
-            <div className="mb-1.5 flex items-center gap-2 px-1">
-              {avatarButton("h-6 w-6 text-[9px]")}
-              {userLabel}
+            <div className="space-y-2 rounded-xl bg-card p-2.5 shadow-card">
+              <div className="flex items-center gap-2.5">
+                {avatarButton("h-9 w-9 text-xs")}
+                <button type="button" onClick={() => navigate("/profile")} className="tappable min-w-0 flex-1 text-left">
+                  <p className="truncate text-[13px] font-semibold leading-tight">{displayName}</p>
+                  {profile && <p className="truncate text-[11px] leading-tight text-muted-foreground">{roleSubtitle}</p>}
+                </button>
+              </div>
+              {isActualSuperAdmin && (
+                <Select
+                  className="h-8 text-xs"
+                  value={viewAsRole ?? ""}
+                  onChange={(e) => setViewAsRole((e.target.value || null) as Role | null)}
+                  aria-label="ดูมุมมองบทบาท"
+                  title="ดูมุมมองบทบาท (เมนู/สิทธิ์เท่านั้น ข้อมูลยังเป็นของผู้ดูแลระบบสูงสุด)"
+                >
+                  <option value="">ผู้ดูแลระบบสูงสุด (จริง)</option>
+                  {ROLES.filter((r) => r !== "super_admin").map((r) => (
+                    <option key={r} value={r}>
+                      {ROLE_LABEL[r]}
+                    </option>
+                  ))}
+                </Select>
+              )}
             </div>
           )}
-          {isActualSuperAdmin && !collapsed && (
-            <Select
-              className="mb-2 h-7 text-[10px]"
-              value={viewAsRole ?? ""}
-              onChange={(e) => setViewAsRole((e.target.value || null) as Role | null)}
-              aria-label="ดูมุมมองบทบาท"
-              title="ดูมุมมองบทบาท (เมนู/สิทธิ์เท่านั้น ข้อมูลยังเป็นของผู้ดูแลระบบสูงสุด)"
-            >
-              <option value="">ผู้ดูแลระบบสูงสุด (จริง)</option>
-              {ROLES.filter((r) => r !== "super_admin").map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_LABEL[r]}
-                </option>
-              ))}
-            </Select>
-          )}
-          <div className={cn("hidden flex-col gap-1.5 lg:flex", collapsed ? "items-center" : "px-1")}>
+          <div className={cn("hidden lg:flex", collapsed ? "flex-col items-center gap-1" : "gap-1")}>
             {maySeeSettings && (
               <button
                 type="button"
                 onClick={() => navigate("/settings")}
                 title="ตั้งค่าระบบ"
-                className={sidebarActionClass(location.pathname === "/settings")}
+                aria-label="ตั้งค่าระบบ"
+                className={footerIconClass(location.pathname === "/settings")}
               >
-                <SettingsIcon className="h-4 w-4 shrink-0" />
-                {!collapsed && <span className="truncate">ตั้งค่าระบบ</span>}
+                <SettingsIcon className="h-4 w-4" />
               </button>
             )}
             <button
               type="button"
               onClick={cycle}
-              title={`Theme: ${preference}`}
+              title={themeLabel}
               aria-label={`Theme: ${preference}. Tap to cycle.`}
-              className={sidebarActionClass()}
+              className={footerIconClass()}
             >
-              {preference === "system" ? (
-                <Monitor className="h-4 w-4 shrink-0" />
-              ) : preference === "dark" ? (
-                <Sun className="h-4 w-4 shrink-0" />
-              ) : (
-                <Moon className="h-4 w-4 shrink-0" />
-              )}
-              {!collapsed && <span className="truncate">{themeLabel}</span>}
+              {preference === "system" ? <Monitor className="h-4 w-4" /> : preference === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
             <button
               type="button"
               onClick={signOut}
-              aria-label="ออกจากระบบ"
               title="ออกจากระบบ"
-              className={sidebarActionClass()}
+              aria-label="ออกจากระบบ"
+              className={cn(footerIconClass(), "hover:bg-destructive/10 hover:text-destructive")}
             >
-              <LogOut className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="truncate">ออกจากระบบ</span>}
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         </div>
