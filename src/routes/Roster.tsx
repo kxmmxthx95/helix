@@ -2,15 +2,17 @@ import { AlertTriangle, CallIcon, CheckmarkCircleIcon, HomeIcon, KeyIcon, Profil
 import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportSheet } from "@/components/ImportSheet";
+import { Modal } from "@/components/Modal";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Avatar, Card, CloseButton, EmptyState, Field, FormSection, Input, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
+import { Button, Avatar, Card, CloseButton, EmptyState, Field, FormSection, Input, Pagination, Select, SheetFormContext, Skeleton, Spinner } from "@/components/ui";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
 import { useClassrooms } from "@/hooks/useStatusManagement";
 import { useDepartments, useInviteUsers, type InviteOutcome, type UserInvite } from "@/hooks/useProfiles";
 import { passwordFromNationalId } from "@/lib/password";
+import { cn } from "@/lib/utils";
 import {
   useDeleteStudentContact,
   useGuardianFinancials,
@@ -121,7 +123,7 @@ export function AddressInputs({
   const isRequired = (k: keyof AddressFields) => required.includes(k);
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <Field label="บ้านเลขที่">
           <Input
             value={value.house_no ?? ""}
@@ -137,7 +139,7 @@ export function AddressInputs({
           />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <Field label="ตรอก/ซอย">
           <Input
             value={value.alley ?? ""}
@@ -153,7 +155,7 @@ export function AddressInputs({
           />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <Field label="ตำบล/แขวง">
           <Input
             value={value.subdistrict ?? ""}
@@ -169,7 +171,7 @@ export function AddressInputs({
           />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <Field label="จังหวัด">
           <Input
             value={value.province ?? ""}
@@ -738,6 +740,14 @@ export function Roster() {
   );
 }
 
+type StudentTab = "general" | "contact" | "health" | "guardian";
+const STUDENT_TABS: { key: StudentTab; label: string }[] = [
+  { key: "general", label: "ข้อมูลทั่วไป" },
+  { key: "contact", label: "ติดต่อ/ที่อยู่" },
+  { key: "health", label: "สุขภาพ" },
+  { key: "guardian", label: "ผู้ปกครอง" },
+];
+
 function blankDraft(departmentId: string): StudentDraft {
   return {
     student_code: "",
@@ -781,6 +791,7 @@ export function EditStudentSheet({
   const { data: departments = [] } = useDepartments();
   const save = useSaveStudent();
   const [draft, setDraft] = useState<StudentDraft | null>(null);
+  const [tab, setTab] = useState<StudentTab>("general");
 
   const isNew = target === "new";
   // Teachers can open a row to view it (mayView in the parent) but can't
@@ -802,6 +813,7 @@ export function EditStudentSheet({
 
   function close() {
     setDraft(null);
+    setTab("general");
     onClose();
   }
 
@@ -828,32 +840,45 @@ export function EditStudentSheet({
     close();
   }
 
-  return (
-    <Sheet
-      open={target !== null}
-      onOpenChange={(open) => !open && close()}
-      title={isNew ? "เพิ่มนักเรียน" : readOnly ? "ข้อมูลนักเรียน" : "แก้ไขข้อมูลนักเรียน"}
-      description={current && !isNew ? `${current.first_name} ${current.last_name}`.trim() : undefined}
-      headerEnd={<CloseButton onClick={close} />}
-      footer={
-        current ? (
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={close}>
-              {readOnly ? "ปิด" : "ยกเลิก"}
-            </Button>
-            {!readOnly && (
-              <Button type="submit" form="edit-student" className="flex-1">
-                บันทึก
-              </Button>
-            )}
-          </div>
-        ) : undefined
-      }
-    >
+  const title = isNew ? "เพิ่มนักเรียน" : readOnly ? "ข้อมูลนักเรียน" : "แก้ไขข้อมูลนักเรียน";
+  const description = current && !isNew ? `${current.first_name} ${current.last_name}`.trim() : undefined;
+  const footer = current ? (
+    <div className="flex gap-2">
+      <Button type="button" variant="outline" className="flex-1" onClick={close}>
+        {readOnly ? "ปิด" : "ยกเลิก"}
+      </Button>
+      {!readOnly && (
+        <Button type="submit" form="edit-student" className="flex-1">
+          บันทึก
+        </Button>
+      )}
+    </div>
+  ) : undefined;
+  const body = (
+    <>
       {current && (
         <div className="space-y-4">
-          <form id="edit-student" onSubmit={submit} className="space-y-4">
+          <div role="tablist" aria-label="หัวข้อข้อมูลนักเรียน" className="flex overflow-x-auto border-b border-border [scrollbar-width:none]">
+            {STUDENT_TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.key}
+                onClick={() => setTab(t.key)}
+                className={cn(
+                  "tappable -mb-px min-h-10 flex-1 whitespace-nowrap border-b-2 px-3 text-[13px] font-medium transition-colors",
+                  tab === t.key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {/* Panels stay mounted (hidden) so the draft and the single form survive tab switches; an invalid required field jumps back to the first tab. */}
+          <form id="edit-student" onSubmit={submit} onInvalidCapture={() => setTab("general")} className="space-y-4">
           <fieldset disabled={readOnly} className="space-y-4">
+            <div hidden={tab !== "general"}>
             <FormSection icon={<ProfileIcon className="h-4 w-4" />} title="ข้อมูลทั่วไป" description="ข้อมูลพื้นฐานของนักเรียน">
                 <Field label="รหัสนักเรียน">
                   <Input
@@ -957,7 +982,9 @@ export function EditStudentSheet({
                 </div>
 
             </FormSection>
+            </div>
 
+            <div hidden={tab !== "contact"} className="space-y-4">
             <FormSection icon={<CallIcon className="h-4 w-4" />} title="ข้อมูลติดต่อ">
                 <Field label="เบอร์โทรศัพท์">
                   <Input
@@ -980,7 +1007,9 @@ export function EditStudentSheet({
             <FormSection icon={<HomeIcon className="h-4 w-4" />} title="ที่อยู่">
               <AddressInputs value={current} onChange={(patch) => setDraft({ ...current, ...patch })} />
             </FormSection>
+            </div>
 
+            <div hidden={tab !== "health"}>
             <FormSection icon={<ShieldIcon className="h-4 w-4" />} title="สุขภาพ">
                 <Field label="หมู่เลือด">
                   <Select
@@ -1022,9 +1051,11 @@ export function EditStudentSheet({
                   />
                 </Field>
             </FormSection>
+            </div>
           </fieldset>
           </form>
 
+          <div hidden={tab !== "guardian"}>
           <FormSection icon={<UsersIcon className="h-4 w-4" />} title="ผู้ปกครอง">
             <fieldset disabled={readOnly} className="space-y-4">
               <Field label="สถานภาพครอบครัว">
@@ -1054,8 +1085,27 @@ export function EditStudentSheet({
               )}
             </fieldset>
           </FormSection>
+          </div>
         </div>
       )}
+    </>
+  );
+
+  // New student: centered pop-up. Existing: side drawer.
+  return isNew ? (
+    <Modal open={target !== null} onOpenChange={(open) => !open && close()} title={title} footer={footer} className="max-w-lg">
+      <SheetFormContext.Provider value>{body}</SheetFormContext.Provider>
+    </Modal>
+  ) : (
+    <Sheet
+      open={target !== null}
+      onOpenChange={(open) => !open && close()}
+      title={title}
+      description={description}
+      headerEnd={<CloseButton onClick={close} />}
+      footer={footer}
+    >
+      {body}
     </Sheet>
   );
 }
