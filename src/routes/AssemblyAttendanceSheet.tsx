@@ -97,7 +97,7 @@ export function AssemblyAttendanceSheet({
       })),
       {
         onSuccess: () => {
-          toast(`บันทึกเช็คชื่อหน้าเสาธง ${roomLabel(classroom.id)} เรียบร้อย`);
+          toast(`บันทึกเช็คชื่อเข้าแถว ${roomLabel(classroom.id)} เรียบร้อย`);
           onOpenChange(false);
         },
         onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),

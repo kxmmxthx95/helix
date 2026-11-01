@@ -5,7 +5,7 @@ import { profileFullName, type ProfileWithRoles } from "@/lib/database.types";
 import { ChevronForward, PaletteIcon } from "@/components/icons";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
-import { Avatar, Skeleton, Spinner } from "@/components/ui";
+import { Avatar, Spinner } from "@/components/ui";
 import { useActiveAcademicYear, useActiveTerm, useAcademicEvents } from "@/hooks/useAcademicTerms";
 import { useHomeroomClassrooms } from "@/hooks/useAttendance";
 import { useSubjects } from "@/hooks/useCurriculum";
@@ -24,7 +24,6 @@ import { gradeShortLabel } from "@/lib/gradeLevels";
 import { supabase } from "@/lib/supabase";
 import { cn, todayIso } from "@/lib/utils";
 import { AssemblyAttendanceSheet } from "@/routes/AssemblyAttendanceSheet";
-import { QuickClockSection } from "@/routes/Dashboard";
 import { PeriodDaySheet, type DayPeriod } from "@/routes/PeriodDaySheet";
 import { bangkokTime } from "@/routes/TimeTracking";
 import { TeacherTimetable } from "@/routes/Timetable";
@@ -32,7 +31,6 @@ import { TeacherTimetable } from "@/routes/Timetable";
 // Teacher home: "what do I teach today" first, open work second. Cards are widget-style (macOS).
 
 const WIDGET = "min-w-0 rounded-[24px] bg-card text-card-foreground shadow-card";
-const SECTION_LABEL = "px-1 text-[13px] font-medium text-muted-foreground";
 // Banner gradient: five colours laid out as soft blobs; the teacher picks a preset or tunes the colours.
 const BANNER_PRESETS: { name: string; colors: string[] }[] = [
   { name: "พระอาทิตย์ตก", colors: ["#ff9a3c", "#ffd86b", "#ff7a8a", "#5ad6e8", "#7ee8d0"] },
@@ -130,9 +128,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const { data: activeTerm } = useActiveTerm(departmentId || null);
   const scheduleTerm = splitsByTerm ? (activeTerm?.term_type === "term2" ? 2 : 1) : null;
 
-  const { data: entries = [], isLoading: loadingEntries } = useTeacherSchedule(me.id, academicYear, scheduleTerm);
+  const { data: entries = [] } = useTeacherSchedule(me.id, academicYear, scheduleTerm);
   // ponytail: department default periods only — a grade with its own override can show slightly different times; read per-grade periods if that matters
-  const { data: periods = [], isLoading: loadingPeriods } = useDepartmentPeriods(departmentId || null);
+  const { data: periods = [] } = useDepartmentPeriods(departmentId || null);
   const { data: events = [] } = useAcademicEvents();
   const { data: subjects = [] } = useSubjects({
     search: "",
@@ -197,8 +195,6 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     const grade = classrooms.find((c) => c.id === e.teaching_assignment.classroom_id)?.grade_level_id;
     return { gradient: colors.gradient(area, grade), hex: colors.hex(area, grade) };
   };
-
-  const current = isToday ? timed.find((t) => t.start <= nowMin && nowMin < t.end) : undefined;
 
   // Back of the "เช็คชื่อรายคาบ" tile: the period in progress, else the next one — rolling to the next teaching day when today is done.
   const upNext = (() => {
@@ -285,28 +281,94 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     }
   }
 
-  const work = [
-    ...(unchecked > 0 ? [{ key: "periods", label: "คาบที่ยังไม่เช็คชื่อ", count: unchecked, to: "/period-attendance" }] : []),
-    ...assemblyPending.map((h) => ({ key: `assembly-${h.id}`, label: `เช็คชื่อเข้าแถว ${roomLabel(h.id)}`, count: null, to: "/attendance" })),
-    ...(pendingLeave.length > 0 ? [{ key: "leave", label: "ใบลาที่รออนุมัติ", count: pendingLeave.length, to: "/attendance" }] : []),
+  const tiles = [
+    ...(showClock
+      ? [
+          {
+            clock: true,
+      title: clock?.clock_out_time ? "ลงเวลาแล้ว" : clock?.clock_in_time ? "ออกงาน" : "เข้างาน",
+            text: clock?.clock_out_time
+              ? `เข้า ${bangkokTime(clock.clock_in_time ?? clock.clock_out_time)} · ออก ${bangkokTime(clock.clock_out_time)}`
+              : clock?.clock_in_time
+                ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}`
+                : "ยังไม่ได้บันทึกเวลาเข้างาน",
+            busy: clockIn.isPending || clockOut.isPending,
+            disabled: loadingClock || !!clock?.clock_out_time,
+            onClick: () => onClock(clock?.clock_in_time ? "out" : "in"),
+          },
+        ]
+      : []),
+    { title: "เช็คชื่อรายคาบ", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", sheet: true },
+    {
+      title: "ใบลารออนุมัติ",
+      text: pendingLeave.length > 0 ? `มี ${pendingLeave.length} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง",
+      busy: false,
+      disabled: false,
+      onClick: () => setLeaveOpen(true),
+    },
+    {
+      title: "เช็คชื่อเข้าแถว",
+      text:
+        homerooms.length === 0
+          ? "ไม่ได้เป็นครูที่ปรึกษา"
+          : !assemblyDay
+            ? "วันนี้ไม่มีเข้าแถว"
+            : assemblyPending.length > 0
+              ? `ยังไม่เช็ค ${assemblyPending.map((h) => roomLabel(h.id)).join(", ")}`
+              : "เช็คชื่อเรียบร้อยแล้ว",
+      busy: false,
+      disabled: false,
+      onClick: () => setAssemblyOpen(true),
+    },
   ];
-
-  const loading = loadingEntries || loadingPeriods;
-  const heading = !shown ? "วันนี้" : shown.offset === 0 ? "วันนี้" : shown.offset === 1 ? "พรุ่งนี้" : `วัน${DAY_NAME[shown.day]}`;
-  const dateText = new Intl.DateTimeFormat("th-TH", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(
-    new Date(`${(shown?.iso ?? today)}T00:00:00Z`),
-  );
+  type Tile = (typeof tiles)[number];
+  const renderTile = (t: Tile, surface: string) => {
+    const body = (
+      <>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold">{t.title}</span>
+          <span className="block text-sm text-muted-foreground">{t.text}</span>
+        </span>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-accent text-accent">
+          {"busy" in t && t.busy ? <Spinner className="h-4 w-4" /> : <ChevronForward className="h-4 w-4" />}
+        </span>
+      </>
+    );
+    const cls = cn("flex h-full items-center gap-3 rounded-2xl p-4 text-left transition-colors", surface);
+    if ("sheet" in t && upNext) {
+      return (
+        <button
+          key={t.title}
+          type="button"
+          onClick={() => setPeriodsOpen(true)}
+          className={cls}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold">{t.title}</span>
+            <span className="block text-sm text-muted-foreground">{t.text}</span>
+          </span>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-accent text-accent">
+            <ChevronForward className="h-4 w-4" />
+          </span>
+        </button>
+      );
+    }
+    return "onClick" in t ? (
+      <button key={t.title} type="button" disabled={t.disabled || t.busy} onClick={t.onClick} className={cn(cls, "disabled:opacity-60")}>
+        {body}
+      </button>
+    ) : (
+      <Link key={t.title} to={t.to} className={cls}>
+        {body}
+      </Link>
+    );
+};
 
   return (
     <div>
-      <div className="mb-4 lg:hidden">
-        <h1 className="font-heading text-[32px] font-bold leading-tight tracking-[-0.02em]">{heading}</h1>
-        <p className="text-sm text-muted-foreground">{dateText}</p>
-      </div>
-
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <section className={cn(WIDGET, "relative hidden overflow-hidden lg:col-span-2 lg:block")}>
-          <div className="relative h-36" style={bannerBackground(bannerColors)}>
+        <section className={cn(WIDGET, "relative overflow-hidden lg:col-span-2")}>
+          <div className="relative h-24 sm:h-36" style={bannerBackground(bannerColors)}>
             <button
               type="button"
               aria-label="เปลี่ยนสีพื้นหลังการ์ด"
@@ -356,19 +418,19 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
               </>
             )}
           </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,26rem)] gap-8 px-8 pb-8">
+          <div className="grid gap-5 px-4 pb-5 sm:px-8 sm:pb-8 md:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] md:gap-8">
             <div className="min-w-0">
               <Avatar
                 name={profileFullName(me)}
                 src={avatarUrl(me)}
-                className={cn("relative z-10 -mt-14 h-28 w-28 text-4xl ring-4", me.line_user_id ? "ring-[#06C755]" : "ring-card")}
+                className={cn("relative z-10 -mt-10 h-20 w-20 text-3xl ring-4 sm:-mt-14 sm:h-28 sm:w-28 sm:text-4xl", me.line_user_id ? "ring-[#06C755]" : "ring-card")}
               />
-              <h1 className="font-heading mt-3 truncate text-3xl font-bold tracking-[-0.02em]">{profileFullName(me)}</h1>
+              <h1 className="font-heading mt-3 truncate text-2xl font-bold sm:text-3xl tracking-[-0.02em]">{profileFullName(me)}</h1>
               <p className="mt-1 truncate text-base text-muted-foreground">{me.email || "ยังไม่ได้ระบุอีเมล"}</p>
               {homerooms.length > 0 && (
                 <p className="truncate text-base text-muted-foreground">ครูที่ปรึกษา {homerooms.map((h) => roomLabel(h.id)).join(", ")}</p>
               )}
-              <div className="mt-5 flex items-center gap-3">
+              <div className="mt-4 flex items-center gap-3 sm:mt-5">
                 <button
                   type="button"
                   onClick={() => setTimetableOpen(true)}
@@ -384,10 +446,10 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                 </Link>
               </div>
             </div>
-            <div className="flex flex-col items-end gap-4 pt-5 text-right">
+            <div className="flex flex-col items-start gap-4 text-left md:items-end md:pt-5 md:text-right">
               <div>
                 <p className="text-sm text-muted-foreground">ตำแหน่ง</p>
-                <div className="mt-1.5 flex flex-wrap justify-end gap-2">
+                <div className="mt-1.5 flex flex-wrap gap-2 md:justify-end">
                   {roleSubtitle
                     .split(", ")
                     .filter(Boolean)
@@ -401,7 +463,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
               {taught.length > 0 && (
                 <div>
                   <p className="text-sm text-muted-foreground">วิชาที่สอน</p>
-                  <div className="mt-1.5 flex flex-wrap justify-end gap-2">
+                  <div className="mt-1.5 flex flex-wrap gap-2 md:justify-end">
                     {taught.slice(0, 6).map((t) => (
                       <span key={t.code} className={cn("rounded-full px-3 py-1 text-sm font-medium", colors.shade(t.area))}>
                         {t.code}
@@ -413,221 +475,10 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
               )}
             </div>
           </div>
-          <div className={cn("grid items-stretch gap-3 px-8 pb-8", showClock ? "grid-cols-4" : "grid-cols-3")}>
-            {[
-              ...(showClock
-                ? [
-                    {
-                      title: clock?.clock_out_time ? "ลงเวลาแล้ว" : clock?.clock_in_time ? "ออกงาน" : "เข้างาน",
-                      text: clock?.clock_out_time
-                        ? `เข้า ${bangkokTime(clock.clock_in_time ?? clock.clock_out_time)} · ออก ${bangkokTime(clock.clock_out_time)}`
-                        : clock?.clock_in_time
-                          ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}`
-                          : "ยังไม่ได้บันทึกเวลาเข้างาน",
-                      busy: clockIn.isPending || clockOut.isPending,
-                      disabled: loadingClock || !!clock?.clock_out_time,
-                      onClick: () => onClock(clock?.clock_in_time ? "out" : "in"),
-                    },
-                  ]
-                : []),
-              { title: "เช็คชื่อรายคาบ", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", sheet: true },
-              {
-                title: "ใบลารออนุมัติ",
-                text: pendingLeave.length > 0 ? `มี ${pendingLeave.length} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง",
-                busy: false,
-                disabled: false,
-                onClick: () => setLeaveOpen(true),
-              },
-              {
-                title: "เช็คชื่อหน้าเสาธง",
-                text:
-                  homerooms.length === 0
-                    ? "ไม่ได้เป็นครูที่ปรึกษา"
-                    : !assemblyDay
-                      ? "วันนี้ไม่มีเข้าแถว"
-                      : assemblyPending.length > 0
-                        ? `ยังไม่เช็ค ${assemblyPending.map((h) => roomLabel(h.id)).join(", ")}`
-                        : "เช็คชื่อเรียบร้อยแล้ว",
-                busy: false,
-                disabled: false,
-                onClick: () => setAssemblyOpen(true),
-              },
-            ].map((t) => {
-              const body = (
-                <>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[15px] font-semibold">{t.title}</span>
-                    <span className="block text-sm text-muted-foreground">{t.text}</span>
-                  </span>
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-accent text-accent">
-                    {"busy" in t && t.busy ? <Spinner className="h-4 w-4" /> : <ChevronForward className="h-4 w-4" />}
-                  </span>
-                </>
-              );
-              const cls = "flex h-full items-center gap-3 rounded-2xl bg-muted/70 p-4 text-left transition-colors hover:bg-muted";
-              if ("sheet" in t && upNext) {
-                const sub = subjectOf(upNext.entry.teaching_assignment.subject_id);
-                return (
-                  <button
-                    key={t.title}
-                    type="button"
-                    onClick={() => setPeriodsOpen(true)}
-                    className={cn("flex h-full items-center gap-3 rounded-2xl p-4 text-left", styleOf(upNext.entry).gradient)}
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-medium opacity-70">{upNext.label}</span>
-                      <span className="block truncate text-[15px] font-semibold">{sub?.name_th ?? "—"}</span>
-                      <span className="block truncate text-sm opacity-80">
-                        {sub?.code} · {roomLabel(upNext.entry.teaching_assignment.classroom_id)} · {upNext.startText}–{upNext.endText}
-                      </span>
-                    </span>
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-current">
-                      <ChevronForward className="h-4 w-4" />
-                    </span>
-                  </button>
-                );
-              }
-              return "onClick" in t ? (
-                <button key={t.title} type="button" disabled={t.disabled || t.busy} onClick={t.onClick} className={cn(cls, "disabled:opacity-60")}>
-                  {body}
-                </button>
-              ) : (
-                <Link key={t.title} to={t.to} className={cls}>
-                  {body}
-                </Link>
-              );
-            })}
+          <div className={cn("grid grid-cols-1 items-stretch gap-3 px-4 pb-4 sm:grid-cols-2 sm:px-8 sm:pb-8", showClock ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
+            {tiles.map((t) => renderTile(t, "bg-muted/70 hover:bg-muted"))}
           </div>
         </section>
-        {showClock && (
-          <div className={cn(WIDGET, "p-4 md:p-5 lg:hidden")}>
-            <QuickClockSection profileId={me.id} departmentId={me.department_id} />
-          </div>
-        )}
-
-        <section className="space-y-2 lg:col-start-1 lg:row-start-2">
-          <h2 className={SECTION_LABEL}>
-            <span className="hidden lg:inline">
-              คาบสอน · {heading} · {dateText}
-            </span>
-            <span className="lg:hidden">คาบสอน</span>
-          </h2>
-          {loading ? (
-            <div role="status" aria-label="กำลังโหลด" className={cn(WIDGET, "space-y-3 p-4")}>
-              <Skeleton className="h-24 w-full rounded-2xl" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : !shown ? (
-            <div className={cn(WIDGET, "px-4 py-12 text-center text-sm text-muted-foreground")}>ยังไม่มีคาบสอนใน 2 สัปดาห์ข้างหน้า</div>
-          ) : (
-            <>
-              {current && (
-                <Link
-                  to={`/period-attendance?entry=${current.entry.id}`}
-                  className={cn(
-                    "relative isolate block overflow-hidden rounded-[24px] p-4 shadow-[inset_0_1px_0_rgb(255_255_255/0.7),0_12px_32px_-8px_rgb(0_0_0/0.25)] transition-transform active:scale-[0.99] md:p-5",
-                    styleOf(current.entry).gradient,
-                  )}
-                >
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-white/45 via-transparent to-transparent"
-                  />
-                  <p className="relative text-xs font-medium opacity-70">
-                    กำลังสอน · {current.startText}–{current.endText} · เหลือ {current.end - nowMin} นาที
-                  </p>
-                  <p className="mt-1 text-xl font-bold leading-snug">
-                    {subjectOf(current.entry.teaching_assignment.subject_id)?.name_th ?? "—"}
-                  </p>
-                  <p className="text-sm opacity-80">
-                    {subjectOf(current.entry.teaching_assignment.subject_id)?.code} · {roomLabel(current.entry.teaching_assignment.classroom_id)}
-                  </p>
-                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/15">
-                    <div
-                      className="h-full rounded-full bg-current opacity-60"
-                      style={{ width: `${Math.min(100, ((nowMin - current.start) / (current.end - current.start)) * 100)}%` }}
-                    />
-                  </div>
-                  <span className="mt-3 inline-flex h-8 items-center rounded-full bg-black/80 px-4 text-sm font-medium text-white dark:bg-white/90 dark:text-black">
-                    {takenSet.has(current.entry.id) ? "ดูการเช็คชื่อ" : "เช็คชื่อ"}
-                  </span>
-                </Link>
-              )}
-
-              <ul className={cn(WIDGET, "divide-y divide-border/60 overflow-hidden")}>
-                {timed
-                  .filter((t) => t !== current)
-                  .map((t) => {
-                    const past = isToday && t.end <= nowMin;
-                    const taken = takenSet.has(t.entry.id);
-                    const subject = subjectOf(t.entry.teaching_assignment.subject_id);
-                    return (
-                      <li key={t.entry.id}>
-                        <Link
-                          to={`/period-attendance?entry=${t.entry.id}`}
-                          className={cn(
-                            "flex min-h-14 items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50 active:bg-muted",
-                            past && taken && "opacity-55",
-                          )}
-                        >
-                          <span className="w-12 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
-                            {t.startText}
-                          </span>
-                          <span
-                            aria-hidden
-                            className="h-8 w-1 shrink-0 rounded-full"
-                            style={{ backgroundColor: styleOf(t.entry).hex }}
-                          />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[15px] font-medium">{subject?.name_th ?? "—"}</span>
-                            <span className="block truncate text-xs text-muted-foreground">
-                              {subject?.code} · {roomLabel(t.entry.teaching_assignment.classroom_id)}
-                            </span>
-                          </span>
-                          {isToday && (taken || past) && (
-                            <span
-                              className={cn(
-                                "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
-                                taken ? "bg-success/15 text-success" : "bg-warning/15 text-warning",
-                              )}
-                            >
-                              {taken ? "เช็คแล้ว" : "ยังไม่เช็ค"}
-                            </span>
-                          )}
-                          <ChevronForward className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        </Link>
-                      </li>
-                    );
-                  })}
-              </ul>
-            </>
-          )}
-        </section>
-
-        {work.length > 0 && (
-          <section className="space-y-2 lg:col-start-2 lg:row-start-2">
-            <h2 className={SECTION_LABEL}>งานค้าง</h2>
-            <ul className={cn(WIDGET, "divide-y divide-border/60 overflow-hidden")}>
-              {work.map((w) => (
-                <li key={w.key}>
-                  <Link
-                    to={w.to}
-                    className="flex min-h-12 items-center gap-3 px-4 py-2.5 text-[15px] transition-colors hover:bg-muted/50 active:bg-muted"
-                  >
-                    <span className="min-w-0 flex-1 truncate">{w.label}</span>
-                    {w.count !== null && (
-                      <span className="rounded-full bg-warning/15 px-2 py-0.5 font-mono text-xs font-semibold tabular-nums text-warning">
-                        {w.count}
-                      </span>
-                    )}
-                    <ChevronForward className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
       </div>
       {upNext && (
         <PeriodDaySheet

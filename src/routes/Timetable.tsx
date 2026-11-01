@@ -1276,7 +1276,7 @@ function TimetableGrid({
                   return (
                     <td
                       key={day}
-                      className={cn("h-px border-l border-border p-0.5 transition-colors", canDrop && overKey === cellKey && "bg-accent/15")}
+                      className={cn("border-l border-border p-0.5 transition-colors", canDrop && overKey === cellKey && "bg-accent/15")}
                       onDragOver={(ev) => {
                         if (!canDrop) return;
                         ev.preventDefault();
@@ -1301,7 +1301,7 @@ function TimetableGrid({
                         );
                       }}
                     >
-                      <div className="flex h-full flex-col gap-0.5">
+                      <div className="flex flex-col gap-0.5">
                         {cellEntries.map((e) => {
                           const subjectId = e.teaching_assignment.subject_id;
                           return (
