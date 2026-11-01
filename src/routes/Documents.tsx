@@ -151,7 +151,7 @@ function StudentDocuments() {
     );
   }
   return (
-    <div className="space-y-3">
+    <div className="flex flex-1 flex-col space-y-3">
       {options.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {options.map((s) => (

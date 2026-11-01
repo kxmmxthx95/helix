@@ -1226,7 +1226,7 @@ function StudentPractice() {
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-4">
+    <div className="mx-auto flex w-full max-w-xl flex-1 flex-col space-y-4">
       {options.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {options.map((s) => (
@@ -1315,7 +1315,7 @@ function PracticeHome({
   const openSubject = openSubjectId ? subjectById.get(openSubjectId) : null;
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-1 flex-col space-y-4">
       <Button
         variant="outline"
         className="w-full"

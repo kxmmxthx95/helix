@@ -8,6 +8,7 @@
   /* Helix design system — Vercel (Geist) × Apple iOS. Source of truth: the Helix Design System artifact
      (tokens.json). Light and dark are designed equally; ThemeProvider follows the OS by default. */
   :root {
+    --field: var(--card);
     --shell: 240 24% 95.9%;            /* #f2f2f7 frame + sidebar behind the main pane */
     --background: 0 0% 100%;           /* #ffffff main pane */
     --foreground: 0 0% 3.9%;           /* #0a0a0a ink */
@@ -81,31 +82,61 @@
     --accent: 211 100% 62%;
   }
 
-  /* Student game skin (GameShell sets this on <html>). Light-only: `.dark` is overridden too. */
-  .theme-game,
-  .dark.theme-game {
-    --background: 330 100% 97%;
-    --foreground: 280 45% 16%;
-    --card: 40 100% 97%;
-    --card-foreground: 280 45% 16%;
-    --primary: 330 85% 55%;
+  /* Student portal skin: iPhone (iOS system colours, grouped background, SF type). GameShell sets this on <html>; follows light/dark. */
+  .theme-game {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --primary: 349 100% 59%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 320 60% 92%;
-    --secondary-foreground: 280 45% 16%;
-    --muted: 320 50% 93%;
-    --muted-foreground: 285 25% 38%;
-    --accent: 280 60% 45%;
+    --secondary: 240 6% 93%;
+    --secondary-foreground: 0 0% 0%;
+    --muted: 240 6% 93%;
+    --muted-foreground: 240 3% 46%;
+    --accent: 211 100% 50%;
     --accent-foreground: 0 0% 100%;
-    --border: 285 40% 30%;
-    --input: 300 35% 70%;
-    --ring: 330 85% 55%;
-    --radius: 1rem;
-    --glass: 40 100% 97%;
-    --glass-alpha: 0.95;
-    --shell: 320 50% 93%;
-    --raised: 40 100% 97%;
-    --fill-strong: 320 45% 88%;
-    --accent-soft: 280 60% 94%;
+    --destructive: 3 100% 59%;
+    --success: 135 59% 49%;
+    --warning: 35 100% 50%;
+    --border: 240 4% 82%;
+    --input: 240 6% 93%;
+    --field: 240 6% 93%;
+    --ring: 211 100% 50%;
+    --radius: 0.625rem;
+    --glass: 0 0% 100%;
+    --glass-alpha: 0.82;
+    --shell: 240 24% 96%;
+    --raised: 0 0% 100%;
+    --fill-strong: 240 6% 90%;
+    --accent-soft: 211 100% 95%;
+  }
+  .dark.theme-game {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 100%;
+    --card: 240 3% 11.4%;
+    --card-foreground: 0 0% 100%;
+    --primary: 349 100% 61%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 3% 18%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 3% 18%;
+    --muted-foreground: 240 3% 61%;
+    --accent: 210 100% 52%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 3 100% 61%;
+    --success: 135 64% 50%;
+    --warning: 36 100% 52%;
+    --border: 240 2% 23%;
+    --input: 240 3% 18%;
+    --field: 240 3% 18%;
+    --ring: 210 100% 52%;
+    --glass: 240 3% 11%;
+    --glass-alpha: 0.82;
+    --shell: 0 0% 0%;
+    --raised: 240 3% 15%;
+    --fill-strong: 240 3% 24%;
+    --accent-soft: 210 100% 16%;
   }
 
   * {
@@ -182,17 +213,22 @@
 }
 
 @layer components {
-  /* Game skin shapes: chunky outline + bottom "press" shadow on cards and fields. */
-  .theme-game .glass {
-    border-width: 2px;
-    border-radius: 1.25rem;
-    box-shadow: 0 3px 0 hsl(var(--border));
+  /* iPhone skin: SF type, filled 10px fields, green switches, 0.5px separators. */
+  .theme-game body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Sukhumvit Set", "Noto Sans Thai", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.01em;
   }
   .theme-game input,
   .theme-game select,
   .theme-game textarea {
-    border-width: 2px;
-    border-radius: 0.875rem;
+    border-radius: 0.625rem;
+  }
+  .theme-game [role="switch"][aria-checked="true"] {
+    background-color: hsl(var(--success));
+  }
+  .theme-game .hairline {
+    height: 0.5px;
   }
 
   .glass {

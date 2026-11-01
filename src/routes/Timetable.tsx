@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { useProfilesByIds } from "@/hooks/usePractice";
 import {
@@ -119,31 +119,6 @@ export function Timetable() {
   if (isStudent) {
     return myClassroom ? (
       <div className="space-y-4">
-        <div className="flex items-center gap-2">
-        {splitsByTerm && (
-          <div className="inline-flex h-8 gap-1 rounded-lg border border-border p-0.5">
-            {[1, 2].map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTerm(t as 1 | 2)}
-                className={cn(
-                  "inline-flex h-full shrink-0 items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                  term === t
-                    ? "bg-foreground/10 text-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                {TERM_LABEL[t]}
-              </button>
-            ))}
-          </div>
-        )}
-          <Button size="sm" variant="outline" className="ml-auto h-8 shrink-0" onClick={() => setExportOpen(true)}>
-            <DownloadIcon className="h-3.5 w-3.5" />
-            ส่งออก PDF
-          </Button>
-        </div>
         <TimetableExportSheet
           open={exportOpen}
           onOpenChange={setExportOpen}
@@ -160,6 +135,12 @@ export function Timetable() {
           classroomId={myClassroom.id}
           academicYear={academicYear}
           term={scheduleTerm}
+          legendAction={
+            <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={() => setExportOpen(true)}>
+              <DownloadIcon className="h-3.5 w-3.5" />
+              ส่งออก PDF
+            </Button>
+          }
           mayEdit={false}
           classrooms={classrooms}
           gradeLevels={gradeLevels}
@@ -444,7 +425,9 @@ function ClassroomTimetable({
   teachers,
   onBack,
   ghostEntries,
+  legendAction,
 }: {
+  legendAction?: ReactNode;
   departmentId: string;
   classroomId: string;
   ghostEntries?: ScheduleEntryRow[];
@@ -509,6 +492,7 @@ function ClassroomTimetable({
         styling={styling}
         scope={{ departmentId, academicYear, term }}
         ghostEntries={ghostEntries}
+        legendAction={legendAction}
         mode="classroom"
         mayEdit={mayEdit}
         isLoading={loadingDefaultPeriods || loadingGradePeriods || loadingEntries}
@@ -1081,7 +1065,9 @@ function TimetableGrid({
   styling,
   scope,
   ghostEntries = [],
+  legendAction,
 }: {
+  legendAction?: ReactNode;
   periods: PeriodDefinition[];
   entries: ScheduleEntryRow[];
   candidates: TeachingAssignment[];
@@ -1427,15 +1413,15 @@ function TimetableGrid({
         onClose={() => setPlacing(null)}
       />
     </div>
-    <TimetableLegend styling={styling} subjectIds={[...new Set(entries.map((e) => e.teaching_assignment.subject_id))]} />
+    <TimetableLegend styling={styling} subjectIds={[...new Set(entries.map((e) => e.teaching_assignment.subject_id))]} action={legendAction} />
     </div>
   );
 }
 
 /** Colour key under the grid: the areas in view, the shade ramp for grade, and the subject-type labels. */
-function TimetableLegend({ styling, subjectIds }: { styling: TimetableStyling; subjectIds: string[] }) {
+function TimetableLegend({ styling, subjectIds, action }: { styling: TimetableStyling; subjectIds: string[]; action?: ReactNode }) {
   const areas = styling.legend(subjectIds);
-  if (areas.length === 0) return null;
+  if (areas.length === 0) return action ? <div className="flex justify-end">{action}</div> : null;
   const sample = areas[0]!.id;
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[11px] text-muted-foreground">
@@ -1464,6 +1450,7 @@ function TimetableLegend({ styling, subjectIds }: { styling: TimetableStyling; s
           </span>
         ))}
       </span>
+      {action && <span className="ml-auto">{action}</span>}
     </div>
   );
 }

@@ -54,7 +54,7 @@ export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTML
         value={value}
         inputMode={isDate ? "none" : inputMode}
         className={cn(
-          "ui-control flex h-8 w-full min-w-0 rounded-md border border-input bg-card px-3 text-base outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground/80 hover:border-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/20 disabled:opacity-50 md:text-[13px]",
+          "ui-control flex h-8 w-full min-w-0 rounded-md border border-input bg-field px-3 text-base outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground/80 hover:border-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/20 disabled:opacity-50 md:text-[13px]",
           isDate && "ui-date pr-8",
           isDate && (value === "" || value === undefined) && "ui-date-empty",
           className,
@@ -117,7 +117,7 @@ export const Select = forwardRef<
     ref={ref}
     value={value}
     className={cn(
-      "ui-select ui-control h-8 w-full min-w-0 rounded-md border border-input bg-card px-3 pr-8 text-base outline-none transition-[border-color,box-shadow] hover:border-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/20 disabled:opacity-50 md:text-[13px]",
+      "ui-select ui-control h-8 w-full min-w-0 rounded-md border border-input bg-field px-3 pr-8 text-base outline-none transition-[border-color,box-shadow] hover:border-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/20 disabled:opacity-50 md:text-[13px]",
       placeholder != null && (value === "" || value === undefined) && "ui-select-placeholder",
       className,
     )}

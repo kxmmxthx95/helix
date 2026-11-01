@@ -1,5 +1,6 @@
 import { MotionConfig } from "framer-motion";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { FiSidebar } from "react-icons/fi";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import {
@@ -9,14 +10,23 @@ import {
   ClipboardIcon,
   CloudOff,
   DocumentTextIcon,
-  GraduationCap,
   HomeIcon,
   LibraryIcon,
+  LogOut,
+  Monitor,
+  Moon,
   PricetagIcon,
   ProfileIcon,
+  Sun,
   TimetableIcon,
 } from "@/components/icons";
 import { MobileHeaderProvider } from "@/components/MobileHeaderSlot";
+import { SheetStyleContext } from "@/components/Sheet";
+import { useTheme } from "@/components/ThemeProvider";
+import { Avatar } from "@/components/ui";
+import { avatarUrl } from "@/hooks/useAvatar";
+import { useRoleSubtitle } from "@/hooks/useProfiles";
+import { profileFullName } from "@/lib/database.types";
 import { useOutboxSync } from "@/hooks/useOutboxSync";
 import { ROLE_LABEL } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -60,7 +70,8 @@ const SIDE: readonly NavItem[] = [
 ];
 
 const isActive = (pathname: string, to: string) => (to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`));
-const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-[#e0398a] focus-visible:ring-offset-2";
+const SIDEBAR_KEY = "helix-sidebar-collapsed"; // shared with the teacher shell
+const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
 
 /**
  * Student-only shell. Mobile: scrolling page + bottom tab bar. Desktop (lg): left sidebar + wide content.
@@ -75,7 +86,9 @@ export function GameShell() {
   return (
     <MobileHeaderProvider>
       <MotionConfig reducedMotion="user">
-        <GameShellInner />
+        <SheetStyleContext.Provider value="ios">
+          <GameShellInner />
+        </SheetStyleContext.Provider>
       </MotionConfig>
     </MobileHeaderProvider>
   );
@@ -88,12 +101,41 @@ function GameShellInner() {
   const navigate = useNavigate();
   const isHome = location.pathname === "/";
   const title = TITLES[location.pathname] ?? "";
+  // iOS large title: collapses into the nav bar once the page scrolls under it.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => setScrolled(false), [location.pathname]);
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_KEY, collapsed ? "1" : "0");
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, [collapsed]);
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden overscroll-none bg-background">
-      <Sidebar pathname={location.pathname} />
+    <div className={cn("fixed inset-0 flex overflow-hidden overscroll-none bg-background lg:p-2", collapsed ? "lg:gap-0" : "lg:gap-2")}>
+      <div className="absolute inset-0 z-0 hidden bg-shell lg:block" aria-hidden />
+      <div className="pointer-events-none absolute left-3 top-4 z-20 hidden lg:block">
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          aria-label={collapsed ? "ขยายแถบด้านข้าง" : "หุบแถบด้านข้าง"}
+          aria-expanded={!collapsed}
+          className={cn("pointer-events-auto flex h-9 w-9 items-center justify-center rounded-lg text-foreground ", FOCUS)}
+        >
+          <FiSidebar className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <Sidebar pathname={location.pathname} collapsed={collapsed} />
 
-      <div className="relative flex min-w-0 flex-1 flex-col">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden bg-background lg:rounded-2xl lg:shadow-card">
         {!online && (
           <div className="relative z-20 flex items-center justify-center gap-2 bg-warning/90 py-1 text-xs font-bold text-white">
             <CloudOff className="h-3.5 w-3.5" />
@@ -109,25 +151,52 @@ function GameShellInner() {
           </div>
         )}
 
-        {!isHome && (
-          <header className="relative z-10 flex h-14 shrink-0 items-center gap-1 border-b border-border bg-background/90 px-2 pt-safe backdrop-blur-md lg:h-16 lg:px-6">
-            <button
-              type="button"
-              aria-label="กลับหน้าแรก"
-              onClick={() => navigate("/")}
-              className={cn("flex h-10 w-10 items-center justify-center rounded-full text-[#9c1f63] hover:bg-secondary lg:hidden", FOCUS)}
+        <header
+          className={cn(
+            "z-20 shrink-0 border-b-[0.5px] pt-safe transition-colors duration-200",
+            isHome ? "pointer-events-none absolute inset-x-0 top-0 lg:hidden" : "relative",
+            scrolled ? "pointer-events-auto border-border bg-card/80 backdrop-blur-xl backdrop-saturate-150" : "border-transparent bg-background",
+            isHome && !scrolled && "bg-transparent",
+          )}
+        >
+          <div className="relative flex h-11 items-center justify-center px-2 lg:h-14 lg:px-8">
+            {!isHome && (
+              <button
+                type="button"
+                aria-label="กลับหน้าแรก"
+                onClick={() => navigate("/")}
+                className={cn("absolute left-1 flex h-11 items-center gap-0.5 rounded-lg pl-1 pr-3 text-[17px] text-accent active:opacity-40 lg:hidden", FOCUS)}
+              >
+                <ChevronBack className="h-6 w-6" />
+                หน้าแรก
+              </button>
+            )}
+            <p
+              aria-hidden={!scrolled}
+              className={cn(
+                "font-heading max-w-[55%] truncate text-[17px] font-semibold transition-opacity duration-200 lg:max-w-none lg:text-[22px] lg:font-bold lg:opacity-100",
+                !collapsed && "lg:hidden",
+                scrolled ? "opacity-100" : "opacity-0",
+              )}
             >
-              <ChevronBack className="h-5 w-5" />
-            </button>
-            <h1 className="font-heading min-w-0 flex-1 truncate text-lg font-semibold tracking-tight lg:text-xl">{title}</h1>
-          </header>
-        )}
+              {isHome ? "หน้าแรก" : title}
+            </p>
+          </div>
+        </header>
 
-        <main id="student-scroll" className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", !isHome && "flex flex-col")}>
+        <main
+          id="student-scroll"
+          onScroll={(e) => {
+            const next = e.currentTarget.scrollTop > (isHome ? 64 : 30);
+            if (next !== scrolled) setScrolled(next);
+          }}
+          className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", !isHome && "flex flex-col")}
+        >
           {isHome ? (
             <Outlet />
           ) : (
-            <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col p-3 lg:p-6">
+            <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-4 pb-4 lg:p-6">
+              <h1 className="font-heading shrink-0 pb-3 text-[34px] font-bold leading-[41px] tracking-tight lg:hidden">{title}</h1>
               <Outlet />
             </div>
           )}
@@ -139,17 +208,19 @@ function GameShellInner() {
   );
 }
 
-function Sidebar({ pathname }: { pathname: string }) {
+function Sidebar({ pathname, collapsed }: { pathname: string; collapsed: boolean }) {
   const navigate = useNavigate();
+  const { profile, signOut } = useAuth();
+  const { preference, cycle } = useTheme();
+  const roleSubtitle = useRoleSubtitle(profile?.id, profile?.roles ?? []);
+  const displayName = profile ? profileFullName(profile) : "Helix";
+  const footerIcon = "tappable flex h-10 flex-1 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground";
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card lg:flex">
-      <div className="flex h-16 items-center gap-2.5 px-5">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#ff7ab8] to-[#c0267a] text-white shadow-sm">
-          <GraduationCap className="h-5 w-5" />
-        </span>
-        <span className="font-heading text-lg font-bold tracking-tight">Helix</span>
+    <aside className={cn("font-ui relative z-10 hidden shrink-0 flex-col overflow-hidden bg-shell transition-[width] duration-200 ease-ios lg:flex", collapsed ? "w-0" : "w-60")}>
+      <div className="flex h-12 shrink-0 items-center px-3">
+        <img src="/logo.webp" alt="Helix" className="ml-auto h-6 w-auto dark:invert" />
       </div>
-      <nav aria-label="เมนูหลัก" className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-2">
+      <nav aria-label="เมนูหลัก" className="scrollbar-hidden flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
         {SIDE.map(({ to, label, icon: Icon }) => {
           const active = isActive(pathname, to);
           return (
@@ -159,17 +230,34 @@ function Sidebar({ pathname }: { pathname: string }) {
               aria-current={active ? "page" : undefined}
               onClick={() => navigate(to)}
               className={cn(
-                "flex h-11 w-full items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors",
-                active ? "bg-[#fde3f0] text-[#9c1f63]" : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                "group tappable flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-semibold transition-colors",
+                active ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                 FOCUS,
               )}
             >
-              <Icon className="h-5 w-5" />
-              {label}
+              <Icon className={cn("h-4 w-4 shrink-0", active && "text-accent")} />
+              <span className="truncate">{label}</span>
             </button>
           );
         })}
       </nav>
+      <div className="mt-auto flex flex-col gap-2 border-t border-border/60 p-3">
+        <div className="flex items-center gap-2.5 rounded-xl bg-card p-2.5 shadow-card">
+          <Avatar name={displayName} src={profile ? avatarUrl(profile) : null} className="h-9 w-9 text-xs" />
+          <button type="button" onClick={() => navigate("/profile")} className="tappable min-w-0 flex-1 text-left">
+            <p className="truncate text-[13px] font-semibold leading-tight">{displayName}</p>
+            {profile && <p className="truncate text-[11px] leading-tight text-muted-foreground">{roleSubtitle}</p>}
+          </button>
+        </div>
+        <div className="flex gap-1">
+          <button type="button" onClick={cycle} aria-label={`Theme: ${preference}. Tap to cycle.`} className={footerIcon}>
+            {preference === "system" ? <Monitor className="h-4 w-4" /> : preference === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
+          <button type="button" onClick={signOut} title="ออกจากระบบ" aria-label="ออกจากระบบ" className={cn(footerIcon, "hover:bg-destructive/10 hover:text-destructive")}>
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
     </aside>
   );
 }
@@ -179,7 +267,7 @@ function TabBar({ pathname }: { pathname: string }) {
   return (
     <nav
       aria-label="เมนูหลัก"
-      className="relative z-20 shrink-0 border-t border-border bg-card/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
+      className="relative z-20 shrink-0 border-t-[0.5px] border-border bg-card/80 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 lg:hidden"
     >
       <ul className="mx-auto grid max-w-[480px] grid-cols-5">
         {TABS.map(({ to, label, icon: Icon }) => {
@@ -190,12 +278,10 @@ function TabBar({ pathname }: { pathname: string }) {
                 type="button"
                 aria-current={active ? "page" : undefined}
                 onClick={() => navigate(to)}
-                className={cn("flex min-h-14 w-full flex-col items-center justify-center gap-0.5 rounded-xl transition-colors", FOCUS)}
+                className={cn("flex h-[3.25rem] w-full flex-col items-center justify-center gap-0.5 rounded-lg pt-0.5 transition-transform active:scale-90", FOCUS)}
               >
-                <span className={cn("flex h-8 w-14 items-center justify-center rounded-full transition-colors", active ? "bg-[#fde3f0] text-[#c0267a]" : "text-muted-foreground")}>
-                  <Icon className="h-6 w-6" />
-                </span>
-                <span className={cn("text-[11px] font-medium leading-tight", active ? "text-[#9c1f63]" : "text-muted-foreground")}>{label}</span>
+                <Icon className={cn("h-6 w-6", active ? "text-primary" : "text-muted-foreground")} />
+                <span className={cn("text-[10px] font-medium leading-tight", active ? "text-primary" : "text-muted-foreground")}>{label}</span>
               </button>
             </li>
           );
