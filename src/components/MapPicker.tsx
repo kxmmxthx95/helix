@@ -6,7 +6,8 @@ export type LatLng = { lat: number; lng: number };
 // Just the slice of the Google Maps JS API used here — avoids pulling in @types/google.maps.
 type GMap = { setCenter(p: LatLng): void; setZoom(z: number): void; addListener(e: string, cb: (ev: { latLng: { lat(): number; lng(): number } }) => void): void };
 type GMarker = { setPosition(p: LatLng | null): void; setMap(m: GMap | null): void; addListener(e: string, cb: () => void): void; getPosition(): { lat(): number; lng(): number } | null };
-type GMaps = { Map: new (el: HTMLElement, o: object) => GMap; Marker: new (o: object) => GMarker };
+type GCircle = { setOptions(o: { center?: LatLng; radius?: number; map?: GMap | null }): void };
+type GMaps = { Map: new (el: HTMLElement, o: object) => GMap; Marker: new (o: object) => GMarker; Circle: new (o: object) => GCircle };
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 const BANGKOK: LatLng = { lat: 13.7563, lng: 100.5018 };
@@ -44,10 +45,24 @@ const fmt = (p: LatLng | null) => (p ? `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}
  * Pick a location by clicking / dragging a marker on Google Maps, or type / paste "lat, lng".
  * Without VITE_GOOGLE_MAPS_API_KEY the map is skipped and only the text field is shown.
  */
-export function MapPicker({ value, onChange, disabled }: { value: LatLng | null; onChange: (p: LatLng | null) => void; disabled?: boolean }) {
+export function MapPicker({
+  value,
+  onChange,
+  disabled,
+  radius,
+}: {
+  value: LatLng | null;
+  onChange: (p: LatLng | null) => void;
+  disabled?: boolean;
+  /** Metres; draws a circle around the marker. */
+  radius?: number | null;
+}) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<GMap | null>(null);
   const marker = useRef<GMarker | null>(null);
+  const circle = useRef<GCircle | null>(null);
+  const radiusRef = useRef(radius);
+  radiusRef.current = radius;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const [text, setText] = useState(fmt(value));
@@ -70,6 +85,15 @@ export function MapPicker({ value, onChange, disabled }: { value: LatLng | null;
           fullscreenControl: false,
         });
         marker.current = new maps.Marker({ map: map.current, position: value, draggable: !disabled });
+        circle.current = new maps.Circle({
+          map: map.current,
+          center: value ?? BANGKOK,
+          radius: radiusRef.current ?? 0,
+          clickable: false,
+          strokeWeight: 1,
+          fillOpacity: 0.15,
+        });
+        circle.current.setOptions({ map: value && radiusRef.current ? map.current : null });
         if (disabled) return;
         const set = (lat: number, lng: number) => onChangeRef.current({ lat, lng });
         map.current.addListener("click", (e) => set(e.latLng.lat(), e.latLng.lng()));
@@ -94,6 +118,14 @@ export function MapPicker({ value, onChange, disabled }: { value: LatLng | null;
       map.current?.setZoom(16);
     }
   }, [value]);
+
+  useEffect(() => {
+    circle.current?.setOptions({
+      center: value ?? undefined,
+      radius: radius ?? 0,
+      map: value && radius ? map.current : null,
+    });
+  }, [value, radius]);
 
   function commit() {
     if (!text.trim()) return onChange(null);

@@ -1,8 +1,8 @@
+import { MapPicker } from "@/components/MapPicker";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import {
   AirplaneIcon,
-  BarChartIcon,
   AppsIcon,
   BriefcaseIcon,
   CalendarIcon,
@@ -11,7 +11,6 @@ import {
   InfoIcon,
   LibraryIcon,
   ListIcon,
-  NotificationIcon,
   PencilIcon,
   Plus,
   ProfileIcon,
@@ -108,8 +107,8 @@ function SectionCard({
   subtitle,
   children,
 }: {
-  icon: IconComponent;
-  tint: string;
+  icon?: IconComponent;
+  tint?: string;
   title: string;
   subtitle: string;
   children: React.ReactNode;
@@ -117,9 +116,11 @@ function SectionCard({
   return (
     <section className="space-y-4 rounded-xl bg-card shadow-card p-5">
       <div className="flex items-center gap-3">
-        <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", tint)}>
-          <Icon className="h-5 w-5" />
-        </div>
+        {Icon && (
+          <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", tint)}>
+            <Icon className="h-5 w-5" />
+          </div>
+        )}
         <div className="min-w-0">
           <h2 className="text-base font-bold">{title}</h2>
           <p className="text-xs text-muted-foreground">{subtitle}</p>
@@ -386,12 +387,6 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
     );
   }
 
-  const tint = {
-    chart: "bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300",
-    bell: "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300",
-    time: "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
-  };
-
   return (
     <form
       className="space-y-4"
@@ -402,9 +397,6 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
     >
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-card shadow-card p-5">
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-muted">
-            <LibraryIcon className="h-7 w-7" />
-          </div>
           <div className="min-w-0">
             <h2 className="text-lg font-bold">{departmentName ? `ตั้งค่าแผนก${departmentName}` : "ตั้งค่าแผนก"}</h2>
             <p className="text-xs text-muted-foreground">กำหนดระบบเวลาทำงานและนโยบายการให้คะแนนของแผนก</p>
@@ -422,8 +414,6 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
       </div>
 
       <SectionCard
-        icon={BarChartIcon}
-        tint={tint.chart}
         title="สัดส่วนคะแนนเก็บ : สอบ"
         subtitle="ค่า default ของแผนก — แต่ละวิชากำหนดสัดส่วนของตัวเองแทนได้ภายหลัง"
       >
@@ -461,8 +451,6 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
       </SectionCard>
 
       <SectionCard
-        icon={NotificationIcon}
-        tint={tint.bell}
         title="เกณฑ์คาบสอน/สัปดาห์ (แจ้งเตือนภาระงาน)"
         subtitle="ไม่กำหนด = ไม่มีการแจ้งเตือน"
       >
@@ -489,12 +477,10 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
       </SectionCard>
 
       <SectionCard
-        icon={TimeIcon}
-        tint={tint.time}
         title="เวลาทำงาน (บันทึกเวลาเข้า-ออกงาน)"
         subtitle="กำหนดเวลาเข้างานและตำแหน่งที่อนุญาตให้ลงเวลา"
       >
-        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr_1.1fr]">
+        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto_1.1fr]">
           <Field label="เวลาเข้างานมาตรฐาน">
             <Input
               type="time"
@@ -502,27 +488,6 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
               onChange={(e) => setForm({ ...form, work_start_time: e.target.value || null })}
             />
           </Field>
-          <Field label="ละติจูด">
-            <Input
-              type="number"
-              step="any"
-              placeholder="ไม่กำหนด"
-              value={form.checkin_lat ?? ""}
-              onChange={(e) => setForm({ ...form, checkin_lat: nullableNumber(e.target.value) })}
-            />
-          </Field>
-          <Field label="ลองจิจูด">
-            <Input
-              type="number"
-              step="any"
-              placeholder="ไม่กำหนด"
-              value={form.checkin_lng ?? ""}
-              onChange={(e) => setForm({ ...form, checkin_lng: nullableNumber(e.target.value) })}
-            />
-          </Field>
-          <div className="row-span-2 hidden lg:block">
-            <NoteBox>ไม่กำหนดตำแหน่ง = ไม่บังคับการลงเวลา ไม่ว่าจะอยู่ที่ไหนก็สามารถลงเวลาได้</NoteBox>
-          </div>
           <Field label="รัศมี (เมตร)">
             <Input
               type="number"
@@ -551,7 +516,18 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
               {locating ? <Spinner className="h-3.5 w-3.5" /> : "ใช้ตำแหน่งปัจจุบัน"}
             </Button>
           </div>
+          <div className="hidden lg:block">
+            <NoteBox>ไม่กำหนดตำแหน่ง = ไม่บังคับการลงเวลา ไม่ว่าจะอยู่ที่ไหนก็สามารถลงเวลาได้</NoteBox>
+          </div>
         </div>
+        <MapPicker
+          value={form.checkin_lat != null && form.checkin_lng != null ? { lat: form.checkin_lat, lng: form.checkin_lng } : null}
+          onChange={(p) =>
+            // DB requires lat/lng/radius all set or all null (department_settings_geofence_check)
+            setForm({ ...form, checkin_lat: p?.lat ?? null, checkin_lng: p?.lng ?? null, checkin_radius_m: p ? (form.checkin_radius_m ?? 100) : null })
+          }
+          radius={form.checkin_radius_m}
+        />
         <div className="lg:hidden">
           <NoteBox>ไม่กำหนดตำแหน่ง = ไม่บังคับการลงเวลา ไม่ว่าจะอยู่ที่ไหนก็สามารถลงเวลาได้</NoteBox>
         </div>
