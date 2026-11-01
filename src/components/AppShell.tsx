@@ -24,6 +24,7 @@ import {
   Moon,
   NotificationIcon,
   PersonAddIcon,
+  PricetagIcon,
   RibbonIcon,
   SettingsIcon,
   ShieldIcon,
@@ -49,6 +50,7 @@ import {
   canManage,
   canManageAcademic,
   canManageUsers,
+  isCashierOnly,
   isDeptHead,
   isOrgWide,
   ROLE_LABEL,
@@ -393,6 +395,18 @@ const TABS = [
     orgWideOrParentOnly: true,
   },
   {
+    to: "/card-topup",
+    label: "บัตรเติมเงิน",
+    icon: PricetagIcon,
+    section: "การเงิน",
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: false,
+    cardTopupOnly: true,
+  },
+  {
     to: "/line-notifications",
     label: "แจ้งเตือนไลน์",
     icon: NotificationIcon,
@@ -501,6 +515,9 @@ function AppShellInner() {
             profile.roles.includes("student") ||
             profile.roles.includes("parent")))) &&
       (!t.orgWideOrParentOnly || (profile && (isOrgWide(profile.roles) || profile.roles.includes("parent")))) &&
+      (!t.cardTopupOnly || (profile && (isOrgWide(profile.roles) || profile.roles.includes("cashier") || profile.roles.includes("parent")))) &&
+      // A cashier-only account sees nothing but the POS screen.
+      (!profile || !isCashierOnly(profile.roles) || t.to === "/card-topup") &&
       (!t.hideFromStudent || !profile || !profile.roles.includes("student")) &&
       // /time-tracking is further gated by the school-wide per-role toggle (migration 0032).
       (t.to !== "/time-tracking" ||

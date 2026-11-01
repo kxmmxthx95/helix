@@ -11,6 +11,8 @@ import { avatarUrl, studentAvatarUrl } from "@/hooks/useAvatar";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useClassrooms } from "@/hooks/useStatusManagement";
 import { useDepartments, useInviteUsers, type InviteOutcome, type UserInvite } from "@/hooks/useProfiles";
+import { useBindCard, useLiveCards } from "@/hooks/useCardTopup";
+import { parseSwipe } from "@/lib/cardSwipe";
 import { addressOptions, useZipRows } from "@/lib/thaiAddress";
 import { passwordFromNationalId } from "@/lib/password";
 import { cn } from "@/lib/utils";
@@ -807,6 +809,10 @@ export function EditStudentSheet({
   const [guardianSource, setGuardianSource] = useState<GuardianSource | null>(null);
   const saveGuardians = useSaveGuardians();
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  // บัตรเติมเงิน: swipe into the field to bind on save (org-wide only; null = untouched).
+  const [cardUid, setCardUid] = useState<string | null>(null);
+  const bindCard = useBindCard();
+  const { data: liveCards = [] } = useLiveCards();
   useEffect(() => {
     if (!(avatar instanceof File)) return setAvatarPreview(null);
     const url = URL.createObjectURL(avatar);
@@ -844,6 +850,7 @@ export function EditStudentSheet({
     setGuardianSource(null);
     setTab("general");
     setAvatar(null);
+    setCardUid(null);
     onClose();
   }
 
@@ -868,10 +875,12 @@ export function EditStudentSheet({
     const guardianDrafts = currentGuardians;
     const guardianRows = loadedGuardians.rows;
     const source = currentSource;
+    const newCard = cardUid === null ? "" : parseSwipe(cardUid);
     save
       .mutateAsync({ ...current, ...(isNew ? {} : { id: (target as Student).id }), avatar: avatar ?? undefined })
       .then(async (id) => {
         if (guardiansEdited) await saveGuardians(id, guardianDrafts, guardianRows, source);
+        if (newCard) await bindCard.mutateAsync({ student_id: id, card_uid: newCard });
         toast("บันทึกข้อมูลนักเรียนสำเร็จ");
       })
       .catch((err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"));
@@ -946,6 +955,17 @@ export function EditStudentSheet({
                     maxLength={13}
                   />
                 </Field>
+
+                {me && isOrgWide(me.roles) && !readOnly && (
+                  <Field label="เลขบัตรเติมเงิน (รูดบัตรที่ช่องนี้)">
+                    <Input
+                      autoComplete="off"
+                      placeholder="รูดบัตรเพื่อผูก/เปลี่ยนบัตร"
+                      value={cardUid ?? (isNew ? "" : (liveCards.find((c) => c.student_id === (target as Student).id)?.card_uid ?? ""))}
+                      onChange={(e) => setCardUid(e.target.value)}
+                    />
+                  </Field>
+                )}
 
                 <Field label="วันเดือนปีเกิด" error={err("date_of_birth")}>
                   <BuddhistDateSelect

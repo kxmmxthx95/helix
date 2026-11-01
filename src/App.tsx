@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { AppShell } from "@/components/AppShell";
@@ -35,12 +36,29 @@ import { TeachingPlan } from "@/routes/TeachingPlan";
 import { TeachingPlanOverview } from "@/routes/TeachingPlanOverview";
 import { Timetable } from "@/routes/Timetable";
 import { TimeTracking } from "@/routes/TimeTracking";
+import { canUsePos, isCashierOnly } from "@/lib/roles";
+import { PosLogin, POS_DENIED_KEY } from "@/routes/PosLogin";
+import { CardTopup } from "@/routes/CardTopup";
 import { Tuition } from "@/routes/Tuition";
 import { Leave } from "@/routes/Leave";
 import { LineNotifications } from "@/routes/LineNotifications";
 import { DutyRoster } from "@/routes/DutyRoster";
 import { PeriodAttendance } from "@/routes/PeriodAttendance";
 import { Users } from "@/routes/Users";
+
+/** A signed-in account without POS access landed on /pos-login: sign out and let PosLogin show a neutral error. */
+function PosDenied() {
+  const { signOut } = useAuth();
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(POS_DENIED_KEY, "1");
+    } catch {
+      /* ignore private mode */
+    }
+    void signOut();
+  }, [signOut]);
+  return null;
+}
 
 function Gate() {
   const { session, profile, loading, onboardingStep, onboardingLoading } = useAuth();
@@ -54,7 +72,17 @@ function Gate() {
     );
   }
 
-  if (!session) return location.pathname === "/student-login" ? <StudentLogin /> : <Login />;
+  if (!session) {
+    if (location.pathname === "/student-login") return <StudentLogin />;
+    if (location.pathname === "/pos-login") return <PosLogin />;
+    // Logging out of the POS lands back on its own sign-in, not the shared one.
+    if (location.pathname.startsWith("/card-topup")) return <Navigate to="/pos-login" replace />;
+    return <Login />;
+  }
+
+  if (location.pathname === "/pos-login") {
+    return profile && canUsePos(profile.roles) ? <Navigate to="/card-topup" replace /> : <PosDenied />;
+  }
 
   // Blocks the whole menu until the student's required data is filled in and
   // their password changed — regardless of which path they're on. See
@@ -66,7 +94,7 @@ function Gate() {
   return (
     <Routes>
       <Route element={isStudent ? <GameShell /> : <AppShell />}>
-        <Route index element={isStudent ? <GameHud /> : <Dashboard />} />
+        <Route index element={isStudent ? <GameHud /> : isCashierOnly(profile?.roles ?? []) ? <Navigate to="/card-topup" replace /> : <Dashboard />} />
         <Route path="users" element={<Users />} />
         <Route path="roster" element={<Roster />} />
         <Route path="classrooms" element={<Classrooms />} />
@@ -91,6 +119,7 @@ function Gate() {
         <Route path="time-tracking" element={<TimeTracking />} />
         <Route path="leave" element={<Leave />} />
         <Route path="tuition" element={<Tuition />} />
+        <Route path="card-topup" element={<CardTopup />} />
         <Route path="duty-roster" element={<DutyRoster />} />
         <Route path="employees" element={<Employees />} />
         <Route path="staff-attendance" element={<StaffAttendance />} />

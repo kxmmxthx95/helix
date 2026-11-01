@@ -58,6 +58,9 @@ export type SchoolSettings = {
   attendance_digest_last_sent: string | null;
   staff_attendance_digest_time: string | null;
   staff_attendance_digest_last_sent: string | null;
+  // โรงเรียนรับเติมเงินบัตรผ่านพร้อมเพย์ (migration 0108) — shown to parents with the QR image.
+  promptpay_id: string | null;
+  promptpay_qr_path: string | null; // object path in the school-assets bucket
 };
 
 /** One row per department, always present — see migration 0002 seed trigger. */
@@ -1234,6 +1237,136 @@ export type TuitionPayment = {
   updated_at: string;
 };
 
+// ------------------------------------------------------- บัตรเติมเงิน (0107)
+// Balance = sum of non-voided card_transactions.amount (signed). Writes go through RPCs only.
+
+export type PosTerminal = {
+  id: string;
+  name: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StudentWallet = {
+  id: string;
+  student_id: string;
+  daily_limit: number | null; // null = unlimited
+  created_at: string;
+  updated_at: string;
+};
+
+export type StudentCardStatus = "active" | "frozen" | "replaced";
+
+export type StudentCard = {
+  id: string;
+  student_id: string;
+  card_uid: string;
+  status: StudentCardStatus;
+  frozen_by: "parent" | "school" | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CardTransactionType = "topup_cash" | "topup_slip" | "sale" | "refund_withdraw";
+
+export type CardTransaction = {
+  id: string;
+  student_id: string;
+  card_id: string | null;
+  type: CardTransactionType;
+  amount: number; // signed: top-ups > 0, sales / cash-outs < 0
+  terminal_id: string | null;
+  note: string | null;
+  voided_at: string | null;
+  void_reason: string | null;
+  recorded_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** pos_lookup() result — all a cashier ever sees of a student. */
+export type PosStudent = {
+  student_id: string;
+  student_code: string;
+  name: string;
+  avatar_path: string | null;
+  avatar_updated_at: string;
+  classroom: string | null;
+  balance: number;
+  daily_limit: number | null;
+  spent_today: number;
+  card_status: StudentCardStatus | null;
+};
+
+/** pos_topup_cash() returns a wrong PIN as a result (not an error) so the attempt counter commits. */
+export type PosTopupResult =
+  | { ok: true; tx_id: string; amount: number; balance: number }
+  | { ok: false; status: "no_pin" | "bad" | "locked"; attempts_left?: number; locked_until?: string };
+
+export type CardSlipStatus = "pending" | "approved" | "rejected";
+
+export type CardSlipRequest = {
+  id: string;
+  student_id: string;
+  requested_by: string;
+  amount: number;
+  transferred_at: string;
+  slip_path: string; // card-slips bucket, <student_id>/<uuid>.jpg
+  status: CardSlipStatus;
+  approved_amount: number | null;
+  reject_reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  tx_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** card_portal_summary() — what a parent / student sees of the card. */
+export type CardPortalSummary = {
+  balance: number;
+  daily_limit: number | null;
+  spent_today: number;
+  card_status: StudentCardStatus | null;
+  /** Who froze it — a parent may only lift their own freeze (migration 0110). */
+  card_frozen_by: "parent" | "school" | null;
+};
+
+type ReportTotals = { sales_count: number; sales_total: number; cash_topup_total: number; slip_topup_total: number };
+
+/** card_report() — voided rows are excluded from every figure and listed in `voids`. */
+export type CardReport = {
+  totals: ReportTotals & { refund_total: number };
+  by_terminal: (ReportTotals & { terminal_id: string | null; name: string | null })[];
+  by_cashier: (Omit<ReportTotals, "slip_topup_total"> & { profile_id: string; name: string })[];
+  voids: {
+    id: string;
+    type: CardTransactionType;
+    amount: number;
+    created_at: string;
+    voided_at: string;
+    void_reason: string;
+    cashier: string;
+    student_name: string;
+  }[];
+};
+
+export type PosMyToday = {
+  sales_count: number;
+  sales_total: number;
+  topup_total: number;
+  transactions: {
+    id: string;
+    type: CardTransactionType;
+    amount: number;
+    created_at: string;
+    voided_at: string | null;
+    student_name: string;
+  }[];
+};
+
 // ------------------------------------------------------------- academic_terms
 // See supabase/migrations/0018_academic_terms.sql for the full grill rationale.
 
@@ -1529,6 +1662,14 @@ export type Database = {
         TuitionPayment,
         InsertOf<TuitionPayment, "receipt_no" | "paid_at" | "note" | "voided_at" | "void_reason">
       >;
+      pos_terminals: Table<PosTerminal, InsertOf<PosTerminal, "active">>;
+      student_wallets: Table<StudentWallet, InsertOf<StudentWallet, "daily_limit">>;
+      student_cards: Table<StudentCard, Partial<StudentCard>>;
+      card_transactions: Table<CardTransaction, Record<string, never>>;
+      card_slip_requests: Table<
+        CardSlipRequest,
+        Pick<CardSlipRequest, "student_id" | "requested_by" | "amount" | "transferred_at" | "slip_path">
+      >;
       audit_logs: Table<{
         id: number;
         actor_id: string | null;
@@ -1631,6 +1772,70 @@ export type Database = {
       staff_attendance_status: {
         Args: { p_start: string; p_end: string };
         Returns: StaffAttendanceStatusRow[];
+      };
+      pos_lookup: {
+        Args: { p_card_uid: string | null; p_student_id: string | null };
+        Returns: PosStudent;
+      };
+      pos_sale: {
+        Args: { p_card_uid: string; p_amount: number; p_terminal_id: string | null; p_client_tx_id: string | null };
+        Returns: { ok: true; tx_id: string; amount: number; balance: number };
+      };
+      pos_topup_cash: {
+        Args: { p_card_uid: string | null; p_student_id: string | null; p_amount: number; p_terminal_id: string | null; p_pin: string; p_client_tx_id: string | null };
+        Returns: PosTopupResult;
+      };
+      pos_void: {
+        Args: { p_tx_id: string; p_reason: string };
+        Returns: { ok: true; balance: number };
+      };
+      card_refund_withdraw: {
+        Args: { p_student_id: string; p_amount: number; p_note: string | null };
+        Returns: { ok: true; tx_id: string; balance: number };
+      };
+      card_bind: {
+        Args: { p_student_id: string; p_card_uid: string };
+        Returns: void;
+      };
+      cashier_pin_status: {
+        Args: Record<string, never>;
+        Returns: { has_pin: boolean; locked_until: string | null };
+      };
+      cashier_pin_set: {
+        Args: { p_pin: string };
+        Returns: void;
+      };
+      cashier_pin_reset: {
+        Args: { p_profile_id: string };
+        Returns: void;
+      };
+      card_slip_approve: {
+        Args: { p_request_id: string; p_amount: number | null };
+        Returns: { ok: true; tx_id: string; balance: number };
+      };
+      card_slip_reject: {
+        Args: { p_request_id: string; p_reason: string };
+        Returns: void;
+      };
+      card_portal_summary: {
+        Args: { p_student_id: string };
+        Returns: CardPortalSummary;
+      };
+      card_parent_set_limit: {
+        Args: { p_student_id: string; p_limit: number | null };
+        Returns: void;
+      };
+      card_parent_set_frozen: {
+        Args: { p_student_id: string; p_frozen: boolean };
+        Returns: void;
+      };
+      card_report: {
+        Args: { p_from: string; p_to: string };
+        Returns: CardReport;
+      };
+      pos_my_today: {
+        Args: Record<string, never>;
+        Returns: PosMyToday;
       };
       set_line_notifications_enabled: {
         Args: { p_profile_id: string; p_enabled: boolean };

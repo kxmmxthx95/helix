@@ -17,7 +17,7 @@ export function useSchoolSettings() {
 
 export type SchoolSettingsEdit = Pick<
   SchoolSettings,
-  "name_th" | "name_en" | "time_tracking_roles" | "attendance_digest_time" | "staff_attendance_digest_time"
+  "name_th" | "name_en" | "time_tracking_roles" | "promptpay_id" | "attendance_digest_time" | "staff_attendance_digest_time"
 >;
 
 export function useUpdateSchoolSettings() {
@@ -44,6 +44,20 @@ export function useUploadLogo() {
         .from("school_settings")
         .update({ logo_path: LOGO_PATH })
         .eq("id", 1);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["school_settings"] }),
+  });
+}
+
+/** Uploads the school's PromptPay QR image (fixed path, always overwritten) for parents' card top-ups. */
+export function useUploadPromptpayQr() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const { error: upErr } = await supabase.storage.from("school-assets").upload("promptpay-qr", file, { upsert: true });
+      if (upErr) throw upErr;
+      const { error } = await supabase.from("school_settings").update({ promptpay_qr_path: "promptpay-qr" }).eq("id", 1);
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["school_settings"] }),

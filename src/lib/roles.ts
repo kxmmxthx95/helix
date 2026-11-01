@@ -14,6 +14,7 @@ export const ROLES = [
   "dept_director",
   "dept_head",
   "teacher",
+  "cashier",
   "student",
   "parent",
 ] as const;
@@ -27,6 +28,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   dept_director: "ผู้บริหารแผนก",
   dept_head: "หัวหน้างาน",
   teacher: "ครูผู้สอน",
+  cashier: "แคชเชียร์",
   student: "นักเรียน",
   parent: "ผู้ปกครอง",
 };
@@ -79,3 +81,9 @@ export const isAudited = (roles: Role[]) => roles.some((r) => AUDITED.includes(r
 /** True only if every role held is self-scoped — sees just their own record / their own children. */
 export const isSelfScoped = (roles: Role[]) =>
   roles.length > 0 && roles.every((r) => r === "student" || r === "parent");
+
+/** แคชเชียร์ only — sees just the บัตรเติมเงิน POS screen, nothing else (migration 0106). */
+export const isCashierOnly = (roles: Role[]) => roles.length > 0 && roles.every((r) => r === "cashier");
+
+/** May open the POS screen (บัตรเติมเงิน ขาย tab) — cashier or org-wide; mirrors the pos_* RPC checks in migration 0107. */
+export const canUsePos = (roles: Role[]) => isOrgWide(roles) || roles.includes("cashier");

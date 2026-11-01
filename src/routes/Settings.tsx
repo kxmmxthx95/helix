@@ -40,6 +40,7 @@ import {
   useUpdateDepartmentSettings,
   useUpdateSchoolSettings,
   useUploadLogo,
+  useUploadPromptpayQr,
   type DepartmentSettingsEdit,
   type SchoolSettingsEdit,
 } from "@/hooks/useSettings";
@@ -137,8 +138,10 @@ function SchoolSettingsCard() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<Pick<
     SchoolSettingsEdit,
-    "name_th" | "name_en" | "time_tracking_roles"
+    "name_th" | "name_en" | "time_tracking_roles" | "promptpay_id"
   > | null>(null);
+  const uploadQr = useUploadPromptpayQr();
+  const qrRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (settings) {
@@ -146,6 +149,7 @@ function SchoolSettingsCard() {
         name_th: settings.name_th,
         name_en: settings.name_en,
         time_tracking_roles: settings.time_tracking_roles,
+        promptpay_id: settings.promptpay_id,
       });
     }
   }, [settings]);
@@ -167,6 +171,7 @@ function SchoolSettingsCard() {
   }
 
   const logoUrl = schoolLogoUrl(settings);
+  const qrUrl = schoolLogoUrl({ logo_path: settings.promptpay_qr_path, updated_at: settings.updated_at });
 
   return (
     <form
@@ -238,6 +243,43 @@ function SchoolSettingsCard() {
               onChange={(e) => setForm({ ...form, name_en: e.target.value || null })}
             />
           </Field>
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        icon={BriefcaseIcon}
+        tint="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"
+        title="พร้อมเพย์ (บัตรเติมเงิน)"
+        subtitle="แสดงให้ผู้ปกครองเห็นตอนโอนเงินเติมบัตร"
+      >
+        <div className="flex flex-wrap items-start gap-4">
+          <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted text-xs text-muted-foreground">
+            {qrUrl ? <img src={qrUrl} alt="QR พร้อมเพย์ของโรงเรียน" className="h-full w-full object-contain" /> : "ยังไม่มี QR"}
+          </div>
+          <div className="min-w-[16rem] flex-1 space-y-3">
+            <Field label="หมายเลขพร้อมเพย์ (เบอร์โทร/เลขประจำตัวผู้เสียภาษี)">
+              <Input
+                inputMode="numeric"
+                autoComplete="off"
+                value={form.promptpay_id ?? ""}
+                onChange={(e) => setForm({ ...form, promptpay_id: e.target.value.replace(/\D/g, "") || null })}
+              />
+            </Field>
+            <input
+              ref={qrRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) uploadQr.mutate(file, { onError: () => toast("อัปโหลดไม่สำเร็จ", "error") });
+                e.target.value = "";
+              }}
+            />
+            <Button type="button" variant="outline" size="sm" disabled={uploadQr.isPending} onClick={() => qrRef.current?.click()}>
+              {uploadQr.isPending ? <Spinner className="h-3.5 w-3.5" /> : "อัปโหลดรูป QR พร้อมเพย์"}
+            </Button>
+          </div>
         </div>
       </SectionCard>
 

@@ -18,6 +18,7 @@ const TITLES: Record<string, string> = {
   "/practice": "แบบฝึกหัด",
   "/documents": "เอกสาร",
   "/profile": "โปรไฟล์",
+  "/card-topup": "บัตรเติมเงิน",
   "/subjects": "คลังรายวิชา",
 };
 

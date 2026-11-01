@@ -17,6 +17,7 @@ import {
   DocumentTextIcon,
   GlobeIcon,
   Plus,
+  PricetagIcon,
   RibbonIcon,
 } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
@@ -435,6 +436,7 @@ export function GameHud() {
           <RailButton name="nav-leave" icon={AirplaneIcon} label="ลา" onClick={() => setPanel("leave")} />
           <RailButton name="nav-attendance" icon={CheckmarkCircleIcon} label="เช็คชื่อ" onClick={() => setPanel("attendance")} />
           <RailButton name="nav-behavior" icon={RibbonIcon} label="พฤติกรรม" onClick={() => setPanel("behavior")} />
+          <RailButton name="nav-card" icon={PricetagIcon} label="บัตร" onClick={() => navigate("/card-topup")} />
         </nav>
 
         <div className="flex min-h-0 flex-1 flex-col items-center px-[4.75rem] pt-4" aria-roledescription="carousel" aria-label="เกาะวิชา">
