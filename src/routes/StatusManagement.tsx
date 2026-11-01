@@ -65,7 +65,7 @@ export function StatusManagement() {
 
   // dept_head is locked to their own department (RLS enforces it too).
   const [pickedDept, setPickedDept] = useState(orgWide ? "" : (me?.department_id ?? ""));
-  const [subTab, setSubTab] = useState<SubTab | "">("");
+  const [subTab, setSubTab] = useState<SubTab>("promote");
   const [pickedGrade, setPickedGrade] = useState("");
   const { data: gradeLevels = [] } = useGradeLevels(pickedDept || null);
 
@@ -76,7 +76,7 @@ export function StatusManagement() {
   }
 
   return (
-    <div className="page-fill">
+    <div className="page-fill page-flush !pb-0">
       <div className="toolbar shrink-0">
         {departments.length > 0 && (
           <Select
@@ -113,53 +113,9 @@ export function StatusManagement() {
         )}
       </div>
 
-      {pickedDept && (
-        <div
-          role="tablist"
-          aria-label="เมนูจัดการสถานภาพ"
-          className="flex shrink-0 gap-1 overflow-x-auto rounded-xl bg-secondary p-1 [scrollbar-width:none]"
-        >
-          {SUB_TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={subTab === t.key}
-              onClick={() => setSubTab(t.key)}
-              className={cn(
-                "tappable min-h-9 flex-1 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium transition-colors",
-                subTab === t.key
-                  ? "bg-card text-foreground shadow-thumb"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      )}
-
       {!pickedDept && (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="เลือกแผนก" description="เลือกแผนกด้านบนเพื่อจัดการสถานภาพ" />
-        </div>
-      )}
-      {pickedDept && !subTab && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {SUB_TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setSubTab(t.key)}
-              className="tappable flex min-w-0 items-center gap-3 rounded-xl bg-card p-4 text-left shadow-card transition-shadow hover:shadow-float focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="text-[15px] font-semibold">{t.label}</div>
-                <div className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{t.hint}</div>
-              </div>
-              <ChevronForward className="h-4 w-4 shrink-0 text-accent" />
-            </button>
-          ))}
         </div>
       )}
       {pickedDept && subTab && subTab !== "transfer" && !pickedGrade && (
@@ -183,6 +139,31 @@ export function StatusManagement() {
       )}
       {pickedDept && subTab === "transfer" && (
         <TransferIntakePanel departmentId={pickedDept} gradeLevelId={pickedGrade} />
+      )}
+      {pickedDept && (
+        <nav
+          aria-label="เมนูจัดการสถานภาพ"
+          className="sticky bottom-0 z-10 -mx-3 mt-auto grid gap-3 bg-background px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:grid-cols-2"
+        >
+          {SUB_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              aria-current={subTab === t.key ? "page" : undefined}
+              onClick={() => setSubTab(t.key)}
+              className={cn(
+                "tappable flex min-w-0 items-center gap-3 rounded-xl bg-card p-4 text-left shadow-card transition-shadow hover:shadow-float focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground",
+                subTab === t.key && "ring-2 ring-foreground",
+              )}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="text-[15px] font-semibold">{t.label}</div>
+                <div className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{t.hint}</div>
+              </div>
+              <ChevronForward className="h-4 w-4 shrink-0 text-accent" />
+            </button>
+          ))}
+        </nav>
       )}
     </div>
   );

@@ -496,14 +496,13 @@ export function Users() {
 
       <EditUserSheet profile={editing} onClose={() => setEditing(null)} />
       {rows && (
-        <div className="mt-auto grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="sticky bottom-0 z-10 mt-auto grid shrink-0 grid-cols-2 gap-2 bg-background pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 lg:grid-cols-4">
           <StatCard tone="accent" icon={<UsersIcon className="h-5 w-5" />} label="ทั้งหมด" value={rows.length} unit="คน" />
           <StatCard tone="success" icon={<CheckmarkCircleIcon className="h-5 w-5" />} label="ใช้งานอยู่" value={rows.filter((r) => r.is_active).length} unit="คน" />
           <StatCard tone="warning" icon={<TimeIcon className="h-5 w-5" />} label="ปิดใช้งาน" value={rows.filter((r) => !r.is_active).length} unit="คน" />
           <StatCard tone="muted" icon={<UsersIcon className="h-5 w-5" />} label="นักเรียน" value={rows.filter((r) => r.roles.includes("student")).length} unit="คน" />
         </div>
       )}
-
       <CreateUserSheet open={creating} onClose={() => setCreating(false)} />
       <ImportUsersSheet open={importing} onOpenChange={setImporting} />
     </div>
