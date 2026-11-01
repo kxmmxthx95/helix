@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseSwipe } from "@/lib/cardSwipe";
-import { findDuplicateSlips, parseAmount, reportCsv } from "@/lib/cardTopup";
+import { findDuplicateSlips, nextUnbound, parseAmount, reportCsv } from "@/lib/cardTopup";
 
 describe("parseSwipe", () => {
   it("prefers track 2, dropping everything after =", () => {
@@ -69,5 +69,22 @@ describe("reportCsv", () => {
     expect(csv[2]).toBe("รวม,2,70,100,0");
     expect(csv[5]).toBe("สมชาย ใจดี,2,70,100");
     expect(csv[8]).toBe('ด.ช.เอ,ซื้อสินค้า,30,สมชาย ใจดี,"ทอน ""ผิด"""');
+  });
+});
+
+describe("nextUnbound", () => {
+  const rows = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }];
+  it("starts at the first unbound row", () => {
+    expect(nextUnbound(rows, new Set(["a"]))).toBe("b");
+  });
+  it("moves past the row just bound even if the bound set is stale", () => {
+    expect(nextUnbound(rows, new Set(), "b")).toBe("c");
+  });
+  it("wraps to earlier unbound rows, skipping bound ones", () => {
+    expect(nextUnbound(rows, new Set(["b", "c", "d"]), "d")).toBe("a");
+  });
+  it("returns null when everyone has a card", () => {
+    expect(nextUnbound(rows, new Set(["a", "b", "c", "d"]))).toBeNull();
+    expect(nextUnbound(rows, new Set(["a", "c", "d"]), "b")).toBeNull();
   });
 });

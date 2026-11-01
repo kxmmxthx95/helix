@@ -6,11 +6,13 @@ import { cn } from "@/lib/utils";
 import { CardsTab, TerminalsTab } from "@/routes/CardTopupAdmin";
 import { PortalView } from "@/routes/CardTopupPortal";
 import { PosTab } from "@/routes/CardTopupPos";
+import { RegisterTab } from "@/routes/CardTopupRegister";
 import { ReportTab } from "@/routes/CardTopupReport";
 import { SlipsTab } from "@/routes/CardTopupSlips";
 
 const TABS = [
   { key: "cards", label: "บัตรและยอดคงเหลือ" },
+  { key: "register", label: "ลงทะเบียนบัตร" },
   { key: "slips", label: "อนุมัติสลิป" },
   { key: "report", label: "รายงาน" },
   { key: "terminals", label: "เครื่องขาย" },
@@ -56,6 +58,7 @@ export function CardTopup() {
         ))}
       </div>
       {tab === "cards" && <CardsTab />}
+      {tab === "register" && <RegisterTab />}
       {tab === "slips" && <SlipsTab />}
       {tab === "report" && <ReportTab />}
       {tab === "terminals" && <TerminalsTab />}
