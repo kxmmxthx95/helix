@@ -3,10 +3,9 @@ import { animate, AnimatePresence, motion, useReducedMotion, type PanInfo } from
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { BarFill, GameIcon, useArt } from "@/components/game/parts";
+import { GameIcon } from "@/components/game/parts";
 import {
   AirplaneIcon,
-  AlertTriangle,
   BookIcon,
   BriefcaseIcon,
   CalendarIcon,
@@ -15,8 +14,10 @@ import {
   ChevronForward,
   ClipboardIcon,
   DocumentTextIcon,
-  GlobeIcon,
-  Plus,
+  LibraryIcon,
+  ProfileIcon,
+  Search,
+  TimetableIcon,
   PricetagIcon,
   RibbonIcon,
 } from "@/components/icons";
@@ -43,18 +44,16 @@ import {
 import { useOpenExamSubjectIds } from "@/routes/Exams";
 
 type Icon = typeof BookIcon;
-type Panel = "attendance" | "behavior" | "leave" | "bag" | "map";
+type Panel = "attendance" | "behavior" | "leave" | "bag" | "subjects";
 
 const PANEL_TITLE: Record<Panel, string> = {
   attendance: "เช็คชื่อ",
   behavior: "พฤติกรรม",
   leave: "ลา",
   bag: "กระเป๋า",
-  map: "แผนที่เกาะ",
+  subjects: "วิชาของฉัน",
 };
 
-const NAVY = "bg-[#2b2d5c]/85 backdrop-blur-md border-2 border-white/15 shadow-[0_4px_0_rgba(31,33,80,0.55)]";
-const FOCUS = "outline-none focus-visible:ring-4 focus-visible:ring-[#ffd23f]/80";
 const ISLAND_KEY = "helix.island";
 
 /** Lifetime counts for the caller only (RPC resolves the student from auth.uid()). */
@@ -115,66 +114,6 @@ function Inventory({ badges, rank, exp }: { badges: ReturnType<typeof deriveBadg
   );
 }
 
-/* ---------- HUD pieces ---------- */
-
-function CurrencyPill({
-  iconName,
-  icon,
-  label,
-  onClick,
-  alert,
-  children,
-}: {
-  iconName: string;
-  icon: Icon;
-  label: string;
-  onClick: () => void;
-  alert?: boolean;
-  children: React.ReactNode;
-}) {
-  const pillArt = useArt("hud-pill");
-  const plusArt = useArt("hud-plus");
-  return (
-    <button type="button" aria-label={label} onClick={onClick} className={cn("group flex min-h-11 min-w-0 flex-1 items-center rounded-full", FOCUS)}>
-      <span
-        style={pillArt ? { backgroundImage: "url(/game/hud-pill.webp)", backgroundSize: "100% 100%" } : undefined}
-        className={cn(
-          "relative flex h-8 w-full items-center pl-7 pr-1 transition-transform group-active:scale-95 motion-reduce:transition-none",
-          !pillArt && "rounded-full border-2 border-[#1f2150] bg-[#1f2150]/70 shadow-[inset_0_2px_0_rgba(255,255,255,0.12)]",
-        )}
-      >
-        <GameIcon name={iconName} fallback={icon} className="absolute -left-1.5 top-1/2 h-9 w-9 -translate-y-1/2 text-[#ffd23f] drop-shadow-[0_2px_0_#1f2150]" />
-        <span className="game-outline min-w-0 flex-1 truncate text-center font-game text-sm font-bold tabular-nums">{children}</span>
-        {plusArt ? (
-          <img src="/game/hud-plus.webp" alt="" draggable={false} className="h-5 w-5 shrink-0" aria-hidden />
-        ) : (
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-[#7ee06b] to-[#3fae2f] shadow-[0_2px_0_#1f6d16]" aria-hidden>
-            <Plus className="h-3.5 w-3.5 text-white" />
-          </span>
-        )}
-        {alert && (
-          <span className="absolute -right-1 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-[#ff3b5c] text-[10px] font-black leading-none text-white" aria-hidden>
-            !
-          </span>
-        )}
-      </span>
-    </button>
-  );
-}
-
-function RailButton({ name, icon, label, onClick, big }: { name: string; icon: Icon; label: string; onClick: () => void; big?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn("flex flex-col items-center gap-0.5 rounded-xl px-1 py-1 transition-transform active:scale-90 motion-reduce:transition-none", FOCUS, big ? "w-16" : "w-14")}
-    >
-      <GameIcon name={name} fallback={icon} className={cn("text-white drop-shadow-[0_3px_0_#1f2150]", big ? "h-11 w-11" : "h-8 w-8")} />
-      <span className={cn("game-outline font-game font-bold leading-tight", big ? "text-xs" : "text-[11px]")}>{label}</span>
-    </button>
-  );
-}
-
 /* ---------- Island art ---------- */
 
 const AREA_EMOJI: Record<string, string> = {
@@ -189,7 +128,21 @@ const AREA_EMOJI: Record<string, string> = {
   other: "🌴",
 };
 
-/** island-{code}.webp → island-other.webp → CSS island. */
+/** Card / tile gradient per learning area (soft, brand-adjacent). */
+const AREA_GRADIENT: Record<string, string> = {
+  thai: "from-[#ff8fb8] to-[#e0398a]",
+  math: "from-[#8ec5ff] to-[#4b7bec]",
+  science: "from-[#7be0c3] to-[#12a38a]",
+  social: "from-[#ffc47a] to-[#f08a24]",
+  health_pe: "from-[#a6e66f] to-[#4cb33a]",
+  art: "from-[#d7a6ff] to-[#9b51e0]",
+  career: "from-[#ffb199] to-[#ef5f4a]",
+  foreign_lang: "from-[#8fe3f0] to-[#1fa7c9]",
+  other: "from-[#c9b6ff] to-[#7a5af0]",
+};
+const gradientOf = (code: string) => AREA_GRADIENT[code] ?? AREA_GRADIENT.other;
+
+/** island-{code}.webp → island-other.webp → emoji. */
 function IslandArt({ code, className }: { code: string; className?: string }) {
   const chain = code === "other" ? ["island-other"] : [`island-${code}`, "island-other"];
   const [step, setStep] = useState(0);
@@ -200,30 +153,36 @@ function IslandArt({ code, className }: { code: string; className?: string }) {
         src={`/game/${src}.webp`}
         alt=""
         draggable={false}
-        className={cn("pointer-events-none select-none object-contain drop-shadow-[0_18px_18px_rgba(31,33,80,0.35)]", className)}
+        className={cn("pointer-events-none select-none object-contain drop-shadow-[0_14px_16px_rgba(45,10,43,0.35)]", className)}
         onError={() => setStep((s) => s + 1)}
       />
     );
   }
   return (
-    <div className={cn("pointer-events-none relative select-none", className)} aria-hidden>
-      {/* water ring */}
-      <div className="absolute inset-x-[4%] bottom-[16%] h-[34%] rounded-[50%] bg-gradient-to-b from-[#6ff0e6] to-[#1fb7c9] shadow-[inset_0_6px_0_rgba(255,255,255,0.45),0_14px_24px_rgba(31,33,80,0.3)]" />
-      {/* rock underside */}
-      <div className="absolute inset-x-[22%] bottom-[2%] h-[36%] rounded-b-[50%] rounded-t-[30%] bg-gradient-to-b from-[#b07a4f] to-[#6b4226]" />
-      {/* grass top */}
-      <div className="absolute inset-x-[16%] bottom-[28%] h-[30%] rounded-[50%] bg-gradient-to-b from-[#9be86a] to-[#4cb33a] shadow-[inset_0_5px_0_rgba(255,255,255,0.4)]" />
-      <span className="absolute inset-x-0 bottom-[38%] text-center text-[min(5.5rem,20vw)] leading-none drop-shadow-[0_6px_0_rgba(31,33,80,0.25)]">
-        {AREA_EMOJI[code] ?? AREA_EMOJI.other}
-      </span>
+    <div className={cn("pointer-events-none flex select-none items-center justify-center", className)} aria-hidden>
+      <span className="text-[min(7rem,26vw)] leading-none drop-shadow-[0_8px_10px_rgba(45,10,43,0.3)]">{AREA_EMOJI[code] ?? AREA_EMOJI.other}</span>
     </div>
   );
 }
 
-function formatDue(d: string | null) {
-  if (!d) return "ไม่มีกำหนดส่ง";
-  return `ส่ง ${new Date(`${d}T00:00:00`).toLocaleDateString("th-TH", { day: "numeric", month: "short" })}`;
+/* ---------- helpers ---------- */
+
+function dueInfo(d: string | null): { label: string; tone: "late" | "soon" | "calm" | "none" } {
+  if (!d) return { label: "ไม่มีกำหนดส่ง", tone: "none" };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((new Date(`${d}T00:00:00`).getTime() - today.getTime()) / 86400000);
+  if (days < 0) return { label: `เลยกำหนด ${-days} วัน`, tone: "late" };
+  if (days === 0) return { label: "ส่งวันนี้", tone: "soon" };
+  if (days <= 2) return { label: `อีก ${days} วัน`, tone: "soon" };
+  return { label: `อีก ${days} วัน`, tone: "calm" };
 }
+const DUE_CHIP: Record<string, string> = {
+  late: "bg-red-100 text-red-700",
+  soon: "bg-amber-100 text-amber-800",
+  calm: "bg-[#fde3f0] text-[#9c1f63]",
+  none: "bg-black/5 text-black/60",
+};
 
 function readSaved() {
   try {
@@ -233,17 +192,33 @@ function readSaved() {
   }
 }
 
+const HERO_BG = "bg-[linear-gradient(165deg,#2d0a2b_0%,#6d1357_36%,#d4307f_70%,#ff7ab8_100%)]";
+const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-[#e0398a] focus-visible:ring-offset-2";
+
+function SectionHead({ title, onMore, more = "ดูทั้งหมด" }: { title: string; onMore?: () => void; more?: string }) {
+  return (
+    <div className="mb-3 flex items-center justify-between">
+      <h2 className="font-heading text-lg font-semibold tracking-tight">{title}</h2>
+      {onMore && (
+        <button type="button" onClick={onMore} className={cn("flex items-center gap-0.5 rounded-lg px-1 text-sm font-medium text-[#9c1f63]", FOCUS)}>
+          {more}
+          <ChevronForward className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ---------- Home ---------- */
 
-/** Island home (docs/design/student-portal-island.md): HUD, side rails, floating subject island, BATTLE row. */
+/** Student home: gradient hero (next due work), stat cards, icon menu, due-work and subject carousels. */
 export function GameHud() {
   const { profile, myStudent } = useAuth();
   const navigate = useNavigate();
   const reduce = useReducedMotion();
-  const trackArt = useArt("hud-bar-track");
-  const avatarArt = useArt("hud-avatar-frame");
   const [panel, setPanel] = useState<Panel | null>(null);
   const [battle, setBattle] = useState<MyAssignment | null>(null);
+  const [query, setQuery] = useState("");
 
   const studentId = myStudent?.id ?? null;
   const month = currentMonthRange();
@@ -294,6 +269,7 @@ export function GameHud() {
         behaviorRemaining: STARTING_SCORE + life.behavior_points, // ponytail: one 100 for all years; per-year if ranks need to reward each clean year
       })
     : termExp;
+  const rank = rankFromExp(lifeExp);
   const badges = deriveBadges({
     submissions: life ? life.sub_on_time + life.sub_late : submissionsInTerm,
     level: levelFromExp(Math.max(termExp, lifeExp)).level,
@@ -310,8 +286,9 @@ export function GameHud() {
   const termLabel = term ? (term.term_type === "term1" ? "ภาคเรียน 1" : term.term_type === "term2" ? "ภาคเรียน 2" : "ภาคฤดูร้อน") : "";
 
   const name = myStudent ? `${myStudent.first_name} ${myStudent.last_name}` : profile ? profileFullName(profile) : "";
+  const firstName = myStudent?.first_name ?? profile?.first_name ?? "";
 
-  // Island carousel: remembered by subject id for the tab session.
+  // Hero carousel: remembered by subject id for the tab session.
   const [selectedId, setSelectedId] = useState<string | null>(readSaved);
   const [dir, setDir] = useState(1);
   const found = islands.findIndex((i) => i.subject.id === selectedId);
@@ -336,327 +313,431 @@ export function GameHud() {
   }
 
   const hasHard = !!island && openExamSubjects.has(island.subject.id);
-  const doneRatio = island && island.total ? island.submitted / island.total : 0;
+  const dueList = islands
+    .flatMap((isl) => isl.pending.map((a) => ({ a, isl })))
+    .sort((x, y) => (x.a.due_date ?? "9999").localeCompare(y.a.due_date ?? "9999"))
+    .slice(0, 10);
+
+  const menu: { label: string; icon: Icon; onClick: () => void; badge?: number }[] = [
+    { label: "งาน", icon: ClipboardIcon, onClick: () => navigate("/assignments"), badge: pending },
+    { label: "สอบ", icon: DocumentTextIcon, onClick: () => navigate("/exams") },
+    { label: "ตารางเรียน", icon: TimetableIcon, onClick: () => navigate("/timetable") },
+    { label: "แบบฝึกหัด", icon: BookIcon, onClick: () => navigate("/practice") },
+    { label: "ปฏิทิน", icon: CalendarIcon, onClick: () => navigate("/academic-events") },
+    { label: "เอกสาร", icon: LibraryIcon, onClick: () => navigate("/documents") },
+    { label: "ลา", icon: AirplaneIcon, onClick: () => setPanel("leave") },
+    { label: "เช็คชื่อ", icon: CheckmarkCircleIcon, onClick: () => setPanel("attendance") },
+    { label: "พฤติกรรม", icon: RibbonIcon, onClick: () => setPanel("behavior") },
+    { label: "บัตรเติมเงิน", icon: PricetagIcon, onClick: () => navigate("/card-topup") },
+    { label: "กระเป๋า", icon: BriefcaseIcon, onClick: () => setPanel("bag") },
+    { label: "โปรไฟล์", icon: ProfileIcon, onClick: () => navigate("/profile") },
+  ];
+
+  const stats: { label: string; value: React.ReactNode; hint: string; icon: Icon; onClick: () => void; alert?: boolean }[] = [
+    { label: "งานค้าง", value: <CountUp value={pending} />, hint: "ชิ้น", icon: ClipboardIcon, onClick: () => navigate("/assignments"), alert: pending > 0 },
+    { label: "พฤติกรรม", value: <CountUp value={behaviorScore} />, hint: `/ ${STARTING_SCORE}`, icon: RibbonIcon, onClick: () => setPanel("behavior") },
+    {
+      label: "มาเรียนเดือนนี้",
+      value: attendancePct === null ? "-" : <CountUp value={attendancePct} />,
+      hint: attendancePct === null ? "" : "%",
+      icon: CheckmarkCircleIcon,
+      onClick: () => setPanel("attendance"),
+    },
+  ];
+
+  const shownSubjects = islands.filter((i) => {
+    const q = query.trim().toLowerCase();
+    return !q || i.subject.name_th.toLowerCase().includes(q) || i.subject.code.toLowerCase().includes(q);
+  });
+
+  function focusIsland(i: number) {
+    select(i, i >= index ? 1 : -1);
+    document.getElementById("student-scroll")?.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  }
 
   return (
-    <>
-      {/* ===== Top HUD ===== */}
-      <header className="relative z-20 shrink-0 px-3 pt-2">
-        <div className={cn("grid grid-cols-[auto_1fr] items-center gap-x-2.5 gap-y-1 rounded-2xl px-2.5 py-2", NAVY)}>
-          {avatarArt ? (
-            <div className="relative row-span-1 h-[3.75rem] w-[3.75rem]">
-              {profile && (
-                <div className="absolute inset-[15%] overflow-hidden rounded-lg">
-                  <Avatar name={profileFullName(profile)} src={avatarUrl(profile)} className="h-full w-full rounded-none ring-0" />
+    <div className="pb-8">
+      {/* ===== Hero ===== */}
+      <div className="lg:px-6 lg:pt-6">
+        <section className={cn("relative mx-auto max-w-6xl overflow-hidden text-white lg:rounded-[2rem]", HERO_BG, "rounded-b-[2rem]")}>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-[0.16] [background-image:radial-gradient(circle,#fff_1.2px,transparent_1.3px)] [background-size:22px_22px]"
+          />
+          <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
+
+          <div className="relative px-4 pb-14 pt-[max(env(safe-area-inset-top),1rem)] lg:px-8 lg:pb-12 lg:pt-6">
+            {/* top row */}
+            <div className="flex items-center gap-3">
+              <button type="button" aria-label="โปรไฟล์" onClick={() => navigate("/profile")} className={cn("shrink-0 rounded-full", FOCUS)}>
+                {profile && <Avatar name={profileFullName(profile)} src={avatarUrl(profile)} className="h-11 w-11 ring-2 ring-white/70" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPanel("bag")}
+                aria-label={`${name} เลเวล ${lvl.level} ดูกระเป๋า`}
+                className={cn("min-w-0 flex-1 rounded-2xl bg-white/15 px-3 py-1.5 text-left backdrop-blur-md transition-colors hover:bg-white/20", FOCUS)}
+              >
+                <div className="flex items-center gap-2">
+                  <p className="min-w-0 flex-1 truncate text-sm font-semibold leading-5">{name}</p>
+                  <span className="shrink-0 rounded-full bg-white px-2 text-xs font-bold leading-5 text-[#9c1f63]">Lv.{lvl.level}</span>
                 </div>
-              )}
-              <img src="/game/hud-avatar-frame.webp" alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full" />
-            </div>
-          ) : (
-            <div className="row-span-1 rounded-xl border-[3px] border-[#ffd23f] bg-gradient-to-b from-[#ffe58a] to-[#e0a21a] p-0.5 shadow-[0_3px_0_#8a5a00]">
-              {profile && <Avatar name={profileFullName(profile)} src={avatarUrl(profile)} className="h-11 w-11 rounded-lg ring-0" />}
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="game-outline truncate font-game text-base font-bold leading-tight">{name}</p>
-            <div className="mt-1 flex items-center gap-1.5" role="progressbar" aria-label={`EXP เลเวล ${lvl.level}`} aria-valuemin={0} aria-valuemax={lvl.span} aria-valuenow={lvl.into}>
-              <span className="game-outline shrink-0 rounded-md border-2 border-[#1f2150] bg-gradient-to-b from-[#ff6fb5] to-[#d62f86] px-1.5 font-game text-xs font-bold leading-5">
-                Lv.{lvl.level}
-              </span>
-              <div className={cn("relative min-w-0 flex-1", trackArt ? "h-6" : "h-4 overflow-hidden rounded-full border-2 border-[#1f2150] bg-[#1f2150]/70")}>
-                {trackArt && <img src="/game/hud-bar-track.webp" alt="" draggable={false} className="absolute inset-0 h-full w-full" />}
-                <div className={cn("absolute", trackArt ? "inset-y-[24%] left-[9%] right-[9%]" : "inset-0")}>
-                  <BarFill
-                    name="hud-bar-fill-exp"
-                    ratio={lvl.into / lvl.span}
-                    fallback="bg-gradient-to-b from-[#9ff7ff] to-[#2fb4e8] shadow-[inset_0_2px_0_rgba(255,255,255,0.5)]"
-                    transition={reduce ? { duration: 0 } : { duration: 0.8, ease: "easeOut" }}
+                <div
+                  className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/25"
+                  role="progressbar"
+                  aria-label={`EXP เลเวล ${lvl.level}`}
+                  aria-valuemin={0}
+                  aria-valuemax={lvl.span}
+                  aria-valuenow={lvl.into}
+                >
+                  <motion.div
+                    className="h-full rounded-full bg-white"
+                    initial={reduce ? false : { width: 0 }}
+                    animate={{ width: `${Math.round((lvl.into / lvl.span) * 100)}%` }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
                   />
                 </div>
-                <span className="game-outline absolute inset-0 flex items-center justify-center font-game text-[10px] font-bold leading-none tabular-nums">
-                  {lvl.into}/{lvl.span}
-                </span>
-              </div>
+              </button>
+              <button
+                type="button"
+                aria-label="ค้นหาวิชา"
+                onClick={() => setPanel("subjects")}
+                className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 backdrop-blur-md transition-colors hover:bg-white/25", FOCUS)}
+              >
+                <Search className="h-5 w-5" />
+              </button>
             </div>
-          </div>
-          <div className="col-span-2 mt-0.5 flex gap-2.5 pl-1.5">
-            <CurrencyPill iconName="hud-energy" icon={ClipboardIcon} label={`งานค้าง ${pending} ชิ้น`} onClick={() => navigate("/assignments")} alert={pending > 0}>
-              <CountUp value={pending} />
-            </CurrencyPill>
-            <CurrencyPill iconName="hud-coin" icon={RibbonIcon} label={`คะแนนพฤติกรรม ${behaviorScore} จาก ${STARTING_SCORE}`} onClick={() => setPanel("behavior")}>
-              <CountUp value={behaviorScore} />/{STARTING_SCORE}
-            </CurrencyPill>
-            <CurrencyPill
-              iconName="hud-gem"
-              icon={CheckmarkCircleIcon}
-              label={`มาเรียนเดือนนี้ ${attendancePct === null ? "ยังไม่มีข้อมูล" : `${attendancePct}%`}`}
-              onClick={() => setPanel("attendance")}
-            >
-              {attendancePct === null ? "-" : (
-                <>
-                  <CountUp value={attendancePct} />%
-                </>
+
+            {/* slide */}
+            <div className="relative mt-6 min-h-[14.5rem] lg:min-h-[15rem]" aria-roledescription="carousel" aria-label="งานของแต่ละวิชา">
+              {islandsLoading ? (
+                <div className="space-y-3 pt-6" role="status" aria-label="กำลังโหลด">
+                  <div className="h-4 w-24 rounded-full bg-white/20" />
+                  <div className="h-8 w-3/4 rounded-lg bg-white/20" />
+                  <div className="h-4 w-1/2 rounded-full bg-white/20" />
+                </div>
+              ) : !island ? (
+                <div className="pt-8">
+                  <p className="text-sm text-white/80">สวัสดี {firstName}</p>
+                  <h1 className="mt-1 font-heading text-2xl font-bold leading-tight lg:text-3xl">ยังไม่มีวิชาในภาคเรียนนี้</h1>
+                  <p className="mt-2 text-sm text-white/80">เมื่อครูเพิ่มวิชาให้ งานที่ต้องส่งจะมาแสดงที่นี่</p>
+                </div>
+              ) : (
+                <AnimatePresence mode="wait" custom={dir} initial={false}>
+                  <motion.div
+                    key={island.subject.id}
+                    custom={dir}
+                    drag={islands.length > 1 ? "x" : false}
+                    dragConstraints={{ left: 0, right: 0 }}
+                    dragElastic={0.25}
+                    onDragEnd={onDragEnd}
+                    initial={reduce ? false : { opacity: 0, x: dir * 40 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={reduce ? { opacity: 0 } : { opacity: 0, x: dir * -40 }}
+                    transition={{ duration: 0.22 }}
+                    className="relative touch-pan-y"
+                  >
+                    <IslandArt code={island.areaCode} className="absolute -right-3 top-0 h-36 w-36 opacity-95 lg:right-6 lg:h-60 lg:w-60" />
+                    <div className="relative max-w-[68%] pt-1 lg:max-w-[55%]">
+                      <span className="inline-flex max-w-full items-center rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium backdrop-blur-sm">
+                        <span className="truncate">
+                          {island.subject.code} · {island.subject.name_th}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="relative mt-16 lg:mt-14 lg:max-w-[60%]">
+                      <h1 className="font-heading text-[1.65rem] font-bold leading-tight tracking-tight lg:text-4xl">
+                        {island.next ? island.next.label : "เคลียร์งานวิชานี้แล้ว 🎉"}
+                      </h1>
+                      <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-white/90">
+                        {island.next ? (
+                          <>
+                            <span>{dueInfo(island.next.due_date).label}</span>
+                            <span aria-hidden>·</span>
+                          </>
+                        ) : null}
+                        <span>
+                          ส่งแล้ว {island.submitted}/{island.total}
+                        </span>
+                        {termPct !== null && (
+                          <>
+                            <span aria-hidden>·</span>
+                            <span>
+                              {termLabel} ผ่านไป {Math.round(termPct)}%
+                            </span>
+                          </>
+                        )}
+                      </p>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {island.next ? (
+                          <button
+                            type="button"
+                            onClick={() => setBattle(island.next)}
+                            className={cn("h-11 rounded-full bg-white px-6 text-sm font-semibold text-[#9c1f63] shadow-lg shadow-black/10 transition-transform active:scale-95", FOCUS)}
+                          >
+                            ส่งงาน
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => navigate("/assignments")}
+                            className={cn("h-11 rounded-full bg-white px-6 text-sm font-semibold text-[#9c1f63] transition-transform active:scale-95", FOCUS)}
+                          >
+                            ดูงานทั้งหมด
+                          </button>
+                        )}
+                        {hasHard && (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/exams?subject=${encodeURIComponent(island.subject.code)}`)}
+                            className={cn("h-11 rounded-full bg-white/15 px-5 text-sm font-semibold backdrop-blur-sm transition-colors hover:bg-white/25", FOCUS)}
+                          >
+                            มีสอบ
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
               )}
-            </CurrencyPill>
-          </div>
-        </div>
+            </div>
 
-        {/* Term progress */}
-        {termPct !== null && (
-          <div
-            className="relative mx-1 mt-2 h-6 overflow-hidden rounded-full border-2 border-white/60 bg-white/25 shadow-[inset_0_2px_6px_rgba(31,33,80,0.25)] backdrop-blur-sm"
-            role="progressbar"
-            aria-label="ความคืบหน้าภาคเรียน"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(termPct)}
-          >
-            <BarFill
-              name="hud-bar-fill-energy"
-              ratio={termPct / 100}
-              fallback="bg-gradient-to-b from-[#a8f07a] to-[#3fb52f] shadow-[inset_0_2px_0_rgba(255,255,255,0.55)]"
-              transition={{ duration: 1, ease: "easeOut" }}
-              from0={!reduce}
-            />
-            <span className="game-outline absolute inset-0 flex items-center justify-center font-game text-xs font-bold">
-              {termLabel} · ผ่านไป {Math.round(termPct)}%
-            </span>
-          </div>
-        )}
-      </header>
-
-      {/* ===== Middle: rails + island ===== */}
-      <section className="relative flex min-h-0 flex-1 flex-col">
-        <nav aria-label="เมนูซ้าย" className={cn("absolute left-2 top-3 z-10 flex flex-col gap-1 rounded-2xl p-1", NAVY)}>
-          <RailButton big name="nav-bag" icon={BriefcaseIcon} label="กระเป๋า" onClick={() => setPanel("bag")} />
-          <RailButton big name="nav-calendar" icon={CalendarIcon} label="ปฏิทิน" onClick={() => navigate("/academic-events")} />
-          <RailButton big name="nav-documents" icon={DocumentTextIcon} label="เอกสาร" onClick={() => navigate("/documents")} />
-        </nav>
-        <nav aria-label="เมนูขวา" className={cn("absolute right-2 top-3 z-10 flex flex-col gap-1 rounded-2xl p-1", NAVY)}>
-          <RailButton name="nav-leave" icon={AirplaneIcon} label="ลา" onClick={() => setPanel("leave")} />
-          <RailButton name="nav-attendance" icon={CheckmarkCircleIcon} label="เช็คชื่อ" onClick={() => setPanel("attendance")} />
-          <RailButton name="nav-behavior" icon={RibbonIcon} label="พฤติกรรม" onClick={() => setPanel("behavior")} />
-          <RailButton name="nav-card" icon={PricetagIcon} label="บัตร" onClick={() => navigate("/card-topup")} />
-        </nav>
-
-        <div className="flex min-h-0 flex-1 flex-col items-center px-[4.75rem] pt-4" aria-roledescription="carousel" aria-label="เกาะวิชา">
-          <div className="min-h-[4.5rem] text-center" aria-live="polite">
-            {island ? (
-              <>
-                <h2 className="game-outline-lg line-clamp-2 font-game text-[1.6rem] font-bold leading-tight">{island.subject.name_th}</h2>
-                <p className="game-outline mt-1 font-game text-xs font-bold opacity-95">
-                  {island.subject.code} · ส่งแล้ว {island.submitted}/{island.total}
-                </p>
-              </>
-            ) : (
-              <h2 className="game-outline-lg font-game text-xl font-bold leading-tight">{islandsLoading ? "กำลังโหลด…" : "ยังไม่มีวิชาในเทอมนี้"}</h2>
+            {islands.length > 1 && (
+              <div className="absolute bottom-5 right-4 flex items-center gap-1.5 lg:bottom-6 lg:right-8">
+                <button type="button" aria-label="วิชาก่อนหน้า" onClick={() => step(-1)} className={cn("hidden h-8 w-8 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 lg:flex", FOCUS)}>
+                  <ChevronBack className="h-4 w-4" />
+                </button>
+                {islands.slice(0, 7).map((isl, i) => (
+                  <button
+                    key={isl.subject.id}
+                    type="button"
+                    aria-label={`วิชา ${isl.subject.name_th}`}
+                    aria-current={i === index ? "true" : undefined}
+                    onClick={() => select(i, i >= index ? 1 : -1)}
+                    className="flex h-5 items-center px-0.5"
+                  >
+                    <span className={cn("block h-1.5 rounded-full bg-white transition-all", i === index ? "w-5" : "w-1.5 opacity-50")} />
+                  </button>
+                ))}
+                <button type="button" aria-label="วิชาถัดไป" onClick={() => step(1)} className={cn("hidden h-8 w-8 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 lg:flex", FOCUS)}>
+                  <ChevronForward className="h-4 w-4" />
+                </button>
+              </div>
             )}
           </div>
-        </div>
+        </section>
+      </div>
 
-        {/* Island stage spans full width so swipes work edge to edge. */}
-        <div className="absolute inset-x-0 bottom-12 top-[6.5rem] flex items-center justify-center overflow-hidden">
-          <AnimatePresence initial={false} custom={dir} mode="popLayout">
-            <motion.div
-              key={island?.subject.id ?? "none"}
-              custom={dir}
-              variants={{
-                enter: (d: number) => (reduce ? { opacity: 0 } : { x: d * 260, opacity: 0, scale: 0.8 }),
-                center: { x: 0, opacity: 1, scale: 1 },
-                exit: (d: number) => (reduce ? { opacity: 0 } : { x: d * -260, opacity: 0, scale: 0.8 }),
-              }}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ type: "spring", stiffness: 320, damping: 30 }}
-              drag={islands.length > 1 ? "x" : false}
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.5}
-              onDragEnd={onDragEnd}
-              className={cn("flex h-full items-center justify-center", islands.length > 1 && "cursor-grab active:cursor-grabbing")}
-              style={{ touchAction: "pan-y" }}
-            >
-              <motion.div
-                animate={reduce ? undefined : { y: [0, -12, 0], rotate: [0, 0.8, 0] }}
-                transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
-                className={cn(!island && !islandsLoading && "opacity-80", islandsLoading && "animate-pulse motion-reduce:animate-none")}
+      {/* ===== Body ===== */}
+      <div className="mx-auto max-w-6xl px-4 lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-x-6 lg:px-6">
+        {/* stat cards: overlap the hero on mobile, side column on desktop */}
+        <div className="relative z-10 -mt-7 lg:col-start-2 lg:row-span-4 lg:row-start-1 lg:mt-6">
+          <div className="grid grid-cols-3 gap-2 lg:grid-cols-1 lg:gap-3">
+            {stats.map((st) => (
+              <button
+                key={st.label}
+                type="button"
+                onClick={st.onClick}
+                className={cn(
+                  "flex min-w-0 flex-col items-start gap-1 rounded-2xl bg-card p-3 text-left shadow-[0_6px_20px_rgba(157,31,99,0.12)] ring-1 ring-black/5 transition-transform active:scale-[0.97] lg:flex-row lg:items-center lg:gap-3 lg:p-4",
+                  FOCUS,
+                )}
               >
-                <IslandArt key={island?.areaCode ?? "other"} code={island?.areaCode ?? "other"} className="aspect-square h-[min(24rem,42dvh,80vw)]" />
-              </motion.div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Progress + arrows */}
-        {island && (
-          <div className="relative z-10 mt-auto flex items-center gap-2 px-3 pb-1">
-            <ArrowButton label="เกาะก่อนหน้า" disabled={islands.length < 2} onClick={() => step(-1)}>
-              <ChevronBack className="h-6 w-6" />
-            </ArrowButton>
-            <div
-              className="relative h-6 flex-1 overflow-hidden rounded-full border-2 border-[#1f2150] bg-[#1f2150]/60"
-              role="progressbar"
-              aria-label="งานที่ส่งแล้ว"
-              aria-valuemin={0}
-              aria-valuemax={island.total}
-              aria-valuenow={island.submitted}
-            >
-              <BarFill
-                name="hud-bar-fill-exp"
-                ratio={doneRatio}
-                fallback="bg-gradient-to-b from-[#ffe58a] to-[#ffb43d] shadow-[inset_0_2px_0_rgba(255,255,255,0.55)]"
-                transition={reduce ? { duration: 0 } : { duration: 0.6, ease: "easeOut" }}
-              />
-              <span className="game-outline absolute inset-0 flex items-center justify-center font-game text-xs font-bold">
-                ส่งแล้ว {island.submitted}/{island.total}
-                {islands.length > 1 && <span className="ml-2 opacity-80">· เกาะ {index + 1}/{islands.length}</span>}
-              </span>
-            </div>
-            <ArrowButton label="เกาะถัดไป" disabled={islands.length < 2} onClick={() => step(1)}>
-              <ChevronForward className="h-6 w-6" />
-            </ArrowButton>
+                <span
+                  className={cn(
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl lg:h-11 lg:w-11",
+                    st.alert ? "bg-red-100 text-red-600" : "bg-[#fde3f0] text-[#c0267a]",
+                  )}
+                >
+                  <st.icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-xs text-muted-foreground">{st.label}</span>
+                  <span className="block text-xl font-bold leading-tight tabular-nums">
+                    {st.value}
+                    <span className="ml-0.5 text-xs font-medium text-muted-foreground">{st.hint}</span>
+                  </span>
+                </span>
+              </button>
+            ))}
           </div>
-        )}
-      </section>
 
-      {/* ===== Action row ===== */}
-      {island && (
-        <div className="relative z-10 flex shrink-0 items-center justify-center gap-3 px-3 pb-4 pt-2">
           <button
             type="button"
-            aria-label="แผนที่เกาะทั้งหมด"
-            onClick={() => setPanel("map")}
-            className={cn("flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition-transform active:translate-y-1 motion-reduce:transition-none", NAVY, FOCUS)}
+            onClick={() => setPanel("bag")}
+            className={cn("mt-3 hidden w-full items-center gap-3 rounded-2xl bg-card p-4 text-left ring-1 ring-black/5 lg:flex", FOCUS)}
           >
-            <GameIcon name="hud-map" fallback={GlobeIcon} className="h-9 w-9 text-[#9ff7ff] drop-shadow-[0_2px_0_#1f2150]" />
+            <GameIcon name={`rank-${rank.id}`} fallback={RibbonIcon} className="h-11 w-11 shrink-0 text-[#c0267a]" />
+            <span className="min-w-0">
+              <span className="block text-xs text-muted-foreground">แรงก์สะสม</span>
+              <span className="block truncate font-semibold">{rank.label}</span>
+              <span className="block text-xs tabular-nums text-muted-foreground">{lifeExp.toLocaleString()} EXP</span>
+            </span>
+            <ChevronForward className="ml-auto h-4 w-4 text-muted-foreground" />
           </button>
-
-          {island.next ? (
-            <BattleButton
-              title="ลุย!"
-              subtitle={`${island.next.label} · ${formatDue(island.next.due_date)}`}
-              onClick={() => setBattle(island.next)}
-            />
-          ) : (
-            <BattleButton cleared title="เคลียร์แล้ว ✓" subtitle="ดูงานทั้งหมด" onClick={() => navigate("/assignments")} />
-          )}
-
-          {hasHard ? (
-            <button
-              type="button"
-              aria-label={`สอบวิชา ${island.subject.name_th}`}
-              onClick={() => navigate(`/exams?subject=${encodeURIComponent(island.subject.code)}`)}
-              className={cn(
-                "flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl border-[3px] border-[#ffb3b3] bg-gradient-to-b from-[#ff6b6b] to-[#d81e3c] shadow-[0_5px_0_#7a0f22] transition-[transform,box-shadow] active:translate-y-[5px] active:shadow-none motion-reduce:transition-none",
-                FOCUS,
-              )}
-            >
-              <GameIcon name="btn-hard" fallback={AlertTriangle} className="h-7 w-7 text-white drop-shadow-[0_2px_0_#7a0f22]" />
-              <span className="game-outline font-game text-[10px] font-black leading-none">HARD</span>
-            </button>
-          ) : (
-            <span className="w-14 shrink-0" aria-hidden />
-          )}
         </div>
-      )}
-      {!island && <div className="h-6 shrink-0" />}
+
+        {/* icon menu */}
+        <nav aria-label="เมนูลัด" className="mt-5 lg:col-start-1 lg:mt-6">
+          <ul className="grid grid-cols-4 gap-2.5 lg:grid-cols-6">
+            {menu.map((m) => (
+              <li key={m.label}>
+                <button
+                  type="button"
+                  onClick={m.onClick}
+                  className={cn(
+                    "relative flex h-[5.25rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl bg-[#fde8f3] px-1 text-[#5b1442] transition-all hover:bg-[#fbd9ea] active:scale-95 dark:bg-card",
+                    FOCUS,
+                  )}
+                >
+                  <m.icon className="h-6 w-6 text-[#9c1f63]" />
+                  <span className="w-full truncate text-center text-xs font-medium">{m.label}</span>
+                  {!!m.badge && (
+                    <span className="absolute right-1.5 top-1.5 min-w-[1.25rem] rounded-full bg-[#e11d48] px-1 text-center text-[11px] font-bold leading-5 text-white">
+                      {m.badge > 99 ? "99+" : m.badge}
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        {/* due work */}
+        <section className="mt-7 lg:col-start-1" aria-label="งานที่ต้องส่ง">
+          <SectionHead title="งานที่ต้องส่ง" onMore={() => navigate("/assignments")} />
+          {dueList.length === 0 ? (
+            <div className="rounded-2xl bg-card px-4 py-8 text-center text-sm text-muted-foreground ring-1 ring-black/5">
+              {islandsLoading ? "กำลังโหลด…" : "ไม่มีงานค้าง เยี่ยมมาก 🎉"}
+            </div>
+          ) : (
+            <ul className="scrollbar-hidden -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-2 lg:overflow-visible lg:px-0">
+              {dueList.map(({ a, isl }) => {
+                const due = dueInfo(a.due_date);
+                return (
+                  <li key={a.id} className="w-[17.5rem] shrink-0 snap-start lg:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => setBattle(a)}
+                      className={cn("flex w-full items-center gap-3 rounded-2xl bg-card p-3 text-left ring-1 ring-black/10 transition-shadow hover:shadow-md active:scale-[0.98]", FOCUS)}
+                    >
+                      <span className={cn("flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-2xl", gradientOf(isl.areaCode))} aria-hidden>
+                        {AREA_EMOJI[isl.areaCode] ?? AREA_EMOJI.other}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold">{a.label}</span>
+                        <span className="block truncate text-sm text-muted-foreground">{isl.subject.name_th}</span>
+                        <span className={cn("mt-1 inline-block rounded-md px-1.5 py-0.5 text-xs font-medium", DUE_CHIP[due.tone])}>{due.label}</span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        {/* subjects */}
+        {islands.length > 0 && (
+          <section className="mt-7 lg:col-start-1" aria-label="วิชาของฉัน">
+            <SectionHead title="วิชาของฉัน" onMore={() => setPanel("subjects")} />
+            <ul className="scrollbar-hidden -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0">
+              {islands.map((isl, i) => {
+                const ratio = isl.total ? isl.submitted / isl.total : 0;
+                return (
+                  <li key={isl.subject.id} className="w-[9.5rem] shrink-0 snap-start lg:w-auto">
+                    <button
+                      type="button"
+                      aria-label={`${isl.subject.name_th} ${isl.pending.length ? `ค้าง ${isl.pending.length} งาน` : "ไม่มีงานค้าง"}`}
+                      onClick={() => focusIsland(i)}
+                      className={cn(
+                        "relative flex aspect-[4/5] w-full flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br p-3 text-left text-white transition-transform active:scale-[0.97]",
+                        gradientOf(isl.areaCode),
+                        FOCUS,
+                      )}
+                    >
+                      <span className="absolute -right-3 -top-1 text-[4.5rem] leading-none opacity-90 drop-shadow-md" aria-hidden>
+                        {AREA_EMOJI[isl.areaCode] ?? AREA_EMOJI.other}
+                      </span>
+                      {isl.pending.length > 0 ? (
+                        <span className="relative w-fit rounded-full bg-white px-2 text-xs font-bold leading-5 text-[#c0267a]">ค้าง {isl.pending.length}</span>
+                      ) : (
+                        <span className="relative w-fit rounded-full bg-white/25 px-2 text-xs font-bold leading-5">{isl.total ? "ส่งครบ ✓" : "ไม่มีงาน"}</span>
+                      )}
+                      <span className="relative">
+                        <span className="line-clamp-2 block text-sm font-semibold leading-snug drop-shadow-sm">{isl.subject.name_th}</span>
+                        <span className="mt-0.5 block text-xs text-white/85">{isl.subject.code}</span>
+                        <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-black/20">
+                          <span className="block h-full rounded-full bg-white" style={{ width: `${Math.round(ratio * 100)}%` }} />
+                        </span>
+                        <span className="mt-1 block text-[11px] tabular-nums text-white/90">
+                          ส่งแล้ว {isl.submitted}/{isl.total}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+      </div>
 
       <Sheet open={panel !== null} onOpenChange={(o) => !o && setPanel(null)} title={panel ? PANEL_TITLE[panel] : ""}>
         {myStudent && profile && panel === "attendance" && <AttendanceSummarySection student={myStudent} />}
         {myStudent && profile && panel === "behavior" && <BehaviorScoreSection student={myStudent} />}
         {myStudent && profile && panel === "leave" && <StudentLeaveSection student={myStudent} submittedBy={profile.id} />}
-        {panel === "bag" && <Inventory badges={badges} rank={rankFromExp(lifeExp)} exp={lifeExp} />}
-        {panel === "map" && (
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {islands.map((isl, i) => (
-              <li key={isl.subject.id}>
-                <button
-                  type="button"
-                  aria-current={i === index ? "true" : undefined}
-                  onClick={() => {
-                    select(i, i >= index ? 1 : -1);
-                    setPanel(null);
-                  }}
-                  className={cn(
-                    "relative flex w-full flex-col items-center gap-1 rounded-2xl border-2 p-2 text-center transition-transform active:scale-95 motion-reduce:transition-none",
-                    i === index ? "border-[#ffc21a] bg-[#fff8dc]" : "border-black/10 bg-[#f3eaff]",
-                    "outline-none focus-visible:ring-4 focus-visible:ring-[#ffd23f]",
-                  )}
-                >
-                  <IslandArt code={isl.areaCode} className="aspect-square h-20" />
-                  <span className="line-clamp-2 text-xs font-bold leading-snug">{isl.subject.name_th}</span>
-                  <span className="text-[11px] text-black/60">{isl.subject.code}</span>
-                  {isl.pending.length > 0 ? (
-                    <span className="absolute right-1.5 top-1.5 min-w-6 rounded-full border-2 border-white bg-[#ff3b5c] px-1 text-xs font-bold leading-5 text-white">
-                      {isl.pending.length}
-                    </span>
-                  ) : (
-                    isl.total > 0 && <span className="absolute right-1.5 top-1.5 rounded-full bg-[#3fb52f] px-1.5 text-xs font-bold leading-5 text-white">✓</span>
-                  )}
-                  <span className="sr-only">{isl.pending.length ? `ค้าง ${isl.pending.length} งาน` : "ไม่มีงานค้าง"}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+        {panel === "bag" && <Inventory badges={badges} rank={rank} exp={lifeExp} />}
+        {panel === "subjects" && (
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="ค้นหาชื่อหรือรหัสวิชา"
+                aria-label="ค้นหาวิชา"
+                className="h-11 w-full rounded-xl border border-input bg-card pl-9 pr-3 text-base outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/20 md:h-10 md:text-sm"
+              />
+            </div>
+            {shownSubjects.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">ไม่พบวิชา</p>
+            ) : (
+              <ul className="space-y-2">
+                {shownSubjects.map((isl) => (
+                  <li key={isl.subject.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        focusIsland(islands.indexOf(isl));
+                        setPanel(null);
+                      }}
+                      className={cn("flex w-full items-center gap-3 rounded-2xl bg-card p-3 text-left ring-1 ring-black/10", FOCUS)}
+                    >
+                      <span className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-xl", gradientOf(isl.areaCode))} aria-hidden>
+                        {AREA_EMOJI[isl.areaCode] ?? AREA_EMOJI.other}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold">{isl.subject.name_th}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {isl.subject.code} · ส่งแล้ว {isl.submitted}/{isl.total}
+                        </span>
+                      </span>
+                      {isl.pending.length > 0 && (
+                        <span className="rounded-full bg-[#e11d48] px-2 text-xs font-bold leading-5 text-white">{isl.pending.length}</span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </Sheet>
 
       {myStudent && (
         <SubmitSheet item={battle} student={myStudent} scoreInfo={battle ? (scores?.get(battle.id) ?? null) : null} onClose={() => setBattle(null)} />
       )}
-    </>
-  );
-}
-
-function ArrowButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-white/70 bg-white/30 text-white shadow-[0_3px_0_rgba(31,33,80,0.45)] backdrop-blur-sm transition-transform active:translate-y-[3px] active:shadow-none disabled:opacity-40 motion-reduce:transition-none [&_svg]:drop-shadow-[0_2px_0_#1f2150]",
-        FOCUS,
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-/** Chunky slanted 3D button; pulsing glow and press-down travel, both off under reduced motion. */
-function BattleButton({ title, subtitle, onClick, cleared }: { title: string; subtitle: string; onClick: () => void; cleared?: boolean }) {
-  const reduce = useReducedMotion();
-  return (
-    <div className="relative min-w-0 max-w-[15rem] flex-1">
-      {!reduce && (
-        <motion.span
-          aria-hidden
-          className={cn("pointer-events-none absolute -inset-1.5 -skew-x-6 rounded-[1.4rem] blur-md", cleared ? "bg-[#7ee06b]" : "bg-[#ffd23f]")}
-          animate={{ opacity: [0.35, 0.85, 0.35], scale: [0.98, 1.04, 0.98] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-        />
-      )}
-      <motion.button
-        type="button"
-        onClick={onClick}
-        whileTap={reduce ? undefined : { y: 6, boxShadow: cleared ? "0 0 0 #1f6d16" : "0 0 0 #b07a00" }}
-        transition={{ type: "spring", stiffness: 700, damping: 30 }}
-        className={cn(
-          "relative flex h-16 w-full -skew-x-6 flex-col items-center justify-center rounded-[1.2rem] border-[3px] px-3",
-          cleared
-            ? "border-[#d6ffc7] bg-gradient-to-b from-[#9cf07a] to-[#3fb52f] shadow-[0_6px_0_#1f6d16,0_10px_18px_rgba(31,33,80,0.35)]"
-            : "border-[#fff3b0] bg-gradient-to-b from-[#ffe466] to-[#ffd23f] shadow-[0_6px_0_#b07a00,0_10px_18px_rgba(31,33,80,0.35)]",
-          "outline-none focus-visible:ring-4 focus-visible:ring-white",
-        )}
-      >
-        <span className="pointer-events-none absolute inset-x-2 top-1 h-1/3 rounded-full bg-white/35" aria-hidden />
-        <span className="flex min-w-0 max-w-full skew-x-6 flex-col items-center">
-          <span className="game-outline-lg font-game text-2xl font-black leading-none tracking-wide">{title}</span>
-          <span className="mt-1 max-w-full truncate font-game text-[11px] font-bold leading-tight text-[#1f2150]">{subtitle}</span>
-        </span>
-      </motion.button>
     </div>
   );
 }

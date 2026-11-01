@@ -57,10 +57,3 @@ export function reportCsv(r: CardReport): string {
     ...r.voids.map((v) => row(v.student_name, TX_TYPE_LABEL[v.type], Math.abs(v.amount), v.cashier, v.void_reason)),
   ].join("\n");
 }
-
-/** Queue step for ลงทะเบียนบัตร: next row with no card after `afterId` (wrapping), or null when all are bound. */
-export function nextUnbound<T extends { id: string }>(rows: T[], bound: ReadonlySet<string>, afterId?: string | null): string | null {
-  const i = afterId ? rows.findIndex((r) => r.id === afterId) : -1;
-  const order = [...rows.slice(i + 1), ...rows.slice(0, Math.max(i, 0))];
-  return order.find((r) => r.id !== afterId && !bound.has(r.id))?.id ?? null;
-}

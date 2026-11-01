@@ -1,13 +1,13 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Input, Select } from "@/components/ui";
+import { Button, EmptyState, Input, Select } from "@/components/ui";
 import { useBindCard, useLiveCards } from "@/hooks/useCardTopup";
 import { useAllGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useStudents, type StudentFilters } from "@/hooks/useStudents";
 import { useClassrooms } from "@/hooks/useStatusManagement";
 import { parseSwipe } from "@/lib/cardSwipe";
-import { nextUnbound } from "@/lib/cardTopup";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { cn } from "@/lib/utils";
 
@@ -20,10 +20,8 @@ export function RegisterTab() {
   const toast = useToast();
   const [filters, setFilters] = useState<StudentFilters>(EMPTY);
   const [cardFilter, setCardFilter] = useState<CardFilter>("unbound");
-  // Explicit pick from a click; `replace` only after the user confirmed swapping an existing card.
-  const [picked, setPicked] = useState<{ id: string; replace: boolean } | null>(null);
+  const [picked, setPicked] = useState<string | null>(null);
   const [uid, setUid] = useState("");
-  const scanRef = useRef<HTMLInputElement>(null);
 
   const { data: departments = [] } = useDepartments();
   const { data: allGradeLevels = [] } = useAllGradeLevels();
@@ -44,18 +42,8 @@ export function RegisterTab() {
   });
   const boundCount = students.filter((s) => boundIds.has(s.id)).length;
 
-  // Target = the clicked row if still listed, else the first student with no card.
-  const clicked = picked && rows.find((r) => r.id === picked.id);
-  const target = clicked ?? rows.find((r) => r.id === nextUnbound(rows, boundIds));
-  const replacing = !!clicked && picked!.replace;
-
-  function pick(id: string) {
-    if (cardOf.has(id)) {
-      if (!confirm("เปลี่ยนบัตร? บัตรใบเดิมจะใช้ไม่ได้อีก")) return;
-      setPicked({ id, replace: true });
-    } else setPicked({ id, replace: false });
-    scanRef.current?.focus();
-  }
+  const target = rows.find((r) => r.id === picked) ?? null;
+  const targetCard = target ? cardOf.get(target.id) : undefined;
 
   async function submit() {
     const value = parseSwipe(uid);
@@ -64,20 +52,19 @@ export function RegisterTab() {
     try {
       await bind.mutateAsync({ student_id: target.id, card_uid: value });
       toast(`ผูกบัตรให้ ${target.first_name} ${target.last_name} แล้ว`);
-      const next = nextUnbound(rows, boundIds, target.id);
-      setPicked(next ? { id: next, replace: false } : null);
+      setPicked(null);
     } catch (e) {
       toast(errMsg(e), "error");
     }
-    scanRef.current?.focus();
   }
 
-  const set = (patch: Partial<StudentFilters>) => (setFilters({ ...filters, ...patch }), setPicked(null));
+  const set = (patch: Partial<StudentFilters>) => setFilters({ ...filters, ...patch });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <Card className="space-y-3">
+      <div className="space-y-3">
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+          <Input type="search" value={filters.search} onChange={(e) => set({ search: e.target.value })} placeholder="ค้นหาชื่อหรือรหัส" />
           <Select value={filters.departmentId} onChange={(e) => set({ departmentId: e.target.value, gradeLevelId: "", classroomId: "" })}>
             <option value="">ทุกแผนก</option>
             {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -90,38 +77,21 @@ export function RegisterTab() {
             <option value="">ทุกห้อง</option>
             {classrooms.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
-          <Select value={cardFilter} onChange={(e) => (setCardFilter(e.target.value as CardFilter), setPicked(null))}>
+          <Select value={cardFilter} onChange={(e) => setCardFilter(e.target.value as CardFilter)}>
             <option value="unbound">ยังไม่ผูกบัตร</option>
             <option value="bound">ผูกแล้ว</option>
             <option value="frozen">ระงับ</option>
             <option value="all">ทั้งหมด</option>
           </Select>
-          <Input type="search" value={filters.search} onChange={(e) => set({ search: e.target.value })} placeholder="ค้นหาชื่อหรือรหัส" />
         </div>
-        <form className="flex items-end gap-2" onSubmit={(e) => (e.preventDefault(), void submit())}>
-          <div className="min-w-0 flex-1">
-            <p className="mb-1 text-xs text-muted-foreground">
-              {target ? (
-                <>
-                  {replacing ? "เปลี่ยนบัตรให้" : "รูดบัตรให้"}{" "}
-                  <b className="text-sm text-foreground">{target.prefix ?? ""}{target.first_name} {target.last_name}</b> ({target.student_code})
-                </>
-              ) : (
-                "ไม่มีนักเรียนที่ต้องผูกบัตรในรายการนี้"
-              )}
-            </p>
-            <Input ref={scanRef} autoFocus value={uid} onChange={(e) => setUid(e.target.value)} autoComplete="off" disabled={!target} placeholder="รูดบัตรที่นี่" />
-          </div>
-          <Button type="submit" disabled={!uid.trim() || !target || bind.isPending}>ผูกบัตร</Button>
-          <p className="shrink-0 pb-2 text-sm tabular-nums text-muted-foreground">ผูกแล้ว {boundCount} / {students.length}</p>
-        </form>
-      </Card>
+        <p className="text-sm tabular-nums text-muted-foreground">ผูกแล้ว {boundCount} / {students.length}</p>
+      </div>
 
       {isLoading ? null : rows.length === 0 ? (
         <EmptyState title="ไม่พบนักเรียน" description="ลองเปลี่ยนตัวกรอง" />
       ) : (
         <div className="table-panel flex min-h-0 flex-1">
-          <div className="table-panel-scroll">
+          <div className="table-panel-scroll scrollbar-hidden">
             <table className="w-full text-[13px]">
               <thead className="text-left text-xs">
                 <tr>
@@ -138,21 +108,22 @@ export function RegisterTab() {
                   return (
                     <tr
                       key={s.id}
-                      onClick={() => pick(s.id)}
-                      className={cn("h-11 cursor-pointer border-t border-border first:border-t-0", target?.id === s.id && "bg-accent/10")}
+                      className="h-11 border-t border-border first:border-t-0"
                     >
                       <td className="px-4 py-0 font-mono tabular-nums">{s.student_code}</td>
                       <td className="px-4 py-0">{s.prefix ?? ""}{s.first_name} {s.last_name}</td>
                       <td className="px-4 py-0 text-muted-foreground">{deptName.get(s.department_id) ?? "—"}</td>
                       <td className="px-4 py-0 text-muted-foreground">{(s.grade_level_id && gradeName.get(s.grade_level_id)) || "—"}</td>
                       <td className="px-4 py-0">
-                        {c ? (
-                          <span className={cn("rounded-full px-2.5 py-1 text-xs font-medium", c.status === "frozen" ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success")}>
-                            {c.status === "frozen" ? "ระงับ" : "ผูกแล้ว"} · …{c.card_uid.slice(-4)}
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">ยังไม่ผูก</span>
-                        )}
+                        <button type="button" onClick={() => setPicked(s.id)} aria-label="ผูกบัตร">
+                          {c ? (
+                            <span className={cn("rounded-full px-2.5 py-1 text-xs font-medium", c.status === "frozen" ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success")}>
+                              {c.status === "frozen" ? "ระงับ" : "ผูกแล้ว"} · …{c.card_uid.slice(-4)}
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">ยังไม่ผูก</span>
+                          )}
+                        </button>
                       </td>
                     </tr>
                   );
@@ -162,6 +133,20 @@ export function RegisterTab() {
           </div>
         </div>
       )}
+      <Modal
+        open={!!target}
+        onOpenChange={(o) => !o && (setPicked(null), setUid(""))}
+        title={targetCard ? "เปลี่ยนบัตร" : "ผูกบัตร"}
+        description={target ? `${target.prefix ?? ""}${target.first_name} ${target.last_name} (${target.student_code})` : undefined}
+      >
+        <form className="space-y-3" onSubmit={(e) => (e.preventDefault(), void submit())}>
+          {targetCard && <p className="text-xs text-muted-foreground">บัตรปัจจุบัน …{targetCard.card_uid.slice(-4)} จะใช้ไม่ได้อีกหลังผูกใบใหม่</p>}
+          <Input autoFocus value={uid} onChange={(e) => setUid(e.target.value)} autoComplete="off" placeholder="รูดบัตรที่นี่" />
+          <Button type="submit" className="w-full" disabled={!uid.trim() || bind.isPending}>
+            {targetCard ? "เปลี่ยนบัตร" : "ผูกบัตร"}
+          </Button>
+        </form>
+      </Modal>
     </div>
   );
 }
