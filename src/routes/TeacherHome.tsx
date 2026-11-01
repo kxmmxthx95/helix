@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { motion, useReducedMotion } from "framer-motion";
 import { profileFullName, type ProfileWithRoles } from "@/lib/database.types";
 import { ChevronForward, PaletteIcon } from "@/components/icons";
 import { Modal } from "@/components/Modal";
@@ -18,11 +19,12 @@ import { useTeacherSchedule, type ScheduleEntryRow } from "@/hooks/useSchedule";
 import { useSchoolSettings } from "@/hooks/useSettings";
 import { useClockIn, useClockOut, useMyTimeClock } from "@/hooks/useTimeClock";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
-import { usePendingStudentLeaveApprovals } from "@/hooks/useStudentLeave";
+import { usePendingStudentLeaveApprovals, useSetStudentLeaveStatus } from "@/hooks/useStudentLeave";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { supabase } from "@/lib/supabase";
 import { cn, todayIso } from "@/lib/utils";
+import { AssemblyAttendanceSheet } from "@/routes/AssemblyAttendanceSheet";
 import { QuickClockSection } from "@/routes/Dashboard";
 import { bangkokTime } from "@/routes/TimeTracking";
 import { TeacherTimetable } from "@/routes/Timetable";
@@ -68,6 +70,9 @@ function useBannerColors(profileId: string) {
   return [colors, update] as const;
 }
 
+/** ISO yyyy-mm-dd → "14 ต.ค." (formatted in UTC so the day never shifts). */
+const leaveDate = (iso: string) =>
+  new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
 const DAY_NAME = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 
 const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
@@ -99,6 +104,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const [bannerColors, setBannerColors] = useBannerColors(me.id);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [timetableOpen, setTimetableOpen] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [assemblyOpen, setAssemblyOpen] = useState(false);
+  const setLeaveStatus = useSetStudentLeaveStatus();
   const toast = useToast();
   const { data: clock, isLoading: loadingClock } = useMyTimeClock(me.id, today);
   const clockIn = useClockIn();
@@ -106,7 +114,10 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const clockArgs = { profileId: me.id, departmentId: me.department_id, date: today };
   const onClock = (kind: "in" | "out") =>
     (kind === "in" ? clockIn : clockOut).mutate(clockArgs, {
-      onSuccess: () => toast(kind === "in" ? "บันทึกเวลาเข้างานสำเร็จ" : "บันทึกเวลาออกงานสำเร็จ"),
+      onSuccess: () => {
+        const at = bangkokTime(new Date().toISOString());
+        toast(kind === "in" ? `เข้างานเรียบร้อย เวลา ${at} น.` : `ออกงานเรียบร้อย เวลา ${at} น.`);
+      },
       onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
     });
   const roleSubtitle = useRoleSubtitle(me.id, me.roles);
@@ -188,6 +199,33 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
 
   const current = isToday ? timed.find((t) => t.start <= nowMin && nowMin < t.end) : undefined;
 
+  // Back of the "เช็คชื่อรายคาบ" tile: the period in progress, else the next one — rolling to the next teaching day when today is done.
+  const upNext = (() => {
+    for (let offset = 0; offset <= 14; offset++) {
+      const iso = addDays(today, offset);
+      const day = weekdayOf(iso);
+      if (isHoliday(iso)) continue;
+      const first = entries
+        .filter((e) => e.day_of_week === day)
+        .sort((a, b) => a.period_no - b.period_no)
+        .flatMap((e) => {
+          const slot = periods.find((p) => p.day_of_week === day && p.period_no === e.period_no && p.period_type === "teaching");
+          return slot ? [{ entry: e, start: toMin(slot.start_time), end: toMin(slot.end_time), startText: hhmm(slot.start_time), endText: hhmm(slot.end_time) }] : [];
+        })
+        .find((t) => offset > 0 || t.end > nowMin);
+      if (!first) continue;
+      const ordinal = periods.filter((p) => p.day_of_week === day && p.period_type === "teaching" && p.period_no <= first.entry.period_no).length;
+      const label =
+        offset === 0
+          ? first.start <= nowMin
+            ? "กำลังสอน"
+            : "คาบถัดไป"
+          : `${offset === 1 ? "พรุ่งนี้" : DAY_NAME[day]} · คาบ ${ordinal}`;
+      return { ...first, label };
+    }
+    return null;
+  })();
+
   const taught = [...new Map(
     entries.flatMap((e) => {
       const sub = subjectOf(e.teaching_assignment.subject_id);
@@ -216,9 +254,23 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const assemblyPending = assemblyDone ? homerooms.filter((h) => !assemblyDone.has(h.id)) : [];
   const { data: pendingLeave = [] } = usePendingStudentLeaveApprovals();
 
+  async function approveAllLeave() {
+    if (!confirm(`อนุมัติใบลา ${pendingLeave.length} ใบทั้งหมดหรือไม่?`)) return;
+    const results = await Promise.allSettled(
+      pendingLeave.map((l) => setLeaveStatus.mutateAsync({ id: l.id, status: "approved", approvedBy: me.id })),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed === 0) {
+      toast(`อนุมัติใบลา ${results.length} ใบเรียบร้อย`);
+      setLeaveOpen(false);
+    } else {
+      toast(`อนุมัติสำเร็จ ${results.length - failed} ใบ ไม่สำเร็จ ${failed} ใบ`, "error");
+    }
+  }
+
   const work = [
     ...(unchecked > 0 ? [{ key: "periods", label: "คาบที่ยังไม่เช็คชื่อ", count: unchecked, to: "/period-attendance" }] : []),
-    ...assemblyPending.map((h) => ({ key: `assembly-${h.id}`, label: `เช็คชื่อเข้าแถว ${h.label}`, count: null, to: "/attendance" })),
+    ...assemblyPending.map((h) => ({ key: `assembly-${h.id}`, label: `เช็คชื่อเข้าแถว ${roomLabel(h.id)}`, count: null, to: "/attendance" })),
     ...(pendingLeave.length > 0 ? [{ key: "leave", label: "ใบลาที่รออนุมัติ", count: pendingLeave.length, to: "/attendance" }] : []),
   ];
 
@@ -297,7 +349,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
               <h1 className="font-heading mt-3 truncate text-3xl font-bold tracking-[-0.02em]">{profileFullName(me)}</h1>
               <p className="mt-1 truncate text-base text-muted-foreground">{me.email || "ยังไม่ได้ระบุอีเมล"}</p>
               {homerooms.length > 0 && (
-                <p className="truncate text-base text-muted-foreground">ครูที่ปรึกษา {homerooms.map((h) => h.label).join(", ")}</p>
+                <p className="truncate text-base text-muted-foreground">ครูที่ปรึกษา {homerooms.map((h) => roomLabel(h.id)).join(", ")}</p>
               )}
               <div className="mt-5 flex items-center gap-3">
                 <button
@@ -344,7 +396,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
               )}
             </div>
           </div>
-          <div className={cn("grid gap-3 px-8 pb-8", showClock ? "grid-cols-4" : "grid-cols-3")}>
+          <div className={cn("grid items-stretch gap-3 px-8 pb-8", showClock ? "grid-cols-4" : "grid-cols-3")}>
             {[
               ...(showClock
                 ? [
@@ -361,8 +413,14 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                     },
                   ]
                 : []),
-              { title: "เช็คชื่อรายคาบ", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance" },
-              { title: "ใบลารออนุมัติ", text: pendingLeave.length > 0 ? `มี ${pendingLeave.length} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง", to: "/attendance" },
+              { title: "เช็คชื่อรายคาบ", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", flip: true },
+              {
+                title: "ใบลารออนุมัติ",
+                text: pendingLeave.length > 0 ? `มี ${pendingLeave.length} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง",
+                busy: false,
+                disabled: false,
+                onClick: () => setLeaveOpen(true),
+              },
               {
                 title: "เช็คชื่อหน้าเสาธง",
                 text:
@@ -371,9 +429,11 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                     : !assemblyDay
                       ? "วันนี้ไม่มีเข้าแถว"
                       : assemblyPending.length > 0
-                        ? `ยังไม่เช็ค ${assemblyPending.map((h) => h.label).join(", ")}`
+                        ? `ยังไม่เช็ค ${assemblyPending.map((h) => roomLabel(h.id)).join(", ")}`
                         : "เช็คชื่อเรียบร้อยแล้ว",
-                to: "/attendance",
+                busy: false,
+                disabled: false,
+                onClick: () => setAssemblyOpen(true),
               },
             ].map((t) => {
               const body = (
@@ -387,7 +447,37 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                   </span>
                 </>
               );
-              const cls = "flex items-center gap-3 rounded-2xl bg-muted/70 p-4 text-left transition-colors hover:bg-muted";
+              const cls = "flex h-full items-center gap-3 rounded-2xl bg-muted/70 p-4 text-left transition-colors hover:bg-muted";
+              if ("flip" in t && upNext) {
+                const sub = subjectOf(upNext.entry.teaching_assignment.subject_id);
+                return (
+                  <FlipTile
+                    key={t.title}
+                    front={
+                      <Link to={t.to ?? "/period-attendance"} className={cls}>
+                        {body}
+                      </Link>
+                    }
+                    back={
+                      <Link
+                        to={`/period-attendance?entry=${upNext.entry.id}`}
+                        className={cn("flex h-full items-center gap-3 rounded-2xl p-4 text-left", styleOf(upNext.entry).gradient)}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-xs font-medium opacity-70">{upNext.label}</span>
+                          <span className="block truncate text-[15px] font-semibold">{sub?.name_th ?? "—"}</span>
+                          <span className="block truncate text-sm opacity-80">
+                            {sub?.code} · {roomLabel(upNext.entry.teaching_assignment.classroom_id)} · {upNext.startText}–{upNext.endText}
+                          </span>
+                        </span>
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-current">
+                          <ChevronForward className="h-4 w-4" />
+                        </span>
+                      </Link>
+                    }
+                  />
+                );
+              }
               return "onClick" in t ? (
                 <button key={t.title} type="button" disabled={t.disabled || t.busy} onClick={t.onClick} className={cn(cls, "disabled:opacity-60")}>
                   {body}
@@ -401,12 +491,12 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           </div>
         </section>
         {showClock && (
-          <div className={cn(WIDGET, "p-4 md:p-5 lg:col-start-2 lg:row-start-2")}>
+          <div className={cn(WIDGET, "p-4 md:p-5 lg:hidden")}>
             <QuickClockSection profileId={me.id} departmentId={me.department_id} />
           </div>
         )}
 
-        <section className="space-y-2 lg:col-start-1 lg:row-span-2 lg:row-start-2">
+        <section className="space-y-2 lg:col-start-1 lg:row-start-2">
           <h2 className={SECTION_LABEL}>
             <span className="hidden lg:inline">
               คาบสอน · {heading} · {dateText}
@@ -507,7 +597,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         </section>
 
         {work.length > 0 && (
-          <section className="space-y-2 lg:col-start-2 lg:row-start-3">
+          <section className="space-y-2 lg:col-start-2 lg:row-start-2">
             <h2 className={SECTION_LABEL}>งานค้าง</h2>
             <ul className={cn(WIDGET, "divide-y divide-border/60 overflow-hidden")}>
               {work.map((w) => (
@@ -530,6 +620,57 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           </section>
         )}
       </div>
+      <AssemblyAttendanceSheet
+        open={assemblyOpen}
+        onOpenChange={setAssemblyOpen}
+        homerooms={homerooms}
+        academicYear={academicYear}
+        departmentId={departmentId}
+        recorderId={me.id}
+        date={today}
+        roomLabel={roomLabel}
+      />
+
+      <Modal
+        open={leaveOpen}
+        onOpenChange={setLeaveOpen}
+        title="ใบลารออนุมัติ"
+        description={pendingLeave.length > 0 ? `นักเรียนที่รออนุมัติ ${pendingLeave.length} ใบ` : undefined}
+        footer={
+          <button
+            type="button"
+            disabled={pendingLeave.length === 0 || setLeaveStatus.isPending}
+            onClick={approveAllLeave}
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
+          >
+            {setLeaveStatus.isPending && <Spinner className="h-4 w-4" />}
+            อนุมัติทั้งหมด{pendingLeave.length > 0 && ` (${pendingLeave.length})`}
+          </button>
+        }
+      >
+        {pendingLeave.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีใบลาค้าง</p>
+        ) : (
+          <ul className="-my-1 divide-y divide-border">
+            {pendingLeave.map((l) => (
+              <li key={l.id} className="py-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="min-w-0 truncate text-[15px] font-semibold">
+                    {l.student ? `${l.student.first_name} ${l.student.last_name}` : "—"}
+                  </p>
+                  <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{l.student?.student_code}</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {leaveDate(l.start_date)}
+                  {l.end_date !== l.start_date && ` – ${leaveDate(l.end_date)}`} · {l.days} วัน
+                </p>
+                {l.reason && <p className="mt-0.5 text-sm">{l.reason}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Modal>
+
       <Modal
         open={timetableOpen}
         onOpenChange={setTimetableOpen}
@@ -551,6 +692,34 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           </div>
         )}
       </Modal>
+    </div>
+  );
+}
+
+/** Two faces of one tile; flips about the horizontal axis every few seconds, paused while hovered or when motion is reduced. */
+function FlipTile({ front, back }: { front: React.ReactNode; back: React.ReactNode }) {
+  const [flipped, setFlipped] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const reduce = useReducedMotion();
+  useEffect(() => {
+    if (reduce || paused) return;
+    const t = setInterval(() => setFlipped((f) => !f), 5000);
+    return () => clearInterval(t);
+  }, [reduce, paused]);
+
+  const face = "h-full [grid-area:1/1] [backface-visibility:hidden] [-webkit-backface-visibility:hidden]";
+  return (
+    <div className="h-full [perspective:1000px]" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+      <motion.div
+        className="grid h-full [transform-style:preserve-3d]"
+        animate={{ rotateX: flipped ? 180 : 0 }}
+        transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+      >
+        <div className={cn(face, flipped && "pointer-events-none")}>{front}</div>
+        <div className={cn(face, !flipped && "pointer-events-none")} style={{ transform: "rotateX(180deg)" }}>
+          {back}
+        </div>
+      </motion.div>
     </div>
   );
 }

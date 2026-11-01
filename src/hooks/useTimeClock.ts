@@ -135,3 +135,15 @@ export function useRecordTimeClockForOthers() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ["time_clock_records"] }),
   });
 }
+
+/** Manager removes a person's clock record for a day (RLS limits it to their department; the audit trigger logs who did it). */
+export function useDeleteTimeClockRecord() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ profileId, date }: { profileId: string; date: string }) => {
+      const { error } = await supabase.from("time_clock_records").delete().eq("profile_id", profileId).eq("date", date);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["time_clock_records"] }),
+  });
+}

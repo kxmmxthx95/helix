@@ -29,6 +29,8 @@ export function Sheet({
   title,
   description,
   headerEnd,
+  headerClassName,
+  footerClassName,
   icon,
   closable = false,
   children,
@@ -43,6 +45,9 @@ export function Sheet({
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
+  /** Extra classes on the header band / the footer band (e.g. to give both the same height). */
+  headerClassName?: string;
+  footerClassName?: string;
   /** Optional trailing content in the header row (e.g. a badge). */
   headerEnd?: React.ReactNode;
   /** Optional tinted tile before the title (e.g. a document icon). */
@@ -83,7 +88,7 @@ export function Sheet({
           )}
         >
           {ios && <div aria-hidden className="mx-auto mt-1.5 h-[5px] w-9 shrink-0 rounded-full bg-muted-foreground/40" />}
-          <div className={cn("shrink-0 px-4", ios ? "pb-2 pt-2" : "border-b border-border py-3")}>
+          <div className={cn("shrink-0 px-4", ios ? "pb-2 pt-2" : "border-b border-border py-3", headerClassName)}>
             <div className="flex min-w-0 items-center gap-3">
               {icon && <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">{icon}</div>}
               <Drawer.Title className="font-heading min-w-0 flex-1 truncate text-[17px] font-semibold leading-6 tracking-[-0.01em]">{title}</Drawer.Title>
@@ -115,7 +120,7 @@ export function Sheet({
             <SheetFormContext.Provider value>{children}</SheetFormContext.Provider>
           </div>
           {footer ? (
-            <div className="shrink-0 border-t border-border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className={cn("shrink-0 border-t border-border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]", footerClassName)}>
               {footer}
             </div>
           ) : null}

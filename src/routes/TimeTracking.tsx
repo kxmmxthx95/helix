@@ -9,6 +9,7 @@ import {
   useClockIn,
   useClockOut,
   useMyTimeClock,
+  useDeleteTimeClockRecord,
   useRecordTimeClockForOthers,
   useTimeClockRange,
 } from "@/hooks/useTimeClock";
@@ -409,6 +410,7 @@ function ManualRecordCard({ recordedBy }: { recordedBy: string }) {
   const [clockInInput, setClockInInput] = useState("");
   const [clockOutInput, setClockOutInput] = useState("");
   const record = useRecordTimeClockForOthers();
+  const remove = useDeleteTimeClockRecord();
 
   useEffect(() => {
     setClockInInput(existing?.clock_in_time ? bangkokTime(existing.clock_in_time) : "");
@@ -458,9 +460,31 @@ function ManualRecordCard({ recordedBy }: { recordedBy: string }) {
             <Input type="time" value={clockOutInput} onChange={(e) => setClockOutInput(e.target.value)} />
           </Field>
         </div>
-        <Button type="submit" disabled={!targetId || record.isPending}>
-          {record.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button type="submit" disabled={!targetId || record.isPending}>
+            {record.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
+          </Button>
+          {existing && (
+            <Button
+              type="button"
+              variant="outline"
+              className="text-destructive"
+              disabled={remove.isPending}
+              onClick={() => {
+                if (!confirm("ลบรายการลงเวลาของวันนี้ทั้งหมดหรือไม่? การลบจะถูกบันทึกในประวัติระบบ")) return;
+                remove.mutate(
+                  { profileId: targetId, date },
+                  {
+                    onSuccess: () => toast("ลบรายการลงเวลาแล้ว"),
+                    onError: (err) => toast(err instanceof Error ? err.message : "ลบไม่สำเร็จ", "error"),
+                  },
+                );
+              }}
+            >
+              {remove.isPending ? <Spinner className="h-3 w-3" /> : "ลบรายการ"}
+            </Button>
+          )}
+        </div>
       </form>
     </Card>
   );
