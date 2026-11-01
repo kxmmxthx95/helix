@@ -85,7 +85,7 @@ export function Login() {
         >
           <div className="mb-8 text-center">
             <img src="/logo.webp" alt="Helix" className="mx-auto h-28 w-auto invert" />
-            <p className="mt-2 text-sm text-white/65">Academic Enterprise Resource Planning</p>
+            <p className="mt-2 text-sm text-white/65">Piyamitwittaya School Management System</p>
           </div>
 
           <div className="glass-panel space-y-4 rounded-2xl p-5 text-card-foreground">
