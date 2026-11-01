@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { AlertTriangle } from "@/components/icons";
 import { Modal } from "@/components/Modal";
@@ -155,8 +156,9 @@ export function PosTab({ orgWide, onManage }: { orgWide: boolean; onManage?: () 
     </header>
   );
 
+  // Portalled to <body>: AppShell's sidebar toggle sits in a higher stacking context than the page area.
   if (!terminal) {
-    return (
+    return createPortal(
       <div className="fixed inset-0 z-40 flex flex-col bg-background">
         {topBar}
         <div className="flex flex-1 items-center justify-center p-5">
@@ -173,11 +175,12 @@ export function PosTab({ orgWide, onManage }: { orgWide: boolean; onManage?: () 
             {activeTerminals.length === 0 && <p className="text-xs text-muted-foreground">ยังไม่มีเครื่องขาย — ให้ผู้ดูแลเพิ่มที่แท็บ "เครื่องขาย"</p>}
           </Card>
         </div>
-      </div>
+      </div>,
+      document.body,
     );
   }
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-40 flex flex-col bg-background"
       onClick={(e) => !(e.target as HTMLElement).closest("input,select,textarea,dialog") && capture.current?.focus()}
@@ -318,7 +321,8 @@ export function PosTab({ orgWide, onManage }: { orgWide: boolean; onManage?: () 
           }}
         />
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
 

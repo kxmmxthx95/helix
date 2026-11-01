@@ -167,15 +167,6 @@ export function Users() {
 
           <div className="table-panel hidden lg:flex"><div className="table-panel-scroll">
             <table className="w-full text-[13px]">
-              <thead className="text-left text-xs">
-                <tr>
-                  <th className="px-4 py-3">ชื่อ</th>
-                  <th className="px-4 py-3">สิทธิ์</th>
-                  <th className="px-4 py-3">ตำแหน่ง</th>
-                  <th className="px-4 py-3">แผนก</th>
-                  <th className="px-4 py-3">สถานะ</th>
-                </tr>
-              </thead>
               <tbody>
                 {[0, 1, 2, 3, 4].map((i) => (
                   <tr key={i} className="h-14 border-t border-border first:border-t-0">
@@ -317,16 +308,6 @@ export function Users() {
 
           <div className="table-panel hidden rounded-none border-t border-border shadow-none lg:flex"><div className="table-panel-scroll">
             <table className="w-full text-[13px]">
-              <thead className="text-left text-xs">
-                <tr>
-                  <th className="px-4 py-3">ชื่อ</th>
-                  <th className="px-4 py-3">สิทธิ์</th>
-                  <th className="px-4 py-3">ตำแหน่ง</th>
-                  <th className="px-4 py-3">แผนก</th>
-                  <th className="px-4 py-3">สถานะ</th>
-                  {mayManage && <th className="w-14 px-4 py-3" />}
-                </tr>
-              </thead>
               <tbody>
                 {rows.map((row) => (
                   <tr
