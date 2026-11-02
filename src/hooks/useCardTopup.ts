@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@/auth/AuthProvider";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CardPortalSummary,
@@ -274,13 +275,20 @@ export function useRefundWithdraw() {
 export type PortalStudent = Pick<Student, "id" | "student_code" | "prefix" | "first_name" | "last_name" | "avatar_path" | "updated_at">;
 
 /** RLS scopes this to the signed-in parent's children, or the student themself. */
+// RLS also lets anyone in a department read its whole roster, so filter to self + own children explicitly.
 export function useMyCardStudents() {
+  const uid = useAuth().profile?.id;
   return useQuery({
-    queryKey: ["card_my_students"],
+    queryKey: ["card_my_students", uid],
+    enabled: !!uid,
     queryFn: async (): Promise<PortalStudent[]> => {
+      const { data: gs, error: gErr } = await supabase.from("guardianships").select("student_id").eq("parent_id", uid!);
+      if (gErr) throw gErr;
+      const ids = gs.map((g) => g.student_id);
       const { data, error } = await supabase
         .from("students")
         .select("id, student_code, prefix, first_name, last_name, avatar_path, updated_at")
+        .or(`profile_id.eq.${uid},id.in.(${ids.join(",")})`)
         .order("student_code");
       if (error) throw error;
       return data;
