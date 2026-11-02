@@ -16,6 +16,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ImportUsersSheet } from "@/components/ImportUsersSheet";
+import { Modal } from "@/components/Modal";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import {
@@ -29,6 +30,7 @@ import {
   Input,
   PasswordInput,
   Select,
+  SheetFormContext,
   Skeleton,
   Spinner,
   Switch,
@@ -53,9 +55,10 @@ import { profileFullName } from "@/lib/database.types";
 import { blobToBase64, compressImage } from "@/lib/image";
 import { passwordFromDob } from "@/lib/password";
 import { canManageUsers, isOrgWide, PREFIXES, ROLE_LABEL, ROLES, STUDENT_PREFIXES, roleLabels, type Role } from "@/lib/roles";
+import { cn } from "@/lib/utils";
 import { StatCard } from "@/routes/Classrooms";
 import { pickAddress } from "@/routes/Roster";
-import { CloseButton, FormSection } from "@/components/ui";
+import { FormSection } from "@/components/ui";
 
 const EMPTY: ProfileFilters = { search: "", departmentId: "", role: "", active: "" };
 
@@ -777,59 +780,11 @@ function LinkedStudentsField({
   );
 }
 
-/**
- * Uploads immediately on pick (not deferred to the sheet's "บันทึก" button)
- * — same convention as the school-logo and self-service avatar uploads.
- * `profile` here is a snapshot passed down from the row the admin clicked,
- * which won't refresh mid-edit even though the mutations below invalidate
- * the profiles query — so the just-picked/removed photo is tracked locally
- * instead of waiting on that prop to catch up.
- */
-function EditAvatarField({ profile }: { profile: ProfileRow }) {
-  const toast = useToast();
-  const uploadAvatar = useUploadAvatar();
-  const removeAvatar = useRemoveAvatar();
-  const [override, setOverride] = useState<{ url: string | null } | null>(null);
-
-  const busy = uploadAvatar.isPending || removeAvatar.isPending;
-  const src = override ? override.url : avatarUrl(profile);
-
-  function setPreview(url: string | null) {
-    setOverride((prev) => {
-      if (prev?.url) URL.revokeObjectURL(prev.url);
-      return { url };
-    });
-  }
-
-  async function pick(file: File) {
-    setPreview(URL.createObjectURL(file));
-    try {
-      await uploadAvatar.mutateAsync({ file, profileId: profile.id });
-      toast("อัปเดตรูปโปรไฟล์แล้ว");
-    } catch {
-      toast("อัปโหลดรูปไม่สำเร็จ", "error");
-    }
-  }
-
-  async function remove() {
-    setPreview(null);
-    try {
-      await removeAvatar.mutateAsync(profile.id);
-    } catch {
-      toast("ลบรูปไม่สำเร็จ", "error");
-    }
-  }
-
-  return (
-    <AvatarCard
-      name={profileFullName(profile)}
-      src={src}
-      busy={busy}
-      onPick={(f) => void pick(f)}
-      onRemove={() => void remove()}
-    />
-  );
-}
+type UserTab = "general" | "account";
+const USER_TABS: { key: UserTab; label: string; icon: typeof ProfileIcon }[] = [
+  { key: "general", label: "ข้อมูลทั่วไป", icon: ProfileIcon },
+  { key: "account", label: "สิทธิ์และบัญชี", icon: ShieldIcon },
+];
 
 function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClose: () => void }) {
   const { profile: me } = useAuth();
@@ -838,13 +793,37 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
   const { data: positionTitles = [] } = usePositionTitles();
   const update = useUpdateProfile();
   const deleteUser = useDeleteUser();
+  const uploadAvatar = useUploadAvatar();
+  const removeAvatar = useRemoveAvatar();
   const [draft, setDraft] = useState<ProfileEdit | null>(null);
+  const [tab, setTab] = useState<UserTab>("general");
+  const [attempted, setAttempted] = useState(false); // show field errors only after the first save attempt
+  // Picked photo, applied on save; "remove" clears the stored one.
+  const [avatar, setAvatar] = useState<File | "remove" | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  useEffect(() => {
+    if (!(avatar instanceof File)) return setAvatarPreview(null);
+    const url = URL.createObjectURL(avatar);
+    setAvatarPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [avatar]);
   const isStudent = profile?.roles.includes("student") ?? false;
   const { data: linkedStudent } = useStudentByProfile(isStudent ? (profile?.id ?? null) : null);
 
   // draft is cleared on close, so a freshly opened row always starts from its
   // own values rather than the previously edited row's.
   const current: ProfileEdit | null = draft ?? (profile ? pickEditable(profile) : null);
+
+  const errors: Record<string, string> = {};
+  if (current) {
+    if (!current.first_name.trim()) errors.first_name = "กรอกชื่อ";
+    if (!current.last_name.trim()) errors.last_name = "กรอกนามสกุล";
+    if (!current.date_of_birth) errors.date_of_birth = "เลือกวันเดือนปีเกิดให้ครบ";
+    if (current.phone && current.phone.length !== 10) errors.phone = "เบอร์โทรต้องเป็นตัวเลข 10 หลัก";
+    if (current.national_id && current.national_id.length !== 13) errors.national_id = "เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก";
+    if (current.roles.includes("dept_director") && !current.department_id) errors.department_id = "ผู้บริหารแผนกต้องระบุแผนก";
+  }
+  const err = (k: string) => (attempted ? errors[k] : undefined);
 
   function addRole(role: Role) {
     if (!current || current.roles.includes(role)) return;
@@ -866,19 +845,25 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
     setDraft({ ...current, positionTitleIds: current.positionTitleIds.filter((t) => t !== titleId) });
   }
 
-  function save() {
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
     if (!profile || !current) return;
-    if (current.roles.includes("dept_director") && !current.department_id) {
-      toast("ผู้บริหารแผนกต้องระบุแผนก", "error");
+    const invalid = Object.keys(errors);
+    if (invalid.length) {
+      setAttempted(true);
+      setTab(invalid.every((k) => k === "department_id") ? "account" : "general");
+      toast(`กรอกข้อมูลให้ถูกต้อง (${invalid.length} ช่อง)`, "error");
       return;
     }
-    update.mutate(
-      { id: profile.id, originalPhone: profile.phone, ...current },
-      {
-        onSuccess: () => toast("บันทึกข้อมูลผู้ใช้งานสำเร็จ"),
-        onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
-      },
-    );
+    const photo = avatar;
+    update
+      .mutateAsync({ id: profile.id, originalPhone: profile.phone, ...current })
+      .then(async () => {
+        if (photo === "remove") await removeAvatar.mutateAsync(profile.id);
+        else if (photo) await uploadAvatar.mutateAsync({ file: photo, profileId: profile.id });
+        toast("บันทึกข้อมูลผู้ใช้งานสำเร็จ");
+      })
+      .catch((err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"));
     close();
   }
 
@@ -896,166 +881,186 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
 
   function close() {
     setDraft(null);
+    setAttempted(false);
+    setTab("general");
+    setAvatar(null);
     onClose();
   }
 
   return (
-    <Sheet
+    <Modal
       open={profile !== null}
       onOpenChange={(open) => !open && close()}
       title="แก้ไขผู้ใช้งาน"
-      description={profile ? profileFullName(profile) : undefined}
-      headerEnd={<CloseButton onClick={close} />}
+      className="max-w-lg"
       footer={
         profile && current ? (
           <div className="flex gap-2">
             <Button type="button" variant="outline" className="flex-1" onClick={close}>
               ยกเลิก
             </Button>
-            <Button className="flex-1" onClick={save}>
+            <Button type="submit" form="edit-user" className="flex-1">
               บันทึก
             </Button>
           </div>
         ) : undefined
       }
     >
-      {profile && current && (
-        <div className="space-y-4">
-          <EditAvatarField key={profile.id} profile={profile} />
-
-          <FormSection icon={<ProfileIcon className="h-4 w-4" />} title="ข้อมูลทั่วไป" description="ข้อมูลพื้นฐานของผู้ใช้งาน">
-            <PrefixNameFields
-              prefix={current.prefix}
-              firstName={current.first_name}
-              lastName={current.last_name}
-              prefixes={profile.roles.includes("student") ? STUDENT_PREFIXES : PREFIXES}
-              onChange={(patch) => setDraft({ ...current, ...patch })}
-            />
-          </FormSection>
-
-          <FormSection icon={<CallIcon className="h-4 w-4" />} title="ข้อมูลติดต่อ" description="ใช้สำหรับติดต่อและยืนยันตัวตน">
-            <Field label="เบอร์โทร (รหัสผู้ใช้)">
-              <Input
-                type="tel"
-                inputMode="numeric"
-                autoComplete="tel"
-                value={current.phone ?? ""}
-                onChange={(e) =>
-                  setDraft({ ...current, phone: e.target.value.replace(/\D/g, "").slice(0, 10) || null })
-                }
-                maxLength={10}
-              />
-              {!isStudent && (
-                <p className="mt-1.5 text-xs text-muted-foreground">เปลี่ยนเบอร์ = เปลี่ยนรหัสเข้าระบบด้วย</p>
-              )}
-            </Field>
-
-            {isStudent && (
-              <Field label="รหัสนักเรียน">
-                <Input value={linkedStudent?.student_code ?? "—"} disabled readOnly />
-              </Field>
-            )}
-
-            <Field label="อีเมล (ไม่บังคับ)">
-              <Input
-                type="email"
-                value={current.email ?? ""}
-                onChange={(e) => setDraft({ ...current, email: e.target.value || null })}
-              />
-            </Field>
-
-            <Field label="เลขบัตรประชาชน (ใช้ยืนยันตอนลืมรหัสผ่าน)">
-              <Input
-                inputMode="numeric"
-                autoComplete="off"
-                value={current.national_id ?? ""}
-                onChange={(e) =>
-                  setDraft({
-                    ...current,
-                    national_id: e.target.value.replace(/\D/g, "").slice(0, 13) || null,
-                  })
-                }
-                pattern="[0-9]{13}"
-                minLength={13}
-                maxLength={13}
-                title="เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก"
-              />
-            </Field>
-          </FormSection>
-
-          <FormSection icon={<CalendarIcon className="h-4 w-4" />} title="วันเดือนปีเกิด">
-            <Field label="วัน / เดือน / ปี (พ.ศ.)" required>
-              <BuddhistDateSelect
-                key={profile?.id}
-                value={current.date_of_birth ?? ""}
-                onChange={(v) => setDraft({ ...current, date_of_birth: v || null })}
-              />
-            </Field>
-          </FormSection>
-
-          <FormSection icon={<ShieldIcon className="h-4 w-4" />} title="สิทธิ์และบัญชี">
-            <RolePicker
-              roles={current.roles}
-              positionTitleIds={current.positionTitleIds}
-              positionTitles={positionTitles}
-              onAddRole={addRole}
-              onRemoveRole={removeRole}
-              onAddTitle={addTitle}
-              onRemoveTitle={removeTitle}
-            />
-
-            {current.roles.includes("teacher") && (
-              <TeacherFields
-                teacherCode={current.teacher_code}
-                learningAreaId={current.learning_area_id}
-                onChange={(patch) => setDraft({ ...current, ...patch })}
-              />
-            )}
-
-            {me && isOrgWide(me.roles) && (
-              <Field label="แผนก">
-                <Select
-                  value={current.department_id ?? ""}
-                  onChange={(e) => setDraft({ ...current, department_id: e.target.value || null })}
+      <SheetFormContext.Provider value>
+        {profile && current && (
+          <div className="space-y-4">
+            <div role="tablist" aria-label="หัวข้อข้อมูลผู้ใช้งาน" className="flex overflow-x-auto border-b border-border [container-type:inline-size] [scrollbar-width:none]">
+              {USER_TABS.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.key}
+                  title={t.label}
+                  onClick={() => setTab(t.key)}
+                  className={cn(
+                    "tappable -mb-px flex min-h-10 flex-1 items-center justify-center gap-1.5 whitespace-nowrap border-b-2 px-3 text-[13px] font-semibold transition-colors",
+                    tab === t.key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
                 >
-                  <option value="">ทุกแผนก</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            )}
-
-            <div className="flex items-center justify-between py-2">
-              <span className="text-sm font-medium">เปิดใช้งานบัญชี</span>
-              <Switch
-                checked={current.is_active}
-                onChange={(v) => setDraft({ ...current, is_active: v })}
-                label="เปิดใช้งานบัญชี"
-              />
+                  <t.icon className="h-4 w-4 shrink-0" />
+                  <span className="[@container(max-width:26rem)]:sr-only">{t.label}</span>
+                </button>
+              ))}
             </div>
-          </FormSection>
+            {/* Panels stay mounted (hidden) so the draft and the single form survive tab switches. */}
+            <form id="edit-user" onSubmit={submit} noValidate className="space-y-4">
+              <div hidden={tab !== "general"} className="space-y-4">
+                <AvatarCard
+                  name={profileFullName(profile)}
+                  src={avatar === "remove" ? null : (avatarPreview ?? avatarUrl(profile))}
+                  onPick={setAvatar}
+                  onRemove={() => setAvatar("remove")}
+                />
 
-          <FormSection
-            icon={<TrashIcon className="h-4 w-4" />}
-            title="ลบผู้ใช้งาน"
-            description="ลบถาวร บัญชีเข้าสู่ระบบจะถูกลบด้วย กู้คืนไม่ได้"
-          >
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full text-destructive"
-              disabled={profile.id === me?.id || deleteUser.isPending}
-              onClick={remove}
-            >
-              ลบผู้ใช้งาน
-            </Button>
-          </FormSection>
-        </div>
-      )}
-    </Sheet>
+                <FormSection icon={<ProfileIcon className="h-4 w-4" />}>
+                  <PrefixNameFields
+                    prefix={current.prefix}
+                    firstName={current.first_name}
+                    lastName={current.last_name}
+                    prefixes={isStudent ? STUDENT_PREFIXES : PREFIXES}
+                    errors={{ first_name: err("first_name"), last_name: err("last_name") }}
+                    onChange={(patch) => setDraft({ ...current, ...patch })}
+                  />
+                  <Field label="วันเดือนปีเกิด" required error={err("date_of_birth")}>
+                    <BuddhistDateSelect
+                      key={profile.id}
+                      value={current.date_of_birth ?? ""}
+                      onChange={(v) => setDraft({ ...current, date_of_birth: v || null })}
+                    />
+                  </Field>
+                </FormSection>
+
+                <FormSection icon={<CallIcon className="h-4 w-4" />}>
+                  <Field label="เบอร์โทร (รหัสผู้ใช้)" error={err("phone")}>
+                    <Input
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      value={current.phone ?? ""}
+                      onChange={(e) =>
+                        setDraft({ ...current, phone: e.target.value.replace(/\D/g, "").slice(0, 10) || null })
+                      }
+                      maxLength={10}
+                    />
+                  </Field>
+
+                  {isStudent && (
+                    <Field label="รหัสนักเรียน">
+                      <Input value={linkedStudent?.student_code ?? "—"} disabled readOnly />
+                    </Field>
+                  )}
+
+                  <Field label="อีเมล (ไม่บังคับ)">
+                    <Input
+                      type="email"
+                      value={current.email ?? ""}
+                      onChange={(e) => setDraft({ ...current, email: e.target.value || null })}
+                    />
+                  </Field>
+
+                  <Field label="เลขบัตรประชาชน (ใช้ยืนยันตอนลืมรหัสผ่าน)" error={err("national_id")}>
+                    <Input
+                      inputMode="numeric"
+                      autoComplete="off"
+                      value={current.national_id ?? ""}
+                      onChange={(e) =>
+                        setDraft({ ...current, national_id: e.target.value.replace(/\D/g, "").slice(0, 13) || null })
+                      }
+                      maxLength={13}
+                    />
+                  </Field>
+                </FormSection>
+              </div>
+
+              <div hidden={tab !== "account"} className="space-y-4">
+                <FormSection icon={<ShieldIcon className="h-4 w-4" />}>
+                  <RolePicker
+                    roles={current.roles}
+                    positionTitleIds={current.positionTitleIds}
+                    positionTitles={positionTitles}
+                    onAddRole={addRole}
+                    onRemoveRole={removeRole}
+                    onAddTitle={addTitle}
+                    onRemoveTitle={removeTitle}
+                  />
+
+                  {current.roles.includes("teacher") && (
+                    <TeacherFields
+                      teacherCode={current.teacher_code}
+                      learningAreaId={current.learning_area_id}
+                      onChange={(patch) => setDraft({ ...current, ...patch })}
+                    />
+                  )}
+
+                  {me && isOrgWide(me.roles) && (
+                    <Field label="แผนก" error={err("department_id")}>
+                      <Select
+                        value={current.department_id ?? ""}
+                        onChange={(e) => setDraft({ ...current, department_id: e.target.value || null })}
+                      >
+                        <option value="">ทุกแผนก</option>
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  )}
+
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-sm font-medium">เปิดใช้งานบัญชี</span>
+                    <Switch
+                      checked={current.is_active}
+                      onChange={(v) => setDraft({ ...current, is_active: v })}
+                      label="เปิดใช้งานบัญชี"
+                    />
+                  </div>
+                </FormSection>
+
+                <FormSection icon={<TrashIcon className="h-4 w-4" />}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-destructive"
+                    disabled={profile.id === me?.id || deleteUser.isPending}
+                    onClick={remove}
+                  >
+                    ลบผู้ใช้งาน
+                  </Button>
+                </FormSection>
+              </div>
+            </form>
+          </div>
+        )}
+      </SheetFormContext.Provider>
+    </Modal>
   );
 }
 
@@ -1212,12 +1217,10 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
   }
 
   return (
-    <Sheet
+    <Modal
       open={open}
       onOpenChange={(next) => !next && close()}
       title="เพิ่มผู้ใช้งาน"
-      description="เบอร์โทรเป็นรหัสผู้ใช้เข้าระบบ — เว้นรหัสผ่านว่างไว้ได้ ระบบตั้งให้อัตโนมัติตามบทบาท"
-      headerEnd={<CloseButton onClick={close} />}
       footer={
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={close}>
@@ -1228,7 +1231,9 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
           </Button>
         </div>
       }
+      className="max-w-lg"
     >
+      <SheetFormContext.Provider value>
       <form id="create-user" onSubmit={submit} className="space-y-4" noValidate>
         <AvatarCard
           name={`${draft.first_name} ${draft.last_name}`.trim() || "?"}
@@ -1360,7 +1365,8 @@ function CreateUserSheet({ open, onClose }: { open: boolean; onClose: () => void
 
         {failReason && <p className="text-sm text-destructive">{failReason}</p>}
       </form>
-    </Sheet>
+      </SheetFormContext.Provider>
+    </Modal>
   );
 }
 
