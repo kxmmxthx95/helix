@@ -1,3 +1,4 @@
+import { useToast } from "@/components/Toast";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronForward, Plus, Search } from "@/components/icons";
@@ -440,6 +441,7 @@ function ClassroomPanel({
   const createRoom = useCreateClassroom();
   const setActive = useSetClassroomActive();
   const assign = useAssignClassroom();
+  const toast = useToast();
 
   const [newRoomName, setNewRoomName] = useState("");
   const [search, setSearch] = useState("");
@@ -542,7 +544,10 @@ function ClassroomPanel({
         classroom_id: targetRoomId,
         academic_year: academicYear,
       })),
-      { onSuccess: () => setSelected(new Set()) },
+      {
+        onSuccess: () => setSelected(new Set()),
+        onError: (err) => toast(err instanceof Error ? err.message : "จัดห้องไม่สำเร็จ", "error", { durationMs: 8000 }),
+      },
     );
   }
 

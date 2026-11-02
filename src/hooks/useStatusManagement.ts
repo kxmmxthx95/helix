@@ -221,7 +221,8 @@ export function useAssignClassroom() {
   return useMutation({
     mutationFn: async (drafts: ClassroomAssignmentDraft[]) => {
       const { error } = await supabase.from("student_classroom_enrollments").insert(drafts);
-      if (error) throw error;
+      // PostgrestError is a plain object, not an Error — wrap it so callers' `instanceof Error` toast shows the DB message.
+      if (error) throw new Error(error.message);
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["student_classroom_enrollments"] }),
   });
