@@ -103,6 +103,7 @@ export function PeriodDaySheet({
         if (!o) setPickedId(null);
       }}
       title={new Intl.DateTimeFormat("th-TH", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`))}
+      closable
       icon={
         picked && (
           <button type="button" aria-label="กลับ" onClick={() => setPickedId(null)} className="flex h-full w-full items-center justify-center">

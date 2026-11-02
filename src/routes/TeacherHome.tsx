@@ -103,6 +103,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [timetableOpen, setTimetableOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [clockOpen, setClockOpen] = useState(false);
   const [assemblyOpen, setAssemblyOpen] = useState(false);
   const [periodsOpen, setPeriodsOpen] = useState(false);
   const setLeaveStatus = useSetStudentLeaveStatus();
@@ -293,8 +294,8 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                 ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}`
                 : "ยังไม่ได้บันทึกเวลาเข้างาน",
             busy: clockIn.isPending || clockOut.isPending,
-            disabled: loadingClock || !!clock?.clock_out_time,
-            onClick: () => onClock(clock?.clock_in_time ? "out" : "in"),
+            disabled: loadingClock,
+            onClick: () => (clock?.clock_out_time ? setClockOpen(true) : onClock(clock?.clock_in_time ? "out" : "in")),
           },
         ]
       : []),
@@ -500,6 +501,23 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         date={today}
         roomLabel={roomLabel}
       />
+
+      <Modal open={clockOpen} onOpenChange={setClockOpen} title="ลงเวลาวันนี้">
+        <dl className="grid grid-cols-2 gap-3 text-center">
+          <div className="rounded-xl bg-muted p-4">
+            <dt className="text-sm text-muted-foreground">เข้างาน</dt>
+            <dd className="mt-1 font-mono text-2xl font-semibold tabular-nums">
+              {clock?.clock_in_time ? bangkokTime(clock.clock_in_time) : "—"}
+            </dd>
+          </div>
+          <div className="rounded-xl bg-muted p-4">
+            <dt className="text-sm text-muted-foreground">ออกงาน</dt>
+            <dd className="mt-1 font-mono text-2xl font-semibold tabular-nums">
+              {clock?.clock_out_time ? bangkokTime(clock.clock_out_time) : "—"}
+            </dd>
+          </div>
+        </dl>
+      </Modal>
 
       <Modal
         open={leaveOpen}
