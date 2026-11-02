@@ -456,14 +456,6 @@ function GuardianForm({
         />
       </Field>
 
-      <Field label="อีเมล">
-        <Input
-          type="email"
-          value={draft.email ?? ""}
-          onChange={(e) => setDraft({ ...draft, email: e.target.value || null })}
-        />
-      </Field>
-
       <ErrorText error={error} />
       <Button type="submit" className="w-full" disabled={pending}>
         {pending ? <Spinner className="h-3 w-3" /> : "บันทึก"}

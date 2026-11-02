@@ -1286,7 +1286,6 @@ function guardianProblem(drafts: GuardianDrafts, source: GuardianSource): string
     if (!guardianFilled(g)) continue;
     if (!g.first_name.trim() || !g.last_name.trim()) return `${title}: กรอกชื่อและนามสกุลให้ครบ`;
     if (g.phone.trim() && !phoneOk(g.phone)) return `${title}: เบอร์โทรต้องเป็นตัวเลข 9-10 หลัก`;
-    if (g.email.trim() && !EMAIL_RE.test(g.email.trim())) return `${title}: อีเมลไม่ถูกต้อง`;
     if (slot === "other" && !g.relationship_note.trim()) return `${title}: ระบุความสัมพันธ์`;
   }
   return null;
@@ -1428,9 +1427,6 @@ function GuardianCards({
               </Field>
               <Field label="เบอร์โทรศัพท์">
                 <Input type="tel" value={g.phone} onChange={(e) => set({ phone: e.target.value })} />
-              </Field>
-              <Field label="อีเมล">
-                <Input type="email" value={g.email} onChange={(e) => set({ email: e.target.value })} />
               </Field>
               <Field label="อาชีพ">
                 <Input value={g.occupation} onChange={(e) => set({ occupation: e.target.value })} />
