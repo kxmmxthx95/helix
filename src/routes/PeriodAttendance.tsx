@@ -25,7 +25,7 @@ import { canManageAcademic } from "@/lib/roles";
 import { cn, todayIso } from "@/lib/utils";
 
 // ----------------------------------------------------------- period check-in
-// เช็คชื่อรายคาบ ("บันทึกการเข้าเรียน") — keyed by (schedule_entry_id, date),
+// เช็คชื่อเข้าเรียน — keyed by (schedule_entry_id, date),
 // taken by the subject teacher of that period. Not gated by a classroom
 // picker — a subject teacher may not have a homeroom at all. See migration
 // 0037: the daily attendance_records('leave') row syncs/un-syncs via a DB

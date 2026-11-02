@@ -231,7 +231,7 @@ const TABS = [
   },
   {
     to: "/attendance",
-    label: "เช็คชื่อ",
+    label: "เช็คชื่อเข้าแถว",
     icon: CheckmarkCircleIcon,
     section: "การสอนและห้องเรียน",
     managerOnly: false,
@@ -242,7 +242,7 @@ const TABS = [
   },
   {
     to: "/period-attendance",
-    label: "บันทึกการเข้าเรียน",
+    label: "เช็คชื่อเข้าเรียน",
     icon: CheckboxOutlineIcon,
     section: "การสอนและห้องเรียน",
     managerOnly: false,

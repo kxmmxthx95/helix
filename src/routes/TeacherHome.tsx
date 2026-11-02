@@ -197,7 +197,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     return { gradient: colors.gradient(area, grade), hex: colors.hex(area, grade) };
   };
 
-  // Back of the "เช็คชื่อรายคาบ" tile: the period in progress, else the next one — rolling to the next teaching day when today is done.
+  // Back of the "เช็คชื่อเข้าเรียน" tile: the period in progress, else the next one — rolling to the next teaching day when today is done.
   const upNext = (() => {
     for (let offset = 0; offset <= 14; offset++) {
       const iso = addDays(today, offset);
@@ -299,7 +299,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           },
         ]
       : []),
-    { title: "เช็คชื่อรายคาบ", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", sheet: true },
+    { title: "เช็คชื่อเข้าเรียน", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", sheet: true },
     {
       title: "ใบลารออนุมัติ",
       text: pendingLeave.length > 0 ? `มี ${pendingLeave.length} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง",

@@ -45,7 +45,7 @@ type Icon = typeof BookIcon;
 type Panel = "attendance" | "behavior" | "leave" | "bag" | "subjects";
 
 const PANEL_TITLE: Record<Panel, string> = {
-  attendance: "เช็คชื่อ",
+  attendance: "เช็คชื่อเข้าแถว",
   behavior: "พฤติกรรม",
   leave: "ลา",
   bag: "กระเป๋า",
@@ -298,7 +298,7 @@ export function GameHud() {
     { label: "ปฏิทิน", icon: CalendarIcon, color: "linear-gradient(160deg,#ff8aa8,#ff2d55)", onClick: () => navigate("/academic-events") },
     { label: "เอกสาร", icon: LibraryIcon, color: "linear-gradient(160deg,#9aa0ff,#5856d6)", onClick: () => navigate("/documents") },
     { label: "ลา", icon: AirplaneIcon, color: "linear-gradient(160deg,#6dd5e6,#32ade6)", onClick: () => setPanel("leave") },
-    { label: "เช็คชื่อ", icon: CheckmarkCircleIcon, color: "linear-gradient(160deg,#5de0b8,#30b0a0)", onClick: () => setPanel("attendance") },
+    { label: "เช็คชื่อเข้าแถว", icon: CheckmarkCircleIcon, color: "linear-gradient(160deg,#5de0b8,#30b0a0)", onClick: () => setPanel("attendance") },
     { label: "พฤติกรรม", icon: RibbonIcon, color: "linear-gradient(160deg,#ffd45e,#ffcc00)", onClick: () => setPanel("behavior") },
     { label: "บัตรเติมเงิน", icon: PricetagIcon, color: "linear-gradient(160deg,#d58bff,#af52de)", onClick: () => navigate("/card-topup") },
     { label: "กระเป๋า", icon: BriefcaseIcon, color: "linear-gradient(160deg,#b08f6e,#8e6e53)", onClick: () => setPanel("bag") },
