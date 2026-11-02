@@ -179,7 +179,10 @@ function SchoolSettingsCard() {
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        update.mutate(form, { onSuccess: () => toast("บันทึกสำเร็จ") });
+        update.mutate(form, {
+          onSuccess: () => toast("บันทึกสำเร็จ"),
+          onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
+        });
       }}
     >
       <SectionCard
@@ -391,7 +394,10 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        update.mutate(form, { onSuccess: () => toast("บันทึกสำเร็จ") });
+        update.mutate(form, {
+          onSuccess: () => toast("บันทึกสำเร็จ"),
+          onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
+        });
       }}
     >
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl bg-card shadow-card p-5">

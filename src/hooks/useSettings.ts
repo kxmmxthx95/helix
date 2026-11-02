@@ -106,11 +106,14 @@ export function useUpdateDepartmentSettings(departmentId: string | null) {
   return useMutation({
     mutationFn: async (patch: Partial<DepartmentSettingsEdit>) => {
       if (!departmentId) throw new Error("no department");
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("department_settings")
         .update(patch)
-        .eq("department_id", departmentId);
-      if (error) throw error;
+        .eq("department_id", departmentId)
+        .select("department_id");
+      if (error) throw new Error(error.message);
+      // RLS filters a forbidden update down to zero rows without raising an error — don't report that as saved.
+      if (data.length === 0) throw new Error("บันทึกไม่สำเร็จ — ไม่มีสิทธิ์แก้ไขการตั้งค่าแผนกนี้");
     },
     onSettled: () =>
       void qc.invalidateQueries({ queryKey: ["department_settings", departmentId] }),
