@@ -275,7 +275,11 @@ export function useInviteUsers() {
       if (error) throw error;
       return data as InviteOutcome;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["profiles"] }),
+    // A student account sets students.profile_id, which the roster's "มีบัญชีแล้ว" badge reads.
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["profiles"] });
+      void qc.invalidateQueries({ queryKey: ["students"] });
+    },
   });
 }
 

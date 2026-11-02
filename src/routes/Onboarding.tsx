@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { X } from "@/components/icons";
 import { useToast } from "@/components/Toast";
-import { Button, Card, Field, Input, PasswordInput, Select, Spinner } from "@/components/ui";
+import { MapPicker } from "@/components/MapPicker";
+import { BuddhistDateSelect, Button, Card, Field, Input, PasswordInput, Select, Spinner } from "@/components/ui";
 import {
   useDeleteStudentContact,
   useSaveStudentContact,
@@ -16,6 +17,7 @@ import {
   BLOOD_TYPE_LABEL,
   FAMILY_STATUSES,
   RELATIONSHIP_LABEL,
+  ageFromBirthDate,
   pickAddress,
   textareaClass,
 } from "@/routes/Roster";
@@ -162,6 +164,9 @@ function IdentityStep({ student, onDone }: { student: Student; onDone: () => Pro
   const toast = useToast();
   const [draft, setDraft] = useState(() => ({
     national_id: student.national_id ?? "",
+    date_of_birth: student.date_of_birth ?? "",
+    latitude: student.latitude,
+    longitude: student.longitude,
     ...pickAddress(student),
   }));
   const [pending, setPending] = useState(false);
@@ -169,14 +174,19 @@ function IdentityStep({ student, onDone }: { student: Student; onDone: () => Pro
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setPending(true);
     setError(undefined);
+    if (!ageFromBirthDate(draft.date_of_birth || null)) {
+      setError("เลือกวัน เดือน ปีเกิดให้ถูกต้อง");
+      return;
+    }
+    setPending(true);
     try {
+      const { national_id, date_of_birth, latitude, longitude, ...address } = draft;
       const { error: err } = await supabase
         .from("students")
-        .update({ national_id: draft.national_id || null, ...pickAddress(draft) })
+        .update({ national_id: national_id || null, date_of_birth, latitude, longitude, ...pickAddress(address) })
         .eq("id", student.id);
-      if (err) throw err;
+      if (err) throw new Error(err.message);
       toast("บันทึกข้อมูลสำเร็จ");
       await onDone();
     } catch (err) {
@@ -185,6 +195,8 @@ function IdentityStep({ student, onDone }: { student: Student; onDone: () => Pro
       setPending(false);
     }
   }
+
+  const age = ageFromBirthDate(draft.date_of_birth || null);
 
   return (
     <form onSubmit={submit} className="space-y-4">
@@ -196,12 +208,31 @@ function IdentityStep({ student, onDone }: { student: Student; onDone: () => Pro
           required
         />
       </Field>
+      <Field label="วันเดือนปีเกิด">
+        <BuddhistDateSelect
+          value={draft.date_of_birth}
+          onChange={(v) => setDraft({ ...draft, date_of_birth: v })}
+          required
+        />
+      </Field>
+      {age && (
+        <p className="-mt-2 text-xs text-muted-foreground">
+          อายุ {age.years} ปี {age.months} เดือน
+        </p>
+      )}
       <div>
         <p className="mb-1.5 text-xs font-medium text-muted-foreground">ที่อยู่</p>
         <AddressInputs
           value={draft}
           onChange={(patch) => setDraft({ ...draft, ...patch })}
           required={REQUIRED_ADDRESS_KEYS}
+        />
+      </div>
+      <div className="space-y-3">
+        <p className="text-xs font-medium text-muted-foreground">ตำแหน่งบ้าน (ไม่บังคับ)</p>
+        <MapPicker
+          value={draft.latitude !== null && draft.longitude !== null ? { lat: draft.latitude, lng: draft.longitude } : null}
+          onChange={(p) => setDraft({ ...draft, latitude: p?.lat ?? null, longitude: p?.lng ?? null })}
         />
       </div>
       <ErrorText error={error} />

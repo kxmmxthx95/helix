@@ -25,7 +25,8 @@ export const REQUIRED_GUARDIAN_COUNT = 2;
 const filled = (v: string | null | undefined) => !!v?.trim();
 
 export function identityStepComplete(student: Student): boolean {
-  return filled(student.national_id) && REQUIRED_ADDRESS_KEYS.every((k) => filled(student[k]));
+  // date_of_birth: the "ลืมรหัสผ่าน" flow needs national_id + date_of_birth (see reset-password).
+  return filled(student.national_id) && filled(student.date_of_birth) && REQUIRED_ADDRESS_KEYS.every((k) => filled(student[k]));
 }
 
 export function contactStepComplete(student: Student): boolean {

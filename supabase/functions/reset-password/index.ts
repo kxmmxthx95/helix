@@ -82,11 +82,13 @@ Deno.serve(async (req) => {
 
   let targetId: string | undefined = staffMatch?.id;
 
-  // Student — matched by student_code, via the linked profile.
+  // Student — matched by student_code, via the linked profile. The roster row's
+  // date_of_birth (filled on first login / by staff) is the source of truth; the
+  // profile's own date_of_birth still counts for accounts that already had one.
   if (!targetId) {
     const { data: studentRow } = await admin
       .from("students")
-      .select("profile_id")
+      .select("profile_id, date_of_birth")
       .eq("student_code", loginId)
       .not("profile_id", "is", null)
       .maybeSingle();
@@ -94,12 +96,13 @@ Deno.serve(async (req) => {
     if (studentRow?.profile_id) {
       const { data: studentProfile } = await admin
         .from("profiles")
-        .select("id")
+        .select("id, date_of_birth")
         .eq("id", studentRow.profile_id)
         .eq("national_id", nationalId)
-        .eq("date_of_birth", dateOfBirth)
         .maybeSingle();
-      targetId = studentProfile?.id;
+      if (studentProfile && (studentRow.date_of_birth === dateOfBirth || studentProfile.date_of_birth === dateOfBirth)) {
+        targetId = studentProfile.id;
+      }
     }
   }
 

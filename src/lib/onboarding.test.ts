@@ -28,7 +28,7 @@ const complete: Student = {
   chronic_disease: "ไม่มี",
   drug_allergy: "ไม่มี",
   food_allergy: "ไม่มี",
-  date_of_birth: null,
+  date_of_birth: "2008-05-01",
   avatar_path: null,
   latitude: null,
   longitude: null,
@@ -44,6 +44,8 @@ describe("missingOnboardingStep", () => {
   it("stops at identity when national_id or a required address field is missing", () => {
     expect(missingOnboardingStep(false, { ...complete, national_id: null }, 2)).toBe("identity");
     expect(missingOnboardingStep(false, { ...complete, province: "" }, 2)).toBe("identity");
+    // date_of_birth: password reset needs it alongside national_id
+    expect(missingOnboardingStep(false, { ...complete, date_of_birth: null }, 2)).toBe("identity");
     // village_no/alley/road are legitimately optional
     expect(missingOnboardingStep(false, complete, 2)).not.toBe("identity");
   });
