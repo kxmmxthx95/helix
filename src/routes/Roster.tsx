@@ -265,7 +265,10 @@ export function Roster() {
   const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
 
   const { data: departments = [] } = useDepartments();
-  const { data: rows, isLoading, error } = useStudents(filters);
+  // Non-org-wide roles see their own department only — pin it client-side too, since a super_admin
+  // "viewing as" a role still has super_admin RLS and would otherwise get every department.
+  const scopeDepartmentId = me && !isOrgWide(me.roles) ? (me.department_id ?? "") : filters.departmentId;
+  const { data: rows, isLoading, error } = useStudents({ ...filters, departmentId: scopeDepartmentId });
   const { data: allGradeLevels = [] } = useAllGradeLevels();
 
   const deptName = useMemo(() => new Map(departments.map((d) => [d.id, d.name])), [departments]);
@@ -292,8 +295,8 @@ export function Roster() {
     filters.classroomId !== EMPTY.classroomId ||
     filters.status !== EMPTY.status;
 
-  const filterGradeLevels = filters.departmentId
-    ? allGradeLevels.filter((g) => g.department_id === filters.departmentId)
+  const filterGradeLevels = scopeDepartmentId
+    ? allGradeLevels.filter((g) => g.department_id === scopeDepartmentId)
     : allGradeLevels;
   const { data: filterClassrooms = [] } = useClassrooms(filters.gradeLevelId || null);
 
@@ -410,7 +413,7 @@ export function Roster() {
       )}
 
       {hasSearch && rows && rows.length > 0 && (
-        <div className="flex min-h-0 flex-1 flex-col gap-2">
+        <div className="flex shrink-0 flex-col gap-2 lg:min-h-0 lg:flex-1 lg:shrink">
           <ul className="space-y-2 lg:hidden">
             {rows.map((row) => {
               const gender = studentGender(row.prefix);
