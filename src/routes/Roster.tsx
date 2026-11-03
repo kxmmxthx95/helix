@@ -283,6 +283,15 @@ export function Roster() {
   const mayView = mayEdit || (me?.roles.includes("teacher") ?? false);
   const mayManageUsers = me ? canManageUsers(me.roles) : false;
   const deleteStudent = useDeleteStudent();
+  const removeStudent = (row: Student) => {
+    if (
+      confirm(
+        `ลบ "${row.first_name} ${row.last_name}" ถาวร? ข้อมูลผู้ปกครอง, ประวัติลงทะเบียน, และการจัดห้องของนักเรียนคนนี้จะถูกลบไปด้วยทั้งหมด กู้คืนไม่ได้`,
+      )
+    ) {
+      deleteStudent.mutate(row.id);
+    }
+  };
 
   const activeFilterCount = [filters.departmentId, filters.status, filters.gradeLevelId, filters.classroomId].filter(
     Boolean,
@@ -468,61 +477,49 @@ export function Roster() {
                           <span
                             className={
                               gender === "ชาย"
-                                ? "inline-flex shrink-0 items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
-                                : "inline-flex shrink-0 items-center rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                                ? "inline-flex shrink-0 items-center rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300"
+                                : "inline-flex shrink-0 items-center rounded-full bg-pink-500/15 px-2 py-0.5 text-[10px] font-medium text-pink-700 dark:text-pink-300"
                             }
                           >
                             {gender}
                           </span>
                         )}
-                      </div>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">
-                        {deptName.get(row.department_id) ?? "—"}
-                        {" · "}
-                        {row.grade_level_id ? (gradeLevelName.get(row.grade_level_id) ?? "—") : "—"}
-                      </p>
-                    </div>
-                  </div>
-                  {(mayManageUsers || mayEdit) && (
-                    <div className="mt-3 flex items-center gap-2 border-t border-border pt-2.5">
-                      {mayManageUsers &&
-                        (row.profile_id ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-1 text-[11px] font-medium text-success">
-                            <CheckmarkCircleIcon className="size-3" />
-                            มีบัญชีแล้ว
-                          </span>
-                        ) : (
+                        {mayEdit && (
                           <Button
-                            variant="outline"
-                            size="xs"
+                            variant="ghost"
+                            size="icon"
+                            className="-my-1.5 -mr-1.5 ml-auto h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                            aria-label="ลบนักเรียน"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setCreatingLoginFor(row);
+                              removeStudent(row);
                             }}
+                            disabled={deleteStudent.isPending}
                           >
-                            <KeyIcon className="h-3 w-3" />
-                            สร้างบัญชี
+                            <X className="h-3 w-3" />
                           </Button>
-                        ))}
-                      {mayEdit && (
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {mayManageUsers && (
+                    <div className="mt-3 border-t border-border pt-2.5">
+                      {row.profile_id ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-1 text-[11px] font-medium text-success">
+                          <CheckmarkCircleIcon className="size-3" />
+                          มีบัญชีแล้ว
+                        </span>
+                      ) : (
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="ml-auto text-muted-foreground hover:text-destructive"
-                          aria-label="ลบนักเรียน"
+                          variant="outline"
+                          size="xs"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (
-                              confirm(
-                                `ลบ "${row.first_name} ${row.last_name}" ถาวร? ข้อมูลผู้ปกครอง, ประวัติลงทะเบียน, และการจัดห้องของนักเรียนคนนี้จะถูกลบไปด้วยทั้งหมด กู้คืนไม่ได้`,
-                              )
-                            ) {
-                              deleteStudent.mutate(row.id);
-                            }
+                            setCreatingLoginFor(row);
                           }}
-                          disabled={deleteStudent.isPending}
                         >
-                          <X className="h-3 w-3" />
+                          <KeyIcon className="h-3 w-3" />
+                          สร้างบัญชี
                         </Button>
                       )}
                     </div>
@@ -630,13 +627,7 @@ export function Roster() {
                               aria-label="ลบนักเรียน"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (
-                                  confirm(
-                                    `ลบ "${row.first_name} ${row.last_name}" ถาวร? ข้อมูลผู้ปกครอง, ประวัติลงทะเบียน, และการจัดห้องของนักเรียนคนนี้จะถูกลบไปด้วยทั้งหมด กู้คืนไม่ได้`,
-                                  )
-                                ) {
-                                  deleteStudent.mutate(row.id);
-                                }
+                                removeStudent(row);
                               }}
                               disabled={deleteStudent.isPending}
                             >
