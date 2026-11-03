@@ -94,6 +94,7 @@ export type DepartmentSettingsEdit = Pick<
   | "min_periods_per_week"
   | "max_periods_per_week"
   | "work_start_time"
+  | "work_end_time"
   | "checkin_lat"
   | "checkin_lng"
   | "checkin_radius_m"

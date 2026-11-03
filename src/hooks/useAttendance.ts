@@ -147,9 +147,9 @@ export function useAttendanceRange(params: {
   });
 }
 
-export function summarizeAttendance(records: { status: AttendanceStatus }[]): Record<AttendanceStatus, number> {
+export function summarizeAttendance(records: { status: AttendanceStatus | null }[]): Record<AttendanceStatus, number> {
   const counts: Record<AttendanceStatus, number> = { present: 0, late: 0, absent: 0, leave: 0 };
-  for (const r of records) counts[r.status]++;
+  for (const r of records) if (r.status) counts[r.status]++;
   return counts;
 }
 

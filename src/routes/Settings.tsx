@@ -338,6 +338,7 @@ type DepartmentForm = Pick<
   | "min_periods_per_week"
   | "max_periods_per_week"
   | "work_start_time"
+  | "work_end_time"
   | "checkin_lat"
   | "checkin_lng"
   | "checkin_radius_m"
@@ -349,6 +350,7 @@ const toDepartmentForm = (s: DepartmentForm): DepartmentForm => ({
   min_periods_per_week: s.min_periods_per_week,
   max_periods_per_week: s.max_periods_per_week,
   work_start_time: s.work_start_time,
+  work_end_time: s.work_end_time,
   checkin_lat: s.checkin_lat,
   checkin_lng: s.checkin_lng,
   checkin_radius_m: s.checkin_radius_m,
@@ -485,12 +487,19 @@ function DepartmentSettingsCard({ departmentId, departmentName }: { departmentId
         title="เวลาทำงาน (บันทึกเวลาเข้า-ออกงาน)"
         subtitle="กำหนดเวลาเข้างานและตำแหน่งที่อนุญาตให้ลงเวลา"
       >
-        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto_1.1fr]">
+        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1fr_auto_1.1fr]">
           <Field label="เวลาเข้างานมาตรฐาน">
             <Input
               type="time"
               value={form.work_start_time ?? ""}
               onChange={(e) => setForm({ ...form, work_start_time: e.target.value || null })}
+            />
+          </Field>
+          <Field label="เวลาเลิกงานมาตรฐาน">
+            <Input
+              type="time"
+              value={form.work_end_time ?? ""}
+              onChange={(e) => setForm({ ...form, work_end_time: e.target.value || null })}
             />
           </Field>
           <Field label="รัศมี (เมตร)">

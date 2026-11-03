@@ -52,18 +52,50 @@ export function useTimeClockRange(profileId: string | null, startDate: string, e
   });
 }
 
-/** Unset geofence (or no department) = fail-closed: clocking is refused until an admin sets it. Throws with a Thai message on GPS failure or outside-radius. */
-async function checkedPosition(departmentId: string | null): Promise<{ lat: number; lng: number }> {
-  const pos = await getCurrentPosition();
-  if ("error" in pos) throw new Error(GPS_ERROR_MESSAGE[pos.error]);
-  if (!departmentId) throw new Error(GEOFENCE_UNSET_MESSAGE);
+const CLOCK_IN_EARLY_MIN = 60;
 
+export function bangkokMinutes(d: Date) {
+  const [h = 0, m = 0] = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Bangkok" })
+    .format(d)
+    .split(":")
+    .map(Number);
+  return h * 60 + m;
+}
+
+const toMin = (t: string) => {
+  const [h = 0, m = 0] = t.split(":").map(Number);
+  return h * 60 + m;
+};
+const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+
+type ClockTimes = { work_start_time: string | null; work_end_time: string | null };
+
+/** Time-window gate shared by the home card and the mutations. Returns a Thai reason when locked, null when allowed. Unset time = no limit. */
+export function clockGate(kind: "in" | "out", s: ClockTimes | undefined, nowMin: number): string | null {
+  if (kind === "in" && s?.work_start_time) {
+    const opens = Math.max(0, toMin(s.work_start_time) - CLOCK_IN_EARLY_MIN);
+    if (nowMin < opens) return `เช็คอินได้ตั้งแต่ ${hhmm(opens)} น.`;
+  }
+  if (kind === "out" && s?.work_end_time && nowMin < toMin(s.work_end_time)) {
+    return `ออกงานได้ตั้งแต่ ${hhmm(toMin(s.work_end_time))} น.`;
+  }
+  return null;
+}
+
+/** Unset geofence (or no department) = fail-closed: clocking is refused until an admin sets it. Throws with a Thai message on time-window, GPS failure or outside-radius. */
+async function checkedPosition(kind: "in" | "out", departmentId: string | null): Promise<{ lat: number; lng: number }> {
+  if (!departmentId) throw new Error(GEOFENCE_UNSET_MESSAGE);
   const { data: dept, error } = await supabase
     .from("department_settings")
-    .select("checkin_lat, checkin_lng, checkin_radius_m")
+    .select("checkin_lat, checkin_lng, checkin_radius_m, work_start_time, work_end_time")
     .eq("department_id", departmentId)
     .single();
   if (error) throw error;
+  const locked = clockGate(kind, dept, bangkokMinutes(new Date()));
+  if (locked) throw new Error(locked);
+
+  const pos = await getCurrentPosition();
+  if ("error" in pos) throw new Error(GPS_ERROR_MESSAGE[pos.error]);
   if (dept.checkin_lat === null || dept.checkin_lng === null || dept.checkin_radius_m === null) {
     throw new Error(GEOFENCE_UNSET_MESSAGE);
   }
@@ -79,7 +111,7 @@ export function useClockIn() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ profileId, departmentId, date }: { profileId: string; departmentId: string | null; date: string }) => {
-      const pos = await checkedPosition(departmentId);
+      const pos = await checkedPosition("in", departmentId);
       const { error } = await supabase.from("time_clock_records").upsert(
         {
           profile_id: profileId,
@@ -101,7 +133,7 @@ export function useClockOut() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ profileId, departmentId, date }: { profileId: string; departmentId: string | null; date: string }) => {
-      const pos = await checkedPosition(departmentId);
+      const pos = await checkedPosition("out", departmentId);
       const { error } = await supabase
         .from("time_clock_records")
         .update({ clock_out_time: new Date().toISOString(), clock_out_lat: pos.lat, clock_out_lng: pos.lng })

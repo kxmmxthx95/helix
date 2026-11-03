@@ -638,9 +638,13 @@ function AttendancePanel({ row }: { row: EmployeeRow }) {
               <span className="text-muted-foreground tabular-nums">
                 {r.clock_in_time ? bangkokTime(r.clock_in_time) : "—"}
               </span>
-              <span className={cn("rounded-full px-2 py-0.5 text-[10px]", STATUS_STYLE[r.status])}>
-                {STATUS_LABEL[r.status]}
-              </span>
+              {r.status ? (
+                <span className={cn("rounded-full px-2 py-0.5 text-[10px]", STATUS_STYLE[r.status])}>
+                  {STATUS_LABEL[r.status]}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
             </li>
           ))}
         </ul>

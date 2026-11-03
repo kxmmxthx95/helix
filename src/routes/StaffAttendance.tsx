@@ -125,9 +125,13 @@ function RosterView({ departmentId }: { departmentId: string }) {
                     {r.clock_in_time ? bangkokTime(r.clock_in_time) : "—"}
                   </td>
                   <td className="px-3 py-2">
-                    <span className={cn("rounded-full px-2 py-0.5 text-[10px]", STATUS_STYLE[r.status])}>
-                      {STATUS_LABEL[r.status]}
-                    </span>
+                    {r.status ? (
+                      <span className={cn("rounded-full px-2 py-0.5 text-[10px]", STATUS_STYLE[r.status])}>
+                        {STATUS_LABEL[r.status]}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -152,7 +156,7 @@ function SummaryView({ departmentId }: { departmentId: string }) {
   const nameById = useNameById(departmentId);
 
   const byProfile = useMemo(() => {
-    const map = new Map<string, { status: AttendanceStatus }[]>();
+    const map = new Map<string, { status: AttendanceStatus | null }[]>();
     for (const r of rows) {
       if (!nameById.has(r.profile_id)) continue;
       const arr = map.get(r.profile_id) ?? [];

@@ -74,6 +74,8 @@ export type DepartmentSettings = {
   max_periods_per_week: number | null;
   // Time-clock: expected start time + geofence, all-or-nothing null. See migration 0032.
   work_start_time: string | null;
+  // Clock-out unlocks at this time — null = no lock. See migration 0112.
+  work_end_time: string | null;
   checkin_lat: number | null;
   checkin_lng: number | null;
   checkin_radius_m: number | null;
@@ -364,7 +366,8 @@ export type StaffAttendanceStatusRow = {
   profile_id: string;
   department_id: string | null;
   date: string;
-  status: AttendanceStatus;
+  /** null = still pending (today/future, no clock-in, no leave). See migration 0113. */
+  status: AttendanceStatus | null;
   clock_in_time: string | null;
   clock_out_time: string | null;
 };

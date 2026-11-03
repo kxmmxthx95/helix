@@ -15,8 +15,8 @@ import { useDepartmentPeriods } from "@/hooks/usePeriodDefinitions";
 import { useDepartments, useRoleSubtitle } from "@/hooks/useProfiles";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useTeacherSchedule, type ScheduleEntryRow } from "@/hooks/useSchedule";
-import { useSchoolSettings } from "@/hooks/useSettings";
-import { useClockIn, useClockOut, useMyTimeClock } from "@/hooks/useTimeClock";
+import { useDepartmentSettings, useSchoolSettings } from "@/hooks/useSettings";
+import { bangkokMinutes, clockGate, useClockIn, useClockOut, useMyTimeClock } from "@/hooks/useTimeClock";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import { usePendingStudentLeaveApprovals, useSetStudentLeaveStatus } from "@/hooks/useStudentLeave";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
@@ -78,14 +78,6 @@ const weekdayOf = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCDay();
 const toMin = (hms: string) => Number(hms.slice(0, 2)) * 60 + Number(hms.slice(3, 5));
 const hhmm = (hms: string) => hms.slice(0, 5);
 
-function bangkokMinutes(d: Date) {
-  const [h = 0, m = 0] = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Bangkok" })
-    .format(d)
-    .split(":")
-    .map(Number);
-  return h * 60 + m;
-}
-
 function useNowMinutes() {
   const [now, setNow] = useState(() => bangkokMinutes(new Date()));
   useEffect(() => {
@@ -109,6 +101,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const setLeaveStatus = useSetStudentLeaveStatus();
   const toast = useToast();
   const { data: clock, isLoading: loadingClock } = useMyTimeClock(me.id, today);
+  const { data: deptSettings } = useDepartmentSettings(me.department_id);
   const clockIn = useClockIn();
   const clockOut = useClockOut();
   const clockArgs = { profileId: me.id, departmentId: me.department_id, date: today };
@@ -120,6 +113,8 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
       },
       onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
     });
+  // ponytail: after clock-in the card stays locked until work_end_time (no end time set = no lock)
+  const clockLock = clock?.clock_out_time ? null : clockGate(clock?.clock_in_time ? "out" : "in", deptSettings, nowMin);
   const roleSubtitle = useRoleSubtitle(me.id, me.roles);
 
   const { data: departments = [] } = useDepartments();
@@ -288,13 +283,13 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           {
             clock: true,
       title: clock?.clock_out_time ? "ลงเวลาแล้ว" : clock?.clock_in_time ? "ออกงาน" : "เข้างาน",
-            text: clock?.clock_out_time
-              ? `เข้า ${bangkokTime(clock.clock_in_time ?? clock.clock_out_time)} · ออก ${bangkokTime(clock.clock_out_time)}`
-              : clock?.clock_in_time
-                ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}`
-                : "ยังไม่ได้บันทึกเวลาเข้างาน",
+            text: (clock?.clock_in_time && clockLock ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)} · ${clockLock}` : clockLock) ?? (clock?.clock_out_time
+                ? `เข้า ${bangkokTime(clock.clock_in_time ?? clock.clock_out_time)} · ออก ${bangkokTime(clock.clock_out_time)}`
+                : clock?.clock_in_time
+                  ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}`
+                  : "ยังไม่ได้บันทึกเวลาเข้างาน"),
             busy: clockIn.isPending || clockOut.isPending,
-            disabled: loadingClock,
+            disabled: loadingClock || !!clockLock,
             onClick: () => (clock?.clock_out_time ? setClockOpen(true) : onClock(clock?.clock_in_time ? "out" : "in")),
           },
         ]
