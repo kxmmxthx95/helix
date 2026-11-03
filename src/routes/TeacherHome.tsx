@@ -24,6 +24,7 @@ import { gradeShortLabel } from "@/lib/gradeLevels";
 import { supabase } from "@/lib/supabase";
 import { cn, todayIso } from "@/lib/utils";
 import { AssemblyAttendanceSheet } from "@/routes/AssemblyAttendanceSheet";
+import { LineLinkCard } from "@/routes/Profile";
 import { PeriodDaySheet, type DayPeriod, type SheetDay } from "@/routes/PeriodDaySheet";
 import { bangkokTime } from "@/routes/TimeTracking";
 import { TeacherTimetable } from "@/routes/Timetable";
@@ -99,6 +100,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const [bannerColors, setBannerColors] = useBannerColors(me.id);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [timetableOpen, setTimetableOpen] = useState(false);
+  const [lineOpen, setLineOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [clockOpen, setClockOpen] = useState(false);
   const [assemblyOpen, setAssemblyOpen] = useState(false);
@@ -445,7 +447,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
               {homerooms.length > 0 && (
                 <p className="truncate text-base text-muted-foreground">ครูที่ปรึกษา {homerooms.map((h) => roomLabel(h.id)).join(", ")}</p>
               )}
-              <div className="mt-4 flex items-center gap-3 sm:mt-5">
+              <div className="mt-4 flex flex-wrap items-center gap-3 sm:mt-5">
                 <button
                   type="button"
                   onClick={() => setTimetableOpen(true)}
@@ -459,6 +461,17 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                 >
                   โปรไฟล์
                 </Link>
+                <button
+                  type="button"
+                  disabled={!!me.line_user_id}
+                  onClick={() => setLineOpen(true)}
+                  className={cn(
+                    "inline-flex h-11 items-center rounded-full px-6 text-[15px] font-medium transition-transform active:scale-[0.98]",
+                    me.line_user_id ? "bg-[#06C755] text-white" : "bg-muted text-muted-foreground hover:bg-muted/70",
+                  )}
+                >
+                  {me.line_user_id ? "เชื่อมไลน์แล้ว" : "เชื่อมไลน์"}
+                </button>
               </div>
             </div>
             <div className="flex flex-col items-start gap-4 text-left md:items-end md:pt-5 md:text-right">
@@ -515,6 +528,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         roomLabel={roomLabel}
       />
 
+      <Modal open={lineOpen} onOpenChange={setLineOpen} title="เชื่อมต่อไลน์">
+        <LineLinkCard />
+      </Modal>
       <Modal open={clockOpen} onOpenChange={setClockOpen} title="ลงเวลาวันนี้">
         <dl className="grid grid-cols-2 gap-3 text-center">
           <div className="rounded-xl bg-muted p-4">

@@ -376,7 +376,7 @@ function DisplaySection() {
  * just profiles.line_user_id; "ตรวจสอบอีกครั้ง" re-pulls the profile since
  * the actual link only happens once the LINE message round-trips.
  */
-function LineLinkCard() {
+export function LineLinkCard() {
   const { profile, refreshProfile } = useAuth();
   const generate = useGenerateLinkCode();
   const [code, setCode] = useState<string | null>(null);
