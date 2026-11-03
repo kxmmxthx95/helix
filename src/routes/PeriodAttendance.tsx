@@ -151,6 +151,7 @@ function PeriodCheckInPanel({
         <Input
           type="date"
           value={date}
+          max={todayIso()}
           onChange={(e) => {
             setDate(e.target.value);
             setOpenEntryId(null);

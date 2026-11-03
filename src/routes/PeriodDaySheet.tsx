@@ -9,7 +9,7 @@ import { useSavePeriodAttendance, usePeriodAttendance, usePeriodAttendanceTakenS
 import { useApprovedLeaveOnDate } from "@/hooks/useStudentLeave";
 import type { AttendanceStatus } from "@/lib/database.types";
 import { levelTone } from "@/lib/gradeLevels";
-import { cn } from "@/lib/utils";
+import { cn, todayIso } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
 import { SEGMENT_STYLE, STATUS_ORDER } from "@/routes/AssemblyAttendanceSheet";
 
@@ -93,7 +93,8 @@ export function PeriodDaySheet({
     );
   }
 
-  const canSave = !!picked && roster.length > 0 && seededFor.current === picked.entryId;
+  const future = date > todayIso(); // future days are view-only (DB trigger 0114 backs this up)
+  const canSave = !future && !!picked && roster.length > 0 && seededFor.current === picked.entryId;
 
   return (
     <Sheet
@@ -166,6 +167,7 @@ export function PeriodDaySheet({
           <p className="truncate text-sm font-semibold">
             {picked.subjectCode} {picked.subjectName}
           </p>
+          {future && <p className="text-xs text-muted-foreground">ยังไม่ถึงวันนี้ — ดูรายชื่อได้ แต่เช็คชื่อล่วงหน้าไม่ได้</p>}
           {loadingRoster || loadingRecords ? (
             <div role="status" aria-label="กำลังโหลด" className="space-y-2">
               {[0, 1, 2, 3, 4].map((i) => (
@@ -194,7 +196,7 @@ export function PeriodDaySheet({
                         <button
                           key={st}
                           type="button"
-                          disabled={locked}
+                          disabled={locked || future}
                           aria-pressed={status === st}
                           onClick={() => setMarks((prev) => new Map(prev).set(s.id, prev.get(s.id) === st ? null : st))}
                           className={cn(
