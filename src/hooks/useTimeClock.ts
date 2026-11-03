@@ -15,6 +15,8 @@ const GPS_ERROR_MESSAGE = {
   timeout: "หาตำแหน่งไม่สำเร็จ (หมดเวลา) ลองใหม่อีกครั้ง",
 } as const;
 
+const GEOFENCE_UNSET_MESSAGE = "แผนกยังไม่ได้ตั้งพื้นที่ลงเวลา — แจ้งผู้ดูแลให้ปักหมุดใน ตั้งค่า ก่อน";
+
 export function useMyTimeClock(profileId: string | null, date: string) {
   return useQuery({
     queryKey: ["time_clock_records", "one", profileId, date],
@@ -50,11 +52,11 @@ export function useTimeClockRange(profileId: string | null, startDate: string, e
   });
 }
 
-/** null geofence on the department = unset = fail-open (no block). Throws with a Thai message on GPS failure or outside-radius. */
+/** Unset geofence (or no department) = fail-closed: clocking is refused until an admin sets it. Throws with a Thai message on GPS failure or outside-radius. */
 async function checkedPosition(departmentId: string | null): Promise<{ lat: number; lng: number }> {
   const pos = await getCurrentPosition();
   if ("error" in pos) throw new Error(GPS_ERROR_MESSAGE[pos.error]);
-  if (!departmentId) return pos;
+  if (!departmentId) throw new Error(GEOFENCE_UNSET_MESSAGE);
 
   const { data: dept, error } = await supabase
     .from("department_settings")
@@ -62,7 +64,9 @@ async function checkedPosition(departmentId: string | null): Promise<{ lat: numb
     .eq("department_id", departmentId)
     .single();
   if (error) throw error;
-  if (dept.checkin_lat === null || dept.checkin_lng === null || dept.checkin_radius_m === null) return pos;
+  if (dept.checkin_lat === null || dept.checkin_lng === null || dept.checkin_radius_m === null) {
+    throw new Error(GEOFENCE_UNSET_MESSAGE);
+  }
 
   const distance = distanceMeters(pos.lat, pos.lng, dept.checkin_lat, dept.checkin_lng);
   if (distance > dept.checkin_radius_m) {
