@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { profileFullName, type ProfileWithRoles } from "@/lib/database.types";
-import { ChevronForward, PaletteIcon } from "@/components/icons";
+import { ChevronForward, LockIcon, PaletteIcon } from "@/components/icons";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { Avatar, Spinner } from "@/components/ui";
@@ -283,13 +283,14 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           {
             clock: true,
       title: clock?.clock_out_time ? "ลงเวลาแล้ว" : clock?.clock_in_time ? "ออกงาน" : "เข้างาน",
-            text: (clock?.clock_in_time && clockLock ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)} · ${clockLock}` : clockLock) ?? (clock?.clock_out_time
+            text: (clock?.clock_in_time && clockLock ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}\n${clockLock}` : clockLock) ?? (clock?.clock_out_time
                 ? `เข้า ${bangkokTime(clock.clock_in_time ?? clock.clock_out_time)} · ออก ${bangkokTime(clock.clock_out_time)}`
                 : clock?.clock_in_time
                   ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}`
                   : "ยังไม่ได้บันทึกเวลาเข้างาน"),
             busy: clockIn.isPending || clockOut.isPending,
             disabled: loadingClock || !!clockLock,
+            locked: !!clockLock,
             onClick: () => (clock?.clock_out_time ? setClockOpen(true) : onClock(clock?.clock_in_time ? "out" : "in")),
           },
         ]
@@ -300,6 +301,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
       text: pendingLeave.length > 0 ? `มี ${pendingLeave.length} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง",
       busy: false,
       disabled: false,
+      badge: pendingLeave.length,
       onClick: () => setLeaveOpen(true),
     },
     {
@@ -323,14 +325,22 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
       <>
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold">{t.title}</span>
-          <span className="block text-sm text-muted-foreground">{t.text}</span>
+          <span className="block whitespace-pre-line text-sm text-muted-foreground">{t.text}</span>
         </span>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-accent text-accent">
-          {"busy" in t && t.busy ? <Spinner className="h-4 w-4" /> : <ChevronForward className="h-4 w-4" />}
+        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2", "locked" in t && t.locked ? "border-muted-foreground/50 text-muted-foreground" : "border-accent text-accent")}>
+          {"busy" in t && t.busy ? <Spinner className="h-4 w-4" /> : "locked" in t && t.locked ? <LockIcon className="h-4 w-4" /> : <ChevronForward className="h-4 w-4" />}
         </span>
+        {"badge" in t && !!t.badge && (
+          <span
+            aria-label={`${t.badge} รายการรอดำเนินการ`}
+            className="absolute right-3 top-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-semibold leading-none text-white"
+          >
+            {t.badge > 99 ? "99+" : t.badge}
+          </span>
+        )}
       </>
     );
-    const cls = cn("flex h-full items-center gap-3 rounded-2xl p-4 text-left transition-colors", surface);
+    const cls = cn("relative flex h-full items-center gap-3 rounded-2xl p-4 text-left transition-colors", surface);
     if ("sheet" in t && upNext) {
       return (
         <button
