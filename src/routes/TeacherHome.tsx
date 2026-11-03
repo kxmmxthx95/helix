@@ -295,7 +295,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           },
         ]
       : []),
-    { title: "เช็คชื่อเข้าเรียน", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", sheet: true },
+    { title: "เช็คชื่อเข้าเรียน", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", sheet: true, badge: unchecked },
     {
       title: "ใบลารออนุมัติ",
       text: pendingLeave.length > 0 ? `มี ${pendingLeave.length} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง",
@@ -316,6 +316,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
               : "เช็คชื่อเรียบร้อยแล้ว",
       busy: false,
       disabled: false,
+      badge: assemblyDay ? assemblyPending.length : 0,
       onClick: () => setAssemblyOpen(true),
     },
   ];
@@ -349,13 +350,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           onClick={() => setPeriodsOpen(true)}
           className={cls}
         >
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold">{t.title}</span>
-            <span className="block text-sm text-muted-foreground">{t.text}</span>
-          </span>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-accent text-accent">
-            <ChevronForward className="h-4 w-4" />
-          </span>
+          {body}
         </button>
       );
     }

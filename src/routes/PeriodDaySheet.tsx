@@ -9,6 +9,7 @@ import { useSavePeriodAttendance, usePeriodAttendance, usePeriodAttendanceTakenS
 import { useApprovedLeaveOnDate } from "@/hooks/useStudentLeave";
 import type { AttendanceStatus } from "@/lib/database.types";
 import { levelTone } from "@/lib/gradeLevels";
+import { bangkokMinutes } from "@/hooks/useTimeClock";
 import { cn, todayIso } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
 import { SEGMENT_STYLE, STATUS_ORDER } from "@/routes/AssemblyAttendanceSheet";
@@ -93,6 +94,12 @@ export function PeriodDaySheet({
     );
   }
 
+  // A period opens for marking once its start time arrives; later days stay closed.
+  const started = (p: DayPeriod) => {
+    if (date !== todayIso()) return date < todayIso();
+    const [h = 0, m = 0] = p.time.split("–")[0]!.split(":").map(Number);
+    return bangkokMinutes(new Date()) >= h * 60 + m;
+  };
   const future = date > todayIso(); // future days are view-only (DB trigger 0114 backs this up)
   const canSave = !future && !!picked && roster.length > 0 && seededFor.current === picked.entryId;
 
@@ -143,13 +150,14 @@ export function PeriodDaySheet({
               <li key={p.entryId}>
                 <button
                   type="button"
+                  disabled={!started(p)}
                   onClick={() => setPickedId(p.entryId)}
-                  className={cn("flex w-full items-center gap-3 rounded-2xl p-4 text-left", p.gradient)}
+                  className={cn("flex w-full items-center gap-3 rounded-2xl p-4 text-left disabled:opacity-50", p.gradient)}
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block text-xs font-medium opacity-70">
                       คาบ {p.ordinal} · {p.time}
-                      {taken.has(p.entryId) && " · เช็คแล้ว"}
+                      {taken.has(p.entryId) ? " · เช็คแล้ว" : !started(p) && " · ยังไม่ถึงเวลา"}
                     </span>
                     <span className="block truncate text-[15px] font-semibold">{p.subjectName}</span>
                     <span className="block truncate text-sm opacity-80">
