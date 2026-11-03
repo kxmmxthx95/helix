@@ -324,7 +324,9 @@ function PeriodCheckInGrid({
       ),
   );
 
-  const remaining = roster.filter((s) => !marks.get(s.id)?.status).length;
+  // lockedSet loads async after marks is seeded, so derive 'leave' here instead of trusting marks.
+  const statusOf = (id: string) => (lockedSet.has(id) ? "leave" : marks.get(id)?.status ?? null);
+  const remaining = roster.filter((s) => !statusOf(s.id)).length;
 
   function setStatus(id: string, status: AttendanceStatus) {
     if (lockedSet.has(id)) return; // server also force-locks this to 'leave' — see migration 0037
@@ -362,7 +364,7 @@ function PeriodCheckInGrid({
         student_id: s.id,
         schedule_entry_id: entry.id,
         date,
-        status: mark.status as AttendanceStatus,
+        status: statusOf(s.id) as AttendanceStatus,
         note: mark.note.trim() || null,
         recorded_by: recorderId,
       };
