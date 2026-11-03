@@ -569,7 +569,7 @@ export function CloseButton({ onClick }: { onClick: () => void }) {
       type="button"
       aria-label="ปิด"
       onClick={onClick}
-      className="tappable flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-fill-strong text-muted-foreground transition-colors hover:text-foreground"
+      className="tappable relative flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-fill-strong text-muted-foreground transition-colors after:absolute after:-inset-[7px] after:content-[''] hover:text-foreground"
     >
       <X className="h-3.5 w-3.5" />
     </button>

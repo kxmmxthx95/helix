@@ -63,7 +63,7 @@ export function AssemblyAttendanceSheet({
       (e.departmentIds.length === 0 || e.departmentIds.includes(departmentId)),
   );
 
-  // Marks start from what's saved, else approved leave, else unmarked; seeded once per room each time the sheet opens.
+  // Marks start from approved leave (locked, like the DB trigger 0115), else what's saved, else unmarked; seeded once per room each time the sheet opens.
   const [marks, setMarks] = useState<Map<string, AttendanceStatus | null>>(new Map());
   const seededFor = useRef<string | null>(null);
   const ready = !loadingRoster && !loadingRecords && !loadingLeave && roster.length > 0;
@@ -73,7 +73,7 @@ export function AssemblyAttendanceSheet({
   useEffect(() => {
     if (!classroomId || !ready || !records || seededFor.current === classroomId) return;
     const saved = new Map(records.map((r) => [r.student_id, r.status]));
-    setMarks(new Map(roster.map((s) => [s.id, saved.get(s.id) ?? (onLeave?.has(s.id) ? "leave" : null)])));
+    setMarks(new Map(roster.map((s) => [s.id, onLeave?.has(s.id) ? "leave" : (saved.get(s.id) ?? null)])));
     seededFor.current = classroomId;
   }, [classroomId, ready, records, roster, onLeave]);
 
@@ -128,7 +128,7 @@ export function AssemblyAttendanceSheet({
             <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
               {remaining > 0 ? `ยังไม่เช็ค ${remaining} คน` : counts.map(([st, n]) => `${STATUS_LABEL[st]} ${n}`).join(" · ")}
             </p>
-            <Button variant="outline" size="sm" className="h-10" onClick={() => setMarks(new Map(roster.map((s) => [s.id, "present"])))}>
+            <Button variant="outline" size="sm" className="h-10" onClick={() => setMarks(new Map(roster.map((s) => [s.id, onLeave?.has(s.id) ? "leave" : "present"])))}>
               มาทั้งหมด
             </Button>
             <Button size="sm" className="h-10" disabled={save.isPending || remaining > 0} onClick={submit}>
@@ -176,6 +176,7 @@ export function AssemblyAttendanceSheet({
               {roster.map((s) => {
                 const name = `${s.first_name} ${s.last_name}`;
                 const status = marks.get(s.id);
+                const locked = !!onLeave?.has(s.id);
                 return (
                   <li key={s.id} className="rounded-xl bg-secondary p-3">
                     <div className="flex min-w-0 items-center gap-3">
@@ -190,11 +191,13 @@ export function AssemblyAttendanceSheet({
                         <button
                           key={st}
                           type="button"
+                          disabled={locked}
                           aria-pressed={status === st}
                           onClick={() => setMarks((prev) => new Map(prev).set(s.id, prev.get(s.id) === st ? null : st))}
                           className={cn(
                             "inline-flex h-9 items-center justify-center rounded-md text-[13px] font-semibold transition-colors",
                             status === st ? SEGMENT_STYLE[st] : "text-foreground/80 hover:text-foreground",
+                            locked && status !== st && "opacity-40",
                           )}
                         >
                           {STATUS_LABEL[st]}

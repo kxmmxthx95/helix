@@ -222,6 +222,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         subjectName: sub?.name_th ?? "—",
         room: roomLabel(t.entry.teaching_assignment.classroom_id),
         gradient: styleOf(t.entry).gradient,
+        hex: styleOf(t.entry).hex,
       };
     });
 
@@ -249,7 +250,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   for (let offset = 0; offset <= 14 && sheetDays.length < 2; offset++) {
     const iso = addDays(today, offset);
     if (isHoliday(iso) || timedOf(iso).length === 0) continue;
-    sheetDays.push({ date: iso, label: offset === 0 ? "วันนี้" : "วันสอนถัดไป", periods: periodsOf(iso) });
+    sheetDays.push({ date: iso, label: offset === 0 ? "วันนี้" : offset === 1 ? "พรุ่งนี้" : "วันสอนถัดไป", periods: periodsOf(iso) });
   }
 
   const taught = [...new Map(

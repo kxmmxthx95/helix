@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, EmptyState, Skeleton, Spinner } from "@/components/ui";
-import { ChevronBack, ChevronForward } from "@/components/icons";
+import { CheckmarkCircleIcon, ChevronBack, ChevronForward } from "@/components/icons";
 import { useClassroomRoster } from "@/hooks/useAttendance";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useSavePeriodAttendance, usePeriodAttendance, usePeriodAttendanceTakenSet } from "@/hooks/usePeriodAttendance";
@@ -23,6 +23,7 @@ export type DayPeriod = {
   subjectName: string;
   room: string;
   gradient: string;
+  hex: string;
 };
 
 export type SheetDay = { date: string; label: string; periods: DayPeriod[] };
@@ -30,42 +31,79 @@ export type SheetDay = { date: string; label: string; periods: DayPeriod[] };
 const thaiDate = (iso: string, opts: Intl.DateTimeFormatOptions) =>
   new Intl.DateTimeFormat("th-TH", { ...opts, timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
 
+const minutesOf = (hhmm: string) => {
+  const [h = 0, m = 0] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+};
+
 /** One day's period cards. Today's open once their start time arrives; later days are tappable for a view-only roster. */
 function DayList({ day, open, onPick }: { day: SheetDay; open: boolean; onPick: (entryId: string) => void }) {
   const { data: taken = new Set<string>() } = usePeriodAttendanceTakenSet(open ? day.periods.map((p) => p.entryId) : [], day.date);
   const isToday = day.date === todayIso();
-  const notStarted = (p: DayPeriod) => {
-    const [h = 0, m = 0] = p.time.split("–")[0]!.split(":").map(Number);
-    return isToday && bangkokMinutes(new Date()) < h * 60 + m;
-  };
+  const nowMin = bangkokMinutes(new Date());
+  const takenCount = day.periods.filter((p) => taken.has(p.entryId)).length;
   return (
     <section>
-      <p className="mb-2 text-xs font-semibold text-muted-foreground">
-        {day.label} · {thaiDate(day.date, { weekday: "short", day: "numeric", month: "short" })}
-      </p>
-      <ul className="space-y-2">
-        {day.periods.map((p) => (
-          <li key={p.entryId}>
-            <button
-              type="button"
-              disabled={notStarted(p)}
-              onClick={() => onPick(p.entryId)}
-              className={cn("flex w-full items-center gap-3 rounded-2xl p-4 text-left disabled:opacity-50", p.gradient)}
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block text-xs font-medium opacity-70">
-                  คาบ {p.ordinal} · {p.time}
-                  {taken.has(p.entryId) ? " · เช็คแล้ว" : notStarted(p) && " · ยังไม่ถึงเวลา"}
+      <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
+        <h3 className="min-w-0 text-[15px] font-semibold text-foreground">
+          {day.label}
+          <span className="ml-2 text-[13px] font-normal text-muted-foreground">
+            {thaiDate(day.date, { weekday: "short", day: "numeric", month: "short" })}
+          </span>
+        </h3>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {isToday ? `เช็คแล้ว ${takenCount}/${day.periods.length} คาบ` : `${day.periods.length} คาบ`}
+        </span>
+      </div>
+      <ul className="space-y-2.5">
+        {day.periods.map((p) => {
+          const [from = "", to = ""] = p.time.split("–");
+          const started = !isToday || nowMin >= minutesOf(from);
+          const current = isToday && started && nowMin < minutesOf(to);
+          const done = taken.has(p.entryId);
+          return (
+            <li key={p.entryId}>
+              <button
+                type="button"
+                disabled={!started}
+                onClick={() => onPick(p.entryId)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-2xl border bg-card p-4 text-left transition-colors hover:bg-muted active:bg-muted",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:hover:bg-card",
+                  current ? "border-accent" : "border-border",
+                )}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-start gap-2">
+                    <span aria-hidden className="mt-[7px] h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: p.hex }} />
+                    <span className="min-w-0 break-words text-base font-semibold leading-snug text-foreground">{p.subjectName}</span>
+                  </span>
+                  <span className="mt-1 block pl-[18px] text-sm text-foreground/80">
+                    {p.room} · คาบ {p.ordinal}
+                  </span>
+                  <span className="block pl-[18px] text-[13px] text-muted-foreground">
+                    {p.time} · {p.subjectCode}
+                  </span>
+                  {done ? (
+                    <span className="ml-[18px] mt-2 inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
+                      <CheckmarkCircleIcon className="h-3.5 w-3.5" />
+                      เช็คแล้ว
+                    </span>
+                  ) : !started ? (
+                    <span className="ml-[18px] mt-2 inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                      ยังไม่ถึงเวลา
+                    </span>
+                  ) : isToday ? (
+                    <span className="ml-[18px] mt-2 inline-flex rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent">
+                      {current ? "กำลังสอน · รอเช็คชื่อ" : "รอเช็คชื่อ"}
+                    </span>
+                  ) : null}
                 </span>
-                <span className="block truncate text-[15px] font-semibold">{p.subjectName}</span>
-                <span className="block truncate text-sm opacity-80">
-                  {p.subjectCode} · {p.room}
-                </span>
-              </span>
-              <ChevronForward className="h-4 w-4 shrink-0" />
-            </button>
-          </li>
-        ))}
+                <ChevronForward className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
@@ -163,6 +201,7 @@ export function PeriodDaySheet({
       }
       // Header and footer share one 64px band (12px padding + 40px row).
       headerClassName="[&>div]:min-h-10"
+      bodyClassName={picked ? undefined : "bg-muted"}
       footerClassName="pb-[max(0.75rem,env(safe-area-inset-bottom))]"
       footer={
         canSave ? (
@@ -170,7 +209,7 @@ export function PeriodDaySheet({
             <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
               {remaining > 0 ? `ยังไม่เช็ค ${remaining} คน` : counts.map(([st, n]) => `${STATUS_LABEL[st]} ${n}`).join(" · ")}
             </p>
-            <Button variant="outline" size="sm" className="h-10" onClick={() => setMarks(new Map(roster.map((s) => [s.id, "present"])))}>
+            <Button variant="outline" size="sm" className="h-10" onClick={() => setMarks(new Map(roster.map((s) => [s.id, onLeave?.has(s.id) ? "leave" : "present"])))}>
               มาทั้งหมด
             </Button>
             <Button size="sm" className="h-10" disabled={save.isPending || remaining > 0} onClick={submit}>
