@@ -245,13 +245,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     return null;
   })();
 
-  // Drawer: today (if a teaching day, so missed periods stay reachable) plus the next teaching day.
-  const sheetDays: SheetDay[] = [];
-  for (let offset = 0; offset <= 14 && sheetDays.length < 2; offset++) {
-    const iso = addDays(today, offset);
-    if (isHoliday(iso) || timedOf(iso).length === 0) continue;
-    sheetDays.push({ date: iso, label: offset === 0 ? "วันนี้" : offset === 1 ? "พรุ่งนี้" : "วันสอนถัดไป", periods: periodsOf(iso) });
-  }
+  // Drawer: today's periods only (missed ones stay reachable after school hours).
+  const sheetDays: SheetDay[] =
+    !isHoliday(today) && timedOf(today).length > 0 ? [{ date: today, label: "วันนี้", periods: periodsOf(today) }] : [];
 
   const taught = [...new Map(
     entries.flatMap((e) => {
