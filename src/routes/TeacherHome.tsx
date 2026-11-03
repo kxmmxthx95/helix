@@ -24,7 +24,7 @@ import { gradeShortLabel } from "@/lib/gradeLevels";
 import { supabase } from "@/lib/supabase";
 import { cn, todayIso } from "@/lib/utils";
 import { AssemblyAttendanceSheet } from "@/routes/AssemblyAttendanceSheet";
-import { PeriodDaySheet, type DayPeriod } from "@/routes/PeriodDaySheet";
+import { PeriodDaySheet, type DayPeriod, type SheetDay } from "@/routes/PeriodDaySheet";
 import { bangkokTime } from "@/routes/TimeTracking";
 import { TeacherTimetable } from "@/routes/Timetable";
 
@@ -81,8 +81,13 @@ const hhmm = (hms: string) => hms.slice(0, 5);
 function useNowMinutes() {
   const [now, setNow] = useState(() => bangkokMinutes(new Date()));
   useEffect(() => {
-    const t = setInterval(() => setNow(bangkokMinutes(new Date())), 30_000);
-    return () => clearInterval(t);
+    const tick = () => setNow(bangkokMinutes(new Date()));
+    const t = setInterval(tick, 30_000);
+    document.addEventListener("visibilitychange", tick); // timers pause while the tab/PWA is backgrounded
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", tick);
+    };
   }, []);
   return now;
 }
@@ -192,48 +197,60 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     return { gradient: colors.gradient(area, grade), hex: colors.hex(area, grade) };
   };
 
+  const ordinalOf = (day: number, periodNo: number) =>
+    periods.filter((p) => p.day_of_week === day && p.period_type === "teaching" && p.period_no <= periodNo).length;
+  const timedOf = (iso: string) => {
+    const day = weekdayOf(iso);
+    return entries
+      .filter((e) => e.day_of_week === day)
+      .sort((a, b) => a.period_no - b.period_no)
+      .flatMap((e) => {
+        const slot = periods.find((p) => p.day_of_week === day && p.period_no === e.period_no && p.period_type === "teaching");
+        return slot ? [{ entry: e, start: toMin(slot.start_time), end: toMin(slot.end_time), startText: hhmm(slot.start_time), endText: hhmm(slot.end_time) }] : [];
+      });
+  };
+  // The sheet lists the whole day, not just the next period.
+  const periodsOf = (iso: string): DayPeriod[] =>
+    timedOf(iso).map((t) => {
+      const sub = subjectOf(t.entry.teaching_assignment.subject_id);
+      return {
+        entryId: t.entry.id,
+        classroomId: t.entry.teaching_assignment.classroom_id,
+        ordinal: ordinalOf(weekdayOf(iso), t.entry.period_no),
+        time: `${t.startText}–${t.endText}`,
+        subjectCode: sub?.code ?? "—",
+        subjectName: sub?.name_th ?? "—",
+        room: roomLabel(t.entry.teaching_assignment.classroom_id),
+        gradient: styleOf(t.entry).gradient,
+      };
+    });
+
   // Back of the "เช็คชื่อเข้าเรียน" tile: the period in progress, else the next one — rolling to the next teaching day when today is done.
   const upNext = (() => {
     for (let offset = 0; offset <= 14; offset++) {
       const iso = addDays(today, offset);
       const day = weekdayOf(iso);
       if (isHoliday(iso)) continue;
-      const dayTimed = entries
-        .filter((e) => e.day_of_week === day)
-        .sort((a, b) => a.period_no - b.period_no)
-        .flatMap((e) => {
-          const slot = periods.find((p) => p.day_of_week === day && p.period_no === e.period_no && p.period_type === "teaching");
-          return slot ? [{ entry: e, start: toMin(slot.start_time), end: toMin(slot.end_time), startText: hhmm(slot.start_time), endText: hhmm(slot.end_time) }] : [];
-        });
-      const first = dayTimed.find((t) => offset > 0 || t.end > nowMin);
+      const first = timedOf(iso).find((t) => offset > 0 || t.end > nowMin);
       if (!first) continue;
-      const ordinalOf = (periodNo: number) =>
-        periods.filter((p) => p.day_of_week === day && p.period_type === "teaching" && p.period_no <= periodNo).length;
-      const ordinal = ordinalOf(first.entry.period_no);
       const label =
         offset === 0
           ? first.start <= nowMin
             ? "กำลังสอน"
             : "คาบถัดไป"
-          : `${offset === 1 ? "พรุ่งนี้" : DAY_NAME[day]} · คาบ ${ordinal}`;
-      // The sheet lists the whole day, not just the next period.
-      const dayPeriods: DayPeriod[] = dayTimed.map((t) => {
-        const sub = subjectOf(t.entry.teaching_assignment.subject_id);
-        return {
-          entryId: t.entry.id,
-          classroomId: t.entry.teaching_assignment.classroom_id,
-          ordinal: ordinalOf(t.entry.period_no),
-          time: `${t.startText}–${t.endText}`,
-          subjectCode: sub?.code ?? "—",
-          subjectName: sub?.name_th ?? "—",
-          room: roomLabel(t.entry.teaching_assignment.classroom_id),
-          gradient: styleOf(t.entry).gradient,
-        };
-      });
-      return { ...first, label, iso, dayPeriods };
+          : `${offset === 1 ? "พรุ่งนี้" : DAY_NAME[day]} · คาบ ${ordinalOf(day, first.entry.period_no)}`;
+      return { ...first, label, iso };
     }
     return null;
   })();
+
+  // Drawer: today (if a teaching day, so missed periods stay reachable) plus the next teaching day.
+  const sheetDays: SheetDay[] = [];
+  for (let offset = 0; offset <= 14 && sheetDays.length < 2; offset++) {
+    const iso = addDays(today, offset);
+    if (isHoliday(iso) || timedOf(iso).length === 0) continue;
+    sheetDays.push({ date: iso, label: offset === 0 ? "วันนี้" : "วันสอนถัดไป", periods: periodsOf(iso) });
+  }
 
   const taught = [...new Map(
     entries.flatMap((e) => {
@@ -485,8 +502,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         <PeriodDaySheet
           open={periodsOpen}
           onOpenChange={setPeriodsOpen}
-          date={upNext.iso}
-          periods={upNext.dayPeriods}
+          days={sheetDays}
           academicYear={academicYear}
           recorderId={me.id}
         />

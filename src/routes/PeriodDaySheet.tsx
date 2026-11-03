@@ -25,28 +25,73 @@ export type DayPeriod = {
   gradient: string;
 };
 
-/** One teaching day's periods; tap one to mark its students (same table as the period-attendance page). Roster view mirrors the assembly sheet. */
+export type SheetDay = { date: string; label: string; periods: DayPeriod[] };
+
+const thaiDate = (iso: string, opts: Intl.DateTimeFormatOptions) =>
+  new Intl.DateTimeFormat("th-TH", { ...opts, timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
+
+/** One day's period cards. Today's open once their start time arrives; later days are tappable for a view-only roster. */
+function DayList({ day, open, onPick }: { day: SheetDay; open: boolean; onPick: (entryId: string) => void }) {
+  const { data: taken = new Set<string>() } = usePeriodAttendanceTakenSet(open ? day.periods.map((p) => p.entryId) : [], day.date);
+  const isToday = day.date === todayIso();
+  const notStarted = (p: DayPeriod) => {
+    const [h = 0, m = 0] = p.time.split("–")[0]!.split(":").map(Number);
+    return isToday && bangkokMinutes(new Date()) < h * 60 + m;
+  };
+  return (
+    <section>
+      <p className="mb-2 text-xs font-semibold text-muted-foreground">
+        {day.label} · {thaiDate(day.date, { weekday: "short", day: "numeric", month: "short" })}
+      </p>
+      <ul className="space-y-2">
+        {day.periods.map((p) => (
+          <li key={p.entryId}>
+            <button
+              type="button"
+              disabled={notStarted(p)}
+              onClick={() => onPick(p.entryId)}
+              className={cn("flex w-full items-center gap-3 rounded-2xl p-4 text-left disabled:opacity-50", p.gradient)}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-medium opacity-70">
+                  คาบ {p.ordinal} · {p.time}
+                  {taken.has(p.entryId) ? " · เช็คแล้ว" : notStarted(p) && " · ยังไม่ถึงเวลา"}
+                </span>
+                <span className="block truncate text-[15px] font-semibold">{p.subjectName}</span>
+                <span className="block truncate text-sm opacity-80">
+                  {p.subjectCode} · {p.room}
+                </span>
+              </span>
+              <ChevronForward className="h-4 w-4 shrink-0" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Today's and the next teaching day's periods; tap one to mark its students (same table as the period-attendance page). Roster view mirrors the assembly sheet. */
 export function PeriodDaySheet({
   open,
   onOpenChange,
-  date,
-  periods,
+  days,
   academicYear,
   recorderId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  date: string;
-  periods: DayPeriod[];
+  days: SheetDay[];
   academicYear: number;
   recorderId: string;
 }) {
   const toast = useToast();
   const save = useSavePeriodAttendance();
   const [pickedId, setPickedId] = useState<string | null>(null);
-  const picked = periods.find((p) => p.entryId === pickedId);
+  const pickedDay = days.find((d) => d.periods.some((p) => p.entryId === pickedId));
+  const picked = pickedDay?.periods.find((p) => p.entryId === pickedId);
+  const date = pickedDay?.date ?? todayIso();
   const entryId = open ? (picked?.entryId ?? null) : null;
-  const { data: taken = new Set<string>() } = usePeriodAttendanceTakenSet(open ? periods.map((p) => p.entryId) : [], date);
 
   const { data: roster = [], isLoading: loadingRoster } = useClassroomRoster(picked && open ? picked.classroomId : null, academicYear);
   const { data: records, isLoading: loadingRecords } = usePeriodAttendance(entryId, date);
@@ -94,12 +139,6 @@ export function PeriodDaySheet({
     );
   }
 
-  // A period opens for marking once its start time arrives; later days stay closed.
-  const started = (p: DayPeriod) => {
-    if (date !== todayIso()) return date < todayIso();
-    const [h = 0, m = 0] = p.time.split("–")[0]!.split(":").map(Number);
-    return bangkokMinutes(new Date()) >= h * 60 + m;
-  };
   const future = date > todayIso(); // future days are view-only (DB trigger 0114 backs this up)
   const canSave = !future && !!picked && roster.length > 0 && seededFor.current === picked.entryId;
 
@@ -110,7 +149,7 @@ export function PeriodDaySheet({
         onOpenChange(o);
         if (!o) setPickedId(null);
       }}
-      title={new Intl.DateTimeFormat("th-TH", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`))}
+      title={picked ? thaiDate(date, { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "เช็คชื่อเข้าเรียน"}
       closable
       icon={
         picked && (
@@ -142,33 +181,14 @@ export function PeriodDaySheet({
       }
     >
       {!picked ? (
-        periods.length === 0 ? (
+        days.length === 0 ? (
           <EmptyState title="ไม่มีคาบสอน" />
         ) : (
-          <ul className="space-y-2">
-            {periods.map((p) => (
-              <li key={p.entryId}>
-                <button
-                  type="button"
-                  disabled={!started(p)}
-                  onClick={() => setPickedId(p.entryId)}
-                  className={cn("flex w-full items-center gap-3 rounded-2xl p-4 text-left disabled:opacity-50", p.gradient)}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-xs font-medium opacity-70">
-                      คาบ {p.ordinal} · {p.time}
-                      {taken.has(p.entryId) ? " · เช็คแล้ว" : !started(p) && " · ยังไม่ถึงเวลา"}
-                    </span>
-                    <span className="block truncate text-[15px] font-semibold">{p.subjectName}</span>
-                    <span className="block truncate text-sm opacity-80">
-                      {p.subjectCode} · {p.room}
-                    </span>
-                  </span>
-                  <ChevronForward className="h-4 w-4 shrink-0" />
-                </button>
-              </li>
+          <div className="space-y-5">
+            {days.map((d) => (
+              <DayList key={d.date} day={d} open={open} onPick={setPickedId} />
             ))}
-          </ul>
+          </div>
         )
       ) : (
         <div className="space-y-3">
