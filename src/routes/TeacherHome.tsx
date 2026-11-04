@@ -13,7 +13,7 @@ import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePeriodAttendanceTakenSet } from "@/hooks/usePeriodAttendance";
 import { useDepartmentPeriods } from "@/hooks/usePeriodDefinitions";
 import { useDepartments, useRoleSubtitle } from "@/hooks/useProfiles";
-import { avatarUrl } from "@/hooks/useAvatar";
+import { avatarUrl, studentAvatarUrl } from "@/hooks/useAvatar";
 import { useTeacherSchedule, type ScheduleEntryRow } from "@/hooks/useSchedule";
 import { useDepartmentSettings, useSchoolSettings } from "@/hooks/useSettings";
 import { bangkokMinutes, clockGate, useClockIn, useClockOut, useMyTimeClock } from "@/hooks/useTimeClock";
@@ -570,18 +570,25 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         ) : (
           <ul className="-my-1 divide-y divide-border">
             {pendingLeave.map((l) => (
-              <li key={l.id} className="py-3">
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="min-w-0 truncate text-[15px] font-semibold">
-                    {l.student ? `${l.student.first_name} ${l.student.last_name}` : "—"}
+              <li key={l.id} className="flex gap-3 py-3">
+                <Avatar
+                  name={l.student ? `${l.student.first_name} ${l.student.last_name}` : "—"}
+                  src={l.student ? (studentAvatarUrl(l.student) ?? (l.student.profile ? avatarUrl(l.student.profile) : null)) : null}
+                  className="h-11 w-11 shrink-0 text-sm"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="min-w-0 truncate text-[15px] font-semibold">
+                      {l.student ? `${l.student.first_name} ${l.student.last_name}` : "—"}
+                    </p>
+                    <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{l.student?.student_code}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {leaveDate(l.start_date)}
+                    {l.end_date !== l.start_date && ` – ${leaveDate(l.end_date)}`} · {l.days} วัน
                   </p>
-                  <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{l.student?.student_code}</span>
+                  {l.reason && <p className="mt-0.5 text-sm">{l.reason}</p>}
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {leaveDate(l.start_date)}
-                  {l.end_date !== l.start_date && ` – ${leaveDate(l.end_date)}`} · {l.days} วัน
-                </p>
-                {l.reason && <p className="mt-0.5 text-sm">{l.reason}</p>}
               </li>
             ))}
           </ul>

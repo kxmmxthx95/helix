@@ -25,7 +25,14 @@ export function useStudentLeaveRequests(studentId: string | null) {
 }
 
 export type PendingStudentLeaveRequest = StudentLeaveRequest & {
-  student: { student_code: string; first_name: string; last_name: string } | null;
+  student: {
+    student_code: string;
+    first_name: string;
+    last_name: string;
+    avatar_path: string | null;
+    updated_at: string;
+    profile: { avatar_path: string | null; updated_at: string } | null;
+  } | null;
 };
 
 /** RLS already limits this to the caller's approval scope (current homeroom, or can_manage() in department). */
@@ -35,7 +42,7 @@ export function usePendingStudentLeaveApprovals() {
     queryFn: async (): Promise<PendingStudentLeaveRequest[]> => {
       const { data, error } = await supabase
         .from("student_leave_requests")
-        .select("*, student:students(student_code, first_name, last_name)")
+        .select("*, student:students(student_code, first_name, last_name, avatar_path, updated_at, profile:profiles!profile_id(avatar_path, updated_at))")
         .eq("status", "pending")
         .order("start_date");
       if (error) throw error;
