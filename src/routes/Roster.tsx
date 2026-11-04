@@ -44,7 +44,7 @@ import { StatCard } from "@/routes/Classrooms";
 
 const EMPTY: StudentFilters = { search: "", departmentId: "", status: "studying", gradeLevelId: "", classroomId: "" };
 
-const STATUS_LABEL: Record<StudentStatus, string> = {
+export const STATUS_LABEL: Record<StudentStatus, string> = {
   studying: "กำลังศึกษา",
   transferred: "ย้ายออก",
   graduated: "จบการศึกษา",

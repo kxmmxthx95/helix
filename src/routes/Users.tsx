@@ -51,7 +51,8 @@ import {
   type UserInvite,
 } from "@/hooks/useProfiles";
 import { StudentQrCard } from "@/components/StudentQrCard";
-import { useStudentByProfile, useStudents } from "@/hooks/useStudents";
+import { useStudentClassroomName, useStudentByProfile, useStudents } from "@/hooks/useStudents";
+import { useStudentContacts } from "@/hooks/useStudentContacts";
 import type { PositionTitle, Student } from "@/lib/database.types";
 import { profileFullName } from "@/lib/database.types";
 import { blobToBase64, compressImage } from "@/lib/image";
@@ -59,7 +60,9 @@ import { passwordFromDob } from "@/lib/password";
 import { canManageUsers, isOrgWide, PREFIXES, ROLE_LABEL, ROLES, STUDENT_PREFIXES, roleLabels, type Role } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { StatCard } from "@/routes/Classrooms";
-import { pickAddress } from "@/routes/Roster";
+import { pickAddress, RELATIONSHIP_LABEL, STATUS_LABEL } from "@/routes/Roster";
+import { useAllGradeLevels } from "@/hooks/useCurriculumStructure";
+import { gradeShortLabel } from "@/lib/gradeLevels";
 import { FormSection } from "@/components/ui";
 
 const EMPTY: ProfileFilters = { search: "", departmentId: "", role: "", active: "" };
@@ -812,6 +815,7 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
   }, [avatar]);
   const isStudent = profile?.roles.includes("student") ?? false;
   const { data: linkedStudent } = useStudentByProfile(isStudent ? (profile?.id ?? null) : null);
+  const { data: allGradeLevels = [] } = useAllGradeLevels();
 
   // draft is cleared on close, so a freshly opened row always starts from its
   // own values rather than the previously edited row's.
@@ -999,6 +1003,13 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
                     />
                   </Field>
                 </FormSection>
+
+                {isStudent && linkedStudent && (
+                  <StudentInfoReadOnly
+                    student={linkedStudent}
+                    grade={allGradeLevels.find((g) => g.id === linkedStudent.grade_level_id)}
+                  />
+                )}
               </div>
 
               <div hidden={tab !== "account"} className="space-y-4">
@@ -1048,15 +1059,18 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
                 </FormSection>
 
                 <FormSection icon={<TrashIcon className="h-4 w-4" />}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full text-destructive"
-                    disabled={profile.id === me?.id || deleteUser.isPending}
-                    onClick={remove}
-                  >
-                    ลบผู้ใช้งาน
-                  </Button>
+                  {/* wrapper takes FormSection's row padding, else the button's border sits flush against the clipped rounded edge */}
+                  <div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full text-destructive"
+                      disabled={profile.id === me?.id || deleteUser.isPending}
+                      onClick={remove}
+                    >
+                      ลบผู้ใช้งาน
+                    </Button>
+                  </div>
                 </FormSection>
               </div>
             </form>
@@ -1067,6 +1081,55 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
         )}
       </SheetFormContext.Provider>
     </Modal>
+  );
+}
+
+/** Student-table data the profile form can't edit (class, health, address…). Read-only here; edited from the Roster page. */
+function StudentInfoReadOnly({ student: s, grade }: { student: Student; grade?: { code: string } }) {
+  const address = [
+    s.house_no && `เลขที่ ${s.house_no}`,
+    s.village_no && `หมู่ ${s.village_no}`,
+    s.alley && `ซอย ${s.alley}`,
+    s.road && `ถนน ${s.road}`,
+    s.subdistrict && `ต.${s.subdistrict}`,
+    s.district && `อ.${s.district}`,
+    s.province && `จ.${s.province}`,
+    s.postal_code,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const { data: classroom } = useStudentClassroomName(s.id);
+  const { data: contacts = [] } = useStudentContacts(s.id);
+  const guardians = contacts
+    .map(
+      (c) =>
+        `${c.relationship === "other" ? (c.relationship_note ?? RELATIONSHIP_LABEL.other) : RELATIONSHIP_LABEL[c.relationship]}: ${[c.prefix, c.first_name, c.last_name].filter(Boolean).join("")}${c.phone ? ` · ${c.phone}` : ""}`,
+    )
+    .join("\n");
+  const rows: [string, string | null][] = [
+    ["สถานะนักเรียน", STATUS_LABEL[s.status]],
+    ["ระดับชั้น", grade ? gradeShortLabel(grade.code) : null],
+    ["ห้อง", classroom ?? null],
+    ["ผู้ปกครอง", guardians || null],
+    ["ที่อยู่", address || null],
+    ["หมู่เลือด", s.blood_type && s.blood_type !== "unknown" ? s.blood_type : null],
+    ["โรคประจำตัว", s.chronic_disease],
+    ["ยาที่แพ้", s.drug_allergy],
+    ["อาหารที่แพ้", s.food_allergy],
+    ["สถานภาพครอบครัว", s.family_status],
+  ];
+  return (
+    <FormSection title="ข้อมูลนักเรียน (แก้ไขที่ทะเบียนนักเรียน)">
+      {rows.map(([label, value]) => (
+        <Field key={label} label={label}>
+          {label === "ผู้ปกครอง" && value ? (
+            <p className="whitespace-pre-line text-sm">{value}</p>
+          ) : (
+            <Input value={value ?? "—"} disabled readOnly />
+          )}
+        </Field>
+      ))}
+    </FormSection>
   );
 }
 

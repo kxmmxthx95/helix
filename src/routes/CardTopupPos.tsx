@@ -1,9 +1,9 @@
+import JsBarcode from "jsbarcode";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { AlertTriangle } from "@/components/icons";
 import { Modal } from "@/components/Modal";
-import { useQrImage } from "@/components/StudentQrCard";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
 import {
@@ -37,7 +37,7 @@ const readTerminal = () => {
 
 type Done = { kind: "sale" | "topup"; amount: number; balance: number };
 
-/** Not a `qr_` token, so a real POS lookup would reject it; it only exists to be scanned in ScannerTest. */
+/** Code128 text; not a `qr_` token and not a student code, so it only exists to be scanned in ScannerTest. */
 const TEST_CODE = "HELIX-SCANNER-TEST";
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"] as const;
 
@@ -406,10 +406,13 @@ function ScannerTest() {
   const [result, setResult] = useState<{ text: string; perKey: number } | null>(null);
   const [value, setValue] = useState("");
   const first = useRef(0);
-  const qr = useQrImage(TEST_CODE);
+  const bars = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    if (bars.current) JsBarcode(bars.current, TEST_CODE, { format: "CODE128", height: 70, fontSize: 14, margin: 8 });
+  }, []);
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">ยิง QR ด้านล่าง (หรือบาร์โค้ดอื่น) ขณะเคอร์เซอร์อยู่ในช่อง (ไม่มีการค้นหาหรือตัดเงิน)</p>
+      <p className="text-sm text-muted-foreground">ยิงบาร์โค้ดด้านล่าง ขณะเคอร์เซอร์อยู่ในช่อง (ไม่มีการค้นหาหรือตัดเงิน)</p>
       <Input
         autoFocus
         autoComplete="off"
@@ -426,12 +429,9 @@ function ScannerTest() {
           setValue("");
         }}
       />
-      {qr && (
-        <div className="flex flex-col items-center gap-1">
-          <img src={qr} alt={`QR ทดสอบ ${TEST_CODE}`} className="size-40 rounded-lg border border-border bg-white p-1" />
-          <p className="font-mono text-xs text-muted-foreground">{TEST_CODE}</p>
-        </div>
-      )}
+      <div className="flex justify-center">
+        <svg ref={bars} role="img" aria-label={`บาร์โค้ดทดสอบ ${TEST_CODE}`} className="max-w-full rounded-lg border border-border bg-white" />
+      </div>
       {result ? (
         <div role="status" className="space-y-1 rounded-lg border border-border p-3 text-sm">
           <p className="font-semibold text-success">อ่านได้ ({result.text.length} ตัวอักษร)</p>
@@ -441,7 +441,7 @@ function ScannerTest() {
               ? `ความเร็ว ${result.perKey.toFixed(0)} ms/ตัว — เหมือนเครื่องยิง`
               : `ความเร็ว ${result.perKey.toFixed(0)} ms/ตัว — ช้า เหมือนพิมพ์มือ`}
             {" · "}
-            {result.text.startsWith("qr_") ? "QR นักเรียน" : "รหัสนักเรียน/อื่นๆ"}
+            {result.text.startsWith("qr_") ? "บาร์โค้ดนักเรียน" : "รหัสนักเรียน/อื่นๆ"}
           </p>
         </div>
       ) : (

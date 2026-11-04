@@ -204,3 +204,22 @@ export function useImportStudents() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ["students"] }),
   });
 }
+
+/** Latest placement (any year) → classroom name, or null when never placed. */
+export function useStudentClassroomName(studentId: string | null) {
+  return useQuery({
+    queryKey: ["students", "classroom_name", studentId],
+    enabled: !!studentId,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase
+        .from("student_classroom_enrollments")
+        .select("classroom:classrooms(name)")
+        .eq("student_id", studentId!)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as unknown as { classroom: { name: string } | null } | null)?.classroom?.name ?? null;
+    },
+  });
+}
