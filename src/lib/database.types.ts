@@ -1811,6 +1811,14 @@ export type Database = {
         Args: { p_student_id: string };
         Returns: void;
       };
+      card_issue_qr_bulk: {
+        Args: { p_student_ids: string[] };
+        Returns: number;
+      };
+      card_live_status: {
+        Args: Record<string, never>;
+        Returns: { student_id: string; status: string }[];
+      };
       card_my_qr: {
         Args: { p_student_id: string };
         Returns: StudentQr | null;

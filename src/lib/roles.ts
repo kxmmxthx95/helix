@@ -65,6 +65,9 @@ export const canManage = (roles: Role[]) => roles.some((r) => MANAGERS.includes(
 export const canManageAcademic = (roles: Role[]) => roles.some((r) => ACADEMIC_MANAGERS.includes(r));
 
 /** May open the user-management screen and create/edit accounts — super_admin only (grill decision). */
+/** May create a student's payment barcode: org-wide, or ผู้บริหารแผนก for their own department (DB: _can_issue_qr, migration 0119). */
+export const canIssueBarcode = (roles: Role[]) => isOrgWide(roles) || roles.includes("dept_director");
+
 export const canManageUsers = (roles: Role[]) => roles.includes("super_admin");
 
 /** May manage salary/contract/status/document — director + super_admin only (grill decision, 2026-08-31). */

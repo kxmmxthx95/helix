@@ -227,6 +227,14 @@ export function useStudentQr(studentId: string | null) {
   });
 }
 
+export function useIssueQrBulk() {
+  const refresh = useRefreshMoney();
+  return useMutation({
+    mutationFn: (studentIds: string[]) => rpc<number>(() => supabase.rpc("card_issue_qr_bulk", { p_student_ids: studentIds })),
+    onSettled: refresh,
+  });
+}
+
 export function useIssueQr() {
   const refresh = useRefreshMoney();
   return useMutation({
@@ -362,5 +370,16 @@ export function useCardReport(from: string, to: string) {
     queryKey: ["card_transactions", "report", from, to],
     enabled: !!from && !!to && from <= to,
     queryFn: () => rpc<CardReport>(() => supabase.rpc("card_report", { p_from: from, p_to: to })),
+  });
+}
+
+/** student_id → status of the live barcode card, for the students the caller may issue barcodes to (RPC scopes it; migration 0119). */
+export function useLiveCardStatus() {
+  return useQuery({
+    queryKey: ["student_cards", "live_status"],
+    queryFn: async () => {
+      const rows = await rpc<{ student_id: string; status: string }[]>(() => supabase.rpc("card_live_status"));
+      return new Map(rows.map((c) => [c.student_id, c.status]));
+    },
   });
 }
