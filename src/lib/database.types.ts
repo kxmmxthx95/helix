@@ -37,6 +37,8 @@ export type Profile = {
   must_change_password: boolean;
   /** Object path in the avatars storage bucket — always the profile's own id, see migration 0024. */
   avatar_path: string | null;
+  /** Object path in the banners storage bucket — the profile's own id, see migration 0122. */
+  banner_path: string | null;
   created_at: string;
   updated_at: string;
 } & AddressFields; // self-editable ที่อยู่ — see migration 0061
@@ -1462,6 +1464,7 @@ export type Database = {
           | "learning_area_id"
           | "must_change_password"
           | "avatar_path"
+          | "banner_path"
           | "house_no"
           | "village_no"
           | "alley"
@@ -1487,6 +1490,7 @@ export type Database = {
               | "learning_area_id"
               | "must_change_password"
               | "avatar_path"
+              | "banner_path"
               | "house_no"
               | "village_no"
               | "alley"

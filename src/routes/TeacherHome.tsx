@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { profileFullName, type ProfileWithRoles } from "@/lib/database.types";
+import { profileFullName, type Profile, type ProfileWithRoles } from "@/lib/database.types";
 import { ChevronForward, LockIcon, PaletteIcon } from "@/components/icons";
+import { BannerUpload } from "@/components/BannerUpload";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { Avatar, Spinner } from "@/components/ui";
@@ -13,7 +14,7 @@ import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePeriodAttendanceTakenSet } from "@/hooks/usePeriodAttendance";
 import { useDepartmentPeriods } from "@/hooks/usePeriodDefinitions";
 import { useDepartments, useRoleSubtitle } from "@/hooks/useProfiles";
-import { avatarUrl, studentAvatarUrl } from "@/hooks/useAvatar";
+import { avatarUrl, bannerUrl, studentAvatarUrl } from "@/hooks/useAvatar";
 import { useTeacherSchedule, type ScheduleEntryRow } from "@/hooks/useSchedule";
 import { useDepartmentSettings, useSchoolSettings } from "@/hooks/useSettings";
 import { bangkokMinutes, clockGate, useClockIn, useClockOut, useMyTimeClock } from "@/hooks/useTimeClock";
@@ -46,8 +47,13 @@ export const bannerBackground = (c: string[]) => ({
   backgroundColor: c[0],
   backgroundImage: c.map((col, i) => `radial-gradient(38% 120% at ${BANNER_POS[i]}, ${col}, transparent 70%)`).join(", "),
 });
+/** Uploaded cover wins over the gradient. */
+export const bannerStyle = (profile: Pick<Profile, "banner_path" | "updated_at">, colors: string[]): React.CSSProperties => {
+  const url = bannerUrl(profile);
+  return url ? { backgroundImage: `url("${url}")`, backgroundSize: "cover", backgroundPosition: "center" } : bannerBackground(colors);
+};
 // ponytail: stored per device in localStorage — move to a profiles column if it should follow the teacher across devices
-function useBannerColors(profileId: string) {
+export function useBannerColors(profileId: string) {
   const key = `helix:home-banner:${profileId}`;
   const [colors, setColors] = useState<string[]>(() => {
     try {
@@ -392,7 +398,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     <div>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section className={cn(WIDGET, "relative overflow-hidden lg:col-span-2")}>
-          <div className="relative h-24 sm:h-36" style={bannerBackground(bannerColors)}>
+          <div className="relative h-24 sm:h-36" style={bannerStyle(me, bannerColors)}>
             <button
               type="button"
               aria-label="เปลี่ยนสีพื้นหลังการ์ด"
@@ -423,6 +429,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                       />
                     ))}
                   </div>
+                  <BannerUpload profile={me} />
                   <div>
                     <p className="mb-1.5 text-xs text-muted-foreground">ปรับสีเอง</p>
                     <div className="flex gap-2">

@@ -50,3 +50,44 @@ export function studentAvatarUrl(student: Pick<Student, "avatar_path" | "updated
   const { data } = supabase.storage.from("avatars").getPublicUrl(student.avatar_path);
   return `${data.publicUrl}?v=${encodeURIComponent(student.updated_at)}`;
 }
+
+export const BANNER_MAX_BYTES = 5 * 1024 * 1024; // mirrors the banners bucket's file_size_limit (migration 0122)
+const BANNER_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+/** Home-card cover: validate, shrink to 1600px JPEG, overwrite banners/<profileId>, point profiles.banner_path at it. */
+export function useUploadBanner() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ file, profileId }: { file: File; profileId: string }) => {
+      if (!BANNER_TYPES.includes(file.type)) throw new Error("รองรับเฉพาะไฟล์ JPG, PNG, WebP");
+      if (file.size > BANNER_MAX_BYTES) throw new Error("ไฟล์ใหญ่เกิน 5 MB");
+      const blob = await compressImage(file, 1600, 0.82);
+      const { error: upErr } = await supabase.storage
+        .from("banners")
+        .upload(profileId, blob, { upsert: true, contentType: "image/jpeg" });
+      if (upErr) throw upErr;
+      const { error } = await supabase.from("profiles").update({ banner_path: profileId }).eq("id", profileId);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["profiles"] }),
+  });
+}
+
+/** Clears the pointer; the storage object stays (the next upload overwrites it). */
+export function useRemoveBanner() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (profileId: string) => {
+      const { error } = await supabase.from("profiles").update({ banner_path: null }).eq("id", profileId);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["profiles"] }),
+  });
+}
+
+/** Cache-busted with updated_at, like avatarUrl. */
+export function bannerUrl(profile: Pick<Profile, "banner_path" | "updated_at">): string | null {
+  if (!profile.banner_path) return null;
+  const { data } = supabase.storage.from("banners").getPublicUrl(profile.banner_path);
+  return `${data.publicUrl}?v=${encodeURIComponent(profile.updated_at)}`;
+}
