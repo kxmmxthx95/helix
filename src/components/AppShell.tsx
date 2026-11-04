@@ -538,7 +538,9 @@ function AppShellInner() {
       ? "ตั้งค่าระบบ"
       : location.pathname === "/profile"
         ? "โปรไฟล์"
-        : "ระบบจัดการสถานศึกษา");
+        : location.pathname.startsWith("/card-topup/")
+          ? "เติมเงิน"
+          : "ระบบจัดการสถานศึกษา");
 
   const themeLabel =
     preference === "system" ? "ตามระบบ" : preference === "dark" ? "โหมดมืด" : "โหมดสว่าง";

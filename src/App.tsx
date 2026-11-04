@@ -39,6 +39,7 @@ import { TimeTracking } from "@/routes/TimeTracking";
 import { canUsePos, isCashierOnly } from "@/lib/roles";
 import { PosLogin, POS_DENIED_KEY } from "@/routes/PosLogin";
 import { CardTopup } from "@/routes/CardTopup";
+import { CardTopupForm } from "@/routes/CardTopupForm";
 import { Tuition } from "@/routes/Tuition";
 import { Leave } from "@/routes/Leave";
 import { LineNotifications } from "@/routes/LineNotifications";
@@ -120,6 +121,7 @@ function Gate() {
         <Route path="leave" element={<Leave />} />
         <Route path="tuition" element={<Tuition />} />
         <Route path="card-topup" element={<CardTopup />} />
+        <Route path="card-topup/:studentId" element={<CardTopupForm />} />
         <Route path="duty-roster" element={<DutyRoster />} />
         <Route path="employees" element={<Employees />} />
         <Route path="staff-attendance" element={<StaffAttendance />} />

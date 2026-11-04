@@ -44,7 +44,7 @@ export function Modal({
       }}
       onClick={(e) => e.target === ref.current && onOpenChange(false)}
       className={cn(
-        "drawer-float m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-2xl p-0 text-foreground backdrop:bg-black/35 backdrop:backdrop-blur-[2px] dark:backdrop:bg-black/60 open:flex open:flex-col",
+        "drawer-float fixed inset-0 m-auto h-fit max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-2xl p-0 text-foreground backdrop:bg-black/35 backdrop:backdrop-blur-[2px] dark:backdrop:bg-black/60 open:flex open:flex-col",
         className,
       )}
     >

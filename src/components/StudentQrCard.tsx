@@ -7,7 +7,7 @@ import { useIssueQr, useSetFrozen, useStudentQr } from "@/hooks/useCardTopup";
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "บันทึกไม่สำเร็จ");
 
-function useBarcodeImage(token: string | null) {
+export function useBarcodeImage(token: string | null) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     if (!token) return setSrc(null);

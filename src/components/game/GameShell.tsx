@@ -92,7 +92,8 @@ function GameShellInner() {
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === "/";
-  const title = TITLES[location.pathname] ?? "";
+  const isTopupForm = location.pathname.startsWith("/card-topup/");
+  const title = isTopupForm ? "เติมเงิน" : (TITLES[location.pathname] ?? "");
   // iOS large title: collapses into the nav bar once the page scrolls under it.
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -165,12 +166,11 @@ function GameShellInner() {
             {!isHome && (
               <button
                 type="button"
-                aria-label="กลับหน้าแรก"
-                onClick={() => navigate("/")}
-                className={cn("absolute left-1 flex h-11 items-center gap-0.5 rounded-lg pl-1 pr-3 text-[17px] text-accent active:opacity-40 lg:hidden", FOCUS)}
+                aria-label={isTopupForm ? "กลับบัตรเติมเงิน" : "กลับหน้าแรก"}
+                onClick={() => navigate(isTopupForm ? "/card-topup" : "/")}
+                className={cn("absolute left-2 flex h-10 w-10 items-center justify-center rounded-lg text-foreground active:opacity-40 lg:hidden", FOCUS)}
               >
                 <ChevronBack className="h-6 w-6" />
-                หน้าแรก
               </button>
             )}
             <p
@@ -222,7 +222,7 @@ function GameShellInner() {
             <Outlet />
           ) : (
             <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-4 pb-4 lg:p-6">
-              <h1 className="font-heading shrink-0 pb-3 text-[34px] font-bold leading-[41px] tracking-tight lg:hidden">{title}</h1>
+              <h1 className={cn("font-heading shrink-0 pb-3 text-[34px] font-bold leading-[41px] tracking-tight lg:hidden", location.pathname.startsWith("/card-topup") && "sr-only")}>{title}</h1>
               <Outlet />
             </div>
           )}

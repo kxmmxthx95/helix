@@ -245,7 +245,7 @@ export function useIssueQr() {
 
 // ------------------------------------------- parent / student portal (0108)
 
-export type PortalStudent = Pick<Student, "id" | "student_code" | "prefix" | "first_name" | "last_name" | "avatar_path" | "updated_at">;
+export type PortalStudent = Pick<Student, "id" | "student_code" | "prefix" | "first_name" | "last_name" | "avatar_path" | "updated_at" | "department_id" | "grade_level_id" | "profile_id">;
 
 /** RLS scopes this to the signed-in parent's children, or the student themself. */
 // RLS also lets anyone in a department read its whole roster, so filter to self + own children explicitly.
@@ -260,7 +260,7 @@ export function useMyCardStudents() {
       const ids = gs.map((g) => g.student_id);
       const { data, error } = await supabase
         .from("students")
-        .select("id, student_code, prefix, first_name, last_name, avatar_path, updated_at")
+        .select("id, student_code, prefix, first_name, last_name, avatar_path, updated_at, department_id, grade_level_id, profile_id")
         .or(`profile_id.eq.${uid},id.in.(${ids.join(",")})`)
         .order("student_code");
       if (error) throw error;
