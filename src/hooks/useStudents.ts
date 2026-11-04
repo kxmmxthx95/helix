@@ -131,8 +131,18 @@ export function useSaveStudent() {
       if (error) throw error;
       if (!avatar) return data.id;
       if (avatar === "remove") {
-        const { error: rmErr } = await supabase.from("students").update({ avatar_path: null }).eq("id", data.id);
+        const { data: removed, error: rmErr } = await supabase
+          .from("students")
+          .update({ avatar_path: null })
+          .eq("id", data.id)
+          .select("profile_id")
+          .single();
         if (rmErr) throw rmErr;
+        // The roster falls back to the linked login's photo, so "remove" must clear that one too.
+        if (removed.profile_id) {
+          const { error: pErr } = await supabase.from("profiles").update({ avatar_path: null }).eq("id", removed.profile_id);
+          if (pErr) throw pErr;
+        }
         return data.id;
       }
       const path = `students/${data.id}`;
@@ -144,7 +154,10 @@ export function useSaveStudent() {
       if (pathErr) throw pathErr;
       return data.id;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["students"] }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["students"] });
+      void qc.invalidateQueries({ queryKey: ["profiles"] });
+    },
   });
 }
 

@@ -30,6 +30,7 @@ import {
   useStudents,
   type StudentDraft,
   type StudentFilters,
+  type StudentListItem,
 } from "@/hooks/useStudents";
 import type {
   AddressFields,
@@ -93,6 +94,9 @@ function studentGender(prefix: string | null): "ชาย" | "หญิง" | nu
   if (prefix === "เด็กหญิง" || prefix === "นางสาว") return "หญิง";
   return null;
 }
+
+// Same fallback the roster list uses: the linked login's photo when the student has none of their own.
+const profileAvatarOf = (s: Partial<StudentListItem>) => (s.profile ? avatarUrl(s.profile) : null);
 
 export const RELATIONSHIP_LABEL: Record<GuardianRelationship, string> = {
   father: "บิดา",
@@ -935,7 +939,7 @@ export function EditStudentSheet({
             {!readOnly && (
               <AvatarCard
                 name={`${current.first_name} ${current.last_name}`.trim()}
-                src={avatar === "remove" ? null : (avatarPreview ?? (isNew ? null : studentAvatarUrl(target as Student)))}
+                src={avatar === "remove" ? null : (avatarPreview ?? (isNew ? null : studentAvatarUrl(target as Student) ?? profileAvatarOf(target as Partial<StudentListItem>)))}
                 onPick={setAvatar}
                 onRemove={() => setAvatar("remove")}
               />
@@ -1269,13 +1273,13 @@ const NO_ADDRESS: AddressFields = {
 /** Who counts as the student's guardian: its own slot, or the father / mother (same data, flagged primary). */
 type GuardianSource = GuardianSlot;
 
-const guardianFilled = (g: GuardianDraft) => Object.values(g).some((v) => v.trim());
+// A lone prefix doesn't count: picking "นาย" without a name shouldn't force the rest of the form.
+const guardianFilled = (g: GuardianDraft) => Object.entries(g).some(([k, v]) => k !== "prefix" && v.trim());
 
-/** Why a half-filled guardian can't be saved, or null. A person needs both names; "other" also needs the relationship. */
+/** Why a half-filled guardian can't be saved, or null. Guardians are optional, but a started one needs both names; "other" also needs the relationship. */
 function guardianProblem(drafts: GuardianDrafts, source: GuardianSource): string | null {
   for (const { slot, title } of GUARDIAN_SLOTS) {
     const g = drafts[slot];
-    if (slot === source && source !== "other" && !guardianFilled(g)) return `${title}: กรอกข้อมูลก่อน เพราะใช้เป็นข้อมูลผู้ปกครอง`;
     if (slot === "other" && source !== "other") continue; // ignored while the guardian is a parent
     if (!guardianFilled(g)) continue;
     if (!g.first_name.trim() || !g.last_name.trim()) return `${title}: กรอกชื่อและนามสกุลให้ครบ`;

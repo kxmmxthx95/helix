@@ -32,6 +32,7 @@ export function Sheet({
   headerClassName,
   footerClassName,
   icon,
+  iconClassName,
   closable = false,
   children,
   footer,
@@ -52,6 +53,8 @@ export function Sheet({
   headerEnd?: React.ReactNode;
   /** Optional tinted tile before the title (e.g. a document icon). */
   icon?: React.ReactNode;
+  /** Overrides the icon tile's look (e.g. a bare back button: "bg-transparent text-foreground"). */
+  iconClassName?: string;
   /** Shows an X button at the end of the header row. */
   closable?: boolean;
   children: React.ReactNode;
@@ -90,7 +93,7 @@ export function Sheet({
           {ios && <div aria-hidden className="mx-auto mt-1.5 h-[5px] w-9 shrink-0 rounded-full bg-muted-foreground/40" />}
           <div className={cn("shrink-0 px-4", ios ? "pb-2 pt-2" : "border-b border-border py-3", headerClassName)}>
             <div className="flex min-w-0 items-center gap-3">
-              {icon && <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">{icon}</div>}
+              {icon && <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent", iconClassName)}>{icon}</div>}
               <Drawer.Title className="font-heading min-w-0 flex-1 truncate text-[17px] font-semibold leading-6 tracking-[-0.01em]">{title}</Drawer.Title>
               {resizable && (
                 <Button
