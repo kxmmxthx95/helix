@@ -701,11 +701,12 @@ export function Roster() {
       )}
 
       {hasSearch && rows && (
-        <div className="sticky bottom-0 z-10 mt-auto grid shrink-0 grid-cols-2 gap-2 bg-background pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 lg:grid-cols-4">
+        <div className={`sticky bottom-0 z-10 mt-auto grid shrink-0 grid-cols-2 gap-2 bg-background pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 ${mayIssueBarcode ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
           <StatCard tone="accent" icon={<UsersIcon className="h-5 w-5" />} label="ทั้งหมด" value={rows.length} unit="คน" />
           <StatCard tone="success" icon={<CheckmarkCircleIcon className="h-5 w-5" />} label="กำลังศึกษา" value={rows.filter((r) => r.status === "studying").length} unit="คน" />
           <StatCard tone="muted" icon={<ProfileIcon className="h-5 w-5" />} label="มีบัญชีแล้ว" value={rows.filter((r) => r.profile_id).length} unit="คน" />
           <StatCard tone="warning" icon={<KeyIcon className="h-5 w-5" />} label="ยังไม่มีบัญชี" value={rows.filter((r) => !r.profile_id).length} unit="คน" />
+          {mayIssueBarcode && <StatCard tone="accent" icon={<BarcodeIcon className="h-5 w-5" />} label="มีบาร์โค้ดแล้ว" value={rows.length - missingBarcode.length} unit="คน" />}
         </div>
       )}
 
