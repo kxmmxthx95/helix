@@ -150,11 +150,23 @@ export function useSaveStudent() {
         .from("avatars")
         .upload(path, await compressImage(avatar), { upsert: true, contentType: "image/jpeg" });
       if (upErr) throw upErr;
-      const { error: pathErr } = await supabase.from("students").update({ avatar_path: path }).eq("id", data.id);
+      const { data: saved, error: pathErr } = await supabase
+        .from("students")
+        .update({ avatar_path: path })
+        .eq("id", data.id)
+        .select("profile_id")
+        .single();
       if (pathErr) throw pathErr;
+      // Every other page shows the linked login's photo (profiles.avatar_path), so point it at the same file.
+      if (saved.profile_id) {
+        const { error: pErr } = await supabase.from("profiles").update({ avatar_path: path }).eq("id", saved.profile_id);
+        if (pErr) throw pErr;
+      }
       return data.id;
     },
-    onSettled: () => {
+    onSettled: (_id, _err, vars) => {
+      // A photo change shows up on rosters embedded in many other queries (attendance, scores, classrooms…), so refresh them all.
+      if (vars?.avatar) return void qc.invalidateQueries();
       void qc.invalidateQueries({ queryKey: ["students"] });
       void qc.invalidateQueries({ queryKey: ["profiles"] });
     },
