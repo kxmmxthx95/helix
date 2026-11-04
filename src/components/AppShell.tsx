@@ -460,6 +460,7 @@ function AppShellInner() {
   // Student and teacher homepages carry no title text or header divider (see Dashboard.tsx).
   const isStudentHome = !!profile && (profile.roles.includes("student") || profile.roles.includes("teacher")) && location.pathname === "/";
 
+  const canPickAvatar = !!profile && !profile.roles.includes("student");
   const pickAvatar = () => avatarFileRef.current?.click();
   const onAvatarChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -597,7 +598,7 @@ function AppShellInner() {
   );
 
   const avatarButton = (avatarClassName?: string) => (
-    <button type="button" onClick={pickAvatar} title="เปลี่ยนรูปโปรไฟล์" className="rounded-full">
+    <button type="button" onClick={pickAvatar} disabled={!canPickAvatar} title={canPickAvatar ? "เปลี่ยนรูปโปรไฟล์" : undefined} className="rounded-full">
       <Avatar name={displayName} src={avatarSrc} className={avatarClassName} />
     </button>
   );

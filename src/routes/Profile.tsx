@@ -93,6 +93,7 @@ export function Profile() {
         <div className="-mt-14 flex flex-col items-center px-4 pb-4 text-center">
           <div className="relative">
             <Avatar name={profileFullName(profile)} src={src} className="h-28 w-28 border-4 border-card text-3xl" />
+            {!isStudent && (
             <button
               type="button"
               aria-label="เปลี่ยนรูปโปรไฟล์"
@@ -102,6 +103,7 @@ export function Profile() {
             >
               {uploadAvatar.isPending ? <Spinner className="h-4 w-4" /> : <CameraIcon className="h-4 w-4" />}
             </button>
+            )}
           </div>
           <p className="mt-3 text-lg font-bold">{profileFullName(profile)}</p>
           <p className="text-xs text-muted-foreground">{roleLabels(profile.roles)}</p>
