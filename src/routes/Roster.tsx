@@ -13,6 +13,7 @@ import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructur
 import { useClassrooms } from "@/hooks/useStatusManagement";
 import { useDepartments, useInviteUsers, type InviteOutcome, type UserInvite } from "@/hooks/useProfiles";
 import { addressOptions, useZipRows } from "@/lib/thaiAddress";
+import { isValidNationalId, NATIONAL_ID_HINT, normalizeNationalId } from "@/lib/nationalId";
 import { passwordFromNationalId } from "@/lib/password";
 import { cn } from "@/lib/utils";
 import {
@@ -75,7 +76,7 @@ const phoneOk = (v: string) => /^\d{9,10}$/.test(v.replace(/[\s-]/g, ""));
 export function studentErrors(d: StudentDraft): Partial<Record<keyof StudentDraft, string>> {
   const e: Partial<Record<keyof StudentDraft, string>> = {};
   if (!d.student_code.trim()) e.student_code = "กรอกรหัสนักเรียน";
-  if (d.national_id && !/^\d{13}$/.test(d.national_id)) e.national_id = "ต้องเป็นตัวเลข 13 หลัก";
+  if (d.national_id && !isValidNationalId(normalizeNationalId(d.national_id))) e.national_id = NATIONAL_ID_HINT;
   if (d.date_of_birth && !ageFromBirthDate(d.date_of_birth)) e.date_of_birth = "วันเกิดไม่ถูกต้อง";
   if (!d.prefix) e.prefix = "เลือกคำนำหน้า";
   if (!d.first_name.trim()) e.first_name = "กรอกชื่อ";
@@ -266,7 +267,7 @@ export function AddressInputs({
 /**
  * Splits a roster page's rows into who a bulk login-creation pass can act
  * on. Excludes anyone with an account already (not this action's business)
- * and anyone without a well-formed 13-digit national ID — student login
+ * and anyone without a well-formed national ID (13 digits, or a foreign number) — student login
  * passwords are derived from it (passwordFromNationalId), so there's no
  * password to issue without one. Pure and exported so this — the only real
  * decision in the bulk-create flow — has a test without a rendered sheet.
@@ -276,7 +277,7 @@ export function splitLoginEligibility(students: Student[]): { ready: Student[]; 
   const skipped: Student[] = [];
   for (const s of students) {
     if (s.profile_id) continue;
-    if (s.national_id && /^\d{13}$/.test(s.national_id)) ready.push(s);
+    if (s.national_id && isValidNationalId(normalizeNationalId(s.national_id))) ready.push(s);
     else skipped.push(s);
   }
   return { ready, skipped };
@@ -1031,13 +1032,10 @@ export function EditStudentSheet({
 
                 <Field label="เลขบัตรประจำตัวประชาชน" error={err("national_id")}>
                   <Input
-                    inputMode="numeric"
                     autoComplete="off"
                     value={current.national_id ?? ""}
-                    onChange={(e) =>
-                      setDraft({ ...current, national_id: e.target.value.replace(/\D/g, "").slice(0, 13) || null })
-                    }
-                    maxLength={13}
+                    onChange={(e) => setDraft({ ...current, national_id: normalizeNationalId(e.target.value).slice(0, 20) || null })}
+                    maxLength={20}
                   />
                 </Field>
 
@@ -1550,9 +1548,9 @@ function CreateStudentLoginSheet({
     e.preventDefault();
     if (!student || !current) return;
     setFailReason(null);
-    const nationalId = current.national_id.replace(/\D/g, "");
-    if (nationalId.length !== 13) {
-      setFailReason("เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก");
+    const nationalId = normalizeNationalId(current.national_id);
+    if (!isValidNationalId(nationalId)) {
+      setFailReason(NATIONAL_ID_HINT);
       return;
     }
 
@@ -1610,16 +1608,13 @@ function CreateStudentLoginSheet({
             จะเป็นรหัสผู้ใช้เข้าระบบ
           </p>
 
-          <Field label="เลขบัตรประชาชน (ใช้เป็นรหัสผ่านเริ่มต้น)">
+          <Field label="เลขบัตรประชาชน / เลขต่างชาติ (ใช้เป็นรหัสผ่านเริ่มต้น)">
             <Input
-              inputMode="numeric"
               autoComplete="off"
               value={current.national_id}
-              onChange={(e) => setDraft({ ...current, national_id: e.target.value.replace(/\D/g, "").slice(0, 13) })}
-              pattern="[0-9]{13}"
-              minLength={13}
-              maxLength={13}
-              title="เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก"
+              onChange={(e) => setDraft({ ...current, national_id: normalizeNationalId(e.target.value).slice(0, 20) })}
+              maxLength={20}
+              title={NATIONAL_ID_HINT}
               required
             />
           </Field>
@@ -1744,7 +1739,7 @@ function BulkCreateLoginsSheet({
               <Card className="space-y-1 border-warning/40">
                 <p className="flex items-center gap-2 text-sm font-medium text-warning">
                   <AlertTriangle className="h-3 w-3" />
-                  ข้าม {skipped.length} คน (ไม่มีเลขบัตรประชาชน 13 หลัก)
+                  ข้าม {skipped.length} คน (ไม่มีเลขบัตรประชาชน/เลขต่างชาติที่ถูกต้อง)
                 </p>
                 <ul className="space-y-0.5 text-xs text-muted-foreground">
                   {skipped.slice(0, 5).map((s) => (

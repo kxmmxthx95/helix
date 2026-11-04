@@ -8,6 +8,10 @@ describe("passwordFromDob", () => {
 });
 
 describe("passwordFromNationalId", () => {
+  it("keeps a foreign G-number, upper-cased", () => {
+    expect(passwordFromNationalId("g695600001686")).toBe("G695600001686");
+  });
+
   it("strips non-digit characters", () => {
     expect(passwordFromNationalId("1-2345-67890-12-3")).toBe("1234567890123");
   });

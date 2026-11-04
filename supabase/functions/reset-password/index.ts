@@ -32,7 +32,9 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: "invalid json body" }, 400);
   }
-  const { loginId, nationalId, dateOfBirth, newPassword } = body;
+  const { loginId, dateOfBirth, newPassword } = body;
+  // Same normalization as src/lib/nationalId.ts (stored form: no spaces/hyphens, upper-case).
+  const nationalId = body.nationalId?.replace(/[\s-]/g, "").toUpperCase();
   if (!loginId || !nationalId || !dateOfBirth || !newPassword) {
     return json({ error: "missing fields" }, 400);
   }

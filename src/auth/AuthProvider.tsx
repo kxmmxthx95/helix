@@ -1,3 +1,4 @@
+import { normalizeNationalId } from "@/lib/nationalId";
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ProfileWithRoles, Student } from "@/lib/database.types";
@@ -246,7 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       resetPassword: async (loginId, nationalId, dateOfBirth, newPassword) => {
         const { error } = await supabase.functions.invoke("reset-password", {
-          body: { loginId: loginId.trim(), nationalId: nationalId.trim(), dateOfBirth, newPassword },
+          body: { loginId: loginId.trim(), nationalId: normalizeNationalId(nationalId), dateOfBirth, newPassword },
         });
         if (error) {
           const body = await (error as { context?: Response }).context?.json?.().catch(() => null);

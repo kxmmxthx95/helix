@@ -45,6 +45,11 @@ describe("splitLoginEligibility", () => {
     expect(splitLoginEligibility([s])).toEqual({ ready: [s], skipped: [] });
   });
 
+  it("puts a foreign student's G-number into ready", () => {
+    const s = student({ id: "s5", national_id: "G695600001686" });
+    expect(splitLoginEligibility([s])).toEqual({ ready: [s], skipped: [] });
+  });
+
   it("skips a student with no national ID", () => {
     const s = student({ id: "s2", national_id: null });
     expect(splitLoginEligibility([s])).toEqual({ ready: [], skipped: [s] });

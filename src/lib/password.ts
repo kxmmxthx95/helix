@@ -1,3 +1,5 @@
+import { normalizeNationalId } from "@/lib/nationalId";
+
 /** DDMMYYYY (พ.ศ.) from an <input type=date> value (stored ค.ศ.) — grill decision, initial password = วันเกิด. */
 export function passwordFromDob(dateOfBirth: string): string {
   const [y, m, d] = dateOfBirth.split("-");
@@ -5,7 +7,7 @@ export function passwordFromDob(dateOfBirth: string): string {
   return `${d}${m}${be}`;
 }
 
-/** Digits-only national ID as an initial password — grill decision (2026-08-11), students only. */
+/** Normalized national ID (Thai 13 digits, or a foreign G-number/passport) as an initial password — grill decision (2026-08-11), students only. */
 export function passwordFromNationalId(nationalId: string): string {
-  return nationalId.replace(/\D/g, "");
+  return normalizeNationalId(nationalId);
 }

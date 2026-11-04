@@ -1,3 +1,4 @@
+import { normalizeNationalId } from "@/lib/nationalId";
 import { AlertTriangle, FileUp } from "@/components/icons";
 import { useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
@@ -64,7 +65,7 @@ export function resolveStudentRow(
       department_id: departmentId,
       grade_level_id: gradeLevelId,
       status: "studying",
-      national_id: row.national_id || null,
+      national_id: row.national_id ? normalizeNationalId(row.national_id) : null,
       phone: null,
       email: null,
       house_no: null,

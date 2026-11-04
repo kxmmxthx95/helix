@@ -1,3 +1,4 @@
+import { normalizeNationalId } from "@/lib/nationalId";
 import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { X } from "@/components/icons";
@@ -200,11 +201,10 @@ function IdentityStep({ student, onDone }: { student: Student; onDone: () => Pro
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <Field label="เลขบัตรประชาชน">
+      <Field label="เลขบัตรประชาชน / เลขต่างชาติ">
         <Input
           value={draft.national_id}
-          onChange={(e) => setDraft({ ...draft, national_id: e.target.value })}
-          inputMode="numeric"
+          onChange={(e) => setDraft({ ...draft, national_id: normalizeNationalId(e.target.value).slice(0, 20) })}
           required
         />
       </Field>
