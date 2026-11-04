@@ -484,6 +484,7 @@ export function AvatarCard({
   onRemove: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [zoom, setZoom] = useState(false);
   return (
     <section className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 p-3">
       <div className="relative shrink-0">
@@ -498,15 +499,31 @@ export function AvatarCard({
           {busy ? <Spinner className="h-3.5 w-3.5" /> : <CameraIcon className="h-3.5 w-3.5" />}
         </button>
       </div>
+      {zoom && src && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setZoom(false)}
+          onKeyDown={(e) => e.key === "Escape" && setZoom(false)}
+          role="dialog"
+          aria-label="รูปโปรไฟล์"
+        >
+          <img src={src} alt={name} className="max-h-full max-w-full rounded-xl object-contain" />
+        </div>
+      )}
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold">รูปโปรไฟล์</p>
         <p className="text-xs text-muted-foreground">รองรับไฟล์ JPG, PNG ขนาดไม่เกิน 2MB</p>
       </div>
       {src && (
-        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onRemove}>
-          <TrashIcon className="h-3.5 w-3.5" />
-          ลบรูป
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={() => setZoom(true)} aria-label="ดูรูปขยาย">
+            <EyeIcon className="h-3.5 w-3.5" />
+          </Button>
+          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => confirm("ลบรูปโปรไฟล์นี้?") && onRemove()}>
+            <TrashIcon className="h-3.5 w-3.5" />
+            ลบรูป
+          </Button>
+        </div>
       )}
       <input
         ref={fileRef}
