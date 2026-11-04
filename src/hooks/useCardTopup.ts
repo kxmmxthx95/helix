@@ -11,8 +11,7 @@ import type {
   PosTerminal,
   PosTopupResult,
   Student,
-  StudentCard,
-  StudentCardStatus,
+  StudentQr,
 } from "@/lib/database.types";
 import { compressImage } from "@/lib/image";
 import { supabase } from "@/lib/supabase";
@@ -196,23 +195,7 @@ export function useStudentSearch(term: string) {
 
 // ----------------------------------------------- cards & balances (org-wide)
 
-export type CardRow = StudentCard & { student: Pick<Student, "student_code" | "prefix" | "first_name" | "last_name"> | null };
-
 /** Live (non-replaced) cards, keyed by student. */
-export function useLiveCards() {
-  return useQuery({
-    queryKey: ["student_cards"],
-    queryFn: async (): Promise<CardRow[]> => {
-      const { data, error } = await supabase
-        .from("student_cards")
-        .select("*, student:students(student_code, prefix, first_name, last_name)")
-        .neq("status", "replaced");
-      if (error) throw error;
-      return data as unknown as CardRow[];
-    },
-  });
-}
-
 export function useCardTransactions(studentId: string | null) {
   return useQuery({
     queryKey: ["card_transactions", studentId],
@@ -231,41 +214,19 @@ export function useCardTransactions(studentId: string | null) {
 }
 
 /** Org-wide: one student's balance / limit / card state (the ledger list above is capped, so never sum it). */
-export function useStudentLookup(studentId: string | null) {
+/** Live QR token of one student; owner, guardian and org-wide only (RPC enforces it). */
+export function useStudentQr(studentId: string | null) {
   return useQuery({
-    queryKey: ["card_transactions", "lookup", studentId],
+    queryKey: ["student_cards", "qr", studentId],
     enabled: !!studentId,
-    queryFn: () => posLookup({ student_id: studentId! }),
+    queryFn: () => rpc<StudentQr | null>(() => supabase.rpc("card_my_qr", { p_student_id: studentId! })),
   });
 }
 
-export function useBindCard() {
+export function useIssueQr() {
   const refresh = useRefreshMoney();
   return useMutation({
-    mutationFn: (a: { student_id: string; card_uid: string }) =>
-      rpc<void>(() => supabase.rpc("card_bind", { p_student_id: a.student_id, p_card_uid: a.card_uid })),
-    onSettled: refresh,
-  });
-}
-
-export function useSetCardStatus() {
-  const refresh = useRefreshMoney();
-  return useMutation({
-    mutationFn: async (a: { id: string; status: Exclude<StudentCardStatus, "replaced"> }) => {
-      const { error } = await supabase.from("student_cards").update({ status: a.status }).eq("id", a.id);
-      if (error) throw error;
-    },
-    onSettled: refresh,
-  });
-}
-
-export function useRefundWithdraw() {
-  const refresh = useRefreshMoney();
-  return useMutation({
-    mutationFn: (a: { student_id: string; amount: number; note: string | null }) =>
-      rpc<{ balance: number }>(() =>
-        supabase.rpc("card_refund_withdraw", { p_student_id: a.student_id, p_amount: a.amount, p_note: a.note }),
-      ),
+    mutationFn: (studentId: string) => rpc<void>(() => supabase.rpc("card_issue_qr", { p_student_id: studentId })),
     onSettled: refresh,
   });
 }

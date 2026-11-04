@@ -1,0 +1,110 @@
+import QRCode from "qrcode";
+import { useEffect, useState } from "react";
+import { Modal } from "@/components/Modal";
+import { useToast } from "@/components/Toast";
+import { Button, Spinner } from "@/components/ui";
+import { useIssueQr, useSetFrozen, useStudentQr } from "@/hooks/useCardTopup";
+
+const errMsg = (e: unknown) => (e instanceof Error ? e.message : "บันทึกไม่สำเร็จ");
+
+function useQrImage(token: string | null) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!token) return setSrc(null);
+    let live = true;
+    void QRCode.toDataURL(token, { margin: 2, width: 640, errorCorrectionLevel: "M" }).then((u) => live && setSrc(u));
+    return () => {
+      live = false;
+    };
+  }, [token]);
+  return src;
+}
+
+/**
+ * QR ชำระเงิน — the student's POS credential (migration 0117). `admin` adds issue / reissue / freeze / print;
+ * without it (parent, student) the QR is view-only, with a full-screen view for the scanner.
+ */
+export function StudentQrCard({ studentId, studentName, admin = false }: { studentId: string; studentName: string; admin?: boolean }) {
+  const toast = useToast();
+  const { data: qr, isLoading } = useStudentQr(studentId);
+  const issue = useIssueQr();
+  const setFrozen = useSetFrozen();
+  const [big, setBig] = useState(false);
+  const frozen = qr?.status === "frozen";
+  const src = useQrImage(qr && !frozen ? qr.token : null);
+
+  async function run(p: Promise<unknown>) {
+    try {
+      await p;
+    } catch (e) {
+      toast(errMsg(e), "error");
+    }
+  }
+
+  function print() {
+    if (!src) return;
+    const w = window.open("", "_blank", "width=480,height=640");
+    if (!w) return;
+    w.document.write(`<title>${studentName}</title><body style="text-align:center;font-family:sans-serif"><img src="${src}" style="width:320px"><p>${studentName}</p><script>onload=()=>print()</script>`);
+    w.document.close();
+  }
+
+  if (isLoading) return <Spinner />;
+
+  return (
+    <div className="space-y-3">
+      {qr ? (
+        <div className="flex flex-col items-center gap-2">
+          {src ? (
+            <button type="button" aria-label="ขยาย QR" onClick={() => setBig(true)} className="rounded-xl border border-border bg-white p-1">
+              <img src={src} alt={`QR ชำระเงินของ ${studentName}`} className="size-48" />
+            </button>
+          ) : (
+            <p className="flex size-48 items-center justify-center rounded-xl border border-dashed border-border px-4 text-center text-sm text-muted-foreground">
+              {frozen ? (qr.frozen_by === "school" ? "QR ถูกระงับโดยโรงเรียน" : "QR ถูกระงับ") : "…"}
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">ยังไม่มี QR ชำระเงิน</p>
+      )}
+
+      {admin && (
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button
+            type="button"
+            variant={qr ? "outline" : "default"}
+            disabled={issue.isPending}
+            onClick={() => {
+              if (qr && !window.confirm("สร้าง QR ใหม่? QR เดิมจะใช้ไม่ได้ทันที")) return;
+              void run(issue.mutateAsync(studentId));
+            }}
+          >
+            {qr ? "สร้าง QR ใหม่" : "สร้าง QR"}
+          </Button>
+          {qr && (
+            <Button type="button" variant="outline" disabled={setFrozen.isPending} onClick={() => void run(setFrozen.mutateAsync({ student_id: studentId, frozen: !frozen }))}>
+              {frozen ? "เปิดใช้ QR" : "ระงับ QR"}
+            </Button>
+          )}
+          {src && (
+            <>
+              <a href={src} download={`qr-${studentName}.png`} className="inline-flex">
+                <Button type="button" variant="outline" tabIndex={-1}>
+                  บันทึกรูป
+                </Button>
+              </a>
+              <Button type="button" variant="outline" onClick={print}>
+                พิมพ์
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+
+      <Modal open={big && !!src} onOpenChange={setBig} title={studentName} description="ยื่นให้เครื่องสแกนที่จุดขาย">
+        {src && <img src={src} alt="QR ชำระเงิน" className="mx-auto w-full max-w-sm rounded-xl bg-white" />}
+      </Modal>
+    </div>
+  );
+}

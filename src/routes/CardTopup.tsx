@@ -3,16 +3,13 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Button, Card } from "@/components/ui";
 import { isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
-import { CardsTab, TerminalsTab } from "@/routes/CardTopupAdmin";
+import { TerminalsTab } from "@/routes/CardTopupAdmin";
 import { PortalView } from "@/routes/CardTopupPortal";
 import { PosTab } from "@/routes/CardTopupPos";
-import { RegisterTab } from "@/routes/CardTopupRegister";
 import { ReportTab } from "@/routes/CardTopupReport";
 import { SlipsTab } from "@/routes/CardTopupSlips";
 
 const TABS = [
-  { key: "cards", label: "บัตรและยอดคงเหลือ" },
-  { key: "register", label: "ลงทะเบียนบัตร" },
   { key: "slips", label: "อนุมัติสลิป" },
   { key: "report", label: "รายงาน" },
   { key: "terminals", label: "เครื่องขาย" },
@@ -22,7 +19,7 @@ type Tab = (typeof TABS)[number]["key"];
 // บัตรเติมเงิน — see migration 0107. Cashier sees only ขาย; org-wide sees every tab.
 export function CardTopup() {
   const { profile: me } = useAuth();
-  const [tab, setTab] = useState<Tab>("cards");
+  const [tab, setTab] = useState<Tab>("slips");
   const [managing, setManaging] = useState(false);
   if (!me) return null;
   const orgWide = isOrgWide(me.roles);
@@ -57,8 +54,6 @@ export function CardTopup() {
           </button>
         ))}
       </div>
-      {tab === "cards" && <CardsTab />}
-      {tab === "register" && <RegisterTab />}
       {tab === "slips" && <SlipsTab />}
       {tab === "report" && <ReportTab />}
       {tab === "terminals" && <TerminalsTab />}

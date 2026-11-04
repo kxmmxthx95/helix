@@ -74,6 +74,7 @@ import SchoolOutline from "react-ionicons/lib/SchoolOutline";
 import IonSettings from "react-ionicons/lib/Settings";
 import IonSettingsOutline from "react-ionicons/lib/SettingsOutline";
 import CopyOutline from "react-ionicons/lib/CopyOutline";
+import QrCodeOutline from "react-ionicons/lib/QrCodeOutline";
 import ShieldOutline from "react-ionicons/lib/ShieldOutline";
 import Sunny from "react-ionicons/lib/Sunny";
 import AirplaneOutline from "react-ionicons/lib/AirplaneOutline";
@@ -187,6 +188,7 @@ export const ExpandIcon = wrap(ExpandOutline);
 export const ContractIcon = wrap(ContractOutline);
 export const BriefcaseIcon = wrap(BriefcaseOutline);
 export const ShieldIcon = wrap(ShieldOutline);
+export const QrIcon = wrap(QrCodeOutline);
 export const NotificationIcon = wrap(NotificationsOutline);
 
 /** No ionicons bold/underline glyph exists — plain monoline SVGs matching the wrap()'d icons' size contract instead. */

@@ -1327,6 +1327,9 @@ export type CardSlipRequest = {
   updated_at: string;
 };
 
+/** card_my_qr() — the live QR token (migration 0117); null when the student has none. */
+export type StudentQr = { token: string; status: StudentCardStatus; frozen_by: "parent" | "school" | null };
+
 /** card_portal_summary() — what a parent / student sees of the card. */
 export type CardPortalSummary = {
   balance: number;
@@ -1799,6 +1802,14 @@ export type Database = {
       card_bind: {
         Args: { p_student_id: string; p_card_uid: string };
         Returns: void;
+      };
+      card_issue_qr: {
+        Args: { p_student_id: string };
+        Returns: void;
+      };
+      card_my_qr: {
+        Args: { p_student_id: string };
+        Returns: StudentQr | null;
       };
       cashier_pin_status: {
         Args: Record<string, never>;

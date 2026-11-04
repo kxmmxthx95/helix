@@ -4,6 +4,7 @@ import {
   CheckmarkCircleIcon,
   Plus,
   ProfileIcon,
+  QrIcon,
   Search,
   ShieldIcon,
   SlidersHorizontal,
@@ -49,6 +50,7 @@ import {
   type ProfileRow,
   type UserInvite,
 } from "@/hooks/useProfiles";
+import { StudentQrCard } from "@/components/StudentQrCard";
 import { useStudentByProfile, useStudents } from "@/hooks/useStudents";
 import type { PositionTitle, Student } from "@/lib/database.types";
 import { profileFullName } from "@/lib/database.types";
@@ -780,10 +782,11 @@ function LinkedStudentsField({
   );
 }
 
-type UserTab = "general" | "account";
+type UserTab = "general" | "account" | "qr";
 const USER_TABS: { key: UserTab; label: string; icon: typeof ProfileIcon }[] = [
   { key: "general", label: "ข้อมูลทั่วไป", icon: ProfileIcon },
   { key: "account", label: "สิทธิ์และบัญชี", icon: ShieldIcon },
+  { key: "qr", label: "QR ชำระเงิน", icon: QrIcon },
 ];
 
 function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClose: () => void }) {
@@ -910,7 +913,7 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
         {profile && current && (
           <div className="space-y-4">
             <div role="tablist" aria-label="หัวข้อข้อมูลผู้ใช้งาน" className="flex overflow-x-auto border-b border-border [container-type:inline-size] [scrollbar-width:none]">
-              {USER_TABS.map((t) => (
+              {USER_TABS.filter((t) => t.key !== "qr" || linkedStudent).map((t) => (
                 <button
                   key={t.key}
                   type="button"
@@ -1057,6 +1060,9 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
                 </FormSection>
               </div>
             </form>
+            {tab === "qr" && linkedStudent && (
+              <StudentQrCard admin studentId={linkedStudent.id} studentName={`${linkedStudent.first_name} ${linkedStudent.last_name}`} />
+            )}
           </div>
         )}
       </SheetFormContext.Provider>

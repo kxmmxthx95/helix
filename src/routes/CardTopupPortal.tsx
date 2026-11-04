@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Modal } from "@/components/Modal";
+import { StudentQrCard } from "@/components/StudentQrCard";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { studentAvatarUrl } from "@/hooks/useAvatar";
@@ -73,10 +74,11 @@ function ChildCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
           <p className="text-xs text-muted-foreground">
             {sum.daily_limit === null ? "ไม่จำกัดวงเงินต่อวัน" : `วงเงินต่อวัน ${formatBaht(sum.daily_limit)} ฿ · ใช้วันนี้ ${formatBaht(sum.spent_today)} ฿`}
             {sum.card_status === "frozen" && (sum.card_frozen_by === "school" ? " · บัตรถูกระงับโดยโรงเรียน — ติดต่อฝ่ายการเงิน" : " · บัตรถูกระงับ")}
-            {sum.card_status === null && " · ยังไม่ได้ผูกบัตร"}
+            {sum.card_status === null && " · ยังไม่มี QR — ติดต่อโรงเรียน"}
           </p>
         )}
       </div>
+      <StudentQrCard studentId={kid.id} studentName={fullName(kid)} />
       {canAct && (
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => setTopupOpen(true)}>เติมเงิน (โอนพร้อมเพย์)</Button>
