@@ -53,7 +53,7 @@ export function Modal({
         </h2>
         {description && <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">{description}</p>}
       </div>
-      <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
+      <div className="scrollbar-hidden min-h-0 flex-auto overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
       {footer && <div className="shrink-0 border-t border-border px-5 pb-5 pt-3">{footer}</div>}
     </dialog>
   );
