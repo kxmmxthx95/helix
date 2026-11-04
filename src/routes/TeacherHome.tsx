@@ -458,13 +458,13 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                 <button
                   type="button"
                   onClick={() => setTimetableOpen(true)}
-                  className="inline-flex h-11 items-center rounded-full bg-primary px-6 text-[15px] font-medium text-primary-foreground transition-transform active:scale-[0.98]"
+                  className="inline-flex h-9 items-center rounded-full bg-primary px-4 text-[13px] font-medium text-primary-foreground transition-transform active:scale-[0.98]"
                 >
                   ตารางสอน
                 </button>
                 <Link
                   to="/profile"
-                  className="inline-flex h-11 items-center rounded-full border border-input px-6 text-[15px] font-medium transition-colors hover:bg-muted active:scale-[0.98]"
+                  className="inline-flex h-9 items-center rounded-full border border-input px-4 text-[13px] font-medium transition-colors hover:bg-muted active:scale-[0.98]"
                 >
                   โปรไฟล์
                 </Link>
@@ -473,7 +473,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                   disabled={!!me.line_user_id}
                   onClick={() => setLineOpen(true)}
                   className={cn(
-                    "inline-flex h-11 items-center rounded-full px-6 text-[15px] font-medium transition-transform active:scale-[0.98]",
+                    "inline-flex h-9 items-center rounded-full px-4 text-[13px] font-medium transition-transform active:scale-[0.98]",
                     me.line_user_id ? "bg-[#06C755] text-white" : "bg-muted text-muted-foreground hover:bg-muted/70",
                   )}
                 >
