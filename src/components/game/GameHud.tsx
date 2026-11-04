@@ -226,7 +226,7 @@ export function GameHud() {
     <div className="pb-8">
       <div className="mx-auto max-w-5xl px-4 lg:px-8">
         {/* ===== Profile card (same look as the teacher home) ===== */}
-        <header className="mt-[max(env(safe-area-inset-top),1rem)] overflow-hidden rounded-[24px] bg-card text-card-foreground shadow-card lg:mt-8">
+        <header className="mt-4 overflow-hidden rounded-[24px] bg-card text-card-foreground shadow-card lg:mt-8">
           <div className="relative h-24 sm:h-32" style={bannerBackground(BANNER_PRESETS[0]!.colors)}>
             <button
               type="button"
@@ -304,7 +304,7 @@ export function GameHud() {
 
       <Sheet open={panel !== null} onOpenChange={(o) => !o && setPanel(null)} title={panel ? PANEL_TITLE[panel] : ""}>
         {myStudent && profile && panel === "attendance" && <AttendanceSummarySection student={myStudent} />}
-        {myStudent && profile && panel === "behavior" && <BehaviorScoreSection student={myStudent} />}
+        {myStudent && profile && panel === "behavior" && <BehaviorScoreSection student={myStudent} showName={false} />}
         {myStudent && profile && panel === "leave" && <StudentLeaveSection student={myStudent} submittedBy={profile.id} />}
         {panel === "bag" && <Inventory badges={badges} rank={rank} exp={lifeExp} />}
         {panel === "subjects" && (

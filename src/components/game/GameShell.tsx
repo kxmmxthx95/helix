@@ -13,6 +13,7 @@ import {
   HomeIcon,
   LibraryIcon,
   LogOut,
+  MenuIcon,
   Monitor,
   Moon,
   PricetagIcon,
@@ -21,7 +22,7 @@ import {
   TimetableIcon,
 } from "@/components/icons";
 import { MobileHeaderProvider } from "@/components/MobileHeaderSlot";
-import { SheetStyleContext } from "@/components/Sheet";
+import { Sheet, SheetStyleContext } from "@/components/Sheet";
 import { useTheme } from "@/components/ThemeProvider";
 import { Avatar } from "@/components/ui";
 import { avatarUrl } from "@/hooks/useAvatar";
@@ -94,6 +95,7 @@ function GameShellInner() {
   const title = TITLES[location.pathname] ?? "";
   // iOS large title: collapses into the nav bar once the page scrolls under it.
   const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => setScrolled(false), [location.pathname]);
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -145,12 +147,21 @@ function GameShellInner() {
         <header
           className={cn(
             "z-20 shrink-0 border-b-[0.5px] pt-safe transition-colors duration-200",
-            isHome ? "pointer-events-none absolute inset-x-0 top-0 lg:hidden" : "relative",
+            isHome ? "relative lg:hidden" : "relative",
             scrolled ? "pointer-events-auto border-border bg-card/80 backdrop-blur-xl backdrop-saturate-150" : "border-transparent bg-background",
-            isHome && !scrolled && "bg-transparent",
           )}
         >
           <div className="relative flex h-11 items-center justify-center px-2 lg:h-14 lg:px-8">
+            {isHome && (
+              <button
+                type="button"
+                aria-label="เมนู"
+                onClick={() => setMenuOpen(true)}
+                className={cn("absolute left-2 flex h-10 w-10 items-center justify-center rounded-lg text-foreground active:opacity-40 lg:hidden", FOCUS)}
+              >
+                <MenuIcon className="h-5 w-5" />
+              </button>
+            )}
             {!isHome && (
               <button
                 type="button"
@@ -174,6 +185,30 @@ function GameShellInner() {
             </p>
           </div>
         </header>
+
+        <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="เมนู" side="left">
+          <nav aria-label="เมนูหลัก" className="flex flex-col gap-1">
+            {SIDE.map(({ to, label, icon: Icon }) => (
+              <button
+                key={to}
+                type="button"
+                aria-current={isActive(location.pathname, to) ? "page" : undefined}
+                onClick={() => {
+                  setMenuOpen(false);
+                  navigate(to);
+                }}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] font-medium active:bg-muted",
+                  isActive(location.pathname, to) && "bg-muted",
+                  FOCUS,
+                )}
+              >
+                <Icon className="h-5 w-5 shrink-0 text-accent" />
+                {label}
+              </button>
+            ))}
+          </nav>
+        </Sheet>
 
         <main
           id="student-scroll"
