@@ -232,3 +232,15 @@ export const UnlinkIcon = wrap(UnlinkOutline);
 export const SquareIcon = wrap(SquareOutline);
 export const RestaurantIcon = wrap(RestaurantOutline);
 export const MoreIcon = wrap(EllipsisHorizontal);
+
+/** No ionicons coin glyph exists — monoline SVG (rim + inner ring + vertical bar) matching the wrap()'d icons' size contract. */
+export function CoinIcon({ className, size }: IconProps) {
+  const px = size ?? sizeFromClass(className);
+  return (
+    <svg width={px} height={px} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5.5" />
+      <path d="M12 9.5v5" />
+    </svg>
+  );
+}

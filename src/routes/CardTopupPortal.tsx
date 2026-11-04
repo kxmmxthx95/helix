@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronForward, DocumentTextIcon, FileUp, PricetagIcon, ShieldIcon } from "@/components/icons";
+import { ChevronDown, ChevronForward, DocumentTextIcon, FileUp, CoinIcon, LockIcon, ShieldIcon } from "@/components/icons";
 import { Modal } from "@/components/Modal";
 import { Sheet, SheetStyleContext } from "@/components/Sheet";
 import { TopupFlipCard } from "@/components/TopupFlipCard";
@@ -17,7 +17,7 @@ import {
   useSlipRequests,
   type PortalStudent,
 } from "@/hooks/useCardTopup";
-import { TX_TYPE_LABEL } from "@/lib/cardTopup";
+import { TOPUP_OPEN, TX_TYPE_LABEL } from "@/lib/cardTopup";
 import { formatBaht } from "@/lib/tuition";
 import { cn } from "@/lib/utils";
 import { TopupSlipForm, useCanTopup } from "@/routes/CardTopupForm";
@@ -136,7 +136,7 @@ function ChildCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
       {/* Phone: flip card, balance, top-up card, collapsible sections. */}
       <div className="space-y-3 pt-6 md:hidden">
         <TopupFlipCard kid={kid} />
-        <section className="rounded-2xl bg-card p-4 shadow-card">{balance}</section>
+        <section className="rounded-2xl bg-card p-4 text-center shadow-card">{balance}</section>
         <button type="button" onClick={() => setHistoryOpen(true)} className="flex w-full items-center gap-3 rounded-2xl bg-card p-4 text-left shadow-card active:scale-[0.99]">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
             <DocumentTextIcon className="h-4 w-4" />
@@ -154,9 +154,21 @@ function ChildCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
             <div className="flex flex-wrap gap-2">{manageButtons}</div>
           </Disclosure>
         )}
-        {canTopup && (
+        {canTopup && !TOPUP_OPEN && (
+          <div aria-disabled="true" className="flex w-full items-center gap-3 rounded-2xl bg-card p-4 opacity-60 shadow-card">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+              <CoinIcon className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[15px] font-semibold">เติมเงิน</span>
+              <span className="block truncate text-xs text-muted-foreground">ยังไม่เปิดใช้งาน</span>
+            </span>
+            <LockIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </div>
+        )}
+        {canTopup && TOPUP_OPEN && (
           <Disclosure
-            icon={PricetagIcon}
+            icon={CoinIcon}
             title="เติมเงิน"
             subtitle="โอนพร้อมเพย์แล้วแนบสลิป"
             tile="bg-primary text-primary-foreground"
@@ -180,7 +192,11 @@ function ChildCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
         <StudentQrCard studentId={kid.id} studentName={fullName(kid)} />
         {(canTopup || canAct) && (
           <div className="flex flex-wrap gap-2">
-            {canTopup && <Button onClick={goTopup}>เติมเงิน (โอนพร้อมเพย์)</Button>}
+            {canTopup && (
+              <Button onClick={goTopup} disabled={!TOPUP_OPEN}>
+                {TOPUP_OPEN ? "เติมเงิน (โอนพร้อมเพย์)" : "เติมเงิน (ยังไม่เปิดใช้งาน)"}
+              </Button>
+            )}
             {manageButtons}
           </div>
         )}

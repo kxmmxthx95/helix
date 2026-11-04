@@ -7,7 +7,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { useMyCardStudents, useSubmitSlip, type PortalStudent } from "@/hooks/useCardTopup";
 import { useDepartments } from "@/hooks/useProfiles";
 import { schoolLogoUrl, useSchoolSettings } from "@/hooks/useSettings";
-import { parseAmount, TOPUP_MAX, TOPUP_MIN } from "@/lib/cardTopup";
+import { parseAmount, TOPUP_MAX, TOPUP_MIN, TOPUP_OPEN } from "@/lib/cardTopup";
 
 /** Parents top up for their children; secondary-school (SEC) students for themselves — RLS in migration 0123 enforces the same. */
 export function useCanTopup(kid: PortalStudent | undefined) {
@@ -24,6 +24,7 @@ export function CardTopupForm() {
   const { data: kids = [], isLoading } = useMyCardStudents();
   const kid = kids.find((k) => k.id === studentId);
   const allowed = useCanTopup(kid);
+  if (!TOPUP_OPEN) return <EmptyState title="ยังไม่เปิดใช้งานการเติมเงิน" />;
   if (isLoading) return <Skeleton className="h-40 w-full" />;
   if (!kid || !allowed) return <EmptyState title="ไม่มีสิทธิ์เติมเงินให้บัตรนี้" />;
   return <TopupSlipForm kid={kid} onSent={() => navigate("/card-topup", { replace: true })} />;

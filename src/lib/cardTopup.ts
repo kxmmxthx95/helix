@@ -1,6 +1,8 @@
 import type { CardReport, CardTransactionType } from "@/lib/database.types";
 
 // Mirrors the bounds enforced in the pos_* functions (migration 0107) — the database is the boundary.
+/** Slip top-up is switched off for now (UI only — the RLS from 0108/0123 still allows inserts). Flip to true to reopen. */
+export const TOPUP_OPEN = false;
 export const TOPUP_MIN = 20;
 export const TOPUP_MAX = 5000;
 export const SALE_MIN = 1;
