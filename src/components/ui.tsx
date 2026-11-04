@@ -485,6 +485,7 @@ export function AvatarCard({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [zoom, setZoom] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   return (
     <section className="flex items-center gap-3 rounded-2xl border border-border bg-muted/40 p-3">
       <div className="relative shrink-0">
@@ -519,10 +520,30 @@ export function AvatarCard({
           <Button type="button" size="sm" variant="outline" onClick={() => setZoom(true)} aria-label="ดูรูปขยาย">
             <EyeIcon className="h-3.5 w-3.5" />
           </Button>
-          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => confirm("ลบรูปโปรไฟล์นี้?") && onRemove()}>
-            <TrashIcon className="h-3.5 w-3.5" />
-            ลบรูป
-          </Button>
+          {confirmRemove ? (
+            <>
+              <Button type="button" size="sm" variant="outline" onClick={() => setConfirmRemove(false)}>
+                ยกเลิก
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                disabled={busy}
+                onClick={() => {
+                  setConfirmRemove(false);
+                  onRemove();
+                }}
+              >
+                ยืนยันลบ
+              </Button>
+            </>
+          ) : (
+            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setConfirmRemove(true)}>
+              <TrashIcon className="h-3.5 w-3.5" />
+              ลบรูป
+            </Button>
+          )}
         </div>
       )}
       <input
