@@ -54,6 +54,26 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+/** sessionStorage flag: login pages show "บัญชีถูกระงับ" once after a forced sign-out. */
+export const SUSPENDED_KEY = "helix.suspended";
+
+/** Peeks the flag (idempotent, StrictMode-safe) — login pages use it as the initial error and call clearSuspendedNotice on mount. */
+export function takeSuspendedNotice(): string | undefined {
+  try {
+    return sessionStorage.getItem(SUSPENDED_KEY) ? "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ" : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function clearSuspendedNotice() {
+  try {
+    sessionStorage.removeItem(SUSPENDED_KEY);
+  } catch {
+    /* ignore private mode */
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<ProfileWithRoles | null>(null);
@@ -167,6 +187,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       supabase.from("profile_roles").select("role").eq("profile_id", session.user.id),
     ]).then(([{ data: p }, { data: pr }]) => {
       if (cancelled || !p) return;
+      if (!p.is_active) {
+        // Suspended (profiles.is_active = false): no session, back to the right login page.
+        const wasStudent = (pr ?? []).some((r) => r.role === "student");
+        try {
+          sessionStorage.setItem(SUSPENDED_KEY, "1");
+        } catch {
+          /* ignore private mode */
+        }
+        void supabase.auth.signOut().then(() => {
+          if (wasStudent) window.location.replace("/student-login");
+        });
+        return;
+      }
       const withRoles: ProfileWithRoles = { ...p, roles: (pr ?? []).map((r) => r.role) };
       setProfile(withRoles);
       void loadOnboarding(withRoles);

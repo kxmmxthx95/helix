@@ -299,7 +299,10 @@ export function useDeleteUser() {
         throw new Error(String(data.error));
       }
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["profiles"] }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["profiles"] });
+      void qc.invalidateQueries({ queryKey: ["students"] }); // students.profile_id is set null on delete
+    },
   });
 }
 

@@ -13,7 +13,7 @@ export type StudentFilters = {
 
 /** Roster list row — linked login avatar when the student has an account. */
 export type StudentListItem = Student & {
-  profile: Pick<Profile, "avatar_path" | "updated_at"> | null;
+  profile: Pick<Profile, "avatar_path" | "updated_at" | "is_active"> | null;
 };
 
 export type StudentDraft = Pick<
@@ -76,7 +76,7 @@ export function useStudents(filters: StudentFilters) {
     queryFn: async (): Promise<StudentListItem[]> => {
       let q = supabase
         .from("students")
-        .select("*, profile:profiles!profile_id(avatar_path, updated_at)")
+        .select("*, profile:profiles!profile_id(avatar_path, updated_at, is_active)")
         .order("student_code");
 
       if (filters.departmentId) q = q.eq("department_id", filters.departmentId);
@@ -232,6 +232,21 @@ export function useStudentClassroomName(studentId: string | null) {
         .maybeSingle();
       if (error) throw error;
       return (data as unknown as { classroom: { name: string } | null } | null)?.classroom?.name ?? null;
+    },
+  });
+}
+
+/** Suspend / re-enable a student's login (profiles.is_active) — AuthProvider signs suspended accounts out. */
+export function useSetAccountActive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ profileId, is_active }: { profileId: string; is_active: boolean }) => {
+      const { error } = await supabase.from("profiles").update({ is_active }).eq("id", profileId);
+      if (error) throw error;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["students"] });
+      void qc.invalidateQueries({ queryKey: ["profiles"] });
     },
   });
 }

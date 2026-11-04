@@ -28,11 +28,13 @@ import {
 import {
   useDeleteStudent,
   useSaveStudent,
+  useSetAccountActive,
   useStudents,
   type StudentDraft,
   type StudentFilters,
   type StudentListItem,
 } from "@/hooks/useStudents";
+import { useDeleteUser } from "@/hooks/useProfiles";
 import type {
   AddressFields,
   BloodType,
@@ -143,6 +145,102 @@ export const ADDRESS_KEYS: (keyof AddressFields)[] = [
   "province",
   "postal_code",
 ];
+
+/** Account badge — opens a popup to suspend / re-enable / delete the student's login. */
+function AccountCell({ row, compact }: { row: StudentListItem; compact?: boolean }) {
+  const del = useDeleteUser();
+  const setActive = useSetAccountActive();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [askDelete, setAskDelete] = useState(false);
+  const active = row.profile?.is_active ?? true;
+  const name = `${row.prefix ?? ""}${row.first_name} ${row.last_name}`.trim();
+  const close = () => {
+    setOpen(false);
+    setAskDelete(false);
+  };
+  const fail = (err: unknown) => toast(err instanceof Error ? err.message : "ทำรายการไม่สำเร็จ", "error");
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={cn(
+          "inline-flex items-center gap-1 font-medium",
+          compact ? "rounded-full px-2 py-1 text-[11px]" : "text-xs",
+          active ? "text-success" : "text-warning",
+          compact && (active ? "bg-success/15" : "bg-warning/15"),
+        )}
+      >
+        <CheckmarkCircleIcon className="size-3.5" />
+        {active ? "มีบัญชีแล้ว" : "ถูกระงับ"}
+      </button>
+      <Modal
+        open={open}
+        onOpenChange={(o) => (o ? setOpen(true) : close())}
+        title="จัดการบัญชีผู้ใช้งาน"
+        description={`${name} · ${row.student_code}`}
+        footer={
+          askDelete ? (
+            <>
+              <Button variant="outline" className="flex-1" onClick={() => setAskDelete(false)}>
+                ไม่ลบ
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                disabled={del.isPending}
+                onClick={() =>
+                  del.mutate(row.profile_id!, {
+                    onSuccess: () => (toast("ลบบัญชีแล้ว"), close()),
+                    onError: fail,
+                  })
+                }
+              >
+                {del.isPending ? <Spinner /> : "ยืนยันลบบัญชีถาวร"}
+              </Button>
+            </>
+          ) : (
+            <Button variant="outline" className="flex-1" onClick={close}>
+              ปิด
+            </Button>
+          )
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm">
+            สถานะ:{" "}
+            <span className={active ? "font-medium text-success" : "font-medium text-warning"}>
+              {active ? "ใช้งานอยู่" : "ถูกระงับ"}
+            </span>
+          </p>
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={setActive.isPending}
+            onClick={() =>
+              setActive.mutate(
+                { profileId: row.profile_id!, is_active: !active },
+                { onSuccess: () => toast(active ? "ระงับบัญชีแล้ว" : "เปิดใช้งานบัญชีแล้ว"), onError: fail },
+              )
+            }
+          >
+            {setActive.isPending ? <Spinner /> : active ? "ระงับการใช้งาน" : "เปิดใช้งานอีกครั้ง"}
+          </Button>
+          {askDelete ? (
+            <p className="text-xs text-muted-foreground">
+              บัญชีเข้าสู่ระบบจะถูกลบถาวร กู้คืนไม่ได้ ข้อมูลนักเรียนในทะเบียนยังอยู่
+            </p>
+          ) : (
+            <Button variant="destructive" className="w-full" onClick={() => setAskDelete(true)}>
+              ลบบัญชีถาวร
+            </Button>
+          )}
+        </div>
+      </Modal>
+    </div>
+  );
+}
 
 function BarcodeCell({ status, pending, onIssue }: { status?: string; pending: boolean; onIssue: () => void }) {
   if (!status)
@@ -554,10 +652,7 @@ export function Roster() {
                         <BarcodeCell status={cardStatus?.get(row.id)} pending={issueBarcode.isPending} onIssue={() => issue(row.id)} />
                       )}
                       {!mayManageUsers ? null : row.profile_id ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-1 text-[11px] font-medium text-success">
-                          <CheckmarkCircleIcon className="size-3" />
-                          มีบัญชีแล้ว
-                        </span>
+                        <AccountCell row={row} compact />
                       ) : (
                         <Button
                           variant="outline"
@@ -649,10 +744,7 @@ export function Roster() {
                         {mayManageUsers && (
                           <td className="px-4 py-0">
                             {row.profile_id ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
-                                <CheckmarkCircleIcon className="size-3.5" />
-                                มีบัญชีแล้ว
-                              </span>
+                              <AccountCell row={row} />
                             ) : (
                               <Button
                                 variant="tinted"

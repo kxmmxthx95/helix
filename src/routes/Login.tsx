@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
-import { lazy, Suspense, useState } from "react";
-import { useAuth } from "@/auth/AuthProvider";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { clearSuspendedNotice, takeSuspendedNotice, useAuth } from "@/auth/AuthProvider";
 import { Button, BuddhistDateSelect, Field, Input, PasswordInput, Spinner } from "@/components/ui";
 
 const Beams = lazy(() => import("@/components/Beams/Beams"));
@@ -17,9 +17,10 @@ export function Login() {
   const [password, setPassword] = useState("");
   const [nationalId, setNationalId] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
-  const [error, setError] = useState<string>();
+  const [error, setError] = useState<string | undefined>(takeSuspendedNotice);
   const [notice, setNotice] = useState<string>();
   const [busy, setBusy] = useState(false);
+  useEffect(clearSuspendedNotice, []);
 
   function switchMode(next: Mode) {
     setMode(next);
