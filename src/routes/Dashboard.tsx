@@ -1122,10 +1122,7 @@ export function AttendanceSummarySection({ student }: { student: Student }) {
 
   return (
     <section>
-      <h2 className={SECTION_TITLE}>
-        การมาเรียนของ {student.first_name} {student.last_name}
-      </h2>
-      <div className="mt-2 flex items-center justify-between">
+      <div className="flex items-center justify-between">
         <button
           type="button"
           aria-label="เดือนก่อนหน้า"
@@ -1185,14 +1182,15 @@ export function AttendanceSummarySection({ student }: { student: Student }) {
               );
             })}
           </div>
-          <p className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+          <ul className="mt-4 grid grid-cols-4 gap-2">
             {STATUS_ORDER.map((st) => (
-              <span key={st} className="inline-flex items-center gap-1">
+              <li key={st} className="flex flex-col items-center gap-0.5 rounded-2xl bg-muted/60 px-1 py-3">
                 <span aria-hidden className={cn("h-2.5 w-2.5 rounded-full", STATUS_CELL[st].split(" ")[0])} />
-                {STATUS_LABEL[st]} <strong className="font-semibold">{counts[st]}</strong>
-              </span>
+                <strong className="font-heading text-2xl font-bold leading-8 tabular-nums">{counts[st]}</strong>
+                <span className="text-xs text-muted-foreground">{STATUS_LABEL[st]}</span>
+              </li>
             ))}
-          </p>
+          </ul>
         </>
       )}
     </section>
