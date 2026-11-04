@@ -7,6 +7,7 @@ import { useToast } from "@/components/Toast";
 import { Avatar, Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
 import {
   posLookup,
+  posStudentByCode,
   useOnline,
   usePinStatus,
   usePosMyToday,
@@ -18,7 +19,6 @@ import {
   useTerminals,
 } from "@/hooks/useCardTopup";
 import { studentAvatarUrl } from "@/hooks/useAvatar";
-import { parseSwipe } from "@/lib/cardSwipe";
 import { parseAmount, SALE_MAX, SALE_MIN, TOPUP_MAX, TOPUP_MIN, TX_TYPE_LABEL } from "@/lib/cardTopup";
 import { profileFullName, type PosStudent } from "@/lib/database.types";
 import { formatBaht } from "@/lib/tuition";
@@ -55,6 +55,8 @@ export function PosTab({ orgWide, onManage }: { orgWide: boolean; onManage?: () 
   const [topupOpen, setTopupOpen] = useState(false);
   const [todayOpen, setTodayOpen] = useState(false);
   const [findOpen, setFindOpen] = useState(false);
+  const [codeOpen, setCodeOpen] = useState(false);
+  const [code, setCode] = useState("");
   const [search, setSearch] = useState("");
   const capture = useRef<HTMLInputElement>(null);
   // Idempotency key for the sale on screen: a retry after a lost response reuses it, so the server never charges twice.
@@ -72,7 +74,7 @@ export function PosTab({ orgWide, onManage }: { orgWide: boolean; onManage?: () 
     }
   };
 
-  const modalOpen = topupOpen || todayOpen || findOpen;
+  const modalOpen = topupOpen || todayOpen || findOpen || codeOpen;
   useEffect(() => {
     if (terminal && !modalOpen) capture.current?.focus();
   }, [terminal, modalOpen, student, done]);
@@ -96,6 +98,19 @@ export function PosTab({ orgWide, onManage }: { orgWide: boolean; onManage?: () 
       toast(errMsg(e), "error");
     } finally {
       setLooking(false);
+    }
+  }
+
+  // A student code is not a secret, so a code lookup has no card_uid and can only top up (canSell below).
+  async function lookupCode(raw: string) {
+    const c = raw.trim();
+    if (!c) return;
+    setLooking(true);
+    try {
+      await lookup({ student_id: await posStudentByCode(c) });
+    } catch (e) {
+      setLooking(false);
+      toast(errMsg(e), "error");
     }
   }
 
@@ -136,6 +151,11 @@ export function PosTab({ orgWide, onManage }: { orgWide: boolean; onManage?: () 
         {terminal && (
           <Button variant="outline" size="sm" onClick={() => setTodayOpen(true)}>
             วันนี้ {formatBaht(today?.sales_total ?? 0)} ฿
+          </Button>
+        )}
+        {terminal && (
+          <Button variant="outline" size="sm" onClick={() => setCodeOpen(true)}>
+            กรอกรหัสนักเรียน
           </Button>
         )}
         {terminal && orgWide && (
@@ -206,9 +226,10 @@ export function PosTab({ orgWide, onManage }: { orgWide: boolean; onManage?: () 
           if (e.key !== "Enter") return;
           e.preventDefault();
           if (student && /^\d{1,3}$/.test(entry)) return void charge();
-          const uid = parseSwipe(entry);
+          const raw = entry.trim();
           setEntry("");
-          if (uid) void lookup({ card_uid: uid });
+          if (raw.startsWith("qr_")) void lookup({ card_uid: raw });
+          else if (raw) void lookupCode(raw);
         }}
       />
 
@@ -302,6 +323,25 @@ export function PosTab({ orgWide, onManage }: { orgWide: boolean; onManage?: () 
 
       <Modal open={todayOpen} onOpenChange={setTodayOpen} title="รายการวันนี้">
         <TodayPanel />
+      </Modal>
+      <Modal open={codeOpen} onOpenChange={setCodeOpen} title="กรอกรหัสนักเรียน">
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const c = code;
+            setCode("");
+            setCodeOpen(false);
+            void lookupCode(c);
+          }}
+        >
+          <Field label="รหัสนักเรียน">
+            <Input autoFocus autoComplete="off" value={code} onChange={(e) => setCode(e.target.value)} />
+          </Field>
+          <Button type="submit" className="w-full" disabled={!code.trim()}>
+            ค้นหา
+          </Button>
+        </form>
       </Modal>
       {orgWide && (
         <Modal open={findOpen} onOpenChange={setFindOpen} title="ค้นหานักเรียน">

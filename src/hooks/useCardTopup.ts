@@ -77,6 +77,10 @@ export function useSaveTerminal() {
 export const posLookup = (a: { card_uid?: string; student_id?: string }) =>
   rpc<PosStudent>(() => supabase.rpc("pos_lookup", { p_card_uid: a.card_uid ?? null, p_student_id: a.student_id ?? null }));
 
+/** Exact student_code → student id (cashier-safe: no partial match, no listing). */
+export const posStudentByCode = (code: string) =>
+  rpc<string>(() => supabase.rpc("pos_student_by_code", { p_code: code }));
+
 export function usePosMyToday() {
   return useQuery({
     queryKey: ["pos_my_today"],

@@ -1803,6 +1803,10 @@ export type Database = {
         Args: { p_student_id: string; p_card_uid: string };
         Returns: void;
       };
+      pos_student_by_code: {
+        Args: { p_code: string };
+        Returns: string;
+      };
       card_issue_qr: {
         Args: { p_student_id: string };
         Returns: void;
