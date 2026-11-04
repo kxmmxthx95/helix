@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { motion, useReducedMotion } from "framer-motion";
-import { useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { GameIcon } from "@/components/game/parts";
@@ -14,6 +15,7 @@ import {
   DocumentTextIcon,
   LibraryIcon,
   ProfileIcon,
+  PaletteIcon,
   Search,
   TimetableIcon,
   PricetagIcon,
@@ -32,7 +34,11 @@ import { useMyIslands } from "@/lib/islands";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { SubmitSheet } from "@/routes/Assignments";
-import { BANNER_PRESETS, bannerBackground } from "@/routes/TeacherHome";
+import { useGradeLevels } from "@/hooks/useCurriculumStructure";
+import { useDepartments } from "@/hooks/useProfiles";
+import { gradeShortLabel } from "@/lib/gradeLevels";
+import { BannerUpload } from "@/components/BannerUpload";
+import { BANNER_PRESETS, bannerBackground, bannerStyle, useBannerColors } from "@/routes/TeacherHome";
 import {
   AttendanceSummarySection,
   BehaviorScoreSection,
@@ -144,6 +150,18 @@ export function GameHud() {
   const [panel, setPanel] = useState<Panel | null>(null);
   const [battle, setBattle] = useState<MyAssignment | null>(null);
   const [query, setQuery] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  useEffect(() => {
+    if (!avatarOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setAvatarOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [avatarOpen]);
+  const { data: departments = [] } = useDepartments();
+  const { data: gradeLevels = [] } = useGradeLevels(myStudent?.department_id ?? null);
+  const gradeLevel = gradeLevels.find((g) => g.id === myStudent?.grade_level_id);
+  const [bannerColors, setBannerColors] = useBannerColors(profile?.id ?? "");
 
   const studentId = myStudent?.id ?? null;
   const month = currentMonthRange();
@@ -198,8 +216,6 @@ export function GameHud() {
     behaviorStart: STARTING_SCORE,
   });
 
-  const firstName = myStudent?.first_name ?? profile?.first_name ?? "";
-
   const menu: { label: string; icon: Icon; color: string; onClick: () => void; badge?: number }[] = [
     { label: "งาน", icon: ClipboardIcon, color: "linear-gradient(160deg,#ff7a7a,#ff3b30)", onClick: () => navigate("/assignments"), badge: pending },
     { label: "สอบ", icon: DocumentTextIcon, color: "linear-gradient(160deg,#ffb84d,#ff9500)", onClick: () => navigate("/exams") },
@@ -227,7 +243,45 @@ export function GameHud() {
       <div className="mx-auto max-w-5xl px-4 lg:px-8">
         {/* ===== Profile card (same look as the teacher home) ===== */}
         <header className="mt-4 overflow-hidden rounded-[24px] bg-card text-card-foreground shadow-card lg:mt-8">
-          <div className="relative h-24 sm:h-32" style={bannerBackground(BANNER_PRESETS[0]!.colors)}>
+          <div className="relative h-24 sm:h-32" style={profile ? bannerStyle(profile, bannerColors) : bannerBackground(bannerColors)}>
+            {profile && (
+              <>
+                <button
+                  type="button"
+                  aria-label="เปลี่ยน Cover"
+                  aria-expanded={pickerOpen}
+                  onClick={() => setPickerOpen((o) => !o)}
+                  className={cn("absolute left-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/85 text-accent shadow-card transition-transform active:scale-95", FOCUS)}
+                >
+                  <PaletteIcon className="h-5 w-5" />
+                </button>
+                {pickerOpen && (
+                  <>
+                    <button type="button" aria-label="ปิด" className="fixed inset-0 z-10 cursor-default" onClick={() => setPickerOpen(false)} />
+                    <div className="absolute left-3 top-14 z-20 w-72 max-w-[calc(100vw-3rem)] space-y-3 rounded-2xl bg-card p-3 text-card-foreground shadow-lg ring-1 ring-border">
+                      <p className="text-sm font-semibold">Cover</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {BANNER_PRESETS.map((p) => (
+                          <button
+                            key={p.name}
+                            type="button"
+                            title={p.name}
+                            aria-label={p.name}
+                            onClick={() => setBannerColors(p.colors)}
+                            className={cn(
+                              "h-10 rounded-xl ring-offset-2 ring-offset-card transition-shadow",
+                              p.colors.join() === bannerColors.join() && "ring-2 ring-accent",
+                            )}
+                            style={bannerBackground(p.colors)}
+                          />
+                        ))}
+                      </div>
+                      <BannerUpload profile={profile} />
+                    </div>
+                  </>
+                )}
+              </>
+            )}
             <button
               type="button"
               aria-label="ค้นหาวิชา"
@@ -238,11 +292,26 @@ export function GameHud() {
             </button>
           </div>
           <div className="px-4 pb-4 sm:px-6 sm:pb-5">
-            <button type="button" aria-label="โปรไฟล์" onClick={() => navigate("/profile")} className={cn("relative z-10 -mt-10 block rounded-full sm:-mt-12", FOCUS)}>
+            <button type="button" aria-label="ดูรูปโปรไฟล์ขนาดใหญ่" onClick={() => setAvatarOpen(true)} className={cn("relative z-10 -mt-10 block rounded-full sm:-mt-12", FOCUS)}>
               {profile && <Avatar name={profileFullName(profile)} src={avatarUrl(profile)} className="h-20 w-20 text-3xl ring-4 ring-card sm:h-24 sm:w-24" />}
             </button>
-            <h1 className="mt-3 truncate font-heading text-2xl font-bold tracking-[-0.02em] sm:text-3xl">สวัสดี {firstName}</h1>
-            <p className="mt-1 truncate text-base text-muted-foreground">{profile ? profileFullName(profile) : ""}</p>
+            <h1 className="mt-3 truncate font-heading text-2xl font-bold tracking-[-0.02em] sm:text-3xl">
+              {myStudent ? `${myStudent.first_name} ${myStudent.last_name}` : profile ? profileFullName(profile) : ""}
+            </h1>
+            {myStudent && (
+              <dl className="mt-3 grid grid-cols-3 gap-3 text-sm">
+                {[
+                  ["เลขประจำตัว", myStudent.student_code],
+                  ["แผนก", departments.find((d) => d.id === myStudent.department_id)?.name ?? "-"],
+                  ["ระดับชั้น", gradeLevel ? gradeShortLabel(gradeLevel.code) : "-"],
+                ].map(([label, value]) => (
+                  <div key={label} className="min-w-0">
+                    <dt className="text-xs text-muted-foreground">{label}</dt>
+                    <dd className="truncate font-semibold tabular-nums">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
             <button
               type="button"
               onClick={() => setPanel("bag")}
@@ -301,6 +370,35 @@ export function GameHud() {
           </div>
         </div>
       </div>
+
+      {createPortal(
+        <AnimatePresence>
+          {avatarOpen && profile && (
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="รูปโปรไฟล์"
+              className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+              initial={reduce ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setAvatarOpen(false)}
+            >
+              <motion.div
+                initial={reduce ? false : { scale: 0.3, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.3, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 320, damping: 26 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Avatar name={profileFullName(profile)} src={avatarUrl(profile)} className="h-[min(80vw,22rem)] w-[min(80vw,22rem)] text-8xl ring-4 ring-white shadow-2xl" />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
 
       <Sheet open={panel !== null} onOpenChange={(o) => !o && setPanel(null)} title={panel ? PANEL_TITLE[panel] : ""}>
         {myStudent && profile && panel === "attendance" && <AttendanceSummarySection student={myStudent} />}
