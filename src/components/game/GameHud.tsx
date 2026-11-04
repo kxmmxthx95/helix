@@ -125,19 +125,6 @@ const gradientOf = (code: string) => AREA_GRADIENT[code] ?? AREA_GRADIENT.other;
 
 const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
 
-function SectionHead({ title, onMore, more = "ดูทั้งหมด" }: { title: string; onMore?: () => void; more?: string }) {
-  return (
-    <div className="mb-2 flex items-baseline justify-between px-1">
-      <h2 className="font-heading text-[22px] font-bold leading-7 tracking-tight">{title}</h2>
-      {onMore && (
-        <button type="button" onClick={onMore} className={cn("rounded-md text-[15px] text-accent active:opacity-40", FOCUS)}>
-          {more}
-        </button>
-      )}
-    </div>
-  );
-}
-
 /** iOS Settings-style icon square (squircle, solid colour, white glyph). */
 function IconSquare({ icon: I, color, className, glyph = "h-7 w-7" }: { icon: Icon; color: string; className?: string; glyph?: string }) {
   return (
@@ -311,51 +298,6 @@ export function GameHud() {
                 ))}
               </ul>
             </nav>
-
-            {/* ===== Subjects ===== */}
-            {islands.length > 0 && (
-              <section className="mt-8" aria-label="วิชาของฉัน">
-                <SectionHead title="วิชาของฉัน" onMore={() => setPanel("subjects")} />
-                <ul className="scrollbar-hidden -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0">
-                  {islands.map((isl) => {
-                    const ratio = isl.total ? isl.submitted / isl.total : 0;
-                    return (
-                      <li key={isl.subject.id} className="w-[9.5rem] shrink-0 snap-start lg:w-auto">
-                        <button
-                          type="button"
-                          aria-label={`${isl.subject.name_th} ${isl.pending.length ? `ค้าง ${isl.pending.length} งาน` : "ไม่มีงานค้าง"}`}
-                          onClick={() => focusIsland()}
-                          className={cn(
-                            "relative flex aspect-[4/5] w-full flex-col justify-between overflow-hidden rounded-[20px] bg-gradient-to-br p-3 text-left text-white transition-transform active:scale-[0.97]",
-                            gradientOf(isl.areaCode),
-                            FOCUS,
-                          )}
-                        >
-                          <span className="absolute -right-3 -top-1 text-[4.5rem] leading-none opacity-90 drop-shadow-md" aria-hidden>
-                            {AREA_EMOJI[isl.areaCode] ?? AREA_EMOJI.other}
-                          </span>
-                          {isl.pending.length > 0 ? (
-                            <span className="relative w-fit rounded-full bg-white px-2 text-xs font-bold leading-5 text-primary">ค้าง {isl.pending.length}</span>
-                          ) : (
-                            <span className="relative w-fit rounded-full bg-white/25 px-2 text-xs font-bold leading-5">{isl.total ? "ส่งครบ ✓" : "ไม่มีงาน"}</span>
-                          )}
-                          <span className="relative">
-                            <span className="line-clamp-2 block text-[15px] font-semibold leading-snug">{isl.subject.name_th}</span>
-                            <span className="mt-0.5 block text-xs text-white/85">{isl.subject.code}</span>
-                            <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-black/20">
-                              <span className="block h-full rounded-full bg-white" style={{ width: `${Math.round(ratio * 100)}%` }} />
-                            </span>
-                            <span className="mt-1 block text-[11px] tabular-nums text-white/90">
-                              ส่งแล้ว {isl.submitted}/{isl.total}
-                            </span>
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            )}
           </div>
         </div>
       </div>
