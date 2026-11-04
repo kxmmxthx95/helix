@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { CameraIcon, Moon, Monitor, NotificationIcon, ProfileIcon, ShieldIcon, Sun } from "@/components/icons";
+import { CameraIcon, CopyIcon, Moon, Monitor, NotificationIcon, ProfileIcon, ShieldIcon, Sun } from "@/components/icons";
 import { useTheme, type ThemePreference } from "@/components/ThemeProvider";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, BuddhistDateSelect, Field, Input, PasswordInput, Spinner } from "@/components/ui";
@@ -376,39 +376,75 @@ function DisplaySection() {
  * just profiles.line_user_id; "ตรวจสอบอีกครั้ง" re-pulls the profile since
  * the actual link only happens once the LINE message round-trips.
  */
+// Optional: the school OA's add-friend link, e.g. https://line.me/R/ti/p/@123abcde
+const LINE_OA_URL = import.meta.env.VITE_LINE_OA_URL as string | undefined;
+
 export function LineLinkCard() {
   const { profile, refreshProfile } = useAuth();
   const generate = useGenerateLinkCode();
+  const toast = useToast();
   const [code, setCode] = useState<string | null>(null);
 
   if (!profile) return null;
   const linked = !!profile.line_user_id;
 
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(code!);
+      toast("คัดลอกรหัสแล้ว");
+    } catch {
+      toast("คัดลอกไม่สำเร็จ", "error");
+    }
+  }
+
+  const openOa = LINE_OA_URL && (
+    <a
+      href={LINE_OA_URL}
+      target="_blank"
+      rel="noreferrer"
+      className="tappable inline-flex h-10 flex-1 items-center justify-center rounded-lg bg-[#06C755] px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+    >
+      เปิด LINE OA
+    </a>
+  );
+
   return (
-    <div className="space-y-2 rounded-xl border border-border p-4">
+    <div className="space-y-4 rounded-xl bg-muted p-4">
       <p className="text-sm font-semibold">บัญชี LINE</p>
       {linked ? (
         <p className="text-sm text-success">ผูกบัญชีแล้ว</p>
       ) : code ? (
-        <div className="space-y-2 text-sm">
-          <p>
-            ส่งข้อความ <span className="font-mono text-base font-semibold">{code}</span> ไปยัง LINE
-            ทางการของโรงเรียน ภายใน {LINE_LINK_CODE_TTL_MINUTES} นาที
+        <div className="space-y-4 text-sm">
+          <p className="text-muted-foreground">
+            คัดลอกรหัสนี้ แล้วส่งเป็นข้อความไปยัง LINE ทางการของโรงเรียน ภายใน {LINE_LINK_CODE_TTL_MINUTES} นาที
           </p>
-          <Button variant="outline" size="sm" onClick={() => void refreshProfile()}>
-            ตรวจสอบอีกครั้ง
-          </Button>
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-card px-4 py-3">
+            <span className="font-mono text-2xl font-semibold tracking-widest">{code}</span>
+            <Button variant="secondary" size="lg" onClick={() => void copyCode()}>
+              <CopyIcon className="h-4 w-4" /> คัดลอก
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            {openOa}
+            <Button variant="outline" size="lg" className="flex-1" onClick={() => void refreshProfile()}>
+              ตรวจสอบอีกครั้ง
+            </Button>
+          </div>
         </div>
       ) : (
         <>
           <p className="text-sm text-muted-foreground">ยังไม่ได้ผูกบัญชี — จะได้รับแจ้งเตือนงาน/คะแนนทาง LINE</p>
-          <Button
-            size="sm"
-            disabled={generate.isPending}
-            onClick={() => generate.mutate(profile.id, { onSuccess: setCode })}
-          >
-            {generate.isPending ? <Spinner className="h-3 w-3" /> : "สร้างรหัสผูกบัญชี"}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="lg"
+              className="flex-1"
+              disabled={generate.isPending}
+              onClick={() => generate.mutate(profile.id, { onSuccess: setCode })}
+            >
+              {generate.isPending ? <Spinner className="h-3 w-3" /> : "สร้างรหัสผูกบัญชี"}
+            </Button>
+            {openOa}
+          </div>
         </>
       )}
     </div>
