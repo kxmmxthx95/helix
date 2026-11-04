@@ -618,7 +618,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         className="max-w-6xl"
       >
         {timetableOpen && (
-          <div className="overflow-auto p-4">
+          <div className="scrollbar-hidden overflow-auto pb-4 sm:p-4">
             <TeacherTimetable
               departmentId={departmentId}
               teacherId={me.id}

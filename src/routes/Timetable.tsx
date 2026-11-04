@@ -1163,6 +1163,10 @@ function TimetableGrid({
     return map;
   }, [entries]);
 
+  // Read-only phones get a one-day list instead of the 48rem grid (see below).
+  const [pickedDay, setPickedDay] = useState<number | null>(null);
+  const listDay = pickedDay ?? (days.includes(new Date().getDay()) ? new Date().getDay() : days[0] ?? 0);
+
   if (isLoading) {
     const skeletonDays = [1, 2, 3, 4, 5];
     return (
@@ -1212,7 +1216,71 @@ function TimetableGrid({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-    <div className="min-h-0 flex-1 overflow-x-auto rounded-xl border border-border bg-card">
+    {!mayEdit && (
+      <div className="sm:hidden">
+        <div className="scrollbar-hidden -mx-1 mb-3 flex gap-2 overflow-x-auto px-1" role="tablist">
+          {days.map((d) => (
+            <button
+              key={d}
+              type="button"
+              role="tab"
+              aria-selected={d === listDay}
+              onClick={() => setPickedDay(d)}
+              className={cn(
+                "h-9 shrink-0 rounded-full px-4 text-[13px] font-medium transition-colors",
+                d === listDay ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+              )}
+            >
+              {DAY_LABEL[d] ?? d}
+            </button>
+          ))}
+        </div>
+        <ul className="space-y-2">
+          {periods
+            .filter((pd) => pd.day_of_week === listDay)
+            .sort((x, y) => x.period_no - y.period_no)
+            .map((pd) => {
+              const time = `${hhmm(pd.start_time)} – ${hhmm(pd.end_time)}`;
+              if (pd.period_type === "break") {
+                return (
+                  <li key={pd.period_no} className="flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                    <RestaurantIcon className="h-3.5 w-3.5" />
+                    {pd.label} {time}
+                  </li>
+                );
+              }
+              const cell = entriesAt.get(`${listDay}-${pd.period_no}`) ?? [];
+              return (
+                <li key={pd.period_no} className="flex gap-3">
+                  <div className="w-12 shrink-0 pt-2 text-center">
+                    <p className="text-base font-semibold">{teachingOrdinal(periods, listDay, pd.period_no)}</p>
+                    <p className="text-[10px] leading-tight text-muted-foreground">{hhmm(pd.start_time)}<br />{hhmm(pd.end_time)}</p>
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    {cell.length === 0 ? (
+                      <p className="rounded-xl bg-muted/40 px-3 py-3 text-xs text-muted-foreground">ว่าง</p>
+                    ) : (
+                      cell.map((e) => {
+                        const sid = e.teaching_assignment.subject_id;
+                        return (
+                          <div key={e.id} className={cn("rounded-xl px-3 py-2 leading-snug", styling.gradient(sid, e.teaching_assignment.classroom_id))}>
+                            <p className="text-sm font-semibold">{subjectLabel(sid)}</p>
+                            <p className="truncate text-xs">{subjectName(sid)}</p>
+                            <p className="text-[11px] opacity-70">
+                              {mode === "classroom" ? teacherLabel(e.teaching_assignment.teacher_id) : roomLabel(e.teaching_assignment.classroom_id)}
+                            </p>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+        </ul>
+      </div>
+    )}
+    <div className={cn("min-h-0 flex-1 overflow-x-auto rounded-xl border border-border bg-card", !mayEdit && "max-sm:hidden")}>
       <table className="h-full w-full min-w-[48rem] table-fixed border-collapse text-xs">
         <thead className="bg-muted text-muted-foreground">
           <tr className="h-12">
@@ -1424,7 +1492,7 @@ function TimetableLegend({ styling, subjectIds, action }: { styling: TimetableSt
   if (areas.length === 0) return action ? <div className="flex justify-end">{action}</div> : null;
   const sample = areas[0]!.id;
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[11px] text-muted-foreground">
+    <div className="max-sm:mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[11px] text-muted-foreground">
       <span className="font-medium text-foreground">สีการ์ด</span>
       {areas.map((a) => (
         <span key={a.id} className="inline-flex items-center gap-1.5">

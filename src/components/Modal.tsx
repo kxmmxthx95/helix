@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { X } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 /**
@@ -47,8 +48,16 @@ export function Modal({
         className,
       )}
     >
-      <div className="shrink-0 border-b border-border px-5 pb-3 pt-5">
-        <h2 id="modal-title" className="font-heading text-[17px] font-semibold leading-6 tracking-[-0.01em]">
+      <div className="relative shrink-0 border-b border-border px-5 pb-3 pt-5">
+        <button
+          type="button"
+          aria-label="ปิด"
+          onClick={() => onOpenChange(false)}
+          className="tappable absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground sm:hidden"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <h2 id="modal-title" className="font-heading max-sm:pr-10 text-[17px] font-semibold leading-6 tracking-[-0.01em]">
           {title}
         </h2>
         {description && <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">{description}</p>}
