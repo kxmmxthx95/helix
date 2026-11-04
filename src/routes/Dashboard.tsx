@@ -149,7 +149,7 @@ export function Dashboard() {
       ))}
       {students.map((st) => (
         <Card key={`behavior-${st.id}`}>
-          <BehaviorScoreSection student={st} />
+          <BehaviorScoreSection student={st} showName={st.id !== myStudent?.id} />
         </Card>
       ))}
     </div>
@@ -1112,7 +1112,11 @@ export function AttendanceSummarySection({ student }: { student: Student }) {
   });
   const { data: events = [] } = useAcademicEvents();
   const closed = events.filter((e) => !e.students_attend && (e.departmentIds.length === 0 || e.departmentIds.includes(student.department_id)));
-  const closedOn = (iso: string) => closed.find((e) => iso >= e.start_date && iso <= e.end_date);
+  // Outside the active term (ปิดเทอม) counts as closed too.
+  const closedOn = (iso: string): { name: string } | undefined =>
+    term?.start_date && term.end_date && (iso < term.start_date || iso > term.end_date)
+      ? { name: "ปิดเทอม" }
+      : closed.find((e) => iso >= e.start_date && iso <= e.end_date);
   // Holiday wins over a stray record: not shown, not counted.
   const records = (data ?? []).filter((r) => !closedOn(r.date));
   const counts = summarizeAttendance(records);
@@ -1198,30 +1202,94 @@ export function AttendanceSummarySection({ student }: { student: Student }) {
 }
 
 /** role="student"/"parent" only — teacher/admin get the roster workspace at /behavior instead. */
-export function BehaviorScoreSection({ student }: { student: Student }) {
+/** `showName` off for a student viewing their own score; parents keep it to tell children apart. */
+export function BehaviorScoreSection({ student, showName = true }: { student: Student; showName?: boolean }) {
   const { start, end } = currentAcademicYearRange();
   const { data, isLoading, isError, refetch } = useBehaviorRecords({
     studentId: student.id,
     startDate: start,
     endDate: end,
   });
-  const score = summarizeBehaviorScore(data ?? []);
+  const records = data ?? [];
+  const score = summarizeBehaviorScore(records);
+  const gained = records.reduce((n, r) => n + Math.max(r.points, 0), 0);
+  const lost = records.reduce((n, r) => n + Math.min(r.points, 0), 0);
+  const tone = score < STARTING_SCORE ? "text-destructive" : "text-success";
+  const R = 52;
+  const C = 2 * Math.PI * R;
+  const ratio = Math.min(Math.max(score / STARTING_SCORE, 0), 1);
 
   return (
     <section>
-      <h2 className={SECTION_TITLE}>
-        คะแนนพฤติกรรมของ {student.first_name} {student.last_name}
-      </h2>
+      {showName && (
+        <h2 className={SECTION_TITLE}>
+          {student.first_name} {student.last_name}
+        </h2>
+      )}
       {isLoading ? (
-        <div role="status" aria-label="กำลังโหลดคะแนนพฤติกรรม">
-          <Skeleton className="mt-1 h-4 w-32" />
+        <div role="status" aria-label="กำลังโหลดคะแนนพฤติกรรม" className="mt-3 space-y-3">
+          <Skeleton className="mx-auto h-36 w-36 rounded-full" />
+          <Skeleton className="h-12 w-full rounded-2xl" />
         </div>
       ) : isError && !data ? (
         <LoadError onRetry={() => void refetch()} />
       ) : (
-        <p className={cn("mt-1 text-sm", score < STARTING_SCORE ? "text-destructive" : "text-success")}>
-          <strong className="text-lg font-semibold">{score}</strong> จาก {STARTING_SCORE} คะแนน
-        </p>
+        <div className="mt-3 space-y-4">
+          <div className="relative mx-auto h-36 w-36">
+            <svg viewBox="0 0 120 120" className={cn("h-full w-full -rotate-90", tone)} aria-hidden>
+              <circle cx="60" cy="60" r={R} fill="none" strokeWidth="10" className="stroke-muted" />
+              <circle
+                cx="60"
+                cy="60"
+                r={R}
+                fill="none"
+                strokeWidth="10"
+                strokeLinecap="round"
+                stroke="currentColor"
+                strokeDasharray={C}
+                strokeDashoffset={C * (1 - ratio)}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <strong className={cn("text-4xl font-bold tabular-nums leading-none", tone)}>{score}</strong>
+              <span className="mt-1 text-xs text-muted-foreground">จาก {STARTING_SCORE} คะแนน</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-2xl bg-success/10 px-3 py-2.5 text-center">
+              <p className="text-lg font-semibold tabular-nums text-success">+{gained}</p>
+              <p className="text-xs text-muted-foreground">ได้เพิ่ม</p>
+            </div>
+            <div className="rounded-2xl bg-destructive/10 px-3 py-2.5 text-center">
+              <p className="text-lg font-semibold tabular-nums text-destructive">−{Math.abs(lost)}</p>
+              <p className="text-xs text-muted-foreground">ถูกหัก</p>
+            </div>
+          </div>
+
+          {records.length === 0 ? (
+            <p className="py-4 text-center text-xs text-muted-foreground">ยังไม่มีการบันทึก</p>
+          ) : (
+            <ul className="space-y-2">
+              {records.map((r) => (
+                <li key={r.id} className="flex items-center gap-3 rounded-2xl bg-muted/50 px-3 py-2.5">
+                  <span
+                    className={cn(
+                      "flex h-9 min-w-11 shrink-0 items-center justify-center rounded-xl px-2 text-sm font-semibold tabular-nums",
+                      r.points >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive",
+                    )}
+                  >
+                    {r.points > 0 ? `+${r.points}` : r.points < 0 ? `−${Math.abs(r.points)}` : "0"}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{r.reason || "ไม่ระบุเหตุผล"}</span>
+                    <span className="block text-xs text-muted-foreground">{leaveDate(r.date)}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </section>
   );
