@@ -8,7 +8,7 @@ import { useToast } from "@/components/Toast";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions } from "@/hooks/useAssignments";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
 import { STARTING_SCORE, summarizeBehaviorScore, useBehaviorRecords } from "@/hooks/useBehaviorRecords";
-import { BookIcon, BuildingIcon, CheckboxIcon, ChevronForward, DocumentTextIcon, LinkIcon, PrintIcon, Search, SettingsOutlineIcon, SquareIcon, TrashIcon, UploadOutlineIcon } from "@/components/icons";
+import { BookIcon, BuildingIcon, CheckboxIcon, ChevronBack, ChevronForward, DocumentTextIcon, LinkIcon, PrintIcon, Search, SettingsOutlineIcon, SquareIcon, TrashIcon, UploadOutlineIcon, X } from "@/components/icons";
 import { DOC_ACCEPT, findOrCreateDocLesson, useDeleteDocFile, useUploadDocFile } from "@/hooks/useDocuments";
 import { useAddPrintRequest, usePrintRequests } from "@/hooks/useDocPrint";
 import { openDocFile, useLinkPlanLessonFile, useUnlinkPlanLessonFile } from "@/hooks/usePlan";
@@ -16,7 +16,7 @@ import { DocPicker } from "@/routes/CurriculumMap";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
 import type { OverviewLesson, OverviewTeacher } from "@/hooks/useDeptClassroomOverview";
-import { useCurrentTerm } from "@/hooks/useAcademicTerms";
+import { useAcademicEvents, useActiveTerm, useCurrentTerm } from "@/hooks/useAcademicTerms";
 import {
   useDeptClassroomOverview,
   hiddenSubjectKey,
@@ -59,7 +59,6 @@ const LEAVE_STATUS_STYLE: Record<StudentLeaveStatus, string> = {
 };
 
 const STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent", "leave"];
-const monthLabel = () => new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric" }).format(new Date());
 /** ISO yyyy-mm-dd → "14 ต.ค." (parsed and formatted in UTC so the day never shifts). */
 const leaveDate = (iso: string) =>
   new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
@@ -1086,20 +1085,69 @@ export function AssignmentSummarySection({ student }: { student: Student }) {
 }
 
 /** role="student"/"parent" only — teacher/admin get the full check-in workspace at /attendance instead. */
+const STATUS_CELL: Record<AttendanceStatus, string> = {
+  present: "bg-green-500 text-white",
+  late: "bg-yellow-400 text-black",
+  absent: "bg-red-500 text-white",
+  leave: "bg-gray-400 text-white",
+};
+const WEEKDAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+
 export function AttendanceSummarySection({ student }: { student: Student }) {
-  const { start, end } = currentMonthRange();
+  // Months are browsable within the department's active term; without term dates only the current month shows.
+  const { data: term } = useActiveTerm(student.department_id);
+  const thisMonth = currentMonthRange().start.slice(0, 7);
+  const bounds = term?.start_date && term.end_date ? [term.start_date.slice(0, 7), term.end_date.slice(0, 7)] : null;
+  const [picked, setPicked] = useState<string | null>(null);
+  const want = picked ?? thisMonth;
+  const ym = bounds ? (want < bounds[0]! ? bounds[0]! : want > bounds[1]! ? bounds[1]! : want) : thisMonth;
+  const [year = 0, month = 1] = ym.split("-").map(Number);
+  const shift = (d: number) => setPicked(new Date(Date.UTC(year, month - 1 + d, 1)).toISOString().slice(0, 7));
+  const start = `${ym}-01`;
+  const end = `${ym}-${pad(new Date(Date.UTC(year, month, 0)).getUTCDate())}`;
   const { data, isLoading, isError, refetch } = useAttendanceRange({
     studentId: student.id,
     startDate: start,
     endDate: end,
   });
-  const counts = summarizeAttendance(data ?? []);
+  const { data: events = [] } = useAcademicEvents();
+  const closed = events.filter((e) => !e.students_attend && (e.departmentIds.length === 0 || e.departmentIds.includes(student.department_id)));
+  const closedOn = (iso: string) => closed.find((e) => iso >= e.start_date && iso <= e.end_date);
+  // Holiday wins over a stray record: not shown, not counted.
+  const records = (data ?? []).filter((r) => !closedOn(r.date));
+  const counts = summarizeAttendance(records);
+  const byDate = new Map(records.map((r) => [r.date, r.status]));
+  const offset = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const days = Number(end.slice(8));
 
   return (
     <section>
       <h2 className={SECTION_TITLE}>
-        การมาเรียนของ {student.first_name} {student.last_name} · {monthLabel()}
+        การมาเรียนของ {student.first_name} {student.last_name}
       </h2>
+      <div className="mt-2 flex items-center justify-between">
+        <button
+          type="button"
+          aria-label="เดือนก่อนหน้า"
+          disabled={!bounds || ym <= bounds[0]!}
+          onClick={() => shift(-1)}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 disabled:opacity-30"
+        >
+          <ChevronBack className="h-4 w-4" />
+        </button>
+        <span className="text-sm font-semibold">
+          {new Intl.DateTimeFormat("th-TH", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1)))}
+        </span>
+        <button
+          type="button"
+          aria-label="เดือนถัดไป"
+          disabled={!bounds || ym >= bounds[1]!}
+          onClick={() => shift(1)}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 disabled:opacity-30"
+        >
+          <ChevronForward className="h-4 w-4" />
+        </button>
+      </div>
       {isLoading ? (
         <div role="status" aria-label="กำลังโหลดการมาเรียน">
           <Skeleton className="mt-1 h-4 w-40" />
@@ -1107,15 +1155,45 @@ export function AttendanceSummarySection({ student }: { student: Student }) {
       ) : isError && !data ? (
         <LoadError onRetry={() => void refetch()} />
       ) : (
-        <p className="mt-1 text-sm">
-          {STATUS_ORDER.map((st, i) => (
-            <span key={st}>
-              {i > 0 && " · "}
-              <strong className="font-semibold">{counts[st]}</strong> {STATUS_LABEL[st]}
-            </span>
-          ))}{" "}
-          วัน
-        </p>
+        <>
+          <div className="mt-3 grid grid-cols-7 gap-1.5 text-center">
+            {WEEKDAYS.map((w) => (
+              <span key={w} className="text-[11px] font-medium text-muted-foreground">
+                {w}
+              </span>
+            ))}
+            {Array.from({ length: offset }, (_, i) => (
+              <span key={`pad-${i}`} />
+            ))}
+            {Array.from({ length: days }, (_, i) => {
+              const day = i + 1;
+              const iso = `${start.slice(0, 8)}${pad(day)}`;
+              const off = closedOn(iso);
+              const st = off ? undefined : byDate.get(iso);
+              return (
+                <span
+                  key={day}
+                  title={off ? off.name : st ? STATUS_LABEL[st] : undefined}
+                  aria-disabled={off ? true : undefined}
+                  className={cn(
+                    "flex aspect-square items-center justify-center rounded-xl text-sm tabular-nums",
+                    off ? "cursor-not-allowed bg-muted/30 text-muted-foreground/50" : st ? cn("font-semibold", STATUS_CELL[st]) : "bg-muted/60 text-muted-foreground",
+                  )}
+                >
+                  {off ? <X aria-label={`${day} ${off.name}`} className="h-5 w-5" /> : day}
+                </span>
+              );
+            })}
+          </div>
+          <p className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            {STATUS_ORDER.map((st) => (
+              <span key={st} className="inline-flex items-center gap-1">
+                <span aria-hidden className={cn("h-2.5 w-2.5 rounded-full", STATUS_CELL[st].split(" ")[0])} />
+                {STATUS_LABEL[st]} <strong className="font-semibold">{counts[st]}</strong>
+              </span>
+            ))}
+          </p>
+        </>
       )}
     </section>
   );
