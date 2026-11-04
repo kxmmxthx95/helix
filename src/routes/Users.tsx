@@ -4,7 +4,6 @@ import {
   CheckmarkCircleIcon,
   Plus,
   ProfileIcon,
-  QrIcon,
   Search,
   ShieldIcon,
   SlidersHorizontal,
@@ -50,9 +49,7 @@ import {
   type ProfileRow,
   type UserInvite,
 } from "@/hooks/useProfiles";
-import { StudentQrCard } from "@/components/StudentQrCard";
-import { useStudentClassroomName, useStudentByProfile, useStudents } from "@/hooks/useStudents";
-import { useStudentContacts } from "@/hooks/useStudentContacts";
+import { type StudentDraft, useStudentByProfile, useStudents } from "@/hooks/useStudents";
 import type { PositionTitle, Student } from "@/lib/database.types";
 import { profileFullName } from "@/lib/database.types";
 import { blobToBase64, compressImage } from "@/lib/image";
@@ -60,9 +57,7 @@ import { passwordFromDob } from "@/lib/password";
 import { canManageUsers, isOrgWide, PREFIXES, ROLE_LABEL, ROLES, STUDENT_PREFIXES, roleLabels, type Role } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { StatCard } from "@/routes/Classrooms";
-import { pickAddress, RELATIONSHIP_LABEL, STATUS_LABEL } from "@/routes/Roster";
-import { useAllGradeLevels } from "@/hooks/useCurriculumStructure";
-import { gradeShortLabel } from "@/lib/gradeLevels";
+import { EditStudentSheet, pickAddress } from "@/routes/Roster";
 import { FormSection } from "@/components/ui";
 
 const EMPTY: ProfileFilters = { search: "", departmentId: "", role: "", active: "" };
@@ -785,11 +780,10 @@ function LinkedStudentsField({
   );
 }
 
-type UserTab = "general" | "account" | "qr";
+type UserTab = "general" | "account";
 const USER_TABS: { key: UserTab; label: string; icon: typeof ProfileIcon }[] = [
   { key: "general", label: "ข้อมูลทั่วไป", icon: ProfileIcon },
   { key: "account", label: "สิทธิ์และบัญชี", icon: ShieldIcon },
-  { key: "qr", label: "QR ชำระเงิน", icon: QrIcon },
 ];
 
 function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClose: () => void }) {
@@ -814,8 +808,9 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
     return () => URL.revokeObjectURL(url);
   }, [avatar]);
   const isStudent = profile?.roles.includes("student") ?? false;
-  const { data: linkedStudent } = useStudentByProfile(isStudent ? (profile?.id ?? null) : null);
-  const { data: allGradeLevels = [] } = useAllGradeLevels();
+  const { data: linkedStudent, isLoading: studentLoading } = useStudentByProfile(isStudent ? (profile?.id ?? null) : null);
+  // A student login with a roster row edits through the very same form as the Roster page (see EditStudentSheet); only สิทธิ์และบัญชี is added.
+  const studentMode = isStudent && !!linkedStudent;
 
   // draft is cleared on close, so a freshly opened row always starts from its
   // own values rather than the previously edited row's.
@@ -894,6 +889,97 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
     onClose();
   }
 
+  const accountPanel = current && (
+    <>
+                <FormSection icon={<ShieldIcon className="h-4 w-4" />}>
+                  <RolePicker
+                    roles={current.roles}
+                    positionTitleIds={current.positionTitleIds}
+                    positionTitles={positionTitles}
+                    onAddRole={addRole}
+                    onRemoveRole={removeRole}
+                    onAddTitle={addTitle}
+                    onRemoveTitle={removeTitle}
+                  />
+
+                  {current.roles.includes("teacher") && (
+                    <TeacherFields
+                      teacherCode={current.teacher_code}
+                      learningAreaId={current.learning_area_id}
+                      onChange={(patch) => setDraft({ ...current, ...patch })}
+                    />
+                  )}
+
+                  {!studentMode && me && isOrgWide(me.roles) && (
+                    <Field label="แผนก" error={err("department_id")}>
+                      <Select
+                        value={current.department_id ?? ""}
+                        onChange={(e) => setDraft({ ...current, department_id: e.target.value || null })}
+                      >
+                        <option value="">ทุกแผนก</option>
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  )}
+
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-sm font-medium">เปิดใช้งานบัญชี</span>
+                    <Switch
+                      checked={current.is_active}
+                      onChange={(v) => setDraft({ ...current, is_active: v })}
+                      label="เปิดใช้งานบัญชี"
+                    />
+                  </div>
+                </FormSection>
+
+                <FormSection icon={<TrashIcon className="h-4 w-4" />}>
+                  {/* wrapper takes FormSection's row padding, else the button's border sits flush against the clipped rounded edge */}
+                  <div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full text-destructive"
+                      disabled={profile?.id === me?.id || deleteUser.isPending}
+                      onClick={remove}
+                    >
+                      ลบผู้ใช้งาน
+                    </Button>
+                  </div>
+                </FormSection>
+    </>
+  );
+
+  if (isStudent && studentLoading) return null;
+  if (studentMode && profile && current) {
+    // Name/DOB/contact/address live on both tables with no sync trigger: the roster row is the source, mirror it onto the login.
+    const mirror = (d: StudentDraft): ProfileEdit => ({
+      ...current,
+      prefix: d.prefix,
+      first_name: d.first_name,
+      last_name: d.last_name,
+      email: d.email,
+      national_id: d.national_id,
+      date_of_birth: d.date_of_birth,
+      department_id: d.department_id,
+      ...pickAddress(d),
+    });
+    return (
+      <EditStudentSheet
+        target={linkedStudent!}
+        onClose={close}
+        extra={{
+          title: "แก้ไขผู้ใช้งาน",
+          tabs: [{ key: "account", label: "สิทธิ์และบัญชี", icon: ShieldIcon, panel: accountPanel }],
+          afterSave: (d) => update.mutateAsync({ id: profile.id, originalPhone: profile.phone, ...mirror(d) }),
+        }}
+      />
+    );
+  }
+
   return (
     <Modal
       open={profile !== null}
@@ -917,7 +1003,7 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
         {profile && current && (
           <div className="space-y-4">
             <div role="tablist" aria-label="หัวข้อข้อมูลผู้ใช้งาน" className="flex overflow-x-auto border-b border-border [container-type:inline-size] [scrollbar-width:none]">
-              {USER_TABS.filter((t) => t.key !== "qr" || linkedStudent).map((t) => (
+              {USER_TABS.map((t) => (
                 <button
                   key={t.key}
                   type="button"
@@ -1003,133 +1089,16 @@ function EditUserSheet({ profile, onClose }: { profile: ProfileRow | null; onClo
                     />
                   </Field>
                 </FormSection>
-
-                {isStudent && linkedStudent && (
-                  <StudentInfoReadOnly
-                    student={linkedStudent}
-                    grade={allGradeLevels.find((g) => g.id === linkedStudent.grade_level_id)}
-                  />
-                )}
               </div>
 
               <div hidden={tab !== "account"} className="space-y-4">
-                <FormSection icon={<ShieldIcon className="h-4 w-4" />}>
-                  <RolePicker
-                    roles={current.roles}
-                    positionTitleIds={current.positionTitleIds}
-                    positionTitles={positionTitles}
-                    onAddRole={addRole}
-                    onRemoveRole={removeRole}
-                    onAddTitle={addTitle}
-                    onRemoveTitle={removeTitle}
-                  />
-
-                  {current.roles.includes("teacher") && (
-                    <TeacherFields
-                      teacherCode={current.teacher_code}
-                      learningAreaId={current.learning_area_id}
-                      onChange={(patch) => setDraft({ ...current, ...patch })}
-                    />
-                  )}
-
-                  {me && isOrgWide(me.roles) && (
-                    <Field label="แผนก" error={err("department_id")}>
-                      <Select
-                        value={current.department_id ?? ""}
-                        onChange={(e) => setDraft({ ...current, department_id: e.target.value || null })}
-                      >
-                        <option value="">ทุกแผนก</option>
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </Select>
-                    </Field>
-                  )}
-
-                  <div className="flex items-center justify-between py-2">
-                    <span className="text-sm font-medium">เปิดใช้งานบัญชี</span>
-                    <Switch
-                      checked={current.is_active}
-                      onChange={(v) => setDraft({ ...current, is_active: v })}
-                      label="เปิดใช้งานบัญชี"
-                    />
-                  </div>
-                </FormSection>
-
-                <FormSection icon={<TrashIcon className="h-4 w-4" />}>
-                  {/* wrapper takes FormSection's row padding, else the button's border sits flush against the clipped rounded edge */}
-                  <div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full text-destructive"
-                      disabled={profile.id === me?.id || deleteUser.isPending}
-                      onClick={remove}
-                    >
-                      ลบผู้ใช้งาน
-                    </Button>
-                  </div>
-                </FormSection>
+                {accountPanel}
               </div>
             </form>
-            {tab === "qr" && linkedStudent && (
-              <StudentQrCard admin studentId={linkedStudent.id} studentName={`${linkedStudent.first_name} ${linkedStudent.last_name}`} />
-            )}
           </div>
         )}
       </SheetFormContext.Provider>
     </Modal>
-  );
-}
-
-/** Student-table data the profile form can't edit (class, health, address…). Read-only here; edited from the Roster page. */
-function StudentInfoReadOnly({ student: s, grade }: { student: Student; grade?: { code: string } }) {
-  const address = [
-    s.house_no && `เลขที่ ${s.house_no}`,
-    s.village_no && `หมู่ ${s.village_no}`,
-    s.alley && `ซอย ${s.alley}`,
-    s.road && `ถนน ${s.road}`,
-    s.subdistrict && `ต.${s.subdistrict}`,
-    s.district && `อ.${s.district}`,
-    s.province && `จ.${s.province}`,
-    s.postal_code,
-  ]
-    .filter(Boolean)
-    .join(" ");
-  const { data: classroom } = useStudentClassroomName(s.id);
-  const { data: contacts = [] } = useStudentContacts(s.id);
-  const guardians = contacts
-    .map(
-      (c) =>
-        `${c.relationship === "other" ? (c.relationship_note ?? RELATIONSHIP_LABEL.other) : RELATIONSHIP_LABEL[c.relationship]}: ${[c.prefix, c.first_name, c.last_name].filter(Boolean).join("")}${c.phone ? ` · ${c.phone}` : ""}`,
-    )
-    .join("\n");
-  const rows: [string, string | null][] = [
-    ["สถานะนักเรียน", STATUS_LABEL[s.status]],
-    ["ระดับชั้น", grade ? gradeShortLabel(grade.code) : null],
-    ["ห้อง", classroom ?? null],
-    ["ผู้ปกครอง", guardians || null],
-    ["ที่อยู่", address || null],
-    ["หมู่เลือด", s.blood_type && s.blood_type !== "unknown" ? s.blood_type : null],
-    ["โรคประจำตัว", s.chronic_disease],
-    ["ยาที่แพ้", s.drug_allergy],
-    ["อาหารที่แพ้", s.food_allergy],
-    ["สถานภาพครอบครัว", s.family_status],
-  ];
-  return (
-    <FormSection title="ข้อมูลนักเรียน (แก้ไขที่ทะเบียนนักเรียน)">
-      {rows.map(([label, value]) => (
-        <Field key={label} label={label}>
-          {label === "ผู้ปกครอง" && value ? (
-            <p className="whitespace-pre-line text-sm">{value}</p>
-          ) : (
-            <Input value={value ?? "—"} disabled readOnly />
-          )}
-        </Field>
-      ))}
-    </FormSection>
   );
 }
 

@@ -4,6 +4,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { MapPicker } from "@/components/MapPicker";
 import { ImportSheet } from "@/components/ImportSheet";
 import { Modal } from "@/components/Modal";
+import { StudentQrCard } from "@/components/StudentQrCard";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Avatar, AvatarCard, BuddhistDateSelect, Card, EmptyState, Field, FormSection, Input, Select, SheetFormContext, Skeleton, Spinner, Switch } from "@/components/ui";
@@ -841,7 +842,8 @@ export function Roster() {
 }
 
 type StudentTab = "general" | "contact" | "health" | "guardian";
-const STUDENT_TABS: { key: StudentTab; label: string; icon: typeof ProfileIcon }[] = [
+type TabDef = { key: string; label: string; icon: typeof ProfileIcon };
+const STUDENT_TABS: (TabDef & { key: StudentTab })[] = [
   { key: "general", label: "ข้อมูลทั่วไป", icon: ProfileIcon },
   { key: "contact", label: "ที่อยู่", icon: HomeIcon },
   { key: "health", label: "สุขภาพ", icon: ShieldIcon },
@@ -883,18 +885,21 @@ export function EditStudentSheet({
   target,
   onClose,
   forceReadOnly = false,
+  extra,
 }: {
   target: Student | "new" | null;
   onClose: () => void;
   /** Callers outside the roster's own manage flow (e.g. the read-only Classrooms page) force view-only regardless of the viewer's role. */
   forceReadOnly?: boolean;
+  /** The Users page reuses this exact form for a student's login: its own title, extra tabs (e.g. สิทธิ์และบัญชี) and a step to run after the student row is saved. */
+  extra?: { title?: string; tabs: (TabDef & { panel: React.ReactNode })[]; afterSave?: (draft: StudentDraft) => Promise<unknown> };
 }) {
   const { profile: me } = useAuth();
   const toast = useToast();
   const { data: departments = [] } = useDepartments();
   const save = useSaveStudent();
   const [draft, setDraft] = useState<StudentDraft | null>(null);
-  const [tab, setTab] = useState<StudentTab>("general");
+  const [tab, setTab] = useState<string>("general");
   const [attempted, setAttempted] = useState(false); // show field errors only after the first save attempt
   // Picked photo, applied on save (the student id of a new row doesn't exist yet); "remove" clears the stored one.
   const [avatar, setAvatar] = useState<File | "remove" | null>(null);
@@ -963,17 +968,25 @@ export function EditStudentSheet({
     const guardianDrafts = currentGuardians;
     const guardianRows = loadedGuardians.rows;
     const source = currentSource;
+    const draftToSave = current;
     save
       .mutateAsync({ ...current, ...(isNew ? {} : { id: (target as Student).id }), avatar: avatar ?? undefined })
       .then(async (id) => {
         if (guardiansEdited) await saveGuardians(id, guardianDrafts, guardianRows, source);
+        await extra?.afterSave?.(draftToSave);
         toast("บันทึกข้อมูลนักเรียนสำเร็จ");
       })
       .catch((err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"));
     close();
   }
 
-  const title = isNew ? "เพิ่มนักเรียน" : readOnly ? "ข้อมูลนักเรียน" : "แก้ไขข้อมูลนักเรียน";
+  const title = extra?.title ?? (isNew ? "เพิ่มนักเรียน" : readOnly ? "ข้อมูลนักเรียน" : "แก้ไขข้อมูลนักเรียน");
+  const mayBarcode = !isNew && !forceReadOnly && !!me && canIssueBarcode(me.roles);
+  const tabs: TabDef[] = [
+    ...STUDENT_TABS,
+    ...(mayBarcode ? [{ key: "barcode", label: "บาร์โค้ด", icon: BarcodeIcon }] : []),
+    ...(extra?.tabs ?? []),
+  ];
   const footer = current ? (
     <div className="flex gap-2">
       <Button type="button" variant="outline" className="flex-1" onClick={close}>
@@ -991,7 +1004,7 @@ export function EditStudentSheet({
       {current && (
         <div className="space-y-4">
           <div role="tablist" aria-label="หัวข้อข้อมูลนักเรียน" className="flex overflow-x-auto border-b border-border [container-type:inline-size] [scrollbar-width:none]">
-            {STUDENT_TABS.map((t) => (
+            {tabs.map((t) => (
               <button
                 key={t.key}
                 type="button"
@@ -1245,6 +1258,15 @@ export function EditStudentSheet({
             />
           </fieldset>
           </div>
+
+          {extra?.tabs.map((t) => (
+            <div key={t.key} hidden={tab !== t.key} className="space-y-4">
+              {t.panel}
+            </div>
+          ))}
+          {tab === "barcode" && mayBarcode && (
+            <StudentQrCard admin studentId={(target as Student).id} studentName={`${current.first_name} ${current.last_name}`} />
+          )}
         </div>
       )}
     </>
