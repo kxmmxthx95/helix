@@ -21,7 +21,7 @@ export function TopupFlipCard({ kid }: { kid: PortalStudent }) {
   const [flipped, setFlipped] = useState(false);
   const { data: qr } = useStudentQr(kid.id);
   const frozen = qr?.status === "frozen";
-  const barcode = useBarcodeImage(qr && !frozen ? qr.token : null);
+  const barcode = useBarcodeImage(qr && !frozen ? qr.token : null, 6);
   const { data: departments = [] } = useDepartments();
   const { data: grades = [] } = useGradeLevels(kid.department_id);
   const { data: settings } = useSchoolSettings();
@@ -31,7 +31,7 @@ export function TopupFlipCard({ kid }: { kid: PortalStudent }) {
   const toggle = () => setFlipped((f) => !f);
 
   const front = (
-    <div className={cn(FACE, "flex flex-col justify-between p-4 text-white")} style={{ backgroundImage: "linear-gradient(135deg,#ff7aa8,#ff2d55 60%,#c026d3)", backfaceVisibility: "hidden" }} aria-hidden={flipped}>
+    <div className={cn(FACE, "flex flex-col justify-between gap-3 p-4 text-white")} style={{ backgroundImage: "linear-gradient(135deg,#ff7aa8,#ff2d55 60%,#c026d3)", backfaceVisibility: "hidden" }} aria-hidden={flipped}>
       <div className="flex items-center gap-3">
         <Avatar name={`${kid.first_name} ${kid.last_name}`} src={studentAvatarUrl(kid)} className="size-12 shrink-0 text-base ring-2 ring-white/70" />
         <div className="min-w-0">
@@ -43,7 +43,7 @@ export function TopupFlipCard({ kid }: { kid: PortalStudent }) {
           </p>
         </div>
       </div>
-      <div className="rounded-xl bg-white p-1.5">
+      <div className="rounded-xl bg-white px-1 py-1.5">
         {barcode ? (
           <img src={barcode} alt={`บาร์โค้ดชำระเงินของ ${kid.first_name}`} className="mx-auto h-16 w-full object-contain" />
         ) : (
@@ -52,7 +52,6 @@ export function TopupFlipCard({ kid }: { kid: PortalStudent }) {
           </p>
         )}
       </div>
-      <p className="text-right text-[11px] text-white/80">แตะเพื่อพลิก</p>
     </div>
   );
 

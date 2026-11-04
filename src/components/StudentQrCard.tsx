@@ -7,14 +7,14 @@ import { useIssueQr, useSetFrozen, useStudentQr } from "@/hooks/useCardTopup";
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "บันทึกไม่สำเร็จ");
 
-export function useBarcodeImage(token: string | null) {
+export function useBarcodeImage(token: string | null, margin = 16) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     if (!token) return setSrc(null);
     const canvas = document.createElement("canvas");
-    JsBarcode(canvas, token, { format: "CODE128", width: 2, height: 110, margin: 16, displayValue: false });
+    JsBarcode(canvas, token, { format: "CODE128", width: 2, height: 110, margin, displayValue: false });
     setSrc(canvas.toDataURL("image/png"));
-  }, [token]);
+  }, [token, margin]);
   return src;
 }
 
