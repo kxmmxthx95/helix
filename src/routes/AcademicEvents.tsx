@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { BuildingIcon, CalendarIcon, CheckmarkCircleIcon, ChevronBack, ChevronForward, DownloadIcon, InfoIcon, Plus } from "@/components/icons";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, SheetStyleContext } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, Field, FormSection, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import {
@@ -24,7 +25,7 @@ const EVENT_TYPE_LABEL: Record<AcademicEventType, string> = {
   holiday: "วันหยุด",
   school_event: "กิจกรรมโรงเรียน",
   exam_period: "ช่วงสอบ",
-  teacher_workday: "วันครูทำงาน (เด็กหยุด)",
+  teacher_workday: "วันครูทำงาน",
   suspended: "ปิดกรณีพิเศษ",
 };
 
@@ -87,7 +88,23 @@ const withMonth = (d: Date, year: number, month: number) =>
   new Date(year, month, Math.min(d.getDate(), new Date(year, month + 1, 0).getDate()));
 const shortDate = (iso: string) => fromISODate(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
 
+const sameMonth = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+/** Which type colours a phone-grid cell when a day has several events. */
+const TYPE_PRIORITY: AcademicEventType[] = ["holiday", "suspended", "exam_period", "school_event", "teacher_workday"];
+
 const ATTEND_GOAL = 100;
+
+function useIsPhone() {
+  const q = "(max-width: 767px)";
+  const [phone, setPhone] = useState(() => window.matchMedia(q).matches);
+  useEffect(() => {
+    const m = window.matchMedia(q);
+    const on = () => setPhone(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return phone;
+}
 
 /** Student-only: distinct days present/late in the term containing today, against ATTEND_GOAL. */
 function AttendanceDaysBadge() {
@@ -119,6 +136,8 @@ function AttendanceDaysBadge() {
 
 export function AcademicEvents() {
   const { profile: me } = useAuth();
+  const navigate = useNavigate();
+  const phone = useIsPhone();
   const { data: events = [], isLoading } = useAcademicEvents();
   const del = useDeleteAcademicEvent();
   const syncHolidays = useSyncHolidays();
@@ -175,6 +194,12 @@ export function AcademicEvents() {
         .slice(0, 5),
     [visibleEvents, todayISO],
   );
+
+  /** Phone nav: today's date when landing on the current month, else the 1st. */
+  function shiftMonth(dir: -1 | 1) {
+    const next = new Date(focus.getFullYear(), focus.getMonth() + dir, 1);
+    setFocus(sameMonth(next, new Date()) ? new Date() : next);
+  }
 
   function go(dir: -1 | 1) {
     if (view === "week") setFocus(addDays(focus, 7 * dir));
@@ -240,7 +265,120 @@ export function AcademicEvents() {
 
   return (
     <div className="space-y-4">
-        <div className={cn("flex flex-wrap items-center gap-2", isStudent && "justify-center")}>
+      {/* Phone layout (<md): attendance-summary style month grid + selected-day agenda. */}
+      {phone && (
+        <SheetStyleContext.Provider value="ios">
+          <Sheet open onOpenChange={(o) => !o && navigate(-1)} title="ปฏิทินกิจกรรม" bodyClassName="min-h-[70dvh]">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            aria-label="เดือนก่อนหน้า"
+            onClick={() => shiftMonth(-1)}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60"
+          >
+            <ChevronBack className="h-4 w-4" />
+          </button>
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            {focus.toLocaleDateString("th-TH", { month: "long", year: "numeric" })}
+            {!sameMonth(focus, new Date()) && (
+              <button type="button" onClick={() => setFocus(new Date())} className="rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium">
+                วันนี้
+              </button>
+            )}
+          </span>
+          <button
+            type="button"
+            aria-label="เดือนถัดไป"
+            onClick={() => shiftMonth(1)}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60"
+          >
+            <ChevronForward className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-7 gap-1.5 text-center">
+          {WEEKDAY_LABEL.map((w) => (
+            <span key={w} className="text-[11px] font-medium text-muted-foreground">
+              {w}
+            </span>
+          ))}
+          {Array.from({ length: monthStart.getDay() }, (_, i) => (
+            <span key={`pad-${i}`} />
+          ))}
+          {monthDays
+            .filter((d) => sameMonth(d, focus))
+            .map((day) => {
+              const iso = toISODate(day);
+              const dayEvents = eventsByDay.get(iso) ?? [];
+              const top = TYPE_PRIORITY.find((t) => dayEvents.some((e) => e.event_type === t));
+              return (
+                <button
+                  key={iso}
+                  type="button"
+                  aria-label={`${day.getDate()}${dayEvents.length ? ` ${dayEvents.map((e) => e.name).join(", ")}` : ""}`}
+                  aria-pressed={iso === focusISO}
+                  onClick={() => setFocus(day)}
+                  className={cn(
+                    "relative flex aspect-square items-center justify-center rounded-xl text-sm tabular-nums",
+                    top ? cn("font-semibold text-white", EVENT_TYPE_DOT[top]) : isWeekend(day) ? "bg-muted/30 text-muted-foreground/70" : "bg-muted/60 text-muted-foreground",
+                    iso === todayISO && "font-bold underline underline-offset-2",
+                    iso === focusISO && "ring-2 ring-foreground ring-offset-1 ring-offset-background",
+                  )}
+                >
+                  {day.getDate()}
+                  {dayEvents.length > 1 && (
+                    <span className="absolute right-0.5 top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-background/90 px-0.5 text-[9px] font-bold leading-none text-foreground">
+                      {dayEvents.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+        </div>
+
+        <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+          {(Object.keys(EVENT_TYPE_LABEL) as AcademicEventType[]).map((t) => (
+            <button
+              key={t}
+              type="button"
+              aria-pressed={!hidden.has(t)}
+              onClick={() =>
+                setHidden((h) => {
+                  const next = new Set(h);
+                  if (!next.delete(t)) next.add(t);
+                  return next;
+                })
+              }
+              className={cn("inline-flex items-center gap-1", hidden.has(t) && "opacity-40 line-through")}
+            >
+              <span aria-hidden className={cn("h-2.5 w-2.5 rounded-full", EVENT_TYPE_DOT[t])} />
+              {EVENT_TYPE_LABEL[t]}
+            </button>
+          ))}
+        </p>
+
+        <Card className="space-y-3">
+          <p className="text-sm font-semibold">
+            {focus.toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+          </p>
+          {(eventsByDay.get(focusISO) ?? []).length === 0 ? (
+            <p className="py-4 text-center text-xs text-muted-foreground">ไม่มีกิจกรรม</p>
+          ) : (
+            (eventsByDay.get(focusISO) ?? []).map(eventRow)
+          )}
+          {canCreateOn(focus) && (
+            <Button variant="outline" size="sm" onClick={() => setCreating(focusISO)}>
+              <Plus className="h-3.5 w-3.5" /> เพิ่มกิจกรรมวันนี้
+            </Button>
+          )}
+        </Card>
+      </div>
+          </Sheet>
+        </SheetStyleContext.Provider>
+      )}
+
+        <div className={cn("hidden flex-wrap items-center gap-2 md:flex", isStudent && "justify-center")}>
           <Button variant="outline" size="icon" onClick={() => go(-1)} aria-label="ก่อนหน้า">
             <ChevronBack className="h-4 w-4" />
           </Button>
@@ -324,7 +462,7 @@ export function AcademicEvents() {
           )}
         </div>
 
-      <div className={cn("grid items-start gap-4", !isStudent && "lg:grid-cols-[1fr_20rem]")}>
+      <div className={cn("hidden items-start gap-4 md:grid", !isStudent && "lg:grid-cols-[1fr_20rem]")}>
       <div className="min-w-0 space-y-4">
         {view === "month" && (
           <div className="font-sarabun grid grid-cols-7 overflow-hidden rounded-2xl border-l border-t border-border bg-card">
