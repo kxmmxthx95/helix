@@ -33,7 +33,7 @@ import { TeacherTimetable } from "@/routes/Timetable";
 
 const WIDGET = "min-w-0 rounded-[24px] bg-card text-card-foreground shadow-card";
 // Banner gradient: five colours laid out as soft blobs; the teacher picks a preset or tunes the colours.
-const BANNER_PRESETS: { name: string; colors: string[] }[] = [
+export const BANNER_PRESETS: { name: string; colors: string[] }[] = [
   { name: "พระอาทิตย์ตก", colors: ["#ff9a3c", "#ffd86b", "#ff7a8a", "#5ad6e8", "#7ee8d0"] },
   { name: "ชมพูหวาน", colors: ["#ff6fae", "#ffc2dc", "#ff8fb8", "#c9a7ff", "#ffd6e8"] },
   { name: "มหาสมุทร", colors: ["#2f80ed", "#56ccf2", "#6ee7d0", "#a5b4fc", "#38bdf8"] },
@@ -42,7 +42,7 @@ const BANNER_PRESETS: { name: string; colors: string[] }[] = [
   { name: "เงินเมทัลลิก", colors: ["#e5e7eb", "#9ca3af", "#f9fafb", "#6b7280", "#d1d5db"] },
 ];
 const BANNER_POS = ["0% 10%", "38% 100%", "62% 60%", "85% 0%", "100% 100%"];
-const bannerBackground = (c: string[]) => ({
+export const bannerBackground = (c: string[]) => ({
   backgroundColor: c[0],
   backgroundImage: c.map((col, i) => `radial-gradient(38% 120% at ${BANNER_POS[i]}, ${col}, transparent 70%)`).join(", "),
 });

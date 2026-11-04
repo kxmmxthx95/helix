@@ -47,15 +47,6 @@ const TITLES: Record<string, string> = {
 type Icon = typeof BookIcon;
 type NavItem = { to: string; label: string; icon: Icon };
 
-/** Mobile bottom bar. */
-const TABS: readonly NavItem[] = [
-  { to: "/", label: "หน้าแรก", icon: HomeIcon },
-  { to: "/timetable", label: "ตารางเรียน", icon: TimetableIcon },
-  { to: "/exams", label: "สอบ", icon: DocumentTextIcon },
-  { to: "/practice", label: "แบบฝึกหัด", icon: BookIcon },
-  { to: "/profile", label: "โปรไฟล์", icon: ProfileIcon },
-];
-
 /** Desktop sidebar. */
 const SIDE: readonly NavItem[] = [
   { to: "/", label: "หน้าแรก", icon: HomeIcon },
@@ -201,8 +192,6 @@ function GameShellInner() {
             </div>
           )}
         </main>
-
-        <TabBar pathname={location.pathname} />
       </div>
     </div>
   );
@@ -259,34 +248,5 @@ function Sidebar({ pathname, collapsed }: { pathname: string; collapsed: boolean
         </div>
       </div>
     </aside>
-  );
-}
-
-function TabBar({ pathname }: { pathname: string }) {
-  const navigate = useNavigate();
-  return (
-    <nav
-      aria-label="เมนูหลัก"
-      className="relative z-20 shrink-0 border-t-[0.5px] border-border bg-card/80 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 lg:hidden"
-    >
-      <ul className="mx-auto grid max-w-[480px] grid-cols-5">
-        {TABS.map(({ to, label, icon: Icon }) => {
-          const active = isActive(pathname, to);
-          return (
-            <li key={to}>
-              <button
-                type="button"
-                aria-current={active ? "page" : undefined}
-                onClick={() => navigate(to)}
-                className={cn("flex h-[3.25rem] w-full flex-col items-center justify-center gap-0.5 rounded-lg pt-0.5 transition-transform active:scale-90", FOCUS)}
-              >
-                <Icon className={cn("h-6 w-6", active ? "text-primary" : "text-muted-foreground")} />
-                <span className={cn("text-[10px] font-medium leading-tight", active ? "text-primary" : "text-muted-foreground")}>{label}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
   );
 }

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AnimatePresence, motion, useReducedMotion, type PanInfo } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
@@ -28,10 +28,11 @@ import { avatarUrl } from "@/hooks/useAvatar";
 import { STARTING_SCORE, summarizeBehaviorScore, useBehaviorRecords } from "@/hooks/useBehaviorRecords";
 import { profileFullName } from "@/lib/database.types";
 import { deriveBadges, expFromCounts, levelFromExp, rankFromExp } from "@/lib/exp";
-import { useMyIslands, type Island } from "@/lib/islands";
+import { useMyIslands } from "@/lib/islands";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { SubmitSheet } from "@/routes/Assignments";
+import { BANNER_PRESETS, bannerBackground } from "@/routes/TeacherHome";
 import {
   AttendanceSummarySection,
   BehaviorScoreSection,
@@ -39,7 +40,6 @@ import {
   currentAcademicYearRange,
   currentMonthRange,
 } from "@/routes/Dashboard";
-import { useOpenExamSubjectIds } from "@/routes/Exams";
 
 type Icon = typeof BookIcon;
 type Panel = "attendance" | "behavior" | "leave" | "bag" | "subjects";
@@ -52,7 +52,6 @@ const PANEL_TITLE: Record<Panel, string> = {
   subjects: "วิชาของฉัน",
 };
 
-const ISLAND_KEY = "helix.island";
 
 /** Lifetime counts for the caller only (RPC resolves the student from auth.uid()). */
 function useLifetimeExp() {
@@ -122,52 +121,9 @@ const AREA_GRADIENT: Record<string, string> = {
 };
 const gradientOf = (code: string) => AREA_GRADIENT[code] ?? AREA_GRADIENT.other;
 
-/** island-{code}.webp → island-other.webp → emoji. */
-function IslandArt({ code, className }: { code: string; className?: string }) {
-  const chain = code === "other" ? ["island-other"] : [`island-${code}`, "island-other"];
-  const [step, setStep] = useState(0);
-  const src = chain[step];
-  if (src) {
-    return (
-      <img
-        src={`/game/${src}.webp`}
-        alt=""
-        draggable={false}
-        className={cn("pointer-events-none select-none object-contain drop-shadow-[0_14px_16px_rgba(45,10,43,0.35)]", className)}
-        onError={() => setStep((s) => s + 1)}
-      />
-    );
-  }
-  return (
-    <div className={cn("pointer-events-none flex select-none items-center justify-center", className)} aria-hidden>
-      <span className="text-[min(7rem,26vw)] leading-none drop-shadow-[0_8px_10px_rgba(45,10,43,0.3)]">{AREA_EMOJI[code] ?? AREA_EMOJI.other}</span>
-    </div>
-  );
-}
-
 /* ---------- helpers ---------- */
 
-function dueInfo(d: string | null): { label: string; tone: "late" | "soon" | "calm" | "none" } {
-  if (!d) return { label: "ไม่มีกำหนดส่ง", tone: "none" };
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const days = Math.round((new Date(`${d}T00:00:00`).getTime() - today.getTime()) / 86400000);
-  if (days < 0) return { label: `เลยกำหนด ${-days} วัน`, tone: "late" };
-  if (days === 0) return { label: "ส่งวันนี้", tone: "soon" };
-  if (days <= 2) return { label: `อีก ${days} วัน`, tone: "soon" };
-  return { label: `อีก ${days} วัน`, tone: "calm" };
-}
-
-function readSaved() {
-  try {
-    return sessionStorage.getItem(ISLAND_KEY);
-  } catch {
-    return null;
-  }
-}
-
 const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
-const FEATURE_BG = "bg-[linear-gradient(160deg,#ff7aa8_0%,#ff2d55_55%,#c2185b_100%)]";
 
 function SectionHead({ title, onMore, more = "ดูทั้งหมด" }: { title: string; onMore?: () => void; more?: string }) {
   return (
@@ -214,8 +170,7 @@ export function GameHud() {
   const { data: termAttendance = [] } = useAttendanceRange({ studentId: studentId ?? "", startDate: termRange.start, endDate: termRange.end });
   const { data: termBehavior = [] } = useBehaviorRecords({ studentId: studentId ?? "", startDate: termRange.start, endDate: termRange.end });
   const { data: life } = useLifetimeExp();
-  const { islands, isLoading: islandsLoading } = useMyIslands(myStudent);
-  const openExamSubjects = useOpenExamSubjectIds(studentId);
+  const { islands } = useMyIslands(myStudent);
 
   const counts = summarizeAttendance(attendance);
   const pending = items.filter((item) => {
@@ -256,40 +211,8 @@ export function GameHud() {
     behaviorStart: STARTING_SCORE,
   });
 
-  let termPct: number | null = null;
-  if (term?.start_date && term.end_date) {
-    const total = Date.parse(term.end_date) - Date.parse(term.start_date);
-    termPct = total > 0 ? Math.min(100, Math.max(0, ((Date.now() - Date.parse(term.start_date)) / total) * 100)) : null;
-  }
-  const termLabel = term ? (term.term_type === "term1" ? "ภาคเรียน 1" : term.term_type === "term2" ? "ภาคเรียน 2" : "ภาคฤดูร้อน") : "";
-
   const firstName = myStudent?.first_name ?? profile?.first_name ?? "";
 
-  // Hero carousel: remembered by subject id for the tab session.
-  const [selectedId, setSelectedId] = useState<string | null>(readSaved);
-  const [dir, setDir] = useState(1);
-  const found = islands.findIndex((i) => i.subject.id === selectedId);
-  const index = found >= 0 ? found : 0;
-  const island: Island | null = islands[index] ?? null;
-
-  function select(i: number, d: number) {
-    const target = islands[(i + islands.length) % islands.length];
-    if (!target) return;
-    setDir(d);
-    setSelectedId(target.subject.id);
-    try {
-      sessionStorage.setItem(ISLAND_KEY, target.subject.id);
-    } catch {
-      /* storage blocked — selection just won't persist */
-    }
-  }
-  const step = (d: number) => islands.length > 1 && select(index + d, d);
-  function onDragEnd(_: unknown, info: PanInfo) {
-    if (info.offset.x < -60 || info.velocity.x < -400) step(1);
-    else if (info.offset.x > 60 || info.velocity.x > 400) step(-1);
-  }
-
-  const hasHard = !!island && openExamSubjects.has(island.subject.id);
   const menu: { label: string; icon: Icon; color: string; onClick: () => void; badge?: number }[] = [
     { label: "งาน", icon: ClipboardIcon, color: "linear-gradient(160deg,#ff7a7a,#ff3b30)", onClick: () => navigate("/assignments"), badge: pending },
     { label: "สอบ", icon: DocumentTextIcon, color: "linear-gradient(160deg,#ffb84d,#ff9500)", onClick: () => navigate("/exams") },
@@ -310,163 +233,60 @@ export function GameHud() {
     return !q || i.subject.name_th.toLowerCase().includes(q) || i.subject.code.toLowerCase().includes(q);
   });
 
-  function focusIsland(i: number) {
-    select(i, i >= index ? 1 : -1);
-    document.getElementById("student-scroll")?.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
-  }
-
-  const todayLabel = new Date().toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long" });
+  const focusIsland = () => navigate("/assignments");
 
   return (
     <div className="pb-8">
       <div className="mx-auto max-w-5xl px-4 lg:px-8">
-        {/* ===== Large title ===== */}
-        <header className="pb-3 pt-[max(env(safe-area-inset-top),1rem)] lg:pt-8">
-          <div className="flex items-center justify-between">
-            <p className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">{todayLabel}</p>
-            <button type="button" aria-label="โปรไฟล์" onClick={() => navigate("/profile")} className={cn("rounded-full", FOCUS)}>
-              {profile && <Avatar name={profileFullName(profile)} src={avatarUrl(profile)} className="h-9 w-9" />}
-            </button>
-          </div>
-          <div className="mt-1 flex items-center gap-3">
-            <h1 className="min-w-0 flex-1 truncate font-heading text-[34px] font-bold leading-10 tracking-tight">สวัสดี {firstName}</h1>
+        {/* ===== Profile card (same look as the teacher home) ===== */}
+        <header className="mt-[max(env(safe-area-inset-top),1rem)] overflow-hidden rounded-[24px] bg-card text-card-foreground shadow-card lg:mt-8">
+          <div className="relative h-24 sm:h-32" style={bannerBackground(BANNER_PRESETS[0]!.colors)}>
             <button
               type="button"
               aria-label="ค้นหาวิชา"
               onClick={() => setPanel("subjects")}
-              className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary text-accent", FOCUS)}
+              className={cn("absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/85 text-accent shadow-card transition-transform active:scale-95", FOCUS)}
             >
               <Search className="h-5 w-5" />
             </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setPanel("bag")}
-            aria-label={`เลเวล ${lvl.level} ดูกระเป๋า`}
-            className={cn("mt-3 flex w-full items-center gap-3 rounded-xl text-left", FOCUS)}
-          >
-            <span className="shrink-0 rounded-full bg-primary px-2.5 text-xs font-bold leading-5 text-white">Lv.{lvl.level}</span>
-            <span
-              className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-foreground/10"
-              role="progressbar"
-              aria-label={`EXP เลเวล ${lvl.level}`}
-              aria-valuemin={0}
-              aria-valuemax={lvl.span}
-              aria-valuenow={lvl.into}
+          <div className="px-4 pb-4 sm:px-6 sm:pb-5">
+            <button type="button" aria-label="โปรไฟล์" onClick={() => navigate("/profile")} className={cn("relative z-10 -mt-10 block rounded-full sm:-mt-12", FOCUS)}>
+              {profile && <Avatar name={profileFullName(profile)} src={avatarUrl(profile)} className="h-20 w-20 text-3xl ring-4 ring-card sm:h-24 sm:w-24" />}
+            </button>
+            <h1 className="mt-3 truncate font-heading text-2xl font-bold tracking-[-0.02em] sm:text-3xl">สวัสดี {firstName}</h1>
+            <p className="mt-1 truncate text-base text-muted-foreground">{profile ? profileFullName(profile) : ""}</p>
+            <button
+              type="button"
+              onClick={() => setPanel("bag")}
+              aria-label={`เลเวล ${lvl.level} ดูกระเป๋า`}
+              className={cn("mt-4 flex w-full items-center gap-3 rounded-xl text-left", FOCUS)}
             >
-              <motion.span
-                className="block h-full rounded-full bg-primary"
-                initial={reduce ? false : { width: 0 }}
-                animate={{ width: `${Math.round((lvl.into / lvl.span) * 100)}%` }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-              />
-            </span>
-            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-              {lvl.into}/{lvl.span} EXP
-            </span>
-          </button>
+              <span className="shrink-0 rounded-full bg-primary px-2.5 text-xs font-bold leading-5 text-white">Lv.{lvl.level}</span>
+              <span
+                className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-foreground/10"
+                role="progressbar"
+                aria-label={`EXP เลเวล ${lvl.level}`}
+                aria-valuemin={0}
+                aria-valuemax={lvl.span}
+                aria-valuenow={lvl.into}
+              >
+                <motion.span
+                  className="block h-full rounded-full bg-primary"
+                  initial={reduce ? false : { width: 0 }}
+                  animate={{ width: `${Math.round((lvl.into / lvl.span) * 100)}%` }}
+                  transition={{ duration: 0.8, ease: "easeOut" }}
+                />
+              </span>
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                {lvl.into}/{lvl.span} EXP
+              </span>
+            </button>
+          </div>
         </header>
 
-        <div>
+        <div className="mt-4">
           <div className="min-w-0">
-            {/* ===== Featured card (Today-style) ===== */}
-            <section
-              className={cn("relative overflow-hidden rounded-[22px] text-white shadow-[0_8px_24px_rgba(255,45,85,0.28)]", FEATURE_BG)}
-              aria-roledescription="carousel"
-              aria-label="งานของแต่ละวิชา"
-            >
-              <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/15 blur-2xl" />
-              <div className="relative min-h-[14rem] p-5 lg:min-h-[15rem] lg:p-7">
-                {islandsLoading && islands.length === 0 ? (
-                  <div className="space-y-3 pt-2" role="status" aria-label="กำลังโหลด">
-                    <div className="h-4 w-24 rounded-full bg-white/25" />
-                    <div className="h-8 w-3/4 rounded-lg bg-white/25" />
-                    <div className="h-4 w-1/2 rounded-full bg-white/25" />
-                  </div>
-                ) : !island ? (
-                  <div className="pt-2">
-                    <p className="text-[13px] font-semibold uppercase tracking-wide text-white/80">วิชาของฉัน</p>
-                    <h2 className="mt-1 font-heading text-2xl font-bold leading-tight">ยังไม่มีวิชาในภาคเรียนนี้</h2>
-                    <p className="mt-2 text-sm text-white/85">เมื่อครูเพิ่มวิชาให้ งานที่ต้องส่งจะมาแสดงที่นี่</p>
-                  </div>
-                ) : (
-                  <AnimatePresence mode="wait" custom={dir} initial={false}>
-                    <motion.div
-                      key={island.subject.id}
-                      drag={islands.length > 1 ? "x" : false}
-                      dragConstraints={{ left: 0, right: 0 }}
-                      dragElastic={0.25}
-                      onDragEnd={onDragEnd}
-                      initial={reduce ? false : { opacity: 0, x: dir * 40 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={reduce ? { opacity: 0 } : { opacity: 0, x: dir * -40 }}
-                      transition={{ duration: 0.22 }}
-                      className="relative flex min-h-[11.5rem] touch-pan-y flex-col lg:min-h-[12rem]"
-                    >
-                      <IslandArt code={island.areaCode} className="absolute -right-2 -top-1 h-32 w-32 opacity-95 lg:right-2 lg:h-48 lg:w-48" />
-                      <p className="relative max-w-[62%] text-[13px] font-semibold uppercase leading-tight tracking-wide text-white/85">
-                        {island.next ? "งานถัดไป" : "เรียบร้อย"} · {island.subject.code}
-                      </p>
-                      <p className="relative mt-0.5 max-w-[62%] truncate text-[15px] font-medium text-white/95">{island.subject.name_th}</p>
-                      <div className="relative mt-auto pt-14 lg:max-w-[65%]">
-                        <h2 className="font-heading text-[26px] font-bold leading-[1.15] tracking-tight lg:text-[32px]">
-                          {island.next ? island.next.label : "เคลียร์งานวิชานี้แล้ว 🎉"}
-                        </h2>
-                        <p className="mt-1.5 text-[15px] text-white/90">
-                          {island.next ? `${dueInfo(island.next.due_date).label} · ` : ""}ส่งแล้ว {island.submitted}/{island.total}
-                          {termPct !== null ? ` · ${termLabel} ผ่านไป ${Math.round(termPct)}%` : ""}
-                        </p>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {island.next ? (
-                            <button
-                              type="button"
-                              onClick={() => setBattle(island.next)}
-                              className={cn("h-10 rounded-full bg-white px-6 text-[15px] font-semibold text-[#ff2d55] transition-transform active:scale-95", FOCUS)}
-                            >
-                              ส่งงาน
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => navigate("/assignments")}
-                              className={cn("h-10 rounded-full bg-white px-6 text-[15px] font-semibold text-[#ff2d55] transition-transform active:scale-95", FOCUS)}
-                            >
-                              ดูงานทั้งหมด
-                            </button>
-                          )}
-                          {hasHard && (
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/exams?subject=${encodeURIComponent(island.subject.code)}`)}
-                              className={cn("h-10 rounded-full bg-white/25 px-5 text-[15px] font-semibold backdrop-blur-sm transition-colors hover:bg-white/35", FOCUS)}
-                            >
-                              มีสอบ
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  </AnimatePresence>
-                )}
-              </div>
-              {islands.length > 1 && (
-                <div className="absolute right-4 top-4 flex items-center gap-1 lg:right-6 lg:top-6" role="group" aria-label="เลือกวิชา">
-                  {islands.slice(0, 7).map((isl, i) => (
-                    <button
-                      key={isl.subject.id}
-                      type="button"
-                      aria-label={`วิชา ${isl.subject.name_th}`}
-                      aria-current={i === index ? "true" : undefined}
-                      onClick={() => select(i, i >= index ? 1 : -1)}
-                      className="flex h-5 items-center px-0.5"
-                    >
-                      <span className={cn("block h-1.5 w-1.5 rounded-full bg-white transition-opacity", i === index ? "opacity-100" : "opacity-45")} />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </section>
-
             {/* ===== App-icon menu ===== */}
             <nav aria-label="เมนูลัด" className="mt-6 rounded-[22px] bg-card px-2 py-4 ">
               <ul className="grid grid-cols-4 gap-y-4 lg:grid-cols-6">
@@ -497,14 +317,14 @@ export function GameHud() {
               <section className="mt-8" aria-label="วิชาของฉัน">
                 <SectionHead title="วิชาของฉัน" onMore={() => setPanel("subjects")} />
                 <ul className="scrollbar-hidden -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-4 lg:overflow-visible lg:px-0">
-                  {islands.map((isl, i) => {
+                  {islands.map((isl) => {
                     const ratio = isl.total ? isl.submitted / isl.total : 0;
                     return (
                       <li key={isl.subject.id} className="w-[9.5rem] shrink-0 snap-start lg:w-auto">
                         <button
                           type="button"
                           aria-label={`${isl.subject.name_th} ${isl.pending.length ? `ค้าง ${isl.pending.length} งาน` : "ไม่มีงานค้าง"}`}
-                          onClick={() => focusIsland(i)}
+                          onClick={() => focusIsland()}
                           className={cn(
                             "relative flex aspect-[4/5] w-full flex-col justify-between overflow-hidden rounded-[20px] bg-gradient-to-br p-3 text-left text-white transition-transform active:scale-[0.97]",
                             gradientOf(isl.areaCode),
@@ -566,7 +386,7 @@ export function GameHud() {
                     <button
                       type="button"
                       onClick={() => {
-                        focusIsland(islands.indexOf(isl));
+                        focusIsland();
                         setPanel(null);
                       }}
                       className={cn("flex w-full items-center gap-3 rounded-[14px] bg-card p-3 text-left active:bg-foreground/[0.08]", FOCUS)}
