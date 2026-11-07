@@ -780,7 +780,9 @@ function EditSubjectSheet({
                           }}
                         />
                       </label>
-                      {shown && <p className="text-xs text-muted-foreground">ลากรูปเพื่อปรับตำแหน่ง</p>}
+                      <p className="text-xs text-muted-foreground">
+                        แนะนำ 1600×1000 px (สัดส่วน 16:10) JPG/PNG/WebP ไม่เกิน 10 MB วางส่วนสำคัญไว้กลางภาพ เพราะการ์ดบางขนาดจะตัดขอบ{shown && " · ลากรูปในกรอบเพื่อปรับตำแหน่ง"}
+                      </p>
                       {shown && (
                         <button type="button" className="text-sm font-medium text-destructive" onClick={() => { setCover(null); setCoverPreview(null); setCoverFocus({ x: 50, y: 50 }); }}>
                           ลบปก

@@ -107,7 +107,7 @@ export function useSaveSubject() {
       if (saved.error) throw saved.error;
       if (cover) {
         const sid = saved.data.id;
-        const blob = await compressImage(cover, 1024, 0.82);
+        const blob = await compressImage(cover, 1600, 0.82);
         const up = await supabase.storage.from("subject-covers").upload(sid, blob, { upsert: true, contentType: "image/jpeg" });
         if (up.error) throw up.error;
         const { error } = await supabase.from("subjects").update({ cover_path: sid }).eq("id", sid);
