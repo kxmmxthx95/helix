@@ -648,7 +648,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         {!onSale ? adminView : !terminal ? picker : saleBody}
       </div>
 
-      <Modal open={todayOpen} onOpenChange={setTodayOpen} title="รายการวันนี้">
+      <Modal open={todayOpen} onOpenChange={setTodayOpen} title="รายการวันนี้" className="max-w-2xl">
         <TodayPanel />
       </Modal>
       <Modal open={codeOpen} onOpenChange={(o) => (setCodeOpen(o), !o && setCode(""))} title="ค้นหานักเรียน">
@@ -1237,81 +1237,170 @@ function RecentTx({ studentId }: { studentId: string }) {
 }
 
 function TodayPanel() {
-  const toast = useToast();
   const { data, isLoading, error } = usePosMyToday();
   const voidTx = usePosVoid();
-  const [target, setTarget] = useState<string | null>(null);
+  const toast = useToast();
+  const [filter, setFilter] = useState<"all" | "sale" | "topup_cash" | "voided">("all");
+  const [targetId, setTargetId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [voidError, setVoidError] = useState<string | null>(null);
+
+  const txs = data?.transactions ?? [];
+  const target = txs.find((t) => t.id === targetId) ?? null;
+  const shown = txs.filter((t) => (filter === "all" ? true : filter === "voided" ? !!t.voided_at : t.type === filter && !t.voided_at));
+  const voidedCount = txs.filter((t) => t.voided_at).length;
+  const time = (iso: string) => new Date(iso).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+
+  function close() {
+    setTargetId(null);
+    setReason("");
+    setVoidError(null);
+  }
 
   async function confirmVoid() {
     if (!target || !reason.trim()) return;
+    setVoidError(null);
     try {
-      await voidTx.mutateAsync({ tx_id: target, reason: reason.trim() });
-      toast("ยกเลิกรายการแล้ว");
-      setTarget(null);
-      setReason("");
+      await voidTx.mutateAsync({ tx_id: target.id, reason: reason.trim() });
+      toast(`ยกเลิกรายการของ ${target.student_name} แล้ว`);
+      close();
     } catch (e) {
-      toast(errMsg(e), "error");
+      setVoidError(errMsg(e));
     }
   }
 
+  const chip = (active: boolean) =>
+    cn(
+      "tappable flex h-12 shrink-0 items-center rounded-full border px-5 text-lg font-semibold transition-colors",
+      active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-foreground/5",
+    );
+  const typeBadge = (type: string) =>
+    type === "sale" ? "bg-sky-500/15 text-sky-700 dark:text-sky-300" : type === "topup_cash" ? "bg-success/15 text-success" : "bg-muted text-muted-foreground";
+
   return (
-    <Card className="space-y-3 self-start">
-      <p className="font-ui text-xl font-semibold">รายการวันนี้ของฉัน</p>
-      {isLoading && <Spinner />}
+    <div className="space-y-4">
+      {isLoading && <Spinner className="mx-auto size-8" />}
       {error && <p className="rounded-xl bg-destructive/10 px-4 py-3 text-lg text-destructive">{errMsg(error)}</p>}
       {data && (
         <>
-          <dl className="grid grid-cols-2 gap-3 text-base">
-            <div>
-              <dt className="text-muted-foreground">ขาย ({data.sales_count} ครั้ง)</dt>
-              <dd className="text-3xl font-bold tabular-nums">{formatBaht(data.sales_total)}</dd>
+          <dl className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <dt className="text-lg text-muted-foreground">ขายสินค้า · {data.sales_count} ครั้ง</dt>
+              <dd className="text-3xl font-bold tabular-nums">{formatBaht(data.sales_total)} ฿</dd>
             </div>
-            <div>
-              <dt className="text-muted-foreground">เติมเงินสด</dt>
-              <dd className="text-3xl font-bold tabular-nums">{formatBaht(data.topup_total)}</dd>
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <dt className="text-lg text-muted-foreground">เติมเงินสด</dt>
+              <dd className="text-3xl font-bold tabular-nums">{formatBaht(data.topup_total)} ฿</dd>
             </div>
           </dl>
-          <ul className="max-h-[50vh] divide-y divide-border overflow-y-auto">
-            {data.transactions.map((t) => (
-              <li key={t.id} className={cn("flex min-h-14 items-center justify-between gap-3 py-2 text-base", t.voided_at && "text-muted-foreground line-through")}>
-                <span className="min-w-0 truncate">
-                  {new Date(t.created_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} · {TX_TYPE_LABEL[t.type]} · {t.student_name}
-                </span>
-                <span className="flex shrink-0 items-center gap-3">
-                  <span className="text-lg font-semibold tabular-nums">{formatBaht(Math.abs(t.amount))}</span>
-                  {!t.voided_at && (t.type === "sale" || t.type === "topup_cash") && (
-                    <button type="button" className="tappable h-11 rounded-xl border border-border px-3 text-base font-semibold text-destructive" aria-label={`ยกเลิกรายการ ${t.student_name}`} onClick={() => setTarget(t.id)}>
-                      ยกเลิก
-                    </button>
-                  )}
-                </span>
-              </li>
+
+          <div className="scrollbar-hidden flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="ประเภทรายการ">
+            {(
+              [
+                ["all", `ทั้งหมด (${txs.length})`],
+                ["sale", "ขายสินค้า"],
+                ["topup_cash", "เติมเงินสด"],
+                ["voided", `ยกเลิกแล้ว (${voidedCount})`],
+              ] as const
+            ).map(([key, label]) => (
+              <button key={key} type="button" role="tab" aria-selected={filter === key} className={chip(filter === key)} onClick={() => setFilter(key)}>
+                {label}
+              </button>
             ))}
-            {data.transactions.length === 0 && <li className="py-4 text-lg text-muted-foreground">ยังไม่มีรายการ</li>}
+          </div>
+
+          <ul className="max-h-[50vh] space-y-2 overflow-y-auto">
+            {shown.map((t) => {
+              const canVoid = !t.voided_at && (t.type === "sale" || t.type === "topup_cash");
+              return (
+                <li key={t.id} className={cn("rounded-2xl border border-border bg-card p-4", t.voided_at && "bg-muted/60")}>
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className={cn("truncate text-lg font-semibold", t.voided_at && "text-muted-foreground")}>{t.student_name}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span className="text-lg tabular-nums text-muted-foreground">{time(t.created_at)} น.</span>
+                        <span className={cn("whitespace-nowrap rounded-full px-3 py-0.5 text-sm font-semibold", typeBadge(t.type))}>{TX_TYPE_LABEL[t.type]}</span>
+                        {t.voided_at && <span className="whitespace-nowrap rounded-full bg-destructive/15 px-3 py-0.5 text-sm font-semibold text-destructive">ยกเลิกแล้ว {time(t.voided_at)} น.</span>}
+                      </div>
+                    </div>
+                    <span className={cn("shrink-0 text-2xl font-bold tabular-nums", t.voided_at && "text-muted-foreground line-through")}>{formatBaht(Math.abs(t.amount))} ฿</span>
+                  </div>
+                  {canVoid && (
+                    <div className="mt-3 flex justify-end border-t border-border pt-3">
+                      <button
+                        type="button"
+                        className="tappable h-12 rounded-xl border border-destructive/40 px-5 text-base font-semibold text-destructive hover:bg-destructive/10"
+                        aria-label={`ยกเลิกรายการ ${t.student_name} ${formatBaht(Math.abs(t.amount))} บาท`}
+                        onClick={() => setTargetId(t.id)}
+                      >
+                        ยกเลิกรายการ
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+            {shown.length === 0 && <li className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-lg text-muted-foreground">ยังไม่มีรายการ</li>}
           </ul>
+          <p className="text-base text-muted-foreground">ยกเลิกได้เฉพาะรายการของตัวเองในวันนี้</p>
         </>
       )}
+
       <Modal
         open={!!target}
-        onOpenChange={(o) => !o && (setTarget(null), setReason(""))}
+        onOpenChange={(o) => !o && !voidTx.isPending && close()}
         title="ยกเลิกรายการ"
-        description="ยกเลิกได้เฉพาะรายการของตนเองในวันนี้"
+        className="max-w-lg"
         footer={
-          <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => (setTarget(null), setReason(""))}>
-              ปิด
+          <div className="flex gap-3">
+            <Button variant="outline" className="h-14 flex-1 text-lg" disabled={voidTx.isPending} onClick={close}>
+              ไม่ยกเลิก
             </Button>
-            <Button variant="destructive" className="flex-1" disabled={!reason.trim() || voidTx.isPending} onClick={() => void confirmVoid()}>
-              ยืนยันยกเลิก
+            <Button variant="destructive" className="h-14 flex-[1.4] text-lg" disabled={!reason.trim() || voidTx.isPending} onClick={() => void confirmVoid()}>
+              {voidTx.isPending ? <Spinner /> : "ยืนยันยกเลิกรายการ"}
             </Button>
           </div>
         }
       >
-        <Field label="เหตุผล" required>
-          <Input value={reason} onChange={(e) => setReason(e.target.value)} />
-        </Field>
+        {target && (
+          <div className="space-y-4">
+            {/* What is being undone, in big type */}
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-xl font-semibold">{target.student_name}</p>
+                  <p className="text-lg text-muted-foreground">
+                    {TX_TYPE_LABEL[target.type]} · เวลา {time(target.created_at)}
+                  </p>
+                </div>
+                <p className="shrink-0 text-3xl font-bold tabular-nums">{formatBaht(Math.abs(target.amount))} ฿</p>
+              </div>
+            </div>
+            <p className="flex items-start gap-3 rounded-xl bg-warning/15 px-4 py-3 text-lg">
+              <AlertTriangle className="mt-0.5 h-6 w-6 shrink-0 text-warning" />
+              {target.type === "topup_cash"
+                ? `ยอดเติม ${formatBaht(Math.abs(target.amount))} ฿ จะถูกหักออกจากบัตร — คืนเงินสดให้ผู้เติมด้วย`
+                : `เงิน ${formatBaht(Math.abs(target.amount))} ฿ จะคืนเข้าบัตรของนักเรียน`}
+            </p>
+
+            <div className="space-y-2">
+              <p className="text-lg font-semibold">
+                เหตุผล <span className="text-destructive">*</span>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {(target.type === "topup_cash" ? ["กดยอดผิด", "เติมผิดคน", "ผู้ปกครองขอคืน"] : ["กดยอดผิด", "สแกนผิดคน", "นักเรียนเปลี่ยนใจ", "สินค้าหมด"]).map((r) => (
+                  <button key={r} type="button" className={chip(reason === r)} onClick={() => setReason(r)}>
+                    {r}
+                  </button>
+                ))}
+              </div>
+              <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="เลือกด้านบน หรือพิมพ์เหตุผลเอง" aria-label="เหตุผลที่ยกเลิก" />
+            </div>
+
+            {voidError && <p className="rounded-xl bg-destructive/10 px-4 py-3 text-lg font-semibold text-destructive">{voidError}</p>}
+          </div>
+        )}
       </Modal>
-    </Card>
+    </div>
   );
 }
