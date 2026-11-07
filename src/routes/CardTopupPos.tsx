@@ -534,8 +534,8 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               </div>
             </div>
           ) : (
-            <div className="flex h-full min-h-0 w-full flex-col gap-4">
-              <div className="flex items-center justify-center gap-4 pt-2">
+            <div className={cn("flex h-full min-h-0 w-full flex-col gap-4", mode === "topup" && "justify-center")}>
+              <div className={cn("flex items-center justify-center gap-4", mode === "sale" && "pt-2")}>
                 <svg viewBox="0 0 120 76" className={cn("w-14 shrink-0", mode === "topup" ? "text-amber-500" : "text-muted-foreground")} aria-hidden>
                   <rect x="1.5" y="1.5" width="117" height="73" rx="9" fill="none" stroke="currentColor" strokeWidth="3" />
                   <rect x="1.5" y="14" width="117" height="14" fill="currentColor" opacity="0.5" />
@@ -565,7 +565,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
           {mode === "topup" ? (
             <>
               <div className="rounded-xl bg-muted px-4 py-3 text-right">
-                <p className="text-xs text-muted-foreground">ยอดเติมเงินสด ({TOPUP_MIN}–{TOPUP_MAX} บาท)</p>
                 <p className="font-heading text-6xl font-semibold tabular-nums">{topupAmount || "0"} ฿</p>
               </div>
               {keypad}
