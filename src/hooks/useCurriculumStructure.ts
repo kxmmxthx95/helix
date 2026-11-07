@@ -63,9 +63,18 @@ export function useAllGradeLevels() {
   return useQuery({
     queryKey: ["grade_levels", "all"],
     queryFn: async (): Promise<GradeLevel[]> => {
-      const { data, error } = await supabase.from("grade_levels").select("*").order("sort_order");
-      if (error) throw error;
-      return data;
+      // sort_order restarts per department, so order by department (KG → PRI → SEC) first.
+      const [grades, depts] = await Promise.all([
+        supabase.from("grade_levels").select("*").order("sort_order"),
+        supabase.from("departments").select("id, code"),
+      ]);
+      if (grades.error) throw grades.error;
+      if (depts.error) throw depts.error;
+      const rank: Record<string, number> = { KG: 0, PRI: 1, SEC: 2 };
+      const deptRank = new Map(depts.data.map((d) => [d.id, rank[d.code] ?? 999]));
+      return grades.data.sort(
+        (a, b) => (deptRank.get(a.department_id) ?? 999) - (deptRank.get(b.department_id) ?? 999) || a.sort_order - b.sort_order,
+      );
     },
   });
 }
