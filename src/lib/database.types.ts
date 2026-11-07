@@ -1253,6 +1253,19 @@ export type PosTerminal = {
   updated_at: string;
 };
 
+/** Catalogue row (0124). `code` is system-generated ("P-000123") and printed as a Code128 label. */
+export type PosProduct = {
+  id: string;
+  code: string;
+  name: string;
+  price: number; // whole baht, 1–500
+  category: string | null;
+  active: boolean;
+  image_path: string | null; // object name in the pos-products bucket (0126)
+  created_at: string;
+  updated_at: string;
+};
+
 export type StudentWallet = {
   id: string;
   student_id: string;
@@ -1305,9 +1318,9 @@ export type PosStudent = {
   card_status: StudentCardStatus | null;
 };
 
-/** pos_topup_cash() returns a wrong PIN as a result (not an error) so the attempt counter commits. */
-export type PosTopupResult =
-  | { ok: true; tx_id: string; amount: number; balance: number }
+/** cashier_pin_unlock() returns a wrong PIN as a result (not an error) so the attempt counter commits. */
+export type PinUnlockResult =
+  | { ok: true; unlocked_until: string }
   | { ok: false; status: "no_pin" | "bad" | "locked"; attempts_left?: number; locked_until?: string };
 
 export type CardSlipStatus = "pending" | "approved" | "rejected";
@@ -1673,6 +1686,7 @@ export type Database = {
         InsertOf<TuitionPayment, "receipt_no" | "paid_at" | "note" | "voided_at" | "void_reason">
       >;
       pos_terminals: Table<PosTerminal, InsertOf<PosTerminal, "active">>;
+      pos_products: Table<PosProduct, Pick<PosProduct, "name" | "price"> & Partial<Pick<PosProduct, "category" | "active" | "image_path">>>;
       student_wallets: Table<StudentWallet, InsertOf<StudentWallet, "daily_limit">>;
       student_cards: Table<StudentCard, Partial<StudentCard>>;
       card_transactions: Table<CardTransaction, Record<string, never>>;
@@ -1791,9 +1805,13 @@ export type Database = {
         Args: { p_card_uid: string; p_amount: number; p_terminal_id: string | null; p_client_tx_id: string | null };
         Returns: { ok: true; tx_id: string; amount: number; balance: number };
       };
+      pos_sale_items: {
+        Args: { p_card_uid: string; p_items: { product_id: string; qty: number }[]; p_terminal_id: string | null; p_client_tx_id: string | null };
+        Returns: { ok: true; tx_id: string; amount: number; balance: number };
+      };
       pos_topup_cash: {
-        Args: { p_card_uid: string | null; p_student_id: string | null; p_amount: number; p_terminal_id: string | null; p_pin: string; p_client_tx_id: string | null };
-        Returns: PosTopupResult;
+        Args: { p_card_uid: string | null; p_student_id: string | null; p_amount: number; p_terminal_id: string | null; p_client_tx_id: string | null };
+        Returns: { ok: true; tx_id: string; amount: number; balance: number };
       };
       pos_void: {
         Args: { p_tx_id: string; p_reason: string };
@@ -1829,7 +1847,15 @@ export type Database = {
       };
       cashier_pin_status: {
         Args: Record<string, never>;
-        Returns: { has_pin: boolean; locked_until: string | null };
+        Returns: { has_pin: boolean; locked_until: string | null; unlocked_until: string | null };
+      };
+      cashier_pin_unlock: {
+        Args: { p_pin: string };
+        Returns: PinUnlockResult;
+      };
+      cashier_pin_lock: {
+        Args: Record<string, never>;
+        Returns: void;
       };
       cashier_pin_set: {
         Args: { p_pin: string };

@@ -7,9 +7,10 @@ import type {
   CardSlipRequest,
   CardTransaction,
   PosMyToday,
+  PosProduct,
   PosStudent,
   PosTerminal,
-  PosTopupResult,
+  PinUnlockResult,
   Student,
   StudentQr,
 } from "@/lib/database.types";
@@ -108,17 +109,73 @@ export function usePosSale() {
   });
 }
 
+/** Cart sale: the server prices it from pos_products, so only ids and quantities travel. */
+export function usePosSaleItems() {
+  const refresh = useRefreshMoney();
+  return useMutation({
+    mutationFn: (a: { card_uid: string; items: { product_id: string; qty: number }[]; terminal_id: string | null; client_tx_id: string }) =>
+      rpc<{ tx_id: string; amount: number; balance: number }>(() =>
+        supabase.rpc("pos_sale_items", { p_card_uid: a.card_uid, p_items: a.items, p_terminal_id: a.terminal_id, p_client_tx_id: a.client_tx_id }),
+      ),
+    onSettled: refresh,
+  });
+}
+
+// ----------------------------------------------------------------- products
+
+/** Cashiers and org-wide read the whole catalogue; the POS filters to `active`. */
+export function usePosProducts() {
+  return useQuery({
+    queryKey: ["pos_products"],
+    queryFn: async (): Promise<PosProduct[]> => {
+      const { data, error } = await supabase.from("pos_products").select("*").order("category", { nullsFirst: false }).order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** Public URL of the product photo, cache-busted with updated_at so a re-upload shows at once. */
+export function productImageUrl(p: Pick<PosProduct, "image_path" | "updated_at">): string | null {
+  if (!p.image_path) return null;
+  return `${supabase.storage.from("pos-products").getPublicUrl(p.image_path).data.publicUrl}?v=${encodeURIComponent(p.updated_at)}`;
+}
+
+export function useSaveProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    // image: undefined = leave as is, null = remove, File = replace.
+    mutationFn: async (p: { id?: string; name: string; price: number; category: string | null; active: boolean; image?: File | null }) => {
+      const { id, image, ...fields } = p;
+      const patch = { ...fields, ...(image === null ? { image_path: null } : {}) };
+      const saved = id
+        ? await supabase.from("pos_products").update(patch).eq("id", id).select("id").single()
+        : await supabase.from("pos_products").insert(patch).select("id").single();
+      if (saved.error) throw saved.error;
+      if (image) {
+        const pid = saved.data.id;
+        const blob = await compressImage(image, 640, 0.82);
+        const up = await supabase.storage.from("pos-products").upload(pid, blob, { upsert: true, contentType: "image/jpeg" });
+        if (up.error) throw up.error;
+        const { error } = await supabase.from("pos_products").update({ image_path: pid }).eq("id", pid);
+        if (error) throw error;
+      }
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["pos_products"] }),
+  });
+}
+
+/** Needs the cashier unlocked (usePinUnlock) — the server refuses otherwise. */
 export function usePosTopupCash() {
   const refresh = useRefreshMoney();
   return useMutation({
-    mutationFn: (a: { card_uid?: string; student_id?: string; amount: number; terminal_id: string | null; pin: string; client_tx_id: string }) =>
-      rpc<PosTopupResult>(() =>
+    mutationFn: (a: { card_uid?: string; student_id?: string; amount: number; terminal_id: string | null; client_tx_id: string }) =>
+      rpc<{ tx_id: string; amount: number; balance: number }>(() =>
         supabase.rpc("pos_topup_cash", {
           p_card_uid: a.card_uid ?? null,
           p_student_id: a.student_id ?? null,
           p_amount: a.amount,
           p_terminal_id: a.terminal_id,
-          p_pin: a.pin,
           p_client_tx_id: a.client_tx_id,
         }),
       ),
@@ -138,7 +195,7 @@ export function usePosVoid() {
 export function usePinStatus() {
   return useQuery({
     queryKey: ["cashier_pin_status"],
-    queryFn: () => rpc<{ has_pin: boolean; locked_until: string | null }>(() => supabase.rpc("cashier_pin_status")),
+    queryFn: () => rpc<{ has_pin: boolean; locked_until: string | null; unlocked_until: string | null }>(() => supabase.rpc("cashier_pin_status")),
   });
 }
 
@@ -146,6 +203,23 @@ export function useSetPin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (pin: string) => rpc<void>(() => supabase.rpc("cashier_pin_set", { p_pin: pin })),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["cashier_pin_status"] }),
+  });
+}
+
+/** One correct PIN unlocks cash top-up for an hour (server-side, migration 0125). */
+export function usePinUnlock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pin: string) => rpc<PinUnlockResult>(() => supabase.rpc("cashier_pin_unlock", { p_pin: pin })),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["cashier_pin_status"] }),
+  });
+}
+
+export function usePinLock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => rpc<void>(() => supabase.rpc("cashier_pin_lock")),
     onSettled: () => void qc.invalidateQueries({ queryKey: ["cashier_pin_status"] }),
   });
 }
@@ -176,7 +250,7 @@ export function useCashiers() {
 }
 
 // Fallback lookup for org-wide staff (a cashier has no student list access).
-export type StudentHit = Pick<Student, "id" | "student_code" | "prefix" | "first_name" | "last_name">;
+export type StudentHit = Pick<Student, "id" | "student_code" | "prefix" | "first_name" | "last_name" | "avatar_path" | "updated_at">;
 
 export function useStudentSearch(term: string) {
   const t = term.trim();
@@ -187,7 +261,7 @@ export function useStudentSearch(term: string) {
       const like = `%${t}%`;
       const { data, error } = await supabase
         .from("students")
-        .select("id, student_code, prefix, first_name, last_name")
+        .select("id, student_code, prefix, first_name, last_name, avatar_path, updated_at")
         .or(`first_name.ilike.${like},last_name.ilike.${like},student_code.ilike.${like}`)
         .order("student_code")
         .limit(8);
