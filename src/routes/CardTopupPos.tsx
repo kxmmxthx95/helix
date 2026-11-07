@@ -1,4 +1,5 @@
 import JsBarcode from "jsbarcode";
+import { fromThaiLayout } from "@/lib/scanText";
 import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { FiSidebar } from "react-icons/fi";
@@ -423,7 +424,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
           if (e.key === "Escape") return void (setStudent(null), setEntry(""));
           if (e.key !== "Enter") return;
           e.preventDefault();
-          const raw = entry.trim();
+          const raw = fromThaiLayout(entry.trim());
           setEntry("");
           // Typed digits with a student on screen set the amount; the cashier then confirms with ตัดเงิน.
           if (student && mode === "topup" && /^\d{1,4}$/.test(raw)) return void setTopupAmount(raw);
