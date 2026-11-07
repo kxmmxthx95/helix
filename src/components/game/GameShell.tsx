@@ -96,6 +96,8 @@ function GameShellInner() {
   const title = isTopupForm ? "เติมเงิน" : (TITLES[location.pathname] ?? "");
   // iOS large title: collapses into the nav bar once the page scrolls under it.
   const [scrolled, setScrolled] = useState(false);
+  // Every non-home page shows its title centered in the nav bar (the large title below is sr-only).
+  const titleShown = !isHome || scrolled;
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => setScrolled(false), [location.pathname]);
   const [collapsed, setCollapsed] = useState(() => {
@@ -174,11 +176,11 @@ function GameShellInner() {
               </button>
             )}
             <p
-              aria-hidden={!scrolled}
+              aria-hidden={!titleShown}
               className={cn(
                 "font-heading max-w-[55%] truncate text-[17px] font-semibold transition-opacity duration-200 lg:max-w-none lg:text-[22px] lg:font-bold lg:opacity-100",
                 !collapsed && "lg:hidden",
-                scrolled ? "opacity-100" : "opacity-0",
+                titleShown ? "opacity-100" : "opacity-0",
               )}
             >
               {isHome ? "หน้าแรก" : title}
@@ -236,7 +238,7 @@ function GameShellInner() {
             <Outlet />
           ) : (
             <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-4 pb-4 lg:p-6">
-              <h1 className={cn("font-heading shrink-0 pb-3 text-[34px] font-bold leading-[41px] tracking-tight lg:hidden", location.pathname.startsWith("/card-topup") && "sr-only")}>{title}</h1>
+              <h1 className="sr-only">{title}</h1>
               <Outlet />
             </div>
           )}

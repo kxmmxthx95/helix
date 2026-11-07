@@ -766,15 +766,15 @@ function AppShellInner() {
             !isStudentHome && "border-b border-border",
           )}
         >
-          {/* Title stays leading (after menu) — never centered under the Dynamic Island */}
-          <div className="flex h-12 items-center gap-2 px-shell">
+          {/* Title centered between the menu and the end slot; pt-safe on the header keeps it clear of the Dynamic Island */}
+          <div className="relative flex h-12 items-center gap-2 px-shell">
             {menuButton}
             {!isStudentHome && (
-              <p className="font-heading min-w-0 flex-1 truncate text-[17px] font-semibold tracking-[-0.01em] text-foreground">
+              <p className="font-heading pointer-events-none absolute inset-x-0 mx-auto max-w-[60%] truncate text-center text-[17px] font-semibold tracking-[-0.01em] text-foreground">
                 {pageTitle}
               </p>
             )}
-            {mobileHeaderEnd ? <div className="shrink-0">{mobileHeaderEnd}</div> : null}
+            {mobileHeaderEnd ? <div className="ml-auto shrink-0">{mobileHeaderEnd}</div> : null}
           </div>
         </header>
 
