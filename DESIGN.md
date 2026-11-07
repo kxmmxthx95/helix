@@ -1,6 +1,6 @@
 ---
 name: Helix
-description: School operations back-office — Vercel (Geist) precision with Apple iOS patterns, light and dark equally; a separate pastel game skin for students.
+description: School operations back-office — Vercel (Geist) precision with Apple iOS patterns, light and dark equally; an iPhone-style skin for students and a large-size tablet mode for the POS.
 colors:
   shell: { light: "#f2f2f7", dark: "#000000" }
   background: { light: "#ffffff", dark: "#0a0a0a" }
@@ -31,7 +31,7 @@ The full system (tokens, components, previews, usage rules) lives in the **Helix
 
 ## Overview
 
-Helix pairs **Vercel's precision** — Geist type, hairlines, neutral surfaces, a black/white primary button — with **Apple iOS patterns** — large titles, inset grouped lists, segmented controls, sheets/drawers, a tab-bar-style nav and translucent chrome. Staff screens follow the OS light/dark setting (`ThemeProvider`, default `system`); both themes are designed equally. The student portal stays a separate `.theme-game` world and does not use these rules.
+Helix pairs **Vercel's precision** — Geist type, hairlines, neutral surfaces, a black/white primary button — with **Apple iOS patterns** — large titles, inset grouped lists, segmented controls, sheets/drawers, a tab-bar-style nav and translucent chrome. Staff screens follow the OS light/dark setting (`ThemeProvider`, default `system`); both themes are designed equally. Two scoped variants sit on top of the same components: the **student portal** (`.theme-game`, an iPhone skin — see *Student portal*) and the **POS** (`.pos-large`, the same staff look at a large size for tablet cashiers — see *POS (tablet)*).
 
 ## Principles
 
@@ -109,9 +109,35 @@ Helix pairs **Vercel's precision** — Geist type, hairlines, neutral surfaces, 
 - **AddressInputs**: house number, moo, soi, road, then postcode, then province, district, subdistrict as selects narrowed by the postcode. A level with one choice fills itself; changing the postcode clears the levels below it. Older free-text values stay selectable.
 - **Guardian cards** (father, mother, guardian): three separate cards. A toggle pair on the guardian card ("ผู้ปกครองคือบิดา / มารดา") reuses the father's or mother's data and hides the guardian's own fields.
 
+## Student portal (iPhone skin)
+
+Set by `GameShell` as `.theme-game` on `<html>`; follows light/dark. Files: `src/components/game/GameShell.tsx`, `GameHud.tsx`, the `.theme-game` blocks in `index.css`.
+
+- **Colours (iOS system):** ground `#f2f2f7` / dark `#000`, cards `#fff` / `#1c1c1e`, separators 0.5px, tint = system pink (`--primary` ≈ `#ff2d55`), links and back buttons = system blue (`--accent`), switches green (`--success`). Inputs are filled (`--field`, `bg-field`) with no border, 10px corners.
+- **Type:** SF Pro / Sukhumvit (`-apple-system` first). Large title 34/41 bold, nav title 17 semibold, body 17, secondary 15, footnote 13, tab labels 10.
+- **Shell:** phones = translucent bottom tab bar (5 tabs, icon + label, active = tint) and an iOS nav bar on inner pages (blue "‹ หน้าแรก", centred 17px title); the page's large title collapses into the nav bar on scroll and the bar turns to frosted material. Desktop (≥1024) = translucent sidebar (source-list style, selected row `foreground/8%` with tint text).
+- **Home:** greeting large title + Lv/EXP bar → Today-style featured card (pink gradient, next due work, swipe between subjects, "ส่งงาน") → app-icon menu (56px squircles, iOS colours, red badge) → inset-grouped "งานที่ต้องส่ง" list → subject cards scroller → "สรุปของฉัน" Settings-style list (30px coloured icon squares, value + chevron).
+- **Sheets:** on phones every `Sheet` in the portal is an iPhone bottom card sheet with a grabber (`SheetStyleContext` = `"ios"` provided by `GameShell`); desktop keeps the side drawer.
+- Don't: game art, thick outlines, press shadows, or the old island/BATTLE UI.
+
+## POS (tablet)
+
+The cashier counter (`CardTopupPos.tsx`, `PosLogin.tsx`, `CardTopupSlips/Report/Products/Admin.tsx`). Users are school cashiers aged 40–60 on a **tablet** (landscape 1024–1366, portrait 768–834). Same Helix tokens and components, **larger and simpler**.
+
+- **`.pos-large`** on `<html>` while the POS (or its login) is mounted: every `ui-control` is ≥52px tall with 16px side padding and 12px corners; small control text becomes 17px; field labels 16px; dialog text 17px. Call sites that ask for more keep it (min-height only). Ionicon wrappers are sized with `h-*`/`w-*`, not `size-*`.
+- **Sizes:** body ≥18px (`text-lg`), headings 24–30px, money 30–72px bold `tabular-nums`; buttons `h-14 text-lg`, primary/confirm `h-16 text-xl`; keypad keys 72–80px with 30–36px digits; gaps ≥12px; list rows ≥56px.
+- **Rules:** every action is a labelled button (no icon-only buttons, no underline links); status is colour **and** a word (green ออนไลน์ / red ออฟไลน์, amber รออนุมัติ); errors stay on screen in a red box (not only a toast); secondary text never carries important info; no hover-only or gesture-only actions.
+- **Shell:** top bar = labelled "เมนู" button (drawer at every width) · segmented tabs ขายสินค้า / เติมเงิน (48px, top-up shows minutes left, red + blinking ≤5 min) · status pill · "รายการวันนี้". Admin views (สลิป, รายงาน, สินค้า, เครื่องขาย) live in the drawer.
+- **Sale:** product grid (photo, 18px name, 20px bold price, 48px category chips) or keypad on the right, cart with 56px ± steppers, step hint under the charge button (① เลือกสินค้า → ② สแกนบัตร → ③ กดตัดเงิน), success = whole panel green with a big check + "ทำรายการต่อไป".
+- **Admin pages share one pattern:** title + count, search (`!pl-12` with a left icon), black "เพิ่ม…" button; 48px pill filter chips (active = `foreground` fill); card grid `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` of `rounded-2xl` cards; tap a card to edit in a Modal; quick on/off `Switch` + word in the card footer, saved at once with a toast.
+- **Reports:** date presets (วันนี้ / เมื่อวาน / 7 วัน / เดือนนี้ / เลือกเอง), the drawer cash total as the headline, 4 stat tiles, then tabs (ตามแคชเชียร์ / ตามเครื่องขาย / รายการยกเลิก) of cards, not wide tables.
+- **Slip approval:** review queue — list left, review panel right (slip image inline, facts, 64px amount field, "อนุมัติ เติมเงิน X ฿" over "ไม่อนุมัติ"); portrait opens the panel as a Modal; after a decision the next pending slip opens. Reject reasons offer one-tap presets.
+- **PIN pad:** lock icon, one instruction line, six 48px boxes (next box outlined), inline red error with a shake, "กำลังตรวจสอบ…", keys 80px with ล้าง / ลบ words; first-time setup shows a 2-step bar.
+- **Scanner test:** hidden capture input (tap anywhere), one big status box (amber ready / green ทำงานปกติ / red with the cause: no Enter, Thai keyboard layout, wrong characters, too slow), steps 1-2-3, big barcode, "ทดสอบอีกครั้ง".
+
 ## Don'ts
 
 - No gradients or glow on staff chrome; no coloured left-border cards; no emoji as icons.
 - No second accent hue in the back-office.
 - No fixed-width rows that can't wrap; no text under absolutely positioned controls.
-- Don't reuse the game skin's pink, thick borders or press shadow in staff screens.
+- Don't bring the student portal's pink tint and iOS chrome, or the POS's large sizes, into ordinary staff screens.
