@@ -333,12 +333,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
       <FiSidebar className="h-3.5 w-3.5" />
     </Button>
   );
-  const statusDot = (
-    <span className={cn("flex items-center gap-1.5 text-xs", online ? "text-success" : "font-semibold text-destructive")} role="status">
-      <span className={cn("size-2 rounded-full", online ? "bg-success" : "bg-destructive")} aria-hidden />
-      {online ? "ออนไลน์" : "ออฟไลน์"}
-    </span>
-  );
   const itemClass = (active = false) =>
     cn(
       "group font-ui tappable flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold transition-colors",
@@ -362,14 +356,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
           <div className="flex h-12 shrink-0 items-center px-3">
             <img src="/logo.webp" alt="Helix" className="ml-auto h-6 w-auto dark:invert" />
           </div>
-          <div className="flex flex-wrap items-center gap-2 px-3 pb-2">
-            {terminal && (
-              <button type="button" className="tappable rounded-md border border-border bg-card px-2.5 py-1 text-xs font-semibold" onClick={() => (setTerminalId(""), setDrawer(false))}>
-                {terminal.name} · เปลี่ยน
-              </button>
-            )}
-            {statusDot}
-          </div>
           <nav className="scrollbar-hidden flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-2" aria-label="เมนูบัตรเติมเงิน">
               <div>
                 <div className="flex flex-col gap-0.5">
@@ -388,8 +374,17 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               </div>
           </nav>
           <div className="mt-auto flex flex-col gap-2 border-t border-border/60 p-3">
+            {terminal && (
+              <button type="button" className="tappable rounded-lg border border-border bg-card px-2.5 py-1.5 text-left text-xs font-semibold" onClick={() => (setTerminalId(""), setDrawer(false))}>
+                {terminal.name} · เปลี่ยนเครื่อง
+              </button>
+            )}
             <div className="flex items-center gap-2.5 rounded-xl bg-card p-2.5 shadow-card">
-              <Avatar name={profile ? profileFullName(profile) : "Helix"} src={profile ? avatarUrl(profile) : null} className="h-9 w-9 text-xs" />
+              {/* Connection status: pulsing ring around the photo — green online, red offline. */}
+              <span className="relative flex shrink-0 rounded-full" role="status" aria-label={online ? "ออนไลน์" : "ออฟไลน์"} title={online ? "ออนไลน์" : "ออฟไลน์"}>
+                <span aria-hidden className={cn("absolute -inset-1 rounded-full border-2 motion-safe:animate-pulse", online ? "border-success" : "border-destructive")} />
+                <Avatar name={profile ? profileFullName(profile) : "Helix"} src={profile ? avatarUrl(profile) : null} className="h-9 w-9 text-xs" />
+              </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-semibold leading-tight">{profile ? profileFullName(profile) : ""}</p>
                 {profile && <p className="truncate text-[11px] leading-tight text-muted-foreground">{roleSubtitle}</p>}
