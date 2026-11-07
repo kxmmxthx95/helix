@@ -39,6 +39,7 @@ import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { BannerUpload } from "@/components/BannerUpload";
+import { BannerAdjustOverlay, useBannerAdjust } from "@/components/BannerAdjust";
 import { BANNER_PRESETS, bannerBackground, bannerStyle, useBannerColors } from "@/routes/TeacherHome";
 import {
   AttendanceSummarySection,
@@ -163,6 +164,7 @@ export function GameHud() {
   const { data: gradeLevels = [] } = useGradeLevels(myStudent?.department_id ?? null);
   const gradeLevel = gradeLevels.find((g) => g.id === myStudent?.grade_level_id);
   const [bannerColors, setBannerColors] = useBannerColors(profile?.id ?? "");
+  const adjust = useBannerAdjust(profile);
 
   const studentId = myStudent?.id ?? null;
   const month = currentMonthRange();
@@ -245,9 +247,10 @@ export function GameHud() {
       <div className="mx-auto max-w-5xl px-4 lg:px-8">
         {/* ===== Profile card (same look as the teacher home) ===== */}
         <header className="mt-4 overflow-hidden rounded-[24px] bg-card text-card-foreground shadow-card lg:mt-8">
-          <div className="relative h-24 sm:h-32" style={profile ? bannerStyle(profile, bannerColors) : bannerBackground(bannerColors)}>
+          <div className="relative h-24 sm:h-32" style={profile ? bannerStyle(profile, bannerColors, adjust.draft ?? undefined) : bannerBackground(bannerColors)} {...adjust.dragProps}>
             {profile && (
               <>
+                <BannerAdjustOverlay adjust={adjust} />
                 <button
                   type="button"
                   aria-label="เปลี่ยน Cover"
@@ -278,7 +281,7 @@ export function GameHud() {
                           />
                         ))}
                       </div>
-                      <BannerUpload profile={profile} />
+                      <BannerUpload profile={profile} onAdjust={() => { setPickerOpen(false); adjust.start(); }} />
                     </div>
                   </>
                 )}

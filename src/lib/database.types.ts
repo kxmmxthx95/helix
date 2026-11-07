@@ -39,6 +39,9 @@ export type Profile = {
   avatar_path: string | null;
   /** Object path in the banners storage bucket — the profile's own id, see migration 0122. */
   banner_path: string | null;
+  /** Focal point of the banner image, % (0–100), used as background-position — migration 0135. */
+  banner_focus_x: number;
+  banner_focus_y: number;
   created_at: string;
   updated_at: string;
 } & AddressFields; // self-editable ที่อยู่ — see migration 0061
@@ -1536,6 +1539,8 @@ export type Database = {
           | "must_change_password"
           | "avatar_path"
           | "banner_path"
+          | "banner_focus_x"
+          | "banner_focus_y"
           | "house_no"
           | "village_no"
           | "alley"
@@ -1562,6 +1567,8 @@ export type Database = {
               | "must_change_password"
               | "avatar_path"
               | "banner_path"
+              | "banner_focus_x"
+              | "banner_focus_y"
               | "house_no"
               | "village_no"
               | "alley"

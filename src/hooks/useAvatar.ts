@@ -66,7 +66,7 @@ export function useUploadBanner() {
         .from("banners")
         .upload(profileId, blob, { upsert: true, contentType: "image/jpeg" });
       if (upErr) throw upErr;
-      const { error } = await supabase.from("profiles").update({ banner_path: profileId }).eq("id", profileId);
+      const { error } = await supabase.from("profiles").update({ banner_path: profileId, banner_focus_x: 50, banner_focus_y: 50 }).eq("id", profileId);
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["profiles"] }),
@@ -78,7 +78,18 @@ export function useRemoveBanner() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (profileId: string) => {
-      const { error } = await supabase.from("profiles").update({ banner_path: null }).eq("id", profileId);
+      const { error } = await supabase.from("profiles").update({ banner_path: null, banner_focus_x: 50, banner_focus_y: 50 }).eq("id", profileId);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["profiles"] }),
+  });
+}
+
+export function useSaveBannerFocus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ profileId, x, y }: { profileId: string; x: number; y: number }) => {
+      const { error } = await supabase.from("profiles").update({ banner_focus_x: Math.round(x), banner_focus_y: Math.round(y) }).eq("id", profileId);
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["profiles"] }),

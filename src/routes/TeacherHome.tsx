@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { profileFullName, type Profile, type ProfileWithRoles } from "@/lib/database.types";
 import { ChevronForward, LockIcon, PaletteIcon } from "@/components/icons";
 import { BannerUpload } from "@/components/BannerUpload";
+import { BannerAdjustOverlay, useBannerAdjust } from "@/components/BannerAdjust";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { Avatar, Spinner } from "@/components/ui";
@@ -48,9 +49,14 @@ export const bannerBackground = (c: string[]) => ({
   backgroundImage: c.map((col, i) => `radial-gradient(38% 120% at ${BANNER_POS[i]}, ${col}, transparent 70%)`).join(", "),
 });
 /** Uploaded cover wins over the gradient. */
-export const bannerStyle = (profile: Pick<Profile, "banner_path" | "updated_at">, colors: string[]): React.CSSProperties => {
+export const bannerStyle = (
+  profile: Pick<Profile, "banner_path" | "updated_at" | "banner_focus_x" | "banner_focus_y">,
+  colors: string[],
+  focus?: { x: number; y: number }, // live value while the user is dragging
+): React.CSSProperties => {
   const url = bannerUrl(profile);
-  return url ? { backgroundImage: `url("${url}")`, backgroundSize: "cover", backgroundPosition: "center" } : bannerBackground(colors);
+  const f = focus ?? { x: profile.banner_focus_x, y: profile.banner_focus_y };
+  return url ? { backgroundImage: `url("${url}")`, backgroundSize: "cover", backgroundPosition: `${f.x}% ${f.y}%` } : bannerBackground(colors);
 };
 // ponytail: stored per device in localStorage — move to a profiles column if it should follow the teacher across devices
 export function useBannerColors(profileId: string) {
@@ -105,6 +111,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const nowMin = useNowMinutes();
   const [bannerColors, setBannerColors] = useBannerColors(me.id);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const adjust = useBannerAdjust(me);
   const [timetableOpen, setTimetableOpen] = useState(false);
   const [lineOpen, setLineOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
@@ -400,7 +407,8 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     <div>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section className={cn(WIDGET, "relative overflow-hidden lg:col-span-2")}>
-          <div className="relative h-24 sm:h-36" style={bannerStyle(me, bannerColors)}>
+          <div className="relative h-24 sm:h-36" style={bannerStyle(me, bannerColors, adjust.draft ?? undefined)} {...adjust.dragProps}>
+            <BannerAdjustOverlay adjust={adjust} />
             <button
               type="button"
               aria-label="เปลี่ยนสีพื้นหลังการ์ด"
@@ -431,7 +439,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                       />
                     ))}
                   </div>
-                  <BannerUpload profile={me} />
+                  <BannerUpload profile={me} onAdjust={() => { setPickerOpen(false); adjust.start(); }} />
                   <div>
                     <p className="mb-1.5 text-xs text-muted-foreground">ปรับสีเอง</p>
                     <div className="flex gap-2">
