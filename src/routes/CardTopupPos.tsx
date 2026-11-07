@@ -363,7 +363,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                     <button key={key} type="button" aria-current={view === key ? "page" : undefined} onClick={() => (key === "topup" ? openTopup() : setView(key), setDrawer(false))} className={itemClass(view === key)}>
                       <Icon className="h-4 w-4 shrink-0 group-aria-[current=page]:text-accent" />
                       <span className="truncate">{label}</span>
-                      {key === "topup" && isUnlocked && <span className="ml-auto shrink-0 text-[11px] font-medium tabular-nums text-muted-foreground">เหลือ {minutesLeft} นาที</span>}
+                      {key === "topup" && isUnlocked && <span className={cn("ml-auto shrink-0 text-[11px] font-medium tabular-nums", minutesLeft <= 5 ? "font-semibold text-destructive motion-safe:animate-pulse" : "text-muted-foreground")}>เหลือ {minutesLeft} นาที</span>}
                     </button>
                   ))}
                   <button type="button" className={itemClass()} onClick={() => (setTestOpen(true), setDrawer(false))}>
