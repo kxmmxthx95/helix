@@ -63,7 +63,7 @@ type View = (typeof VIEWS)[number]["key"];
 /** Cashiers get these two in the sidebar; the rest are org-wide only. */
 const isCounterView = (k: View) => k === "sale" || k === "topup";
 
-type Done = { kind: "sale"; amount: number; balance: number };
+type Done = { kind: "sale" | "topup"; amount: number; balance: number };
 
 /** Code128 text; not a `qr_` token and not a student code, so it only exists to be scanned in ScannerTest. */
 const TEST_CODE = "HELIX-SCANNER-TEST";
@@ -248,7 +248,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
       setEntry("");
       setConfirmOpen(false);
       setTopupAmount("");
-      toast(`เติมเงิน ${formatBaht(r.amount)} ฿ สำเร็จ`);
+      setDone({ kind: "topup", amount: r.amount, balance: r.balance });
     } catch (e) {
       setConfirmOpen(false);
       // The hour ran out (or the lock was pressed elsewhere): ask for the PIN again.
@@ -700,7 +700,18 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               ยกเลิก
             </Button>
             <Button type="button" className="h-16 flex-[2] text-xl" disabled={topup.isPending || !online} onClick={() => void confirmTopup()}>
-              {topup.isPending ? <Spinner /> : "ยืนยันเติมเงิน"}
+              {topup.isPending ? (
+                <span role="status" className="flex items-center gap-3">
+                  {/* Blinking amber light = the top-up request is in flight. */}
+                  <span className="relative flex size-4 shrink-0">
+                    <span className="absolute inline-flex size-full rounded-full bg-amber-300 opacity-75 motion-safe:animate-ping" />
+                    <span className="relative inline-flex size-4 rounded-full bg-amber-300 motion-safe:animate-pulse" />
+                  </span>
+                  กำลังเติมเงิน…
+                </span>
+              ) : (
+                "ยืนยันเติมเงิน"
+              )}
             </Button>
           </div>
         }
