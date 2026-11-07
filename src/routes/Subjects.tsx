@@ -9,6 +9,7 @@ import {
   useDeleteSubject,
   useLearningAreas,
   useSaveLearningArea,
+  subjectCoverUrl,
   useSaveSubject,
   useSubjects,
   type SubjectDraft,
@@ -652,6 +653,10 @@ function EditSubjectSheet({
   const save = useSaveSubject();
   const [draft, setDraft] = useState<SubjectDraft | null>(null);
   const [addingSubArea, setAddingSubArea] = useState(false);
+  // cover: undefined = unchanged, null = remove, File = new image. coverPreview is what the form shows.
+  const [cover, setCover] = useState<File | null | undefined>(undefined);
+  const [coverPreview, setCoverPreview] = useState<string | null | undefined>(undefined);
+  const canSetCover = me ? isOrgWide(me.roles) : false;
 
   const canAddLearningArea = me ? isOrgWide(me.roles) : false;
   const topLevelAreas = useMemo(() => learningAreas.filter((a) => !a.parent_id), [learningAreas]);
@@ -679,6 +684,8 @@ function EditSubjectSheet({
   useEffect(() => {
     setDraft(null);
     setAddingSubArea(false);
+    setCover(undefined);
+    setCoverPreview(undefined);
   }, [target]);
 
   const selectedArea = learningAreas.find((a) => a.id === current?.learning_area_id);
@@ -699,7 +706,7 @@ function EditSubjectSheet({
     if (!current) return;
     if (!current.learning_area_id || !current.subject_type) return;
     save.mutate(
-      { ...current, ...(isNew ? {} : { id: (target as Subject).id }) },
+      { ...current, ...(isNew ? {} : { id: (target as Subject).id }), ...(canSetCover ? { cover } : {}) },
       {
         onSuccess: () => toast("บันทึกวิชาสำเร็จ"),
         onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
@@ -735,6 +742,44 @@ function EditSubjectSheet({
     >
       {current && (
         <form id="edit-subject" onSubmit={submit} className="space-y-4">
+          {canSetCover && (
+            <Field label="ปกวิชา">
+              {(() => {
+                const shown = coverPreview !== undefined ? coverPreview : !isNew ? subjectCoverUrl(target as Subject) : null;
+                return (
+                  <div className="flex items-center gap-3">
+                    <div className="flex aspect-[16/10] w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted text-sm text-muted-foreground">
+                      {shown ? <img src={shown} alt="" className="size-full object-cover" /> : "ไม่มีปก"}
+                    </div>
+                    <div className="flex flex-col items-start gap-2">
+                      <label className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-border bg-muted px-3 text-sm font-medium">
+                        {shown ? "เปลี่ยนปก" : "เพิ่มปก"}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          hidden
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            e.target.value = "";
+                            if (!f) return;
+                            if (f.size > 10 * 1024 * 1024) return toast("ไฟล์ใหญ่เกิน 10 MB", "error");
+                            setCover(f);
+                            setCoverPreview(URL.createObjectURL(f));
+                          }}
+                        />
+                      </label>
+                      {shown && (
+                        <button type="button" className="text-sm font-medium text-destructive" onClick={() => { setCover(null); setCoverPreview(null); }}>
+                          ลบปก
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </Field>
+          )}
+
           <Field label="รหัสวิชา">
             <Input value={current.code} onChange={(e) => setDraft({ ...current, code: e.target.value })} required />
           </Field>

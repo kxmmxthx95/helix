@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { LearningArea, Subject, SubjectType } from "@/lib/database.types";
+import { compressImage } from "@/lib/image";
 import { supabase } from "@/lib/supabase";
 import type { ImportOutcome } from "@/hooks/useStudents";
 
@@ -83,20 +84,35 @@ export type SubjectDraft = Pick<
   subject_type: SubjectType | "";
 };
 
+/** Public URL of the subject cover, cache-busted with updated_at so a re-upload shows at once. */
+export function subjectCoverUrl(s: { cover_path: string | null; updated_at: string }): string | null {
+  if (!s.cover_path) return null;
+  return `${supabase.storage.from("subject-covers").getPublicUrl(s.cover_path).data.publicUrl}?v=${encodeURIComponent(s.updated_at)}`;
+}
+
 export function useSaveSubject() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, ...draft }: SubjectDraft & { id?: string }) => {
+    // cover: undefined = leave as is, null = remove, File = replace.
+    mutationFn: async ({ id, cover, ...draft }: SubjectDraft & { id?: string; cover?: File | null }) => {
       const { subject_type, learning_area_id, ...rest } = draft;
       if (!learning_area_id || !subject_type) {
         throw new Error("กรุณาเลือกกลุ่มสาระและประเภทวิชา");
       }
-      const row = { ...rest, learning_area_id, subject_type };
-      const { error } = id
-        ? await supabase.from("subjects").update(row).eq("id", id)
-        : await supabase.from("subjects").insert(row);
-      if (error) throw error;
+      const row = { ...rest, learning_area_id, subject_type, ...(cover === null ? { cover_path: null } : {}) };
+      const saved = id
+        ? await supabase.from("subjects").update(row).eq("id", id).select("id").single()
+        : await supabase.from("subjects").insert(row).select("id").single();
+      if (saved.error) throw saved.error;
+      if (cover) {
+        const sid = saved.data.id;
+        const blob = await compressImage(cover, 1024, 0.82);
+        const up = await supabase.storage.from("subject-covers").upload(sid, blob, { upsert: true, contentType: "image/jpeg" });
+        if (up.error) throw up.error;
+        const { error } = await supabase.from("subjects").update({ cover_path: sid }).eq("id", sid);
+        if (error) throw error;
+      }
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["subjects"] }),
   });
