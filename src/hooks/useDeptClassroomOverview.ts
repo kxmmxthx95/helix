@@ -40,9 +40,10 @@ type TagRow = {
 
 const bySort = <T extends { sort_order: number }>(a: T, b: T) => a.sort_order - b.sort_order;
 
-export function useDeptClassroomOverview(departmentId: string | null, academicYear: number | null, term: number | null) {
+/** `classroomId` narrows to one room (student view: teaching_assignments RLS is department-wide). */
+export function useDeptClassroomOverview(departmentId: string | null, academicYear: number | null, term: number | null, classroomId?: string) {
   return useQuery({
-    queryKey: ["dept_classroom_overview", departmentId, academicYear, term],
+    queryKey: ["dept_classroom_overview", departmentId, academicYear, term, classroomId],
     enabled: !!departmentId && academicYear != null,
     queryFn: async (): Promise<OverviewClassroom[]> => {
       let q = supabase
@@ -53,6 +54,7 @@ export function useDeptClassroomOverview(departmentId: string | null, academicYe
         .eq("classroom.grade_level.department_id", departmentId!)
         .eq("classroom.is_active", true)
         .eq("academic_year", academicYear!);
+      if (classroomId) q = q.eq("classroom_id", classroomId);
       q = term === null ? q.is("term", null) : q.eq("term", term);
       const { data, error } = await q;
       if (error) throw error;

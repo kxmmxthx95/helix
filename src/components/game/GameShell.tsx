@@ -12,6 +12,7 @@ import {
   DocumentTextIcon,
   HomeIcon,
   LibraryIcon,
+  ListIcon,
   LogOut,
   MenuIcon,
   Monitor,
@@ -37,6 +38,7 @@ const TITLES: Record<string, string> = {
   "/assignments": "งาน",
   "/exams": "สอบ",
   "/timetable": "ตารางเรียน",
+  "/my-curriculum": "ผังการเรียน",
   "/academic-events": "ปฏิทินกิจกรรม",
   "/practice": "แบบฝึกหัด",
   "/documents": "เอกสาร",
@@ -54,6 +56,7 @@ const SIDE: readonly NavItem[] = [
   { to: "/assignments", label: "งาน", icon: ClipboardIcon },
   { to: "/exams", label: "สอบ", icon: DocumentTextIcon },
   { to: "/timetable", label: "ตารางเรียน", icon: TimetableIcon },
+  { to: "/my-curriculum", label: "ผังการเรียน", icon: ListIcon },
   { to: "/practice", label: "แบบฝึกหัด", icon: BookIcon },
   { to: "/academic-events", label: "ปฏิทินกิจกรรม", icon: CalendarIcon },
   { to: "/documents", label: "เอกสาร", icon: LibraryIcon },
@@ -92,6 +95,8 @@ function GameShellInner() {
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === "/";
+  // Pages that lay out their own full-width canvas (no centred max-width column).
+  const fullWidth = location.pathname === "/my-curriculum";
   const isTopupForm = location.pathname.startsWith("/card-topup/");
   const title = isTopupForm ? "เติมเงิน" : (TITLES[location.pathname] ?? "");
   // iOS large title: collapses into the nav bar once the page scrolls under it.
@@ -237,7 +242,7 @@ function GameShellInner() {
           {isHome ? (
             <Outlet />
           ) : (
-            <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col px-4 pb-4 lg:p-6">
+            <div className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col px-4 pb-4 lg:p-6", !fullWidth && "max-w-5xl")}>
               <h1 className="sr-only">{title}</h1>
               <Outlet />
             </div>

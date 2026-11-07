@@ -229,6 +229,14 @@ export async function docFileSignedUrl(path: string): Promise<string | null> {
   return error ? null : data.signedUrl;
 }
 
+/** Saves a file under its original name (signed URL with Content-Disposition: attachment). */
+export async function downloadDocFile(path: string, fileName: string): Promise<boolean> {
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60, { download: fileName });
+  if (error) return false;
+  window.location.href = data.signedUrl;
+  return true;
+}
+
 // ------------------------------------------------------------ cascade delete
 
 /** Paths of every file under a lesson — for the "จะลบเอกสาร N ไฟล์ด้วย" confirm and the pre-delete Storage cleanup. */
