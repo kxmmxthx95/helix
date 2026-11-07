@@ -2,7 +2,8 @@ import JsBarcode from "jsbarcode";
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
-import { Button, Card, Field, Input, Spinner, Switch } from "@/components/ui";
+import { CheckmarkCircleIcon, Search } from "@/components/icons";
+import { Button, Field, Input, Spinner, Switch } from "@/components/ui";
 import { productImageUrl, usePosProducts, useSaveProduct } from "@/hooks/useCardTopup";
 import type { PosProduct } from "@/lib/database.types";
 import { downloadLabelPng, printLabels } from "@/lib/productLabel";
@@ -24,8 +25,12 @@ export function ProductsTab() {
   const { data: products = [], isLoading } = usePosProducts();
   const save = useSaveProduct();
   const [form, setForm] = useState<Form | null>(null);
-  const [label, setLabel] = useState<PosProduct | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  // Grid filters: free text (name / barcode), a category chip or the "ปิดขาย" chip.
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [toggling, setToggling] = useState<string | null>(null);
 
   const categories = [...new Set(products.map((p) => p.category?.trim()).filter((c): c is string => !!c))].sort();
   const price = form ? parseAmount(form.price, SALE_MIN, SALE_MAX) : null;
@@ -58,68 +63,208 @@ export function ProductsTab() {
       return n;
     });
   const chosen = products.filter((p) => picked.has(p.id));
+  const editing = form?.id ? (products.find((p) => p.id === form.id) ?? null) : null;
+
+  const OFF = "__off__";
+  const offCount = products.filter((p) => !p.active).length;
+  const q = query.trim().toLowerCase();
+  const shown = products.filter((p) => {
+    if (filter === OFF ? p.active : filter !== null && categoryOf(p) !== filter) return false;
+    return !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q);
+  });
+  const cats = [...new Set(products.map(categoryOf))].sort();
+
+  const openEdit = (p: PosProduct) =>
+    setForm({ id: p.id, name: p.name, price: String(p.price), category: p.category ?? "", active: p.active, preview: productImageUrl(p) });
+
+  // Quick on/off from the card: same save call, every other field unchanged (image undefined = keep).
+  async function setActive(p: PosProduct, active: boolean) {
+    setToggling(p.id);
+    try {
+      await save.mutateAsync({ id: p.id, name: p.name, price: p.price, category: p.category ?? null, active });
+      toast(active ? `เปิดขาย ${p.name}` : `ปิดขาย ${p.name}`);
+    } catch (err) {
+      toast(errMsg(err), "error");
+    } finally {
+      setToggling(null);
+    }
+  }
+
+  const chip = (active: boolean) =>
+    cn(
+      "tappable flex h-12 shrink-0 items-center rounded-full border px-5 text-lg font-semibold transition-colors",
+      active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-foreground/5",
+    );
 
   return (
-    <Card className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="font-ui text-sm font-semibold">สินค้า ({products.length})</p>
-        <div className="ml-auto flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" disabled={chosen.length === 0} onClick={() => printLabels(chosen)}>
-            พิมพ์ป้ายที่เลือก (A4){chosen.length ? ` · ${chosen.length}` : ""}
+    <div className="space-y-4">
+      {/* Title row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="font-ui text-2xl font-semibold">สินค้า ({products.length})</h2>
+        <div className="relative ml-auto min-w-0 flex-1 sm:max-w-sm">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            className="h-14 !pl-12 text-lg"
+            placeholder="ค้นหาชื่อ หรือสแกนบาร์โค้ด"
+            aria-label="ค้นหาสินค้า"
+            autoComplete="off"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              // A scanned barcode ends in Enter: an exact code match opens that product.
+              if (e.key !== "Enter") return;
+              const hit = products.find((p) => p.code.toLowerCase() === q);
+              if (hit) {
+                e.preventDefault();
+                setQuery("");
+                openEdit(hit);
+              }
+            }}
+          />
+        </div>
+        <Button className="h-14 px-6 text-lg" onClick={() => setForm(blank)}>
+          เพิ่มสินค้า
+        </Button>
+      </div>
+
+      {/* Filter row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="scrollbar-hidden flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1" role="tablist" aria-label="หมวดหมู่สินค้า">
+          <button type="button" role="tab" aria-selected={filter === null} className={chip(filter === null)} onClick={() => setFilter(null)}>
+            ทั้งหมด
+          </button>
+          {cats.map((c) => (
+            <button key={c} type="button" role="tab" aria-selected={filter === c} className={chip(filter === c)} onClick={() => setFilter(c)}>
+              {c}
+            </button>
+          ))}
+          {offCount > 0 && (
+            <button type="button" role="tab" aria-selected={filter === OFF} className={chip(filter === OFF)} onClick={() => setFilter(OFF)}>
+              ปิดขาย ({offCount})
+            </button>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          className="h-14 shrink-0 px-5 text-lg"
+          onClick={() => {
+            setSelecting((v) => !v);
+            setPicked(new Set());
+          }}
+        >
+          {selecting ? "เลิกเลือก" : "เลือกเพื่อพิมพ์ป้าย"}
+        </Button>
+      </div>
+
+      {isLoading && <Spinner className="mx-auto size-8" />}
+      {!isLoading && products.length === 0 && (
+        <p className="rounded-2xl border border-dashed border-border px-4 py-12 text-center text-lg text-muted-foreground">ยังไม่มีสินค้า — กด "เพิ่มสินค้า"</p>
+      )}
+      {!isLoading && products.length > 0 && shown.length === 0 && (
+        <p className="px-4 py-12 text-center text-lg text-muted-foreground">ไม่พบสินค้าที่ตรงกับการค้นหา</p>
+      )}
+
+      {/* Card grid — same look as the sale screen's product tiles */}
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {shown.map((p) => {
+          const src = productImageUrl(p);
+          const isPicked = picked.has(p.id);
+          return (
+            <li
+              key={p.id}
+              className={cn(
+                "relative flex flex-col overflow-hidden rounded-2xl border bg-card transition-shadow",
+                isPicked ? "border-foreground ring-2 ring-foreground" : "border-border",
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => (selecting ? toggle(p.id) : openEdit(p))}
+                aria-pressed={selecting ? isPicked : undefined}
+                aria-label={selecting ? `${isPicked ? "ยกเลิกเลือก" : "เลือก"} ${p.name}` : `แก้ไข ${p.name}`}
+                className="tappable flex flex-1 flex-col text-left active:bg-foreground/5"
+              >
+                <div className={cn("relative aspect-[3/2] w-full bg-muted", !p.active && "opacity-50 grayscale")}>
+                  {src ? (
+                    <img src={src} alt="" loading="lazy" className="size-full object-cover" />
+                  ) : (
+                    <span className="flex size-full items-center justify-center text-base text-muted-foreground">ไม่มีรูป</span>
+                  )}
+                </div>
+                {!p.active && (
+                  <span className="absolute right-2 top-2 rounded-full bg-destructive px-3 py-1 text-sm font-semibold text-white">ปิดขาย</span>
+                )}
+                {selecting && (
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "absolute left-2 top-2 flex size-10 items-center justify-center rounded-full border-2 shadow",
+                      isPicked ? "border-foreground bg-foreground text-background" : "border-white bg-black/30 text-transparent",
+                    )}
+                  >
+                    <CheckmarkCircleIcon className="h-7 w-7" />
+                  </span>
+                )}
+                <span className="flex flex-1 flex-col gap-1 px-4 pb-2 pt-3">
+                  <span className={cn("line-clamp-2 text-lg font-semibold leading-snug", !p.active && "text-muted-foreground")}>{p.name}</span>
+                  <span className="text-2xl font-bold tabular-nums">{p.price} ฿</span>
+                  <span className="truncate text-base text-muted-foreground">{categoryOf(p)}</span>
+                </span>
+              </button>
+              {!selecting && (
+                <div className="flex items-center justify-between gap-2 border-t border-border px-4 py-3">
+                  <span className={cn("text-base font-semibold", p.active ? "text-success" : "text-muted-foreground")}>{p.active ? "เปิดขาย" : "ปิดขาย"}</span>
+                  {toggling === p.id ? (
+                    <Spinner className="size-6" />
+                  ) : (
+                    <Switch label={`เปิดขาย ${p.name}`} checked={p.active} disabled={save.isPending} onChange={(v) => void setActive(p, v)} />
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Select-to-print bar */}
+      {selecting && (
+        <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-3 border-t border-border bg-card/95 px-4 py-3 backdrop-blur">
+          <p className="text-lg font-semibold" aria-live="polite">
+            เลือกแล้ว {chosen.length} รายการ
+          </p>
+          <Button variant="outline" className="h-14 px-5 text-lg" onClick={() => setPicked(new Set(shown.map((p) => p.id)))}>
+            เลือกทั้งหมดที่แสดง
           </Button>
-          <Button size="sm" onClick={() => setForm(blank)}>
-            เพิ่มสินค้า
+          <Button className="ml-auto h-14 px-6 text-lg" disabled={chosen.length === 0} onClick={() => printLabels(chosen)}>
+            พิมพ์ป้าย (A4){chosen.length ? ` · ${chosen.length}` : ""}
           </Button>
         </div>
-      </div>
-      {isLoading && <Spinner />}
-      <ul className="divide-y divide-border">
-        {products.map((p) => (
-          <li key={p.id} className="flex items-center gap-3 py-2 text-sm">
-            <input type="checkbox" className="size-5" aria-label={`เลือก ${p.name}`} checked={picked.has(p.id)} onChange={() => toggle(p.id)} />
-            <ProductThumb product={p} />
-            <div className={cn("min-w-0 flex-1", !p.active && "text-muted-foreground")}>
-              <p className={cn("truncate font-semibold", !p.active && "line-through")}>{p.name}</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {p.code} · {categoryOf(p)}
-                {!p.active && " · ปิดขาย"}
-              </p>
-            </div>
-            <span className="shrink-0 font-semibold tabular-nums">{p.price} ฿</span>
-            <Button size="sm" variant="ghost" onClick={() => setLabel(p)}>
-              ป้าย
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setForm({ id: p.id, name: p.name, price: String(p.price), category: p.category ?? "", active: p.active, preview: productImageUrl(p) })}>
-              แก้ไข
-            </Button>
-          </li>
-        ))}
-        {!isLoading && products.length === 0 && <li className="py-2 text-xs text-muted-foreground">ยังไม่มีสินค้า — กด "เพิ่มสินค้า"</li>}
-      </ul>
+      )}
 
       <Modal
         open={!!form}
         onOpenChange={(o) => !o && setForm(null)}
         title={form?.id ? "แก้ไขสินค้า" : "เพิ่มสินค้า"}
         footer={
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => setForm(null)}>
+          <div className="flex gap-3">
+            <Button type="button" variant="outline" className="h-14 flex-1 text-lg" onClick={() => setForm(null)}>
               ยกเลิก
             </Button>
-            <Button type="submit" form="product-form" className="flex-1" disabled={!canSave}>
+            <Button type="submit" form="product-form" className="h-14 flex-1 text-lg" disabled={!canSave}>
               {save.isPending ? <Spinner /> : "บันทึก"}
             </Button>
           </div>
         }
       >
         {form && (
-          <form id="product-form" onSubmit={submit} className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted text-xs text-muted-foreground">
+          <form id="product-form" onSubmit={submit} className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="flex size-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted text-base text-muted-foreground">
                 {form.preview ? <img src={form.preview} alt="" className="size-full object-cover" /> : "ไม่มีรูป"}
               </div>
-              <div className="flex flex-col items-start gap-1">
-                <label className="tappable inline-flex h-9 cursor-pointer items-center rounded-xl bg-muted px-3 text-[13px] font-medium">
+              <div className="flex flex-col items-start gap-3">
+                <label className="tappable inline-flex h-14 cursor-pointer items-center rounded-xl border border-border bg-muted px-5 text-lg font-medium">
                   {form.preview ? "เปลี่ยนรูป" : "เพิ่มรูปสินค้า"}
                   <input
                     type="file"
@@ -132,7 +277,7 @@ export function ProductsTab() {
                   />
                 </label>
                 {form.preview && (
-                  <button type="button" className="text-xs text-destructive" onClick={() => setForm({ ...form, image: null, preview: null })}>
+                  <button type="button" className="tappable h-12 rounded-xl border border-border px-4 text-base font-semibold text-destructive" onClick={() => setForm({ ...form, image: null, preview: null })}>
                     ลบรูป
                   </button>
                 )}
@@ -153,22 +298,19 @@ export function ProductsTab() {
               </datalist>
             </Field>
             {form.id && <Switch label="เปิดขาย" checked={form.active} onChange={(active) => setForm({ ...form, active })} />}
-            {!form.id && <p className="text-xs text-muted-foreground">ระบบสร้างรหัสบาร์โค้ดให้อัตโนมัติหลังบันทึก — เปิดป้ายพิมพ์ได้จากรายการ</p>}
+            {!form.id && <p className="text-base text-muted-foreground">ระบบสร้างรหัสบาร์โค้ดให้อัตโนมัติหลังบันทึก — เปิดแก้ไขอีกครั้งเพื่อพิมพ์ป้าย</p>}
           </form>
+        )}
+        {/* Barcode label lives with the product now (the per-row "ป้าย" button is gone). */}
+        {editing && (
+          <div className="mt-6 space-y-2 border-t border-border pt-4">
+            <p className="text-lg font-semibold">ป้ายบาร์โค้ด · {editing.code}</p>
+            <LabelPreview product={editing} />
+          </div>
         )}
       </Modal>
 
-      <Modal open={!!label} onOpenChange={(o) => !o && setLabel(null)} title="ป้ายบาร์โค้ด">
-        {label && <LabelPreview product={label} />}
-      </Modal>
-    </Card>
-  );
-}
-
-function ProductThumb({ product }: { product: PosProduct }) {
-  const src = productImageUrl(product);
-  return (
-    <div className="size-10 shrink-0 overflow-hidden rounded-lg bg-muted">{src && <img src={src} alt="" loading="lazy" className="size-full object-cover" />}</div>
+    </div>
   );
 }
 
@@ -180,15 +322,15 @@ function LabelPreview({ product }: { product: PosProduct }) {
   return (
     <div className="space-y-3">
       <div className="space-y-1 rounded-lg border border-border bg-white p-3 text-center text-black">
-        <p className="font-semibold">{product.name}</p>
+        <p className="text-xl font-semibold">{product.name}</p>
         <svg ref={bars} role="img" aria-label={`บาร์โค้ด ${product.code}`} className="mx-auto max-w-full" />
-        <p className="text-lg font-bold">{product.price} บาท</p>
+        <p className="text-2xl font-bold">{product.price} บาท</p>
       </div>
-      <div className="flex gap-2">
-        <Button className="flex-1" onClick={() => printLabels([product])}>
+      <div className="flex gap-3">
+        <Button className="h-14 flex-1 text-lg" onClick={() => printLabels([product])}>
           พิมพ์
         </Button>
-        <Button variant="outline" className="flex-1" onClick={() => downloadLabelPng(product)}>
+        <Button variant="outline" className="h-14 flex-1 text-lg" onClick={() => downloadLabelPng(product)}>
           ดาวน์โหลด PNG
         </Button>
       </div>

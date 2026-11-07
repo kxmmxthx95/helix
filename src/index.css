@@ -368,6 +368,29 @@
     }
   }
 
+  /* POS (tablet, cashiers 40–60): set on <html> while the POS is open, so its modals get it too.
+     Bigger targets and type; call sites that already ask for something larger keep it (min-height only). */
+  .pos-large .ui-control:not([class*="h-6"]):not([class*="h-7"]) {
+    min-height: 3.25rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    border-radius: 0.75rem;
+  }
+  .pos-large .ui-control:is(.text-sm, [class*="text-[13px]"]),
+  .pos-large .ui-control-icon {
+    font-size: 1.0625rem;
+  }
+  .pos-large .ui-control-icon:not([class*="h-6"]):not([class*="h-7"]) {
+    min-height: 3.25rem;
+    min-width: 3.25rem;
+  }
+  .pos-large [role="dialog"] {
+    font-size: 1.0625rem;
+  }
+  .pos-large label > span.font-ui:first-child {
+    font-size: 1rem;
+  }
+
   /* Scroll without a visible scrollbar (Sheet body, etc.) */
   .scrollbar-hidden {
     scrollbar-width: none;

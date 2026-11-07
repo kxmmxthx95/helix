@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button, Field, Input, PasswordInput, Spinner } from "@/components/ui";
 
@@ -7,7 +7,7 @@ import { Button, Field, Input, PasswordInput, Spinner } from "@/components/ui";
 export const POS_DENIED_KEY = "helix.posDenied";
 export const POS_DENIED_MSG = "รหัสผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
 
-const inputClass = "h-12 border-white/15 bg-white/5 text-base text-white placeholder:text-white/35 focus-visible:border-white/40";
+const inputClass = "h-14 border-white/15 bg-white/5 text-lg text-white placeholder:text-white/35 focus-visible:border-white/40";
 
 function takeDeniedMessage() {
   try {
@@ -27,6 +27,11 @@ export function PosLogin() {
   const [error, setError] = useState<string | undefined>(takeDeniedMessage);
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    document.documentElement.classList.add("pos-large");
+    return () => document.documentElement.classList.remove("pos-large");
+  }, []);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(undefined);
@@ -44,10 +49,10 @@ export function PosLogin() {
   return (
     <div className="dark fixed inset-0 flex flex-col overflow-y-auto overscroll-none bg-[#0a0a0a] text-foreground">
       {/* Terminal bar: the one thing you'd recognise with the logo removed. */}
-      <div className="flex items-center justify-between border-b border-white/10 px-5 py-3 font-mono text-xs uppercase tracking-[0.2em] text-white/50">
+      <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 font-mono text-base uppercase tracking-[0.2em] text-white/70">
         <span>Helix · POS</span>
         <span className="flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden />
+          <span className="h-3 w-3 rounded-full bg-success" aria-hidden />
           พร้อมใช้งาน
         </span>
       </div>
@@ -57,9 +62,9 @@ export function PosLogin() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: "easeOut" }}
-          className="w-full max-w-sm"
+          className="w-full max-w-lg"
         >
-          <svg viewBox="0 0 320 190" className="mx-auto mb-8 w-64" aria-hidden>
+          <svg viewBox="0 0 320 190" className="mx-auto mb-6 w-56 landscape:max-h-[22vh] landscape:w-auto" aria-hidden>
             <rect x="1" y="1" width="318" height="188" rx="16" fill="#1c1c1e" stroke="rgba(255,255,255,0.18)" strokeWidth="2" />
             <rect x="1" y="30" width="318" height="38" fill="#000" />
             <rect x="24" y="96" width="46" height="34" rx="6" fill="rgba(255,255,255,0.14)" />
@@ -70,10 +75,10 @@ export function PosLogin() {
             </text>
           </svg>
 
-          <h1 className="text-center text-2xl font-semibold tracking-tight">เข้าสู่ระบบเครื่อง POS</h1>
-          <p className="mt-1 text-center text-sm text-white/55">บัตรเติมเงินนักเรียน</p>
+          <h1 className="text-center text-3xl font-semibold tracking-tight">เข้าสู่ระบบเครื่อง POS</h1>
+          <p className="mt-2 text-center text-lg text-white/75">บัตรเติมเงินนักเรียน</p>
 
-          <form onSubmit={submit} className="glass-panel mt-6 space-y-4 rounded-2xl p-5">
+          <form onSubmit={submit} className="glass-panel mt-6 space-y-5 rounded-2xl p-6">
             <Field label="รหัสผู้ใช้">
               <Input
                 value={loginId}
@@ -96,17 +101,17 @@ export function PosLogin() {
             </Field>
 
             {error && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-lg text-destructive">
                 {error}
               </p>
             )}
 
-            <Button type="submit" size="lg" className="h-12 w-full text-base" disabled={busy}>
+            <Button type="submit" size="lg" className="h-16 w-full text-xl" disabled={busy}>
               {busy ? <Spinner /> : "เข้าสู่ระบบ"}
             </Button>
           </form>
 
-          <p className="mt-5 text-center text-xs text-white/45">ลืมรหัสผ่าน? ติดต่อฝ่ายการเงิน</p>
+          <p className="mt-5 text-center text-base text-white/70">ลืมรหัสผ่าน? ติดต่อฝ่ายการเงิน</p>
         </motion.div>
       </div>
     </div>

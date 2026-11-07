@@ -1,9 +1,10 @@
 import JsBarcode from "jsbarcode";
+import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { FiSidebar } from "react-icons/fi";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { AlertTriangle, BarChartIcon, BarcodeIcon, CartIcon, CheckmarkCircleIcon, CoinIcon, DesktopIcon, LogOut, Moon, Monitor, Search, Sun } from "@/components/icons";
+import { AlertTriangle, LockIcon, BarChartIcon, BarcodeIcon, CartIcon, CheckmarkCircleIcon, CoinIcon, DesktopIcon, LogOut, Moon, Monitor, Search, Sun } from "@/components/icons";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { useTheme } from "@/components/ThemeProvider";
@@ -49,9 +50,8 @@ const readTerminal = () => {
   }
 };
 
-const SIDEBAR_KEY = "helix-pos-sidebar-collapsed";
 const VIEWS = [
-  { key: "sale", label: "POS", icon: CartIcon },
+  { key: "sale", label: "ขายสินค้า", icon: CartIcon },
   { key: "topup", label: "เติมเงิน", icon: CoinIcon },
   { key: "slips", label: "อนุมัติสลิป", icon: CheckmarkCircleIcon },
   { key: "report", label: "รายงาน", icon: BarChartIcon },
@@ -61,19 +61,6 @@ const VIEWS = [
 type View = (typeof VIEWS)[number]["key"];
 /** Cashiers get these two in the sidebar; the rest are org-wide only. */
 const isCounterView = (k: View) => k === "sale" || k === "topup";
-
-/** True from Tailwind's `lg` (1024px) up — below it the sidebar is a drawer instead of a column. */
-function useWide() {
-  const q = "(min-width: 1024px)";
-  const [wide, setWide] = useState(() => window.matchMedia(q).matches);
-  useEffect(() => {
-    const m = window.matchMedia(q);
-    const on = () => setWide(m.matches);
-    m.addEventListener("change", on);
-    return () => m.removeEventListener("change", on);
-  }, []);
-  return wide;
-}
 
 type Done = { kind: "sale"; amount: number; balance: number };
 
@@ -91,29 +78,12 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   // org-wide only: the other card-top-up tabs live in a sidebar (collapsible like the portal's; a drawer below lg).
   const [view, setView] = useState<View>("sale");
   const onSale = isCounterView(view);
-  const wide = useWide();
   const { preference, cycle } = useTheme();
   const roleSubtitle = useRoleSubtitle(profile?.id, profile?.roles ?? []);
-  const [collapsed, setCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem(SIDEBAR_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
+  // Tablet-first: the menu is a drawer at every width, opened from the labelled "เมนู" button in the top bar.
   const [drawer, setDrawer] = useState(false);
-  const sidebarOpen = wide ? !collapsed : drawer;
-  const toggleSidebar = () => {
-    if (!wide) return setDrawer((v) => !v);
-    setCollapsed((v) => {
-      try {
-        localStorage.setItem(SIDEBAR_KEY, v ? "0" : "1");
-      } catch {
-        /* private mode: the choice just isn't remembered */
-      }
-      return !v;
-    });
-  };
+  const sidebarOpen = drawer;
+  const toggleSidebar = () => setDrawer((v) => !v);
   const [student, setStudent] = useState<(PosStudent & { card_uid?: string }) | null>(null);
   const [done, setDone] = useState<Done | null>(null);
   const [looking, setLooking] = useState(false);
@@ -164,6 +134,11 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
       /* private mode: the choice just isn't remembered */
     }
   };
+
+  useEffect(() => {
+    document.documentElement.classList.add("pos-large");
+    return () => document.documentElement.classList.remove("pos-large");
+  }, []);
 
   const modalOpen = pinOpen || confirmOpen || todayOpen || codeOpen || testOpen;
   useEffect(() => {
@@ -306,8 +281,8 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const picker = (
     <div className="flex flex-1 items-center justify-center p-5">
       <Card className="w-full max-w-md space-y-3">
-        <p className="font-ui text-lg font-semibold">เลือกเครื่องขายของอุปกรณ์นี้</p>
-        <p className="text-xs text-muted-foreground">ใช้สำหรับรายงานเท่านั้น — จดจำไว้ในเครื่องนี้ และเปลี่ยนได้ภายหลัง</p>
+        <p className="font-ui text-2xl font-semibold">เลือกเครื่องขายของอุปกรณ์นี้</p>
+        <p className="text-base text-muted-foreground">ใช้สำหรับรายงานเท่านั้น — จดจำไว้ในเครื่องนี้ และเปลี่ยนได้ภายหลัง</p>
         <Select value="" onChange={(e) => pickTerminal(e.target.value)} aria-label="เครื่องขาย" placeholder="เลือกเครื่องขาย">
           {activeTerminals.map((t) => (
             <option key={t.id} value={t.id}>
@@ -315,59 +290,60 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
             </option>
           ))}
         </Select>
-        {activeTerminals.length === 0 && <p className="text-xs text-muted-foreground">ยังไม่มีเครื่องขาย — ให้ผู้ดูแลเพิ่มที่แท็บ "เครื่องขาย"</p>}
+        {activeTerminals.length === 0 && <p className="text-base text-muted-foreground">ยังไม่มีเครื่องขาย — ให้ผู้ดูแลเพิ่มที่แท็บ "เครื่องขาย"</p>}
       </Card>
     </div>
   );
 
   const toggleButton = (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="hover:bg-transparent active:bg-transparent"
+    <button
+      type="button"
       onClick={toggleSidebar}
-      aria-label={sidebarOpen ? "หุบแถบด้านข้าง" : "ขยายแถบด้านข้าง"}
       aria-expanded={sidebarOpen}
-      title={sidebarOpen ? "หุบแถบด้านข้าง" : "ขยายแถบด้านข้าง"}
+      className="tappable flex h-14 shrink-0 items-center gap-2 rounded-xl border border-border bg-card px-4 text-lg font-semibold transition-colors hover:bg-foreground/5 active:bg-foreground/10"
     >
-      <FiSidebar className="h-3.5 w-3.5" />
-    </Button>
+      <FiSidebar className="h-5 w-5" />
+      เมนู
+    </button>
   );
   const itemClass = (active = false) =>
     cn(
-      "group font-ui tappable flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold transition-colors",
+      "group font-ui tappable flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-lg font-semibold transition-colors",
       active ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
     );
-  const footerIconClass = "tappable flex h-10 flex-1 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground";
+  const footerIconClass = "tappable flex h-14 flex-1 items-center justify-center gap-2 rounded-xl border border-border text-base font-semibold text-foreground transition-colors hover:bg-foreground/5";
   const themeLabel = preference === "system" ? "ตามระบบ" : preference === "dark" ? "โหมดมืด" : "โหมดสว่าง";
   // Same frame as the portal's AppShell: shell-coloured sidebar, toggle pinned top-left, logo top-right,
   // user card + icon row at the foot. Collapsed = zero width; below lg it is a drawer.
   const sidebar = (
     <>
-      {!wide && drawer && <button type="button" aria-label="ปิดแถบด้านข้าง" className="absolute inset-0 z-20 bg-black/35" onClick={() => setDrawer(false)} />}
+      {drawer && <button type="button" aria-label="ปิดเมนู" className="absolute inset-0 z-20 bg-black/40" onClick={() => setDrawer(false)} />}
       <aside
         inert={!sidebarOpen}
         className={cn(
-          "font-ui bg-shell relative z-10 shrink-0 overflow-hidden transition-[width] duration-200 ease-ios max-lg:absolute max-lg:inset-y-0 max-lg:left-0 max-lg:z-30 max-lg:shadow-card",
-          sidebarOpen ? "w-60" : "w-0",
+          "font-ui absolute inset-y-0 left-0 z-30 shrink-0 overflow-hidden bg-shell shadow-card transition-[width] duration-200 ease-ios",
+          sidebarOpen ? "w-80" : "w-0",
         )}
       >
-        <div className="flex h-full w-60 flex-col">
-          <div className="flex h-12 shrink-0 items-center px-3">
-            <img src="/logo.webp" alt="Helix" className="ml-auto h-6 w-auto dark:invert" />
+        <div className="flex h-full w-80 flex-col">
+          <div className="flex h-[4.5rem] shrink-0 items-center gap-3 px-4">
+            <button type="button" onClick={() => setDrawer(false)} className="tappable flex h-12 items-center rounded-xl border border-border bg-card px-4 text-base font-semibold">
+              ปิดเมนู
+            </button>
+            <img src="/logo.webp" alt="Helix" className="ml-auto h-7 w-auto dark:invert" />
           </div>
           <nav className="scrollbar-hidden flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-2" aria-label="เมนูบัตรเติมเงิน">
               <div>
                 <div className="flex flex-col gap-0.5">
                   {VIEWS.filter((v) => orgWide || isCounterView(v.key)).map(({ key, label, icon: Icon }) => (
                     <button key={key} type="button" aria-current={view === key ? "page" : undefined} onClick={() => (key === "topup" ? openTopup() : setView(key), setDrawer(false))} className={itemClass(view === key)}>
-                      <Icon className="h-4 w-4 shrink-0 group-aria-[current=page]:text-accent" />
+                      <Icon className="h-6 w-6 shrink-0 group-aria-[current=page]:text-accent" />
                       <span className="truncate">{label}</span>
-                      {key === "topup" && isUnlocked && <span className={cn("ml-auto shrink-0 text-[11px] font-medium tabular-nums", minutesLeft <= 5 ? "font-semibold text-destructive motion-safe:animate-pulse" : "text-muted-foreground")}>เหลือ {minutesLeft} นาที</span>}
+                      {key === "topup" && isUnlocked && <span className={cn("ml-auto shrink-0 text-base font-semibold tabular-nums", minutesLeft <= 5 ? "font-semibold text-destructive motion-safe:animate-pulse" : "text-muted-foreground")}>เหลือ {minutesLeft} นาที</span>}
                     </button>
                   ))}
                   <button type="button" className={itemClass()} onClick={() => (setTestOpen(true), setDrawer(false))}>
-                    <BarcodeIcon className="h-4 w-4 shrink-0" />
+                    <BarcodeIcon className="h-6 w-6 shrink-0" />
                     <span className="truncate">ทดสอบเครื่องอ่านบาร์โค้ด</span>
                   </button>
                 </div>
@@ -375,7 +351,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
           </nav>
           <div className="mt-auto flex flex-col gap-2 border-t border-border/60 p-3">
             {terminal && (
-              <button type="button" className="tappable rounded-lg border border-border bg-card px-2.5 py-1.5 text-left text-xs font-semibold" onClick={() => (setTerminalId(""), setDrawer(false))}>
+              <button type="button" className="tappable min-h-12 rounded-xl border border-border bg-card px-4 py-2 text-left text-base font-semibold" onClick={() => (setTerminalId(""), setDrawer(false))}>
                 {terminal.name} · เปลี่ยนเครื่อง
               </button>
             )}
@@ -383,19 +359,21 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               {/* Connection status: pulsing ring around the photo — green online, red offline. */}
               <span className="relative flex shrink-0 rounded-full" role="status" aria-label={online ? "ออนไลน์" : "ออฟไลน์"} title={online ? "ออนไลน์" : "ออฟไลน์"}>
                 <span aria-hidden className={cn("absolute -inset-1 rounded-full border-2 motion-safe:animate-pulse", online ? "border-success" : "border-destructive")} />
-                <Avatar name={profile ? profileFullName(profile) : "Helix"} src={profile ? avatarUrl(profile) : null} className="h-9 w-9 text-xs" />
+                <Avatar name={profile ? profileFullName(profile) : "Helix"} src={profile ? avatarUrl(profile) : null} className="h-12 w-12 text-sm" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-semibold leading-tight">{profile ? profileFullName(profile) : ""}</p>
-                {profile && <p className="truncate text-[11px] leading-tight text-muted-foreground">{roleSubtitle}</p>}
+                <p className="truncate text-base font-semibold leading-tight">{profile ? profileFullName(profile) : ""}</p>
+                {profile && <p className="truncate text-base leading-tight text-muted-foreground">{roleSubtitle}</p>}
               </div>
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-2">
               <button type="button" onClick={cycle} title={themeLabel} aria-label={`Theme: ${preference}. Tap to cycle.`} className={footerIconClass}>
-                {preference === "system" ? <Monitor className="h-4 w-4" /> : preference === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                {preference === "system" ? <Monitor className="h-5 w-5" /> : preference === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                {themeLabel}
               </button>
               <button type="button" onClick={() => void signOutAndLock()} title="ออกจากระบบ" aria-label="ออกจากระบบ" className={cn(footerIconClass, "hover:bg-destructive/10 hover:text-destructive")}>
-                <LogOut className="h-4 w-4" />
+                <LogOut className="h-5 w-5" />
+                ออกจากระบบ
               </button>
             </div>
           </div>
@@ -414,7 +392,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   );
 
   const keypad = (
-    <div className="grid flex-1 grid-cols-3 gap-2">
+    <div className="grid flex-1 grid-cols-3 gap-3">
       {KEYS.map((k) => (
         <button
           key={k}
@@ -422,7 +400,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
           aria-label={k === "⌫" ? "ลบ" : k === "C" ? "ล้าง" : k}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => press(k)}
-          className="tappable min-h-16 rounded-xl border border-border bg-background text-2xl font-semibold transition-colors hover:bg-foreground/5 active:bg-foreground/10"
+          className="tappable min-h-[4.5rem] rounded-2xl border border-border bg-background text-3xl font-semibold tabular-nums transition-colors hover:bg-foreground/5 active:bg-foreground/15"
         >
           {k}
         </button>
@@ -456,17 +434,23 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         }}
       />
 
-      <div className={cn("grid min-h-0 flex-1 gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_24rem]", !sidebarOpen && "pt-14")}>
+      <div className="grid min-h-0 flex-1 gap-4 p-4 md:grid-cols-[minmax(0,1fr)_21rem] lg:grid-cols-[minmax(0,1fr)_25rem]">
         {/* Customer panel */}
-        <section className="flex min-h-0 flex-col items-center justify-center rounded-2xl border border-border bg-card p-6 text-center">
+        <section className={cn("flex min-h-0 flex-col items-center justify-center overflow-y-auto rounded-2xl border p-6 text-center", done ? "border-success/40 bg-success/10" : "border-border bg-card")}>
           {looking ? (
             <Spinner className="size-8" />
           ) : done ? (
-            <div role="status" className="space-y-2">
-              <p className="text-lg text-success">{done.kind === "sale" ? "ตัดเงินสำเร็จ" : "เติมเงินสำเร็จ"}</p>
+            <div role="status" className="flex flex-col items-center gap-2">
+              <span className="flex size-24 items-center justify-center rounded-full bg-success text-white shadow-lg" aria-hidden>
+                <CheckmarkCircleIcon className="size-14" />
+              </span>
+              <p className="pt-2 text-3xl font-bold text-success">{done.kind === "sale" ? "ตัดเงินสำเร็จ" : "เติมเงินสำเร็จ"}</p>
               <p className="font-heading text-7xl font-semibold tabular-nums">{formatBaht(done.amount)} ฿</p>
-              <p className="pt-6 text-sm text-muted-foreground">ยอดคงเหลือ</p>
-              <p className="font-heading text-5xl font-semibold tabular-nums text-success">{formatBaht(done.balance)} ฿</p>
+              <p className="pt-6 text-xl text-muted-foreground">ยอดคงเหลือ</p>
+              <p className="font-heading text-5xl font-semibold tabular-nums">{formatBaht(done.balance)} ฿</p>
+              <Button size="lg" variant="outline" className="mt-6 h-14 px-8 text-lg" onClick={() => setDone(null)}>
+                ทำรายการต่อไป
+              </Button>
             </div>
           ) : student ? (
             <div className="w-full max-w-xl space-y-6">
@@ -477,33 +461,33 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                   className="size-28 text-3xl"
                 />
                 <div className="min-w-0 text-left">
-                  <p className="truncate font-heading text-3xl font-semibold">{student.name}</p>
-                  <p className="text-base text-muted-foreground">
+                  <p className="truncate font-heading text-4xl font-semibold">{student.name}</p>
+                  <p className="text-xl text-muted-foreground">
                     {student.student_code}
                     {student.classroom ? ` · ${student.classroom}` : ""}
                   </p>
                 </div>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">ยอดคงเหลือ</p>
+                <p className="text-xl text-muted-foreground">ยอดคงเหลือ</p>
                 <p className="font-heading text-7xl font-semibold tabular-nums">{formatBaht(student.balance)} ฿</p>
                 {student.daily_limit !== null && (
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-1 text-lg text-muted-foreground">
                     วงเงินต่อวัน {formatBaht(student.daily_limit)} · ใช้ไปแล้ววันนี้ {formatBaht(student.spent_today)}
                   </p>
                 )}
               </div>
               {price !== null && canSell && (
-                <p className={cn("text-2xl font-semibold tabular-nums", over && "text-destructive")} role={over ? "alert" : undefined}>
+                <p className={cn("text-3xl font-semibold tabular-nums", over && "rounded-xl bg-destructive/10 px-4 py-3 text-destructive")} role={over ? "alert" : undefined}>
                   ยอดชำระ {formatBaht(price)} ฿{over && " — ยอดคงเหลือไม่พอหรือเกินวงเงิน"}
                 </p>
               )}
-              {student.card_status === "frozen" && <p className="text-base font-semibold text-destructive">บัตรนี้ถูกระงับ — ขายไม่ได้</p>}
-              {student.card_status === null && <p className="text-sm text-muted-foreground">นักเรียนยังไม่ได้ผูกบัตร — เติมเงินได้ แต่ขายไม่ได้</p>}
+              {student.card_status === "frozen" && <p className="rounded-xl bg-destructive/10 px-4 py-3 text-xl font-semibold text-destructive">บัตรนี้ถูกระงับ — ขายไม่ได้</p>}
+              {student.card_status === null && <p className="rounded-xl bg-warning/15 px-4 py-3 text-lg font-medium">นักเรียนยังไม่ได้ผูกบัตร — เติมเงินได้ แต่ขายไม่ได้</p>}
               <RecentTx studentId={student.student_id} />
               <div className="flex justify-center gap-2">
-                <Button variant="ghost" size="lg" onClick={() => (setStudent(null), setEntry(""))}>
-                  ยกเลิก
+                <Button variant="outline" size="lg" className="h-14 px-8 text-lg" onClick={() => (setStudent(null), setEntry(""))}>
+                  ยกเลิก / เปลี่ยนนักเรียน
                 </Button>
               </div>
             </div>
@@ -522,11 +506,11 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                       <span className="absolute inline-flex size-full rounded-full bg-amber-400 opacity-75 motion-safe:animate-ping" />
                       <span className="relative inline-flex size-4 rounded-full bg-amber-400 motion-safe:animate-pulse" />
                     </span>
-                    <p className="text-left font-heading text-2xl font-semibold">สแกนบัตรนักเรียนเพื่อเติมเงิน</p>
+                    <p className="text-left font-heading text-3xl font-semibold">สแกนบัตรนักเรียนเพื่อเติมเงิน</p>
                   </div>
                   <div className="flex justify-center">
-                    <Button variant="outline" size="lg" onClick={() => setCodeOpen(true)}>
-                      <Search className="mr-2 size-4" />
+                    <Button variant="outline" size="lg" className="h-14 px-8 text-lg" onClick={() => setCodeOpen(true)}>
+                      <Search className="mr-2 size-5" />
                       ค้นหาข้อมูลนักเรียน
                     </Button>
                   </div>
@@ -548,8 +532,8 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               <Button size="lg" className="h-20 text-2xl" disabled={!student || topupValue === null || !online || topup.isPending} onClick={() => setConfirmOpen(true)}>
                 {topupValue === null ? "ยืนยันเติมเงิน" : `ยืนยันเติมเงิน ${formatBaht(topupValue)} ฿`}
               </Button>
-              <Button variant="ghost" onClick={() => (setStudent(null), setEntry(""), setTopupAmount(""))}>
-                ล้าง
+              <Button variant="outline" className="h-14 text-lg" onClick={() => (setStudent(null), setEntry(""), setTopupAmount(""))}>
+                ล้างทั้งหมด
               </Button>
             </>
           ) : (
@@ -564,11 +548,23 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                   {keypad}
                 </>
               )}
-              {price !== null && price > SALE_MAX && <p className="text-sm text-destructive">ยอดรวมเกิน {SALE_MAX} บาทต่อรายการ — ลดสินค้า</p>}
+              {price !== null && price > SALE_MAX && <p className="text-base font-medium text-destructive">ยอดรวมเกิน {SALE_MAX} บาทต่อรายการ — ลดสินค้า</p>}
               <Button size="lg" className="h-20 text-2xl" disabled={!canSell || !priceOk || over || paying || !online} onClick={() => void charge()}>
                 {paying ? <Spinner /> : price === null ? "ตัดเงิน" : `ยืนยันตัดเงิน ${formatBaht(price)} ฿`}
               </Button>
-              {priceOk && !student && <p className="text-center text-xs text-muted-foreground">สแกนบัตรนักเรียนเพื่อตัดเงิน</p>}
+              {!paying && (
+                <p className="text-center text-base text-muted-foreground" aria-live="polite">
+                  {!online
+                    ? "ออฟไลน์ — รอเชื่อมต่ออินเทอร์เน็ต"
+                    : !priceOk
+                      ? "① เลือกสินค้า หรือกดยอดเงิน"
+                      : !student
+                        ? "② สแกนบัตรนักเรียน"
+                        : canSell && !over
+                          ? "③ กดปุ่มด้านบนเพื่อตัดเงิน"
+                          : ""}
+                </p>
+              )}
             </>
           )}
         </section>
@@ -580,24 +576,66 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   // Portalled to <body>: AppShell's sidebar toggle sits in a higher stacking context than the page area.
   return createPortal(
     <div
-      className={cn("fixed inset-0 z-40 flex overflow-hidden lg:p-2", sidebarOpen && "lg:gap-2")}
+      className="fixed inset-0 z-40 flex overflow-hidden"
       onClick={(e) => onSale && terminal && !(e.target as HTMLElement).closest("input,select,textarea,dialog") && capture.current?.focus()}
     >
       <div className="absolute inset-0 z-0 bg-shell" aria-hidden />
-      {/* Toggle pinned in the header slot whether the sidebar is open or not, like the portal. */}
-      <div className="pointer-events-none absolute left-2 top-2 z-40 lg:left-3 lg:top-4">
-        <div className="pointer-events-auto">{toggleButton}</div>
-      </div>
       {sidebar}
-      <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background lg:rounded-2xl lg:shadow-card">
-        {!onSale && (
-          <header className="relative flex h-12 shrink-0 items-center justify-center border-b border-border px-12">
-            <p className="font-heading truncate text-[15px] font-semibold tracking-[-0.01em]">{VIEWS.find((v) => v.key === view)?.label}</p>
-          </header>
-        )}
+      <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+        <header className="flex h-[5rem] shrink-0 items-center gap-3 border-b border-border bg-card px-4 pt-safe">
+          {toggleButton}
+          {onSale ? (
+            <div role="tablist" aria-label="งานหน้าเคาน์เตอร์" className="flex min-w-0 gap-1 rounded-2xl bg-muted p-1">
+              {VIEWS.filter((v) => isCounterView(v.key)).map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={view === key}
+                  onClick={() => (key === "topup" ? openTopup() : setView(key))}
+                  className={cn(
+                    "tappable flex h-12 min-w-0 items-center gap-2 rounded-xl px-4 text-lg font-semibold transition-colors sm:px-6",
+                    view === key ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Icon className="h-6 w-6 shrink-0" />
+                  <span className="truncate">{label}</span>
+                  {key === "topup" && isUnlocked && (
+                    <span className={cn("shrink-0 text-base font-semibold tabular-nums", minutesLeft <= 5 ? "text-destructive motion-safe:animate-pulse" : "text-muted-foreground")}>
+                      {minutesLeft} น.
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="font-heading truncate text-2xl font-semibold">{VIEWS.find((v) => v.key === view)?.label}</p>
+          )}
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <span
+              role="status"
+              className={cn(
+                "hidden h-12 items-center gap-2 rounded-full px-4 text-base font-semibold md:flex",
+                online ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive",
+              )}
+            >
+              <span className={cn("size-3 rounded-full", online ? "bg-success" : "bg-destructive motion-safe:animate-pulse")} aria-hidden />
+              {online ? "ออนไลน์" : "ออฟไลน์"}
+            </span>
+            {onSale && terminal && (
+              <button
+                type="button"
+                onClick={() => setTodayOpen(true)}
+                className="tappable flex h-14 items-center rounded-xl border border-border bg-card px-4 text-lg font-semibold transition-colors hover:bg-foreground/5"
+              >
+                รายการวันนี้
+              </button>
+            )}
+          </div>
+        </header>
         {!online && onSale && terminal && (
-          <p className="flex items-center gap-2 bg-destructive/10 px-4 py-2 text-sm text-destructive" role="alert">
-            <AlertTriangle className="size-4" />
+          <p className="flex items-center gap-3 bg-destructive/10 px-4 py-3 text-lg font-semibold text-destructive" role="alert">
+            <AlertTriangle className="size-6" />
             ออฟไลน์ — ขายและเติมเงินไม่ได้จนกว่าจะเชื่อมต่ออินเทอร์เน็ต
           </p>
         )}
@@ -621,10 +659,10 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
           <Field label={orgWide ? "รหัสหรือชื่อนักเรียน" : "รหัสนักเรียน"}>
             <Input autoFocus autoComplete="off" value={code} onChange={(e) => setCode(e.target.value)} />
           </Field>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-base text-muted-foreground">
             {orgWide ? "พิมพ์รหัสแล้วกด Enter หรือพิมพ์ชื่อเพื่อเลือกจากรายชื่อ" : "พิมพ์รหัสนักเรียนให้ครบแล้วกด Enter"}
           </p>
-          <Button type="submit" className="w-full" disabled={!code.trim()}>
+          <Button type="submit" className="h-14 w-full text-lg" disabled={!code.trim()}>
             ค้นหา
           </Button>
         </form>
@@ -657,24 +695,24 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         title="ยืนยันการเติมเงินสด"
         footer={
           <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" disabled={topup.isPending} onClick={() => setConfirmOpen(false)}>
+            <Button type="button" variant="outline" className="h-16 flex-1 text-xl" disabled={topup.isPending} onClick={() => setConfirmOpen(false)}>
               ยกเลิก
             </Button>
-            <Button type="button" className="flex-1" disabled={topup.isPending || !online} onClick={() => void confirmTopup()}>
-              {topup.isPending ? <Spinner /> : "ยืนยัน"}
+            <Button type="button" className="h-16 flex-[2] text-xl" disabled={topup.isPending || !online} onClick={() => void confirmTopup()}>
+              {topup.isPending ? <Spinner /> : "ยืนยันเติมเงิน"}
             </Button>
           </div>
         }
       >
         {student && topupValue !== null && (
-          <dl className="space-y-2 text-sm">
+          <dl className="space-y-4 text-lg">
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">นักเรียน</dt>
               <dd className="text-right font-semibold">{student.name}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">เติมเงินสด</dt>
-              <dd className="text-lg font-semibold tabular-nums">{formatBaht(topupValue)} ฿</dd>
+              <dd className="text-4xl font-bold tabular-nums">{formatBaht(topupValue)} ฿</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">ยอดคงเหลือ</dt>
@@ -708,19 +746,19 @@ function ProductGrid({
   onCategory: (c: string | null) => void;
   onPick: (p: PosProduct) => void;
 }) {
-  if (loading) return <Spinner className="mx-auto size-6" />;
-  if (error) return <p className="text-sm text-destructive">โหลดรายการสินค้าไม่สำเร็จ — {errMsg(error)}</p>;
+  if (loading) return <Spinner className="mx-auto size-8" />;
+  if (error) return <p className="text-lg text-destructive">โหลดรายการสินค้าไม่สำเร็จ — {errMsg(error)}</p>;
   if (products.length === 0)
     return (
-      <p className="m-auto text-sm text-muted-foreground">ยังไม่มีสินค้าที่เปิดขาย{canManage ? ' — เพิ่มได้ที่แท็บ "สินค้า" ในแถบด้านข้าง' : " — แจ้งผู้ดูแลเพื่อเพิ่มสินค้า"}</p>
+      <p className="m-auto text-lg text-muted-foreground">ยังไม่มีสินค้าที่เปิดขาย{canManage ? ' — เพิ่มได้ที่แท็บ "สินค้า" ในแถบด้านข้าง' : " — แจ้งผู้ดูแลเพื่อเพิ่มสินค้า"}</p>
     );
   const cats = [...new Set(products.map(categoryOf))].sort();
   const shown = products.filter((p) => !category || categoryOf(p) === category);
   const chip = (active: boolean) =>
-    cn("tappable shrink-0 rounded-full border px-3 py-1 text-sm", active ? "border-foreground bg-foreground text-background" : "border-border");
+    cn("tappable flex h-12 shrink-0 items-center rounded-full border px-5 text-lg font-semibold", active ? "border-foreground bg-foreground text-background" : "border-border bg-background");
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 text-left">
-      <div className="flex shrink-0 gap-2 overflow-x-auto" role="tablist" aria-label="หมวดหมู่สินค้า">
+      <div className="scrollbar-hidden flex shrink-0 gap-2 overflow-x-auto pb-1" role="tablist" aria-label="หมวดหมู่สินค้า">
         <button type="button" role="tab" aria-selected={!category} className={chip(!category)} onMouseDown={(e) => e.preventDefault()} onClick={() => onCategory(null)}>
           ทั้งหมด
         </button>
@@ -730,19 +768,19 @@ function ProductGrid({
           </button>
         ))}
       </div>
-      <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-2 content-start gap-2 overflow-y-auto sm:grid-cols-3 xl:grid-cols-4">
+      <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-2 content-start gap-3 overflow-y-auto lg:grid-cols-3 xl:grid-cols-4">
         {shown.map((p) => (
           <button
             key={p.id}
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onPick(p)}
-            className="tappable flex min-h-16 flex-col gap-1 overflow-hidden rounded-xl border border-border bg-background text-left transition-colors hover:bg-foreground/5 active:bg-foreground/10"
+            className="tappable flex min-h-24 flex-col gap-1 overflow-hidden rounded-2xl border border-border bg-background text-left transition-colors hover:bg-foreground/5 active:scale-[0.98] active:bg-foreground/10"
           >
             {productImageUrl(p) && <img src={productImageUrl(p)!} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover" />}
-            <span className="flex flex-col px-3 pb-2 pt-2">
-              <span className="line-clamp-2 text-sm font-semibold">{p.name}</span>
-              <span className="text-sm tabular-nums text-muted-foreground">{p.price} ฿</span>
+            <span className="flex flex-col gap-0.5 px-4 pb-3 pt-3">
+              <span className="line-clamp-2 text-lg font-semibold leading-snug">{p.name}</span>
+              <span className="text-xl font-bold tabular-nums">{p.price} ฿</span>
             </span>
           </button>
         ))}
@@ -753,28 +791,28 @@ function ProductGrid({
 
 /** Cart lines with quantity steppers; replaces the keypad while the cart has items. */
 function CartPanel({ cart, onQty, onClear }: { cart: CartLine[]; onQty: (productId: string, qty: number) => void; onClear: () => void }) {
-  const step = "tappable size-11 rounded-lg border border-border text-xl font-semibold hover:bg-foreground/5";
+  const step = "tappable size-14 shrink-0 rounded-xl border border-border text-3xl font-semibold hover:bg-foreground/5 active:bg-foreground/10";
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex items-center justify-between">
-        <p className="font-ui text-sm font-semibold">ตะกร้า ({cart.reduce((n, l) => n + l.qty, 0)} ชิ้น)</p>
-        <button type="button" className="text-xs underline" onMouseDown={(e) => e.preventDefault()} onClick={onClear}>
+        <p className="font-ui text-xl font-semibold">ตะกร้า ({cart.reduce((n, l) => n + l.qty, 0)} ชิ้น)</p>
+        <button type="button" className="tappable h-12 rounded-xl border border-border px-4 text-base font-semibold text-destructive" onMouseDown={(e) => e.preventDefault()} onClick={onClear}>
           ล้างตะกร้า
         </button>
       </div>
-      <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+      <ul className="min-h-0 flex-1 divide-y divide-border overflow-y-auto">
         {cart.map((l) => (
-          <li key={l.product.id} className="flex items-center gap-2">
+          <li key={l.product.id} className="flex items-center gap-2 py-2.5">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">{l.product.name}</p>
-              <p className="text-xs tabular-nums text-muted-foreground">
+              <p className="truncate text-lg font-semibold">{l.product.name}</p>
+              <p className="text-base tabular-nums text-muted-foreground">
                 {l.product.price} ฿ × {l.qty} = {l.product.price * l.qty} ฿
               </p>
             </div>
             <button type="button" className={step} aria-label={`ลด ${l.product.name}`} onMouseDown={(e) => e.preventDefault()} onClick={() => onQty(l.product.id, l.qty - 1)}>
               −
             </button>
-            <span className="w-6 text-center font-semibold tabular-nums">{l.qty}</span>
+            <span className="w-8 text-center text-2xl font-semibold tabular-nums">{l.qty}</span>
             <button type="button" className={step} aria-label={`เพิ่ม ${l.product.name}`} onMouseDown={(e) => e.preventDefault()} onClick={() => onQty(l.product.id, l.qty + 1)}>
               +
             </button>
@@ -782,7 +820,7 @@ function CartPanel({ cart, onQty, onClear }: { cart: CartLine[]; onQty: (product
         ))}
       </ul>
       <div className="rounded-xl bg-muted px-4 py-3 text-right">
-        <p className="text-xs text-muted-foreground">ยอดรวม</p>
+        <p className="text-lg text-muted-foreground">ยอดรวม</p>
         <p className="font-heading text-5xl font-semibold tabular-nums">{cartTotal(cart)} ฿</p>
       </div>
     </div>
@@ -794,17 +832,17 @@ function StudentHits({ term, onPick }: { term: string; onPick: (id: string) => v
   const { data: hits = [] } = useStudentSearch(term);
   if (hits.length === 0) return null;
   return (
-    <ul className="mt-2 space-y-0.5" aria-label="รายชื่อที่ตรงกัน">
+    <ul className="mt-3 space-y-1" aria-label="รายชื่อที่ตรงกัน">
       {hits.map((h) => (
         <li key={h.id}>
-          <button type="button" className="flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm hover:bg-foreground/5" onClick={() => onPick(h.id)}>
-            <Avatar name={`${h.first_name} ${h.last_name}`} src={studentAvatarUrl(h)} className="size-10 shrink-0 text-xs" />
+          <button type="button" className="flex min-h-16 w-full items-center gap-3 rounded-xl border border-border px-3 py-2 text-left text-lg hover:bg-foreground/5" onClick={() => onPick(h.id)}>
+            <Avatar name={`${h.first_name} ${h.last_name}`} src={studentAvatarUrl(h)} className="size-12 shrink-0 text-base" />
             <span className="min-w-0">
               <span className="block truncate font-semibold">
                 {h.prefix ?? ""}
                 {h.first_name} {h.last_name}
               </span>
-              <span className="block text-xs text-muted-foreground">{h.student_code}</span>
+              <span className="block text-base text-muted-foreground">{h.student_code}</span>
             </span>
           </button>
         </li>
@@ -815,49 +853,152 @@ function StudentHits({ term, onPick }: { term: string; onPick: (id: string) => v
 
 /** Shows what the reader typed and how fast; nothing is looked up or charged. A scanner "types" a whole code in well under 50 ms per key. */
 function ScannerTest() {
-  const [result, setResult] = useState<{ text: string; perKey: number } | null>(null);
+  type Result =
+    | { kind: "ok"; text: string; perKey: number }
+    | { kind: "mismatch"; text: string; perKey: number; thai: boolean }
+    | { kind: "slow"; text: string; perKey: number }
+    | { kind: "noEnter"; text: string };
+  const [result, setResult] = useState<Result | null>(null);
+  const [okCount, setOkCount] = useState(0);
   const [value, setValue] = useState("");
+  const [focused, setFocused] = useState(true);
   const first = useRef(0);
+  const input = useRef<HTMLInputElement>(null);
+  const noEnter = useRef<number | undefined>(undefined);
   const bars = useRef<SVGSVGElement>(null);
   useEffect(() => {
-    if (bars.current) JsBarcode(bars.current, TEST_CODE, { format: "CODE128", height: 70, fontSize: 14, margin: 8 });
+    if (bars.current) JsBarcode(bars.current, TEST_CODE, { format: "CODE128", height: 110, width: 2.4, fontSize: 18, margin: 12 });
   }, []);
+  useEffect(() => () => window.clearTimeout(noEnter.current), []);
+
+  function finish(text: string) {
+    window.clearTimeout(noEnter.current);
+    const perKey = (performance.now() - first.current) / text.length;
+    setValue("");
+    if (perKey >= 50) return setResult({ kind: "slow", text, perKey });
+    if (text === TEST_CODE) {
+      setOkCount((n) => n + 1);
+      return setResult({ kind: "ok", text, perKey });
+    }
+    setResult({ kind: "mismatch", text, perKey, thai: /[฀-๿]/.test(text) });
+  }
+
+  const tone =
+    !result ? "border-warning/50 bg-warning/10" : result.kind === "ok" ? "border-success/50 bg-success/10" : "border-destructive/40 bg-destructive/10";
+
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">ยิงบาร์โค้ดด้านล่าง ขณะเคอร์เซอร์อยู่ในช่อง (ไม่มีการค้นหาหรือตัดเงิน)</p>
-      <Input
+    <div className="space-y-4" onClick={() => input.current?.focus()}>
+      {/* The reader "types" here; kept off-screen so nobody tries to type into it. */}
+      <input
+        ref={input}
         autoFocus
         autoComplete="off"
-        aria-label="ช่องทดสอบเครื่องอ่านบาร์โค้ด"
+        className="sr-only"
+        aria-label="ช่องรับสัญญาณเครื่องอ่านบาร์โค้ด"
         value={value}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         onChange={(e) => {
           if (!value) first.current = performance.now();
-          setValue(e.target.value);
+          const next = e.target.value;
+          setValue(next);
+          // Characters but no Enter within 1.5 s: the reader isn't sending a suffix.
+          window.clearTimeout(noEnter.current);
+          if (next) noEnter.current = window.setTimeout(() => (setResult({ kind: "noEnter", text: next }), setValue("")), 1500);
         }}
         onKeyDown={(e) => {
           if (e.key !== "Enter" || !value) return;
           e.preventDefault();
-          setResult({ text: value, perKey: (performance.now() - first.current) / value.length });
-          setValue("");
+          finish(value);
         }}
       />
-      <div className="flex justify-center">
-        <svg ref={bars} role="img" aria-label={`บาร์โค้ดทดสอบ ${TEST_CODE}`} className="max-w-full rounded-lg border border-border bg-white" />
+
+      {/* Status — the one thing to look at */}
+      <div role="status" aria-live="polite" className={cn("flex items-center gap-4 rounded-2xl border-2 p-5", tone)}>
+        {!result ? (
+          <>
+            <span className="relative flex size-6 shrink-0" aria-hidden>
+              <span className="absolute inline-flex size-full rounded-full bg-amber-400 opacity-75 motion-safe:animate-ping" />
+              <span className="relative inline-flex size-6 rounded-full bg-amber-400" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-2xl font-bold">{focused ? "พร้อมแล้ว — ยิงบาร์โค้ดด้านล่างได้เลย" : "แตะที่หน้าต่างนี้ก่อน แล้วค่อยยิง"}</p>
+              <p className="text-lg text-muted-foreground">ระบบจะไม่ค้นหาหรือตัดเงิน เป็นการทดสอบเท่านั้น</p>
+            </div>
+          </>
+        ) : result.kind === "ok" ? (
+          <>
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-success text-white" aria-hidden>
+              <CheckmarkCircleIcon className="h-9 w-9" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-2xl font-bold text-success">เครื่องอ่านทำงานปกติ</p>
+              <p className="text-lg">อ่านถูกต้องครบ {result.text.length} ตัวอักษร · เร็ว {result.perKey.toFixed(0)} ms/ตัว</p>
+              {okCount > 1 && <p className="text-base text-muted-foreground">ยิงสำเร็จแล้ว {okCount} ครั้ง</p>}
+            </div>
+          </>
+        ) : (
+          <>
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-destructive text-white" aria-hidden>
+              <AlertTriangle className="h-8 w-8" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-2xl font-bold text-destructive">
+                {result.kind === "noEnter" ? "อ่านได้ แต่เครื่องไม่ส่ง Enter" : result.kind === "slow" ? "สัญญาณช้าเหมือนพิมพ์มือ" : "อ่านได้ แต่ตัวอักษรไม่ตรง"}
+              </p>
+              <p className="text-lg">
+                {result.kind === "noEnter"
+                  ? "ตั้งค่าเครื่องอ่านให้ส่ง Enter (CR) ต่อท้าย ตามคู่มือของเครื่อง"
+                  : result.kind === "slow"
+                    ? "ถ้าใช้เครื่องยิงจริงอยู่ ให้ตรวจสายหรือการเชื่อมต่อบลูทูธ"
+                    : result.thai
+                      ? "แป้นพิมพ์ของเครื่องเป็นภาษาไทยอยู่ — เปลี่ยนเป็นภาษาอังกฤษ แล้วยิงใหม่"
+                      : "ตรวจว่าเครื่องอ่านตั้งเป็นโหมดแป้นพิมพ์ (HID) และภาษาอังกฤษ (US)"}
+              </p>
+              <p className="mt-1 break-all font-mono text-base text-muted-foreground">ได้รับ: {result.text}</p>
+            </div>
+          </>
+        )}
       </div>
-      {result ? (
-        <div role="status" className="space-y-1 rounded-lg border border-border p-3 text-sm">
-          <p className="font-semibold text-success">อ่านได้ ({result.text.length} ตัวอักษร)</p>
-          <p className="break-all font-mono">{result.text}</p>
-          <p className="text-muted-foreground">
-            {result.perKey < 50
-              ? `ความเร็ว ${result.perKey.toFixed(0)} ms/ตัว — เหมือนเครื่องยิง`
-              : `ความเร็ว ${result.perKey.toFixed(0)} ms/ตัว — ช้า เหมือนพิมพ์มือ`}
-            {" · "}
-            {result.text.startsWith("qr_") ? "บาร์โค้ดนักเรียน" : "รหัสนักเรียน/อื่นๆ"}
-          </p>
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground">ถ้ายิงแล้วไม่มีข้อความขึ้น ให้ตรวจว่าเครื่องอยู่โหมด keyboard (HID) และตั้งให้ส่ง Enter ต่อท้าย</p>
+
+      {/* Steps */}
+      <ol className="grid gap-2 text-lg">
+        {["เล็งเครื่องยิงที่บาร์โค้ดด้านล่าง", "กดปุ่มยิงที่เครื่อง", "ดูผลในกล่องด้านบน"].map((t, i) => (
+          <li key={t} className="flex items-center gap-3 rounded-xl bg-muted px-4 py-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-lg font-bold text-background">{i + 1}</span>
+            {t}
+          </li>
+        ))}
+      </ol>
+
+      <div className="flex justify-center rounded-2xl border border-border bg-white p-3">
+        <svg ref={bars} role="img" aria-label={`บาร์โค้ดทดสอบ ${TEST_CODE}`} className="h-auto max-w-full" />
+      </div>
+
+      {result && (
+        <Button
+          variant="outline"
+          className="h-14 w-full text-lg"
+          onClick={(e) => {
+            e.stopPropagation();
+            setResult(null);
+            input.current?.focus();
+          }}
+        >
+          ทดสอบอีกครั้ง
+        </Button>
+      )}
+
+      {!result && (
+        <details className="rounded-xl border border-border px-4 py-3 text-lg">
+          <summary className="cursor-pointer font-semibold">ยิงแล้วไม่มีอะไรขึ้นเลย?</summary>
+          <ul className="mt-2 list-disc space-y-1 pl-6 text-base">
+            <li>ตรวจว่าเครื่องอ่านเปิดอยู่ และเชื่อมต่อกับแท็บเล็ตนี้ (สาย USB หรือบลูทูธ)</li>
+            <li>ตั้งเครื่องอ่านเป็นโหมดแป้นพิมพ์ (HID / Keyboard)</li>
+            <li>แป้นพิมพ์ของแท็บเล็ตต้องเป็นภาษาอังกฤษ</li>
+            <li>แตะที่หน้าต่างนี้หนึ่งครั้งก่อนยิง</li>
+          </ul>
+        </details>
       )}
     </div>
   );
@@ -866,19 +1007,28 @@ function ScannerTest() {
 /** PIN popup with an on-screen pad: one correct PIN unlocks cash top-up for an hour (the server keeps the proof).
  *  Six digits submit by themselves. First use sets the PIN: enter it, then enter it again. */
 function PinUnlockModal({ open, onClose, onUnlocked }: { open: boolean; onClose: () => void; onUnlocked: () => void }) {
-  const toast = useToast();
   const { data: pinStatus } = usePinStatus();
   const unlock = usePinUnlock();
   const setPin = useSetPin();
+  const reduce = useReducedMotion();
   const [pin, setPinText] = useState("");
   const [first, setFirst] = useState<string | null>(null); // first entry while choosing a new PIN
+  // Errors stay on screen (not a toast) so they can be read; `shake` replays the wobble on each new error.
+  const [error, setError] = useState<string | null>(null);
+  const [shake, setShake] = useState(0);
   const hasPin = pinStatus?.has_pin ?? true;
   const locked = !!pinStatus?.locked_until;
   const busy = unlock.isPending || setPin.isPending;
 
+  const fail = (msg: string) => {
+    setError(msg);
+    setShake((n) => n + 1);
+  };
+
   function reset() {
     setPinText("");
     setFirst(null);
+    setError(null);
     onClose();
   }
 
@@ -892,31 +1042,34 @@ function PinUnlockModal({ open, onClose, onUnlocked }: { open: boolean; onClose:
         if (full !== first) {
           setFirst(null);
           setPinText("");
-          return toast("PIN สองครั้งไม่ตรงกัน — ตั้งใหม่", "error");
+          return fail("PIN สองครั้งไม่ตรงกัน — เริ่มตั้งใหม่อีกครั้ง");
         }
         await setPin.mutateAsync(full);
       }
       const r = await unlock.mutateAsync(full);
       setPinText("");
       setFirst(null);
-      if (r.ok) return onUnlocked();
-      toast(
+      if (r.ok) {
+        setError(null);
+        return onUnlocked();
+      }
+      fail(
         r.status === "locked"
-          ? "PIN ผิดเกินกำหนด — ล็อก 15 นาที"
+          ? "ใส่ PIN ผิดเกินกำหนด — ล็อก 15 นาที"
           : r.status === "bad"
-            ? `PIN ไม่ถูกต้อง (เหลือ ${r.attempts_left} ครั้ง)`
+            ? `PIN ไม่ถูกต้อง — ลองได้อีก ${r.attempts_left} ครั้ง`
             : "ยังไม่ได้ตั้ง PIN",
-        "error",
       );
     } catch (err) {
       setPinText("");
       setFirst(null);
-      toast(errMsg(err), "error");
+      fail(errMsg(err));
     }
   }
 
   function press(k: (typeof KEYS)[number]) {
     if (busy || locked) return;
+    setError(null);
     if (k === "C") return setPinText("");
     if (k === "⌫") return setPinText((p) => p.slice(0, -1));
     if (pin.length >= 6) return;
@@ -925,21 +1078,29 @@ function PinUnlockModal({ open, onClose, onUnlocked }: { open: boolean; onClose:
     if (next.length === 6) void submit(next);
   }
 
-  const title = hasPin ? "ใส่ PIN เพื่อเติมเงินสด" : first === null ? "ตั้ง PIN ใหม่ (6 หลัก)" : "ยืนยัน PIN อีกครั้ง";
+  const settingUp = !hasPin;
+  const title = settingUp ? "ตั้ง PIN สำหรับเติมเงินสด" : "ใส่ PIN เพื่อเติมเงินสด";
+  const instruction = locked
+    ? "ล็อกชั่วคราว"
+    : settingUp
+      ? first === null
+        ? "กด PIN ใหม่ 6 หลักที่จำได้ง่าย"
+        : "กด PIN เดิมอีกครั้งเพื่อยืนยัน"
+      : "กด PIN 6 หลักของคุณ";
+
   return (
     <Modal
       open={open}
       onOpenChange={(o) => !o && !busy && reset()}
       title={title}
-      description={hasPin ? "ใส่ครั้งเดียว เติมเงินสดได้ต่อเนื่อง 1 ชั่วโมง" : "ครั้งแรก: ตั้ง PIN 6 หลักของคุณเอง ใช้ปลดล็อกการเติมเงินสด"}
       footer={
-        <Button type="button" variant="outline" className="w-full" disabled={busy} onClick={reset}>
+        <Button type="button" variant="outline" className="h-14 w-full text-lg" disabled={busy} onClick={reset}>
           ยกเลิก
         </Button>
       }
     >
       <div
-        className="space-y-4"
+        className="space-y-5"
         tabIndex={-1}
         // Physical keyboard works too: digits, Backspace.
         onKeyDown={(e) => {
@@ -947,26 +1108,83 @@ function PinUnlockModal({ open, onClose, onUnlocked }: { open: boolean; onClose:
           else if (e.key === "Backspace") press("⌫");
         }}
       >
-        <div className="flex justify-center gap-3" role="status" aria-label={`ใส่แล้ว ${pin.length} จาก 6 หลัก`}>
+        {/* Header: lock + what to do now */}
+        <div className="flex flex-col items-center gap-2 text-center">
+          <span className={cn("flex size-16 items-center justify-center rounded-2xl", locked ? "bg-destructive/15 text-destructive" : "bg-muted text-foreground")} aria-hidden>
+            <LockIcon className="h-8 w-8" />
+          </span>
+          {settingUp && !locked && (
+            <div className="flex items-center gap-2" aria-label={`ขั้นที่ ${first === null ? 1 : 2} จาก 2`}>
+              {[0, 1].map((i) => (
+                <span key={i} className={cn("h-2 w-10 rounded-full", i <= (first === null ? 0 : 1) ? "bg-foreground" : "bg-foreground/15")} />
+              ))}
+            </div>
+          )}
+          <p className="text-2xl font-semibold">{instruction}</p>
+          {!locked && (
+            <p className="text-lg text-muted-foreground">
+              {settingUp ? (first === null ? "ขั้นที่ 1 จาก 2 · ใช้ปลดล็อกการเติมเงินสดทุกครั้ง" : "ขั้นที่ 2 จาก 2") : "ใส่ครั้งเดียว เติมเงินสดได้ต่อเนื่อง 1 ชั่วโมง"}
+            </p>
+          )}
+        </div>
+
+        {/* Six boxes; the next one is outlined so it's clear where the digit goes */}
+        <motion.div
+          key={shake}
+          initial={false}
+          animate={shake && !reduce ? { x: [0, -14, 12, -8, 6, 0] } : { x: 0 }}
+          transition={{ duration: 0.4 }}
+          className="flex justify-center gap-2.5"
+          role="status"
+          aria-label={`ใส่แล้ว ${pin.length} จาก 6 หลัก`}
+        >
           {Array.from({ length: 6 }, (_, i) => (
-            <span key={i} className={cn("size-4 rounded-full border-2 border-foreground transition-colors", i < pin.length && "bg-foreground")} />
-          ))}
-        </div>
-        <div className="mx-auto grid max-w-64 grid-cols-3 gap-2">
-          {KEYS.map((k) => (
-            <button
-              key={k}
-              type="button"
-              disabled={busy || locked}
-              aria-label={k === "⌫" ? "ลบ" : k === "C" ? "ล้าง" : k}
-              onClick={() => press(k)}
-              className="tappable flex h-14 items-center justify-center rounded-xl border border-border bg-background text-xl font-semibold transition-colors hover:bg-foreground/5 active:bg-foreground/10 disabled:opacity-40"
+            <span
+              key={i}
+              className={cn(
+                "flex size-12 items-center justify-center rounded-xl border-2 transition-colors",
+                error ? "border-destructive" : i < pin.length ? "border-foreground bg-foreground" : i === pin.length && !busy && !locked ? "border-foreground" : "border-border",
+              )}
             >
-              {busy && k === "0" ? <Spinner /> : k}
-            </button>
+              {i < pin.length && <span className="size-3.5 rounded-full bg-background" />}
+            </span>
           ))}
+        </motion.div>
+
+        <div className="min-h-[3.25rem]" aria-live="assertive">
+          {busy ? (
+            <p className="flex items-center justify-center gap-3 text-lg font-medium">
+              <Spinner className="size-6" />
+              กำลังตรวจสอบ…
+            </p>
+          ) : error ? (
+            <p className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-lg font-semibold text-destructive">{error}</p>
+          ) : null}
         </div>
-        {locked && <p className="text-center text-xs text-destructive">ล็อกชั่วคราว เพราะใส่ PIN ผิดหลายครั้ง — ให้ผู้ดูแลรีเซ็ต หรือรอ 15 นาที</p>}
+
+        {locked ? (
+          <p className="rounded-xl bg-destructive/10 px-4 py-4 text-center text-lg font-semibold text-destructive">
+            ใส่ PIN ผิดหลายครั้ง — รอ 15 นาที หรือให้ผู้ดูแลรีเซ็ต PIN ที่เมนู "เครื่องขาย"
+          </p>
+        ) : (
+          <div className="mx-auto grid max-w-sm grid-cols-3 gap-3">
+            {KEYS.map((k) => (
+              <button
+                key={k}
+                type="button"
+                disabled={busy}
+                aria-label={k === "⌫" ? "ลบหนึ่งตัว" : k === "C" ? "ล้างทั้งหมด" : k}
+                onClick={() => press(k)}
+                className={cn(
+                  "tappable flex h-20 items-center justify-center rounded-2xl border border-border font-semibold transition-colors active:bg-foreground/15 disabled:opacity-40",
+                  k === "C" || k === "⌫" ? "bg-muted text-xl" : "bg-background text-4xl tabular-nums hover:bg-foreground/5",
+                )}
+              >
+                {k === "C" ? "ล้าง" : k === "⌫" ? "ลบ" : k}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </Modal>
   );
@@ -977,13 +1195,13 @@ function PinUnlockModal({ open, onClose, onUnlocked }: { open: boolean; onClose:
 function RecentTx({ studentId }: { studentId: string }) {
   const { data = [], isLoading } = usePosStudentRecent(studentId);
   if (isLoading) return <Spinner className="mx-auto size-5" />;
-  if (data.length === 0) return <p className="text-sm text-muted-foreground">ยังไม่มีรายการ</p>;
+  if (data.length === 0) return <p className="text-lg text-muted-foreground">ยังไม่มีรายการ</p>;
   return (
     <div className="mx-auto w-full max-w-md text-left">
-      <p className="pb-1 text-xs font-medium text-muted-foreground">รายการล่าสุด</p>
+      <p className="pb-1 text-lg font-medium text-muted-foreground">รายการล่าสุด</p>
       <ul className="max-h-48 divide-y divide-border overflow-y-auto rounded-xl border border-border bg-background px-3">
         {data.map((t) => (
-          <li key={t.id} className={cn("flex items-center justify-between gap-2 py-1.5 text-sm", t.voided_at && "text-muted-foreground line-through")}>
+          <li key={t.id} className={cn("flex items-center justify-between gap-2 py-2.5 text-base", t.voided_at && "text-muted-foreground line-through")}>
             <span className="min-w-0 truncate">
               {new Date(t.created_at).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {TX_TYPE_LABEL[t.type]}
               {t.voided_at && " (ยกเลิก)"}
@@ -1020,38 +1238,38 @@ function TodayPanel() {
 
   return (
     <Card className="space-y-3 self-start">
-      <p className="font-ui text-sm font-semibold">รายการวันนี้ของฉัน</p>
+      <p className="font-ui text-xl font-semibold">รายการวันนี้ของฉัน</p>
       {isLoading && <Spinner />}
-      {error && <p className="text-xs text-destructive">{errMsg(error)}</p>}
+      {error && <p className="rounded-xl bg-destructive/10 px-4 py-3 text-lg text-destructive">{errMsg(error)}</p>}
       {data && (
         <>
-          <dl className="grid grid-cols-2 gap-2 text-xs">
+          <dl className="grid grid-cols-2 gap-3 text-base">
             <div>
               <dt className="text-muted-foreground">ขาย ({data.sales_count} ครั้ง)</dt>
-              <dd className="text-base font-semibold">{formatBaht(data.sales_total)}</dd>
+              <dd className="text-3xl font-bold tabular-nums">{formatBaht(data.sales_total)}</dd>
             </div>
             <div>
               <dt className="text-muted-foreground">เติมเงินสด</dt>
-              <dd className="text-base font-semibold">{formatBaht(data.topup_total)}</dd>
+              <dd className="text-3xl font-bold tabular-nums">{formatBaht(data.topup_total)}</dd>
             </div>
           </dl>
-          <ul className="max-h-[50vh] space-y-1 overflow-y-auto">
+          <ul className="max-h-[50vh] divide-y divide-border overflow-y-auto">
             {data.transactions.map((t) => (
-              <li key={t.id} className={cn("flex items-center justify-between gap-2 text-xs", t.voided_at && "text-muted-foreground line-through")}>
+              <li key={t.id} className={cn("flex min-h-14 items-center justify-between gap-3 py-2 text-base", t.voided_at && "text-muted-foreground line-through")}>
                 <span className="min-w-0 truncate">
                   {new Date(t.created_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} · {TX_TYPE_LABEL[t.type]} · {t.student_name}
                 </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  {formatBaht(Math.abs(t.amount))}
+                <span className="flex shrink-0 items-center gap-3">
+                  <span className="text-lg font-semibold tabular-nums">{formatBaht(Math.abs(t.amount))}</span>
                   {!t.voided_at && (t.type === "sale" || t.type === "topup_cash") && (
-                    <button type="button" className="underline" aria-label={`ยกเลิกรายการ ${t.student_name}`} onClick={() => setTarget(t.id)}>
+                    <button type="button" className="tappable h-11 rounded-xl border border-border px-3 text-base font-semibold text-destructive" aria-label={`ยกเลิกรายการ ${t.student_name}`} onClick={() => setTarget(t.id)}>
                       ยกเลิก
                     </button>
                   )}
                 </span>
               </li>
             ))}
-            {data.transactions.length === 0 && <li className="text-xs text-muted-foreground">ยังไม่มีรายการ</li>}
+            {data.transactions.length === 0 && <li className="py-4 text-lg text-muted-foreground">ยังไม่มีรายการ</li>}
           </ul>
         </>
       )}
