@@ -143,7 +143,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const modalOpen = pinOpen || confirmOpen || todayOpen || codeOpen || testOpen;
   useEffect(() => {
     if (terminal && onSale && !modalOpen) capture.current?.focus();
-  }, [terminal, onSale, modalOpen, student, done]);
+  }, [terminal, onSale, modalOpen, student, done, looking]); // looking: a disabled input drops focus, so re-take it when the lookup ends (also after a failed one)
 
   // The "done" screen clears itself so the next customer starts from a clean idle state.
   useEffect(() => {
