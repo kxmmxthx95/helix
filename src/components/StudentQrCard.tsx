@@ -22,7 +22,7 @@ export function useBarcodeImage(token: string | null, margin = 16) {
  * บาร์โค้ดชำระเงิน — the student's POS credential (migration 0117). `admin` adds issue / reissue / freeze / print;
  * without it (parent, student) the barcode is view-only, with a full-screen view for the scanner.
  */
-export function StudentQrCard({ studentId, studentName, studentCode, admin = false }: { studentId: string; studentName: string; studentCode: string; admin?: boolean }) {
+export function StudentQrCard({ studentId, studentName, admin = false }: { studentId: string; studentName: string; admin?: boolean }) {
   const toast = useToast();
   const { data: qr, isLoading } = useStudentQr(studentId);
   const issue = useIssueQr();
@@ -30,8 +30,6 @@ export function StudentQrCard({ studentId, studentName, studentCode, admin = fal
   const [big, setBig] = useState(false);
   const frozen = qr?.status === "frozen";
   const src = useBarcodeImage(qr && !frozen ? qr.token : null);
-  // Top-up barcode = the student code: not a secret (it can only add money, never charge), so it is shown even when the payment barcode is frozen.
-  const topupSrc = useBarcodeImage(studentCode);
 
   async function run(p: Promise<unknown>) {
     try {
@@ -41,7 +39,7 @@ export function StudentQrCard({ studentId, studentName, studentCode, admin = fal
     }
   }
 
-  function print(src: string | null) {
+  function print() {
     if (!src) return;
     const w = window.open("", "_blank", "width=480,height=640");
     if (!w) return;
@@ -94,23 +92,10 @@ export function StudentQrCard({ studentId, studentName, studentCode, admin = fal
                   บันทึกรูป
                 </Button>
               </a>
-              <Button type="button" variant="outline" onClick={() => print(src)}>
+              <Button type="button" variant="outline" onClick={print}>
                 พิมพ์
               </Button>
             </>
-          )}
-        </div>
-      )}
-
-      {topupSrc && (
-        <div className="flex flex-col items-center gap-2 border-t border-border pt-3">
-          <p className="text-sm font-semibold">บาร์โค้ดเติมเงิน</p>
-          <img src={topupSrc} alt={`บาร์โค้ดเติมเงินของ ${studentName}`} className="w-48 max-w-full rounded-xl border border-border bg-white p-1" />
-          <p className="text-xs text-muted-foreground">รหัส {studentCode} · ให้แคชเชียร์สแกนเพื่อเติมเงิน (ตัดเงินไม่ได้)</p>
-          {admin && (
-            <Button type="button" variant="outline" onClick={() => print(topupSrc)}>
-              พิมพ์
-            </Button>
           )}
         </div>
       )}

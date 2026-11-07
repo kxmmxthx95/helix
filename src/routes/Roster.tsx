@@ -1358,7 +1358,7 @@ export function EditStudentSheet({
             </div>
           ))}
           {tab === "barcode" && mayBarcode && (
-            <StudentQrCard admin studentId={(target as Student).id} studentName={`${current.first_name} ${current.last_name}`} studentCode={(target as Student).student_code} />
+            <StudentQrCard admin studentId={(target as Student).id} studentName={`${current.first_name} ${current.last_name}`} />
           )}
         </div>
       )}

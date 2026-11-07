@@ -189,7 +189,7 @@ function ChildCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
           </div>
         </div>
         {balance}
-        <StudentQrCard studentId={kid.id} studentName={fullName(kid)} studentCode={kid.student_code} />
+        <StudentQrCard studentId={kid.id} studentName={fullName(kid)} />
         {(canTopup || canAct) && (
           <div className="flex flex-wrap gap-2">
             {canTopup && (
