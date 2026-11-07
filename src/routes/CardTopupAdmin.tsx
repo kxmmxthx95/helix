@@ -83,22 +83,20 @@ export function TerminalsTab() {
   return (
     <div className="space-y-8">
       <div className="space-y-4">
-        {/* Title row */}
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="font-ui text-2xl font-semibold">เครื่องขาย ({terminals.length})</h2>
-          <div className="relative ml-auto min-w-0 flex-1 sm:max-w-sm">
+          <div className="relative min-w-0 flex-1 sm:max-w-sm">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
               className="h-14 !pl-12 text-lg"
-              placeholder="ค้นหาชื่อเครื่อง"
+              placeholder={`ค้นหาชื่อเครื่อง · ${terminals.length} เครื่อง`}
               aria-label="ค้นหาเครื่องขาย"
               autoComplete="off"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
-          <Button className="h-14 px-6 text-lg" onClick={() => setForm({ name: "", active: true })}>
+          <Button className="ml-auto h-14 px-6 text-lg" onClick={() => setForm({ name: "", active: true })}>
             เพิ่มเครื่องขาย
           </Button>
         </div>
@@ -166,7 +164,6 @@ export function TerminalsTab() {
 
       <div className="space-y-4">
         <h2 className="font-ui text-2xl font-semibold">รีเซ็ต PIN แคชเชียร์</h2>
-        <p className="text-lg text-muted-foreground">หลังรีเซ็ต แคชเชียร์จะตั้ง PIN ใหม่เองเมื่อเติมเงินสดครั้งถัดไป (ปลดล็อกที่ติดอยู่ด้วย)</p>
         {cashiers.length === 0 && (
           <p className="rounded-2xl border border-dashed border-border px-4 py-8 text-center text-lg text-muted-foreground">ยังไม่มีบัญชีแคชเชียร์ — สร้างได้ที่เมนูผู้ใช้งาน (บทบาท แคชเชียร์)</p>
         )}

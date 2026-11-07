@@ -12,7 +12,6 @@ type Icon = typeof CartIcon;
 /** A date in Asia/Bangkok as yyyy-mm-dd ("sv" formats ISO-style). */
 const bangkokDate = (d: Date) => d.toLocaleDateString("sv", { timeZone: "Asia/Bangkok" });
 const daysAgo = (n: number) => bangkokDate(new Date(Date.now() - n * 86400000));
-const thaiDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
 
 const PRESETS = [
   { key: "today", label: "วันนี้", range: (): [string, string] => [daysAgo(0), daysAgo(0)] },
@@ -47,16 +46,10 @@ export function ReportTab() {
       "tappable flex h-12 shrink-0 items-center gap-2 rounded-full border px-5 text-lg font-semibold transition-colors",
       active ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-foreground/5",
     );
-  const rangeLabel = from === to ? thaiDate(from) : `${thaiDate(from)} – ${thaiDate(to)}`;
 
   return (
     <div className="space-y-5">
-      {/* Title + range */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0">
-          <h2 className="font-ui text-2xl font-semibold">รายงาน</h2>
-          <p className="text-lg text-muted-foreground">{rangeLabel}</p>
-        </div>
         <Button
           variant="outline"
           className="ml-auto h-14 px-5 text-lg"

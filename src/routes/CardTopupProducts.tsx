@@ -98,15 +98,13 @@ export function ProductsTab() {
 
   return (
     <div className="space-y-4">
-      {/* Title row */}
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="font-ui text-2xl font-semibold">สินค้า ({products.length})</h2>
-        <div className="relative ml-auto min-w-0 flex-1 sm:max-w-sm">
+        <div className="relative min-w-0 flex-1 sm:max-w-sm">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
             className="h-14 !pl-12 text-lg"
-            placeholder="ค้นหาชื่อ หรือสแกนบาร์โค้ด"
+            placeholder={`ค้นหาชื่อ หรือสแกนบาร์โค้ด · ${products.length} รายการ`}
             aria-label="ค้นหาสินค้า"
             autoComplete="off"
             value={query}
@@ -123,7 +121,7 @@ export function ProductsTab() {
             }}
           />
         </div>
-        <Button className="h-14 px-6 text-lg" onClick={() => setForm(blank)}>
+        <Button className="ml-auto h-14 px-6 text-lg" onClick={() => setForm(blank)}>
           เพิ่มสินค้า
         </Button>
       </div>

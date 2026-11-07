@@ -29,10 +29,6 @@ export function VoidTopupTab({ unlocked, onNeedPin }: { unlocked: boolean; onNee
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="font-ui text-2xl font-semibold">ยกเลิกรายการเติมเงิน</h2>
-        <p className="text-lg text-muted-foreground">ค้นหารายการเติมเงินย้อนหลังที่ต้องการยกเลิก (เงินสดและสลิป)</p>
-      </div>
       <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-3">
         <Field label="ตั้งแต่วันที่">
           <Input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
