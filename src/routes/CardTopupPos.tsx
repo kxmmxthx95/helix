@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { FiSidebar } from "react-icons/fi";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { AlertTriangle, AppsIcon, BarChartIcon, BarcodeIcon, CalendarIcon, CheckmarkCircleIcon, CoinIcon, LockIcon, LogOut, Moon, Monitor, Search, Sun } from "@/components/icons";
+import { AlertTriangle, BarChartIcon, BarcodeIcon, CartIcon, CheckmarkCircleIcon, CoinIcon, DesktopIcon, LogOut, Moon, Monitor, Search, Sun } from "@/components/icons";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { useTheme } from "@/components/ThemeProvider";
@@ -51,12 +51,12 @@ const readTerminal = () => {
 
 const SIDEBAR_KEY = "helix-pos-sidebar-collapsed";
 const VIEWS = [
-  { key: "sale", label: "POS", icon: AppsIcon },
+  { key: "sale", label: "POS", icon: CartIcon },
   { key: "topup", label: "เติมเงิน", icon: CoinIcon },
   { key: "slips", label: "อนุมัติสลิป", icon: CheckmarkCircleIcon },
   { key: "report", label: "รายงาน", icon: BarChartIcon },
   { key: "products", label: "สินค้า", icon: BarcodeIcon },
-  { key: "terminals", label: "เครื่องขาย", icon: Monitor },
+  { key: "terminals", label: "เครื่องขาย", icon: DesktopIcon },
 ] as const;
 type View = (typeof VIEWS)[number]["key"];
 /** Cashiers get these two in the sidebar; the rest are org-wide only. */
@@ -87,7 +87,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const online = useOnline();
   const { profile, signOut } = useAuth();
   const { data: terminals = [] } = useTerminals();
-  const { data: today } = usePosMyToday();
   const [terminalId, setTerminalId] = useState(readTerminal);
   // org-wide only: the other card-top-up tabs live in a sidebar (collapsible like the portal's; a drawer below lg).
   const [view, setView] = useState<View>("sale");
@@ -131,7 +130,14 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const lockPin = usePinLock();
   const { data: pinStatus } = usePinStatus();
   const unlockedUntil = pinStatus?.unlocked_until ? Date.parse(pinStatus.unlocked_until) : 0;
-  const isUnlocked = unlockedUntil > Date.now();
+  // Re-render every 20 s so the minutes left on the top-up tab count down.
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 20_000);
+    return () => clearInterval(id);
+  }, []);
+  const isUnlocked = unlockedUntil > now;
+  const minutesLeft = Math.max(1, Math.ceil((unlockedUntil - now) / 60000));
   const [todayOpen, setTodayOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
@@ -340,33 +346,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
     );
   const footerIconClass = "tappable flex h-10 flex-1 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground";
   const themeLabel = preference === "system" ? "ตามระบบ" : preference === "dark" ? "โหมดมืด" : "โหมดสว่าง";
-  // Tools only make sense on the sale screen; each one also closes the drawer on narrow screens.
-  const tools = terminal && onSale && (
-    <div>
-      <p className="px-2.5 pb-1.5 text-xs font-medium text-muted-foreground">เครื่องมือ</p>
-      <div className="flex flex-col gap-0.5">
-        {[
-          { label: `วันนี้ ${formatBaht(today?.sales_total ?? 0)} ฿`, icon: CalendarIcon, run: () => setTodayOpen(true), show: true },
-          { label: "ค้นหานักเรียน", icon: Search, run: () => setCodeOpen(true), show: true },
-          { label: "ทดสอบเครื่องอ่านบาร์โค้ด", icon: BarcodeIcon, run: () => setTestOpen(true), show: true },
-        ]
-          .filter((t) => t.show)
-          .map(({ label, icon: Icon, run }) => (
-            <button key={label} type="button" className={itemClass()} onClick={() => (run(), setDrawer(false))}>
-              <Icon className="h-4 w-4 shrink-0" />
-              <span className="truncate">{label}</span>
-            </button>
-          ))}
-        {isUnlocked && (
-          <button type="button" className={itemClass()} onClick={() => void lockPin.mutateAsync().then(() => (setView("sale"), setTopupAmount("")))}>
-            <LockIcon className="h-4 w-4 shrink-0" />
-            <span className="truncate">ล็อกการเติมเงิน · เหลือ {Math.max(1, Math.ceil((unlockedUntil - Date.now()) / 60000))} นาที</span>
-          </button>
-        )}
-      </div>
-    </div>
-  );
-
   // Same frame as the portal's AppShell: shell-coloured sidebar, toggle pinned top-left, logo top-right,
   // user card + icon row at the foot. Collapsed = zero width; below lg it is a drawer.
   const sidebar = (
@@ -393,17 +372,20 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
           </div>
           <nav className="scrollbar-hidden flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-2" aria-label="เมนูบัตรเติมเงิน">
               <div>
-                <p className="px-2.5 pb-1.5 text-xs font-medium text-muted-foreground">บัตรเติมเงิน</p>
                 <div className="flex flex-col gap-0.5">
                   {VIEWS.filter((v) => orgWide || isCounterView(v.key)).map(({ key, label, icon: Icon }) => (
                     <button key={key} type="button" aria-current={view === key ? "page" : undefined} onClick={() => (key === "topup" ? openTopup() : setView(key), setDrawer(false))} className={itemClass(view === key)}>
                       <Icon className="h-4 w-4 shrink-0 group-aria-[current=page]:text-accent" />
                       <span className="truncate">{label}</span>
+                      {key === "topup" && isUnlocked && <span className="ml-auto shrink-0 text-[11px] font-medium tabular-nums text-muted-foreground">เหลือ {minutesLeft} นาที</span>}
                     </button>
                   ))}
+                  <button type="button" className={itemClass()} onClick={() => (setTestOpen(true), setDrawer(false))}>
+                    <BarcodeIcon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">ทดสอบเครื่องอ่านบาร์โค้ด</span>
+                  </button>
                 </div>
               </div>
-            {tools}
           </nav>
           <div className="mt-auto flex flex-col gap-2 border-t border-border/60 p-3">
             <div className="flex items-center gap-2.5 rounded-xl bg-card p-2.5 shadow-card">
@@ -547,11 +529,19 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 )}
                 <div className="text-left">
                   <p className="font-heading text-2xl font-semibold">{mode === "topup" ? "สแกนบัตรนักเรียนเพื่อเติมเงิน" : price !== null ? "สแกนบัตรนักเรียนเพื่อตัดเงิน" : "สแกนบัตรนักเรียน"}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {mode === "topup" ? "หรือกดค้นหานักเรียนในแถบด้านข้าง" : price !== null ? `ยอดชำระ ${formatBaht(price)} ฿` : "หรือสแกน/แตะสินค้าเพื่อเริ่มรายการขาย"}
-                  </p>
+                  {mode === "sale" && (
+                    <p className="text-sm text-muted-foreground">{price !== null ? `ยอดชำระ ${formatBaht(price)} ฿` : "หรือสแกน/แตะสินค้าเพื่อเริ่มรายการขาย"}</p>
+                  )}
                 </div>
               </div>
+              {mode === "topup" && (
+                <div className="flex justify-center">
+                  <Button variant="outline" size="lg" onClick={() => setCodeOpen(true)}>
+                    <Search className="mr-2 size-4" />
+                    ค้นหาข้อมูลนักเรียน
+                  </Button>
+                </div>
+              )}
               {mode === "sale" && <ProductGrid products={products} loading={productsLoading} error={productsError} canManage={orgWide} category={category} onCategory={setCategory} onPick={(pr) => editCart(addToCart(cart, pr))} />}
             </div>
           )}
