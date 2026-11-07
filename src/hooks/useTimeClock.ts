@@ -82,9 +82,46 @@ export function clockGate(kind: "in" | "out", s: ClockTimes | undefined, nowMin:
   return null;
 }
 
+type HolidayEvent = { name: string; event_type: string; staff_attend: boolean; departmentIds: string[] };
+
+/**
+ * Thai reason when `date` (YYYY-MM-DD) is a non-working day for clock-in, else null. Holiday/suspended events and
+ * weekends lock; a teacher_workday with staff_attend (event rows already filtered to cover `date`) unlocks both.
+ */
+export function clockHoliday(date: string, events: HolidayEvent[], departmentId: string | null): string | null {
+  const mine = events.filter((e) => e.departmentIds.length === 0 || (!!departmentId && e.departmentIds.includes(departmentId)));
+  if (mine.some((e) => e.event_type === "teacher_workday" && e.staff_attend)) return null;
+  const off = mine.find((e) => e.event_type === "holiday" || e.event_type === "suspended");
+  if (off) return `วันหยุด · ${off.name}`;
+  const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return dow === 0 || dow === 6 ? "วันหยุดสุดสัปดาห์" : null;
+}
+
+/** Fresh fetch of the events covering `date` for the mutation backstop (the card uses the cached list). */
+async function holidayLock(date: string, departmentId: string | null): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("academic_events")
+    .select("name, event_type, staff_attend, academic_event_departments(department_id)")
+    .lte("start_date", date)
+    .gte("end_date", date);
+  if (error) throw error;
+  return clockHoliday(
+    date,
+    (data as unknown as (Omit<HolidayEvent, "departmentIds"> & { academic_event_departments: { department_id: string }[] })[]).map((e) => ({
+      ...e,
+      departmentIds: e.academic_event_departments.map((d) => d.department_id),
+    })),
+    departmentId,
+  );
+}
+
 /** Unset geofence (or no department) = fail-closed: clocking is refused until an admin sets it. Throws with a Thai message on time-window, GPS failure or outside-radius. */
-async function checkedPosition(kind: "in" | "out", departmentId: string | null): Promise<{ lat: number; lng: number }> {
+async function checkedPosition(kind: "in" | "out", departmentId: string | null, date: string): Promise<{ lat: number; lng: number }> {
   if (!departmentId) throw new Error(GEOFENCE_UNSET_MESSAGE);
+  if (kind === "in") {
+    const off = await holidayLock(date, departmentId);
+    if (off) throw new Error(off);
+  }
   const { data: dept, error } = await supabase
     .from("department_settings")
     .select("checkin_lat, checkin_lng, checkin_radius_m, work_start_time, work_end_time")
@@ -111,7 +148,7 @@ export function useClockIn() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ profileId, departmentId, date }: { profileId: string; departmentId: string | null; date: string }) => {
-      const pos = await checkedPosition("in", departmentId);
+      const pos = await checkedPosition("in", departmentId, date);
       const { error } = await supabase.from("time_clock_records").upsert(
         {
           profile_id: profileId,
@@ -133,7 +170,7 @@ export function useClockOut() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ profileId, departmentId, date }: { profileId: string; departmentId: string | null; date: string }) => {
-      const pos = await checkedPosition("out", departmentId);
+      const pos = await checkedPosition("out", departmentId, date);
       const { error } = await supabase
         .from("time_clock_records")
         .update({ clock_out_time: new Date().toISOString(), clock_out_lat: pos.lat, clock_out_lng: pos.lng })

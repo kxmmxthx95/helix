@@ -17,7 +17,7 @@ import { useDepartments, useRoleSubtitle } from "@/hooks/useProfiles";
 import { avatarUrl, bannerUrl, studentAvatarUrl } from "@/hooks/useAvatar";
 import { useTeacherSchedule, type ScheduleEntryRow } from "@/hooks/useSchedule";
 import { useDepartmentSettings, useSchoolSettings } from "@/hooks/useSettings";
-import { bangkokMinutes, clockGate, useClockIn, useClockOut, useMyTimeClock } from "@/hooks/useTimeClock";
+import { bangkokMinutes, clockGate, clockHoliday, useClockIn, useClockOut, useMyTimeClock } from "@/hooks/useTimeClock";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import { usePendingStudentLeaveApprovals, useSetStudentLeaveStatus } from "@/hooks/useStudentLeave";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
@@ -115,6 +115,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const toast = useToast();
   const { data: clock, isLoading: loadingClock } = useMyTimeClock(me.id, today);
   const { data: deptSettings } = useDepartmentSettings(me.department_id);
+  const { data: events = [] } = useAcademicEvents();
   const clockIn = useClockIn();
   const clockOut = useClockOut();
   const clockArgs = { profileId: me.id, departmentId: me.department_id, date: today };
@@ -127,7 +128,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
       onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
     });
   // ponytail: after clock-in the card stays locked until work_end_time (no end time set = no lock)
-  const clockLock = clock?.clock_out_time ? null : clockGate(clock?.clock_in_time ? "out" : "in", deptSettings, nowMin);
+  // Holiday locks clock-in only; an open record can still clock out.
+  const holidayLock = clock?.clock_in_time ? null : clockHoliday(today, events.filter((e) => e.start_date <= today && today <= e.end_date), me.department_id);
+  const clockLock = clock?.clock_out_time ? null : holidayLock ?? clockGate(clock?.clock_in_time ? "out" : "in", deptSettings, nowMin);
   const roleSubtitle = useRoleSubtitle(me.id, me.roles);
 
   const { data: departments = [] } = useDepartments();
@@ -140,7 +143,6 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const { data: entries = [] } = useTeacherSchedule(me.id, academicYear, scheduleTerm);
   // ponytail: department default periods only — a grade with its own override can show slightly different times; read per-grade periods if that matters
   const { data: periods = [] } = useDepartmentPeriods(departmentId || null);
-  const { data: events = [] } = useAcademicEvents();
   const { data: subjects = [] } = useSubjects({
     search: "",
     departmentId,
