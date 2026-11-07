@@ -9,6 +9,7 @@ import {
   BriefcaseIcon,
   CalendarIcon,
   ChevronBack,
+  ChevronDown,
   CheckmarkCircleIcon,
   ClipboardIcon,
   CloudOff,
@@ -36,7 +37,7 @@ import {
 } from "@/components/icons";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, SheetStyleContext } from "@/components/Sheet";
 import { MobileHeaderProvider, useMobileHeaderSlot } from "@/components/MobileHeaderSlot";
 import { useTheme } from "@/components/ThemeProvider";
 import { useToast } from "@/components/Toast";
@@ -423,8 +424,8 @@ const SIDEBAR_KEY = "helix-sidebar-collapsed";
 
 const navDrawerLink = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "group font-ui tappable flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-[15px] font-semibold transition-colors",
-    isActive ? "bg-card text-foreground shadow-card" : "text-foreground hover:bg-foreground/5",
+    "group font-ui tappable flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
+    isActive ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:bg-foreground/5",
   );
 
 /**
@@ -478,6 +479,8 @@ function AppShellInner() {
     <input ref={avatarFileRef} type="file" accept="image/*" className="hidden" onChange={onAvatarChosen} />
   );
   const [navOpen, setNavOpen] = useState(false);
+  // Mobile drawer: sections collapsible; on each open only the current page's section is expanded.
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_KEY) === "1";
@@ -531,6 +534,13 @@ function AppShellInner() {
     if (group) group.items.push(tab);
     else tabSections.push({ section: tab.section, items: [tab] });
   }
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const cur = tabs.find((t) => (t.to === "/" ? location.pathname === "/" : location.pathname.startsWith(t.to)));
+    setOpenSections(new Set(cur ? [cur.section] : []));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navOpen]);
 
   const pageTitle =
     tabs.find((t) => t.to === location.pathname || (t.to === "/" && location.pathname === "/"))?.label ??
@@ -768,6 +778,7 @@ function AppShellInner() {
           </div>
         </header>
 
+        <SheetStyleContext.Provider value="ios">
         <Sheet
           open={navOpen}
           onOpenChange={setNavOpen}
@@ -784,25 +795,22 @@ function AppShellInner() {
               <ChevronBack className="h-3 w-3" />
             </Button>
           }
+          footerClassName="py-2"
           footer={
-            <div className="flex flex-col gap-0.5">
-              <div className="mb-1 flex items-center gap-3 px-1 py-1">
-                {avatarButton()}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNavOpen(false);
-                    navigate("/profile");
-                  }}
-                  className="min-w-0 flex-1 text-left tappable"
-                >
-                  <p className="truncate text-sm font-semibold">{displayName}</p>
-                  {profile && (
-                    <p className="truncate text-xs text-muted-foreground">{roleSubtitle}</p>
-                  )}
-                </button>
-              </div>
-              <div className="flex items-center justify-end gap-1 px-1 pt-1">
+            <div className="flex items-center gap-2">
+              {avatarButton("h-9 w-9 text-xs")}
+              <button
+                type="button"
+                onClick={() => {
+                  setNavOpen(false);
+                  navigate("/profile");
+                }}
+                className="min-w-0 flex-1 text-left tappable"
+              >
+                <p className="truncate text-sm font-semibold leading-tight">{displayName}</p>
+                {profile && <p className="truncate text-xs leading-tight text-muted-foreground">{roleSubtitle}</p>}
+              </button>
+              <div className="flex shrink-0 items-center">
                 {settingsButton}
                 {themeButton}
                 {signOutButton}
@@ -811,27 +819,47 @@ function AppShellInner() {
           }
         >
           <nav className="flex flex-col gap-4">
-            {tabSections.map(({ section, items }) => (
-              <div key={section}>
-                <p className="px-3 pb-1.5 text-[13px] font-medium text-muted-foreground">{section}</p>
-                <div className="flex flex-col gap-0.5">
-                  {items.map(({ to, label, icon: Icon }) => (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      end={to === "/"}
-                      onClick={() => setNavOpen(false)}
-                      className={navDrawerLink}
-                    >
-                      <Icon className="h-[18px] w-[18px] shrink-0 text-muted-foreground group-aria-[current=page]:text-accent" />
-                      <span className="truncate">{label}</span>
-                    </NavLink>
-                  ))}
+            {tabSections.map(({ section, items }) => {
+              const open = openSections.has(section);
+              return (
+                <div key={section}>
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() =>
+                      setOpenSections((prev) => {
+                        const next = new Set(prev);
+                        if (!next.delete(section)) next.add(section);
+                        return next;
+                      })
+                    }
+                    className="tappable flex w-full items-center justify-between px-3 py-2 text-[15px] font-semibold text-foreground"
+                  >
+                    {section}
+                    <ChevronDown className={cn("h-3 w-3 transition-transform", !open && "-rotate-90")} />
+                  </button>
+                  {open && (
+                    <div className="flex flex-col gap-0.5">
+                      {items.map(({ to, label, icon: Icon }) => (
+                        <NavLink
+                          key={to}
+                          to={to}
+                          end={to === "/"}
+                          onClick={() => setNavOpen(false)}
+                          className={navDrawerLink}
+                        >
+                          <Icon className="h-[18px] w-[18px] shrink-0 text-muted-foreground group-aria-[current=page]:text-accent" />
+                          <span className="truncate">{label}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </nav>
         </Sheet>
+        </SheetStyleContext.Provider>
 
         {!online && (
           <div
