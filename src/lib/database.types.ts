@@ -1388,6 +1388,9 @@ export type PosMyToday = {
   }[];
 };
 
+/** pos_student_recent() row — the POS student card's history (no cashier / terminal). */
+export type PosStudentTx = { id: string; type: CardTransactionType; amount: number; created_at: string; voided_at: string | null };
+
 // ------------------------------------------------------------- academic_terms
 // See supabase/migrations/0018_academic_terms.sql for the full grill rationale.
 
@@ -1892,6 +1895,10 @@ export type Database = {
       pos_my_today: {
         Args: Record<string, never>;
         Returns: PosMyToday;
+      };
+      pos_student_recent: {
+        Args: { p_student_id: string };
+        Returns: PosStudentTx[];
       };
       set_line_notifications_enabled: {
         Args: { p_profile_id: string; p_enabled: boolean };

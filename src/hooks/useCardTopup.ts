@@ -7,6 +7,7 @@ import type {
   CardSlipRequest,
   CardTransaction,
   PosMyToday,
+  PosStudentTx,
   PosProduct,
   PosStudent,
   PosTerminal,
@@ -86,6 +87,15 @@ export function usePosMyToday() {
   return useQuery({
     queryKey: ["pos_my_today"],
     queryFn: () => rpc<PosMyToday>(() => supabase.rpc("pos_my_today")),
+  });
+}
+
+/** Last 10 transactions of the student on screen; refetched after any money movement (card_transactions key). */
+export function usePosStudentRecent(studentId: string | undefined) {
+  return useQuery({
+    queryKey: ["card_transactions", "pos_recent", studentId],
+    enabled: !!studentId,
+    queryFn: () => rpc<PosStudentTx[]>(() => supabase.rpc("pos_student_recent", { p_student_id: studentId! })),
   });
 }
 

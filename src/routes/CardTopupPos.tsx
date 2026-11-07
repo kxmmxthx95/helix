@@ -18,6 +18,7 @@ import {
   productImageUrl,
   usePosMyToday,
   usePosProducts,
+  usePosStudentRecent,
   usePosSale,
   usePosSaleItems,
   usePosTopupCash,
@@ -522,12 +523,8 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               )}
               {student.card_status === "frozen" && <p className="text-base font-semibold text-destructive">บัตรนี้ถูกระงับ — ขายไม่ได้</p>}
               {student.card_status === null && <p className="text-sm text-muted-foreground">นักเรียนยังไม่ได้ผูกบัตร — เติมเงินได้ แต่ขายไม่ได้</p>}
+              <RecentTx studentId={student.student_id} />
               <div className="flex justify-center gap-2">
-                {mode === "sale" && (
-                  <Button variant="outline" size="lg" disabled={!online} onClick={openTopup}>
-                    เติมเงินสด
-                  </Button>
-                )}
                 <Button variant="ghost" size="lg" onClick={() => (setStudent(null), setEntry(""))}>
                   ยกเลิก
                 </Button>
@@ -582,7 +579,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               ) : (
                 <>
                   <div className="rounded-xl bg-muted px-4 py-3 text-right">
-                    <p className="text-xs text-muted-foreground">ยอดที่ขาย ({SALE_MIN}–{SALE_MAX} บาท)</p>
                     <p className="font-heading text-6xl font-semibold tabular-nums">{keyed || "0"} ฿</p>
                   </div>
                   {keypad}
@@ -997,6 +993,32 @@ function PinUnlockModal({ open, onClose, onUnlocked }: { open: boolean; onClose:
 }
 
 /** The caller's own shift today, with void for their own rows. */
+/** The student's last 10 transactions on the POS card: time · type · amount (voided ones struck through). */
+function RecentTx({ studentId }: { studentId: string }) {
+  const { data = [], isLoading } = usePosStudentRecent(studentId);
+  if (isLoading) return <Spinner className="mx-auto size-5" />;
+  if (data.length === 0) return <p className="text-sm text-muted-foreground">ยังไม่มีรายการ</p>;
+  return (
+    <div className="mx-auto w-full max-w-md text-left">
+      <p className="pb-1 text-xs font-medium text-muted-foreground">รายการล่าสุด</p>
+      <ul className="max-h-48 divide-y divide-border overflow-y-auto rounded-xl border border-border bg-background px-3">
+        {data.map((t) => (
+          <li key={t.id} className={cn("flex items-center justify-between gap-2 py-1.5 text-sm", t.voided_at && "text-muted-foreground line-through")}>
+            <span className="min-w-0 truncate">
+              {new Date(t.created_at).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {TX_TYPE_LABEL[t.type]}
+              {t.voided_at && " (ยกเลิก)"}
+            </span>
+            <span className={cn("shrink-0 font-semibold tabular-nums", !t.voided_at && t.amount > 0 && "text-success")}>
+              {t.amount > 0 ? "+" : ""}
+              {formatBaht(t.amount)} ฿
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function TodayPanel() {
   const toast = useToast();
   const { data, isLoading, error } = usePosMyToday();
