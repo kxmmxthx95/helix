@@ -84,7 +84,7 @@ export function TerminalsTab() {
     <div className="space-y-8">
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative min-w-0 flex-1 sm:max-w-sm">
+          <div className="relative ml-auto min-w-0 flex-1 sm:max-w-sm">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
@@ -96,7 +96,7 @@ export function TerminalsTab() {
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
-          <Button className="ml-auto h-14 px-6 text-lg" onClick={() => setForm({ name: "", active: true })}>
+          <Button className="h-14 px-6 text-lg" onClick={() => setForm({ name: "", active: true })}>
             เพิ่มเครื่องขาย
           </Button>
         </div>
