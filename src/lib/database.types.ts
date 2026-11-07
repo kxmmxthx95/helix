@@ -763,6 +763,8 @@ export type ExamSession = {
   gradebook_item_id: string | null;
   /** Teacher-flipped — students only see the answer key/correct answers once true. */
   review_released: boolean;
+  /** Per-exam code + single-device lock (migration 0132). Default on; turning it off is logged. */
+  strict_mode: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -795,9 +797,44 @@ export type ExamAttempt = {
   /** Per-attempt shuffle order (question ids), generated once at start and reused on resume. */
   question_order: string[];
   score: number | null;
+  /** Auth session (JWT session_id) allowed to write this attempt; claim_exam_attempt heartbeats holder_seen_at. Migration 0132. */
+  holder_session: string | null;
+  holder_seen_at: string;
+  /** Set when another session asked to take over after the holder went silent; teacher approves. */
+  takeover_session: string | null;
+  takeover_requested_at: string | null;
   created_at: string;
   updated_at: string;
 };
+
+export type ExamClaimStatus = "ok" | "blocked" | "pending_teacher" | "ended";
+
+export type ExamSecurityEventType =
+  | "login_blocked"
+  | "takeover_requested"
+  | "takeover_approved"
+  | "code_failed"
+  | "code_locked"
+  | "code_unlocked"
+  | "strict_disabled"
+  | "reset_blocked";
+
+/** Teacher-only trail of anti-impersonation events. Device = user agent, ip has its last part masked. */
+export type ExamSecurityEvent = {
+  id: string;
+  session_id: string;
+  attempt_id: string | null;
+  student_id: string | null;
+  event_type: ExamSecurityEventType;
+  device: string | null;
+  ip: string | null;
+  actor: string | null;
+  at: string;
+};
+
+export type ExamSessionCode = { session_id: string; code: string };
+
+export type ExamCodeState = { session_id: string; student_id: string; fails: number; locked: boolean; passed: boolean };
 
 /** One row per question per attempt, upserted on every answer change (autosave). is_correct/points_awarded fill in at submit. */
 export type ExamAttemptAnswer = {
@@ -1734,6 +1771,7 @@ export type Database = {
           | "max_attempts"
           | "shuffle_questions"
           | "shuffle_choices"
+          | "strict_mode"
           | "sync_to_gradebook"
           | "gradebook_item_id"
           | "review_released"
@@ -1743,8 +1781,23 @@ export type Database = {
       exam_session_questions: Table<ExamSessionQuestion, ExamSessionQuestion>;
       exam_attempts: Table<
         ExamAttempt,
-        InsertOf<ExamAttempt, "attempt_no" | "started_at" | "submitted_at" | "status" | "question_order" | "score">
+        InsertOf<
+          ExamAttempt,
+          | "attempt_no"
+          | "started_at"
+          | "submitted_at"
+          | "status"
+          | "question_order"
+          | "score"
+          | "holder_session"
+          | "holder_seen_at"
+          | "takeover_session"
+          | "takeover_requested_at"
+        >
       >;
+      exam_security_events: Table<ExamSecurityEvent, InsertOf<ExamSecurityEvent, "attempt_id" | "student_id" | "device" | "ip" | "actor" | "at">>;
+      exam_session_codes: Table<ExamSessionCode, ExamSessionCode>;
+      exam_code_state: Table<ExamCodeState, InsertOf<ExamCodeState, "fails" | "locked" | "passed">>;
       exam_attempt_answers: Table<
         ExamAttemptAnswer,
         InsertOf<ExamAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
@@ -1805,6 +1858,11 @@ export type Database = {
         Args: { p_attempt_id: string };
         Returns: void;
       };
+      verify_exam_code: { Args: { p_session_id: string; p_code: string }; Returns: "ok" | "wrong" | "locked" };
+      unlock_exam_code: { Args: { p_session_id: string; p_student_id: string }; Returns: void };
+      claim_exam_attempt: { Args: { p_attempt_id: string }; Returns: ExamClaimStatus };
+      approve_exam_takeover: { Args: { p_attempt_id: string }; Returns: void };
+      keep_other_sessions: { Args: Record<string, never>; Returns: boolean };
       save_practice_answer: {
         Args: { p_attempt_id: string; p_question_id: string; p_choice_id: string | null; p_short_answer: string | null };
         Returns: PracticeAttemptAnswer;

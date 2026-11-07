@@ -9,6 +9,19 @@ import { supabase } from "@/lib/supabase";
 /** Auto sign-out after this much inactivity. Tune here, nowhere else. */
 export const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
+/** >0 while a screen (an exam attempt) has asked to pause idle sign-out. */
+let idlePauses = 0;
+
+/** Pauses the idle sign-out while the calling component is mounted — an exam has its own clock + heartbeat. */
+export function usePauseIdleSignOut() {
+  useEffect(() => {
+    idlePauses++;
+    return () => {
+      idlePauses--;
+    };
+  }, []);
+}
+
 /**
  * super_admin-only nav/UI preview (grill-lite decision, 2026-08-12): swaps
  * profile.roles client-side so every existing canManage()/isOrgWide()/role
@@ -217,7 +230,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let timer: number;
     const reset = () => {
       clearTimeout(timer);
-      timer = window.setTimeout(() => void signOut(), IDLE_TIMEOUT_MS);
+      timer = window.setTimeout(() => {
+        if (idlePauses > 0) reset();
+        else void signOut();
+      }, IDLE_TIMEOUT_MS);
     };
 
     const events = ["pointerdown", "keydown", "visibilitychange"] as const;
@@ -272,7 +288,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         let lastError: Error | null = null;
         for (const email of candidates) {
           const { error } = await supabase.auth.signInWithPassword({ email, password });
-          if (!error) return;
+          if (!error) {
+            // Students: newest login wins, unless a strict exam is live on another session (migration 0132).
+            const { data: keep } = await supabase.rpc("keep_other_sessions");
+            if (keep === false) await supabase.auth.signOut({ scope: "others" });
+            return;
+          }
           lastError = error;
         }
         throw lastError;

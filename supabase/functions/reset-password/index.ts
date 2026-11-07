@@ -114,6 +114,13 @@ Deno.serve(async (req) => {
     return json({ error: "ข้อมูลไม่ถูกต้อง" }, 400);
   }
 
+  // Identity proven, but national_id + DOB aren't secret-grade: while a strict exam is open for this
+  // student, only staff may reset (migration 0132). Fails closed if the check itself errors.
+  const { data: examBlocks, error: examError } = await admin.rpc("exam_blocks_reset", { p_profile_id: targetId });
+  if (examError || examBlocks) {
+    return json({ error: "ช่วงสอบไม่สามารถรีเซ็ตรหัสผ่านเองได้ กรุณาติดต่อครู" }, 403);
+  }
+
   const { error: updateError } = await admin.auth.admin.updateUserById(targetId, {
     password: newPassword,
   });

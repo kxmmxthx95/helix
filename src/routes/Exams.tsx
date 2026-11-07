@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useAuth } from "@/auth/AuthProvider";
+import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { ChevronBack, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
@@ -11,26 +11,35 @@ import { useClassroomsByIds, useExamQuestions, useGradeLevelsByIds, useSubjectsB
 import {
   useAttemptAnswers,
   useAttemptQuestions,
+  useApproveTakeover,
   useAvailableExams,
+  useClaimAttempt,
   useCreateExamSession,
   useDeleteExamSession,
+  useExamCode,
   useExamSessionQuestions,
   useExamSessionTargets,
+  useLockedCodeStudents,
   useLogAttemptEvent,
+  useMyAttempts,
   useMyCurrentClassroom,
   useMyExamSessions,
   useSaveAnswer,
+  useSecurityEvents,
   useSessionAttempts,
   useSetSessionQuestions,
   useStartOrResumeAttempt,
+  useStudentNames,
   useSubmitAttempt,
+  useUnlockExamCode,
   useUpdateExamSession,
+  useVerifyExamCode,
   type AvailableExam,
   type ExamSessionQuestionRow,
 } from "@/hooks/useExams";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { SubjectPicker } from "@/routes/ExamBank";
-import type { ExamAttempt, ExamSession, Student } from "@/lib/database.types";
+import type { ExamAttempt, ExamSecurityEventType, ExamSession, Student } from "@/lib/database.types";
 import { cn } from "@/lib/utils";
 
 /** Both teacher (create/manage sessions) and student/parent (take exams) render from here — role-branched, same as Assignments.tsx/ScoreRecording.tsx. See migration 0047. */
@@ -403,6 +412,8 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         />
       </label>
 
+      <SecurityPanel session={session} attempts={attempts} />
+
       <EditSessionQuestionsSheet
         session={session}
         sessionQuestions={sessionQuestions}
@@ -467,6 +478,85 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
             </p>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+const SECURITY_EVENT_LABEL: Record<ExamSecurityEventType, string> = {
+  login_blocked: "พยายามล็อกอินซ้อนระหว่างสอบ",
+  takeover_requested: "ขอเปลี่ยนเครื่อง",
+  takeover_approved: "ครูอนุมัติเปลี่ยนเครื่อง",
+  code_failed: "กรอกรหัสสอบผิด",
+  code_locked: "รหัสสอบถูกล็อก",
+  code_unlocked: "ครูปลดล็อกรหัสสอบ",
+  strict_disabled: "ปิดโหมดสอบจริง",
+  reset_blocked: "ถูกปฏิเสธการรีเซ็ตรหัสผ่านช่วงสอบ",
+};
+
+/** Teacher view of the anti-impersonation controls (migration 0132): code, single-device takeovers, locked students, event trail. */
+function SecurityPanel({ session, attempts }: { session: ExamSession; attempts: ExamAttempt[] }) {
+  const update = useUpdateExamSession();
+  const approve = useApproveTakeover();
+  const unlock = useUnlockExamCode();
+  const toast = useToast();
+  const { data: code } = useExamCode(session.strict_mode ? session.id : null);
+  const { data: locked = [] } = useLockedCodeStudents(session.id);
+  const { data: events = [] } = useSecurityEvents(session.id);
+
+  const pending = attempts.filter((a) => a.status === "in_progress" && a.takeover_session);
+  const names = useStudentNames([
+    ...pending.map((a) => a.student_id),
+    ...locked.map((l) => l.student_id),
+    ...events.flatMap((e) => (e.student_id ? [e.student_id] : [])),
+  ]).data;
+  const nameOf = (id: string | null) => (id ? (names?.get(id) ?? "นักเรียน") : "—");
+  const onError = () => toast("ทำรายการไม่สำเร็จ", "error");
+
+  return (
+    <div className="shrink-0 space-y-2 rounded-lg border border-border px-3 py-2 text-xs">
+      <label className="flex items-center justify-between">
+        โหมดสอบจริง (รหัสสอบ + ล็อกเครื่องเดียว)
+        <Switch checked={session.strict_mode} onChange={(v) => update.mutate({ id: session.id, strict_mode: v }, { onError })} />
+      </label>
+
+      {session.strict_mode && (
+        <p className="flex items-center justify-between">
+          รหัสสอบ (แจ้งในห้องสอบเท่านั้น)
+          <span className="font-mono text-base font-semibold tracking-widest">{code ?? "······"}</span>
+        </p>
+      )}
+
+      {pending.map((a) => (
+        <div key={a.id} className="flex items-center justify-between gap-2 rounded-md bg-muted px-2 py-1.5">
+          <span>{nameOf(a.student_id)} ขอเปลี่ยนเครื่อง</span>
+          <Button size="sm" onClick={() => approve.mutate(a.id, { onError })}>
+            อนุมัติ
+          </Button>
+        </div>
+      ))}
+
+      {locked.map((l) => (
+        <div key={l.student_id} className="flex items-center justify-between gap-2 rounded-md bg-muted px-2 py-1.5">
+          <span>{nameOf(l.student_id)} ถูกล็อกรหัสสอบ</span>
+          <Button size="sm" onClick={() => unlock.mutate({ sessionId: session.id, studentId: l.student_id }, { onError })}>
+            ปลดล็อก
+          </Button>
+        </div>
+      ))}
+
+      {events.length > 0 && (
+        <details>
+          <summary className="cursor-pointer text-muted-foreground">เหตุการณ์ผิดปกติ ({events.length})</summary>
+          <ul className="mt-1 space-y-1">
+            {events.map((e) => (
+              <li key={e.id} className="text-muted-foreground">
+                {new Date(e.at).toLocaleString("th-TH")} · {nameOf(e.student_id)} · {SECURITY_EVENT_LABEL[e.event_type]}
+                {e.device && <span className="block truncate">{e.device}{e.ip ? ` · ${e.ip}` : ""}</span>}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );
@@ -680,12 +770,17 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
 
 function TakeExam({ student, session, onExit }: { student: Student; session: AvailableExam; onExit: () => void }) {
   const { data: sessionQuestions = [] } = useExamSessionQuestions(session.id);
+  const { data: mine, isLoading: mineLoading } = useMyAttempts(session.id, student.id);
   const startOrResume = useStartOrResumeAttempt();
   const [attempt, setAttempt] = useState<ExamAttempt | null>(null);
+  const [codeOk, setCodeOk] = useState(false);
   const toast = useToast();
 
+  // Resuming an unsubmitted attempt needs no code; starting a new one does (strict_mode, migration 0132).
+  const needsCode = session.strict_mode && !mineLoading && !codeOk && !mine?.some((a) => a.status === "in_progress");
+
   useEffect(() => {
-    if (attempt || sessionQuestions.length === 0) return;
+    if (attempt || sessionQuestions.length === 0 || mineLoading || needsCode) return;
     startOrResume.mutate(
       {
         sessionId: session.id,
@@ -696,7 +791,9 @@ function TakeExam({ student, session, onExit }: { student: Student; session: Ava
       { onSuccess: setAttempt, onError: () => toast("เข้าสอบไม่สำเร็จ", "error") },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionQuestions.length]);
+  }, [sessionQuestions.length, mineLoading, needsCode]);
+
+  if (needsCode) return <ExamCodeForm sessionId={session.id} onPassed={() => setCodeOk(true)} onExit={onExit} />;
 
   if (!attempt) {
     return (
@@ -719,7 +816,79 @@ function TakeExam({ student, session, onExit }: { student: Student; session: Ava
     return <AttemptResult attempt={attempt} session={session} onExit={onExit} />;
   }
 
-  return <AttemptRunner attempt={attempt} session={session} onSubmitted={setAttempt} onExit={onExit} />;
+  return (
+    <AttemptGuard attemptId={attempt.id} onExit={onExit}>
+      <AttemptRunner attempt={attempt} session={session} onSubmitted={setAttempt} onExit={onExit} />
+    </AttemptGuard>
+  );
+}
+
+function ExamCodeForm({ sessionId, onPassed, onExit }: { sessionId: string; onPassed: () => void; onExit: () => void }) {
+  const verify = useVerifyExamCode();
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string>();
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(undefined);
+    verify.mutate(
+      { sessionId, code: code.trim() },
+      {
+        onSuccess: (r) => {
+          if (r === "ok") onPassed();
+          else setError(r === "locked" ? "กรอกรหัสผิดเกินกำหนด กรุณาแจ้งครูเพื่อปลดล็อก" : "รหัสสอบไม่ถูกต้อง");
+        },
+        onError: () => setError("ตรวจรหัสไม่สำเร็จ ลองใหม่อีกครั้ง"),
+      },
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="mx-auto max-w-xs space-y-3 pt-8">
+      <Field label="รหัสสอบ (ครูจะแจ้งในห้องสอบ)" error={error}>
+        <Input
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          inputMode="numeric"
+          autoComplete="off"
+          autoFocus
+        />
+      </Field>
+      <Button type="submit" className="w-full" disabled={code.length !== 6 || verify.isPending}>
+        เริ่มสอบ
+      </Button>
+      <Button type="button" variant="ghost" className="w-full" onClick={onExit}>
+        กลับ
+      </Button>
+    </form>
+  );
+}
+
+/** Only the session holding the attempt may render the exam; any other browser session waits here. */
+function AttemptGuard({ attemptId, onExit, children }: { attemptId: string; onExit: () => void; children: React.ReactNode }) {
+  usePauseIdleSignOut(); // the exam has its own clock + heartbeat; an idle sign-out mid-attempt just strands the student
+  const { data: status, isError } = useClaimAttempt(attemptId);
+
+  if (status === "ok") return <>{children}</>;
+  if (!status && !isError) {
+    return <div className="mx-auto max-w-xl pt-8" role="status" aria-label="กำลังโหลด"><Skeleton className="h-3.5 w-full" /></div>;
+  }
+  const message =
+    status === "blocked"
+      ? "บัญชีนี้กำลังทำข้อสอบอยู่ในอุปกรณ์อื่น ไม่สามารถทำซ้อนได้"
+      : status === "pending_teacher"
+        ? "อุปกรณ์เดิมหยุดตอบสนอง ส่งคำขอเปลี่ยนเครื่องให้ครูแล้ว กรุณารอครูอนุมัติ"
+        : status === "ended"
+          ? "การสอบครั้งนี้สิ้นสุดแล้ว"
+          : "เชื่อมต่อไม่สำเร็จ กำลังลองใหม่…";
+  return (
+    <Card className="mx-auto max-w-xl space-y-3 text-sm" role="alert">
+      <p>{message}</p>
+      <Button variant="ghost" onClick={onExit}>
+        กลับ
+      </Button>
+    </Card>
+  );
 }
 
 function AttemptRunner({

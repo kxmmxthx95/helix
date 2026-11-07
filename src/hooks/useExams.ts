@@ -5,6 +5,9 @@ import type {
   ExamAttemptEventType,
   ExamQuestionChoiceForAttempt,
   ExamQuestionForAttempt,
+  ExamClaimStatus,
+  ExamCodeState,
+  ExamSecurityEvent,
   ExamSession,
 } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
@@ -146,7 +149,7 @@ export function useUpdateExamSession() {
     mutationFn: async ({ id, ...patch }: { id: string } & Partial<
       Pick<
         ExamSession,
-        "title" | "opens_at" | "closes_at" | "duration_minutes" | "max_attempts" | "shuffle_questions" | "shuffle_choices" | "sync_to_gradebook" | "review_released"
+        "title" | "opens_at" | "closes_at" | "duration_minutes" | "max_attempts" | "shuffle_questions" | "shuffle_choices" | "sync_to_gradebook" | "review_released" | "strict_mode"
       >
     >) => {
       const { error } = await supabase.from("exam_sessions").update(patch).eq("id", id);
@@ -394,6 +397,119 @@ export function useAttemptEvents(attemptId: string | null) {
         .order("at", { ascending: true });
       if (error) throw error;
       return data;
+    },
+  });
+}
+
+// ------------------------------------------------------- anti-impersonation (migration 0132)
+
+/** Student: checks the exam code server-side (5 wrong tries lock it until the teacher unlocks). */
+export function useVerifyExamCode() {
+  return useMutation({
+    mutationFn: async ({ sessionId, code }: { sessionId: string; code: string }) => {
+      const { data, error } = await supabase.rpc("verify_exam_code", { p_session_id: sessionId, p_code: code });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/**
+ * Open + heartbeat for one attempt: only 'ok' means this browser session may answer. Polls every 30s while
+ * ok, every 10s otherwise so a teacher approval lands quickly. A failed poll keeps the last status.
+ */
+export function useClaimAttempt(attemptId: string | null) {
+  return useQuery({
+    queryKey: ["exam_claim", attemptId],
+    enabled: !!attemptId,
+    gcTime: 0,
+    refetchInterval: (q) => (q.state.data === "ok" ? 30_000 : 10_000),
+    refetchIntervalInBackground: true, // a hidden tab must keep the heartbeat or the lock goes stale
+    queryFn: async (): Promise<ExamClaimStatus> => {
+      const { data, error } = await supabase.rpc("claim_exam_attempt", { p_attempt_id: attemptId! });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** Teacher: the exam code (RLS: only the session's teacher/manager can read it). */
+export function useExamCode(sessionId: string | null) {
+  return useQuery({
+    queryKey: ["exam_session_codes", sessionId],
+    enabled: !!sessionId,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase.from("exam_session_codes").select("code").eq("session_id", sessionId!).maybeSingle();
+      if (error) throw error;
+      return data?.code ?? null;
+    },
+  });
+}
+
+export function useApproveTakeover() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (attemptId: string) => {
+      const { error } = await supabase.rpc("approve_exam_takeover", { p_attempt_id: attemptId });
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["exam_attempts"] }),
+  });
+}
+
+export function useLockedCodeStudents(sessionId: string | null) {
+  return useQuery({
+    queryKey: ["exam_code_state", sessionId],
+    enabled: !!sessionId,
+    queryFn: async (): Promise<ExamCodeState[]> => {
+      const { data, error } = await supabase.from("exam_code_state").select("*").eq("session_id", sessionId!).eq("locked", true);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useUnlockExamCode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ sessionId, studentId }: { sessionId: string; studentId: string }) => {
+      const { error } = await supabase.rpc("unlock_exam_code", { p_session_id: sessionId, p_student_id: studentId });
+      if (error) throw error;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["exam_code_state"] });
+      void qc.invalidateQueries({ queryKey: ["exam_security_events"] });
+    },
+  });
+}
+
+export function useSecurityEvents(sessionId: string | null) {
+  return useQuery({
+    queryKey: ["exam_security_events", sessionId],
+    enabled: !!sessionId,
+    queryFn: async (): Promise<ExamSecurityEvent[]> => {
+      const { data, error } = await supabase
+        .from("exam_security_events")
+        .select("*")
+        .eq("session_id", sessionId!)
+        .order("at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** student_id -> display name for the teacher's security panel (the attempts table still shows raw ids elsewhere). */
+export function useStudentNames(ids: string[]) {
+  const key = [...new Set(ids)].sort();
+  return useQuery({
+    queryKey: ["student_names", ...key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<Map<string, string>> => {
+      const { data, error } = await supabase.from("students").select("id, student_code, prefix, first_name, last_name").in("id", key);
+      if (error) throw error;
+      return new Map(data.map((s) => [s.id, `${s.student_code} ${s.prefix ?? ""}${s.first_name} ${s.last_name}`.trim()]));
     },
   });
 }
