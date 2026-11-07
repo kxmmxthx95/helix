@@ -474,6 +474,8 @@ export type Subject = {
   suggested_term: number | null;
   is_active: boolean; // soft delete — past academic years may still reference a retired subject
   cover_path: string | null; // object name in the subject-covers bucket (0134)
+  cover_focus_x: number; // focal point of the cover, % 0–100 (0136)
+  cover_focus_y: number;
   created_at: string;
   updated_at: string;
 };
@@ -1619,7 +1621,7 @@ export type Database = {
         Subject,
         InsertOf<
           Subject,
-          "name_en" | "is_active" | "suggested_grade_level_id" | "suggested_term" | "grading_method" | "cover_path"
+          "name_en" | "is_active" | "suggested_grade_level_id" | "suggested_term" | "grading_method" | "cover_path" | "cover_focus_x" | "cover_focus_y"
         >
       >;
       study_plans: Table<StudyPlan, InsertOf<StudyPlan, never>>;

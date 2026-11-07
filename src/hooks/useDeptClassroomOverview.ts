@@ -17,13 +17,13 @@ export type OverviewLesson = {
   topics: { id: string; name: string }[] };
 /** One teacher with the fields avatarUrl() needs. */
 export type OverviewTeacher = { name: string; avatar_path: string | null; updated_at: string };
-export type OverviewSubject = { id: string; code: string; name: string; coverUrl: string | null; areaId: string | null; teachers: string[]; teacherList: OverviewTeacher[]; lessons: OverviewLesson[] };
+export type OverviewSubject = { id: string; code: string; name: string; coverUrl: string | null; coverFocus: { x: number; y: number }; areaId: string | null; teachers: string[]; teacherList: OverviewTeacher[]; lessons: OverviewLesson[] };
 export type OverviewClassroom = { id: string; name: string; gradeLevelId: string; gradeCode: string; subjects: OverviewSubject[] };
 
 type Teacher = { prefix: string | null; first_name: string; last_name: string; avatar_path: string | null; updated_at: string };
 type AssignmentRow = {
   subject_id: string;
-  subject: { code: string; name_th: string; learning_area_id: string | null; cover_path: string | null; updated_at: string };
+  subject: { code: string; name_th: string; learning_area_id: string | null; cover_path: string | null; cover_focus_x: number; cover_focus_y: number; updated_at: string };
   teacher: Teacher | null;
   classroom: { id: string; name: string; grade_level: { id: string; code: string; name: string; sort_order: number } };
 };
@@ -50,7 +50,7 @@ export function useDeptClassroomOverview(departmentId: string | null, academicYe
       let q = supabase
         .from("teaching_assignments")
         .select(
-          "subject_id, subject:subjects!inner(code, name_th, learning_area_id, cover_path, updated_at), teacher:profiles(prefix, first_name, last_name, avatar_path, updated_at), classroom:classrooms!inner(id, name, grade_level:grade_levels!inner(id, code, name, sort_order, department_id))",
+          "subject_id, subject:subjects!inner(code, name_th, learning_area_id, cover_path, cover_focus_x, cover_focus_y, updated_at), teacher:profiles(prefix, first_name, last_name, avatar_path, updated_at), classroom:classrooms!inner(id, name, grade_level:grade_levels!inner(id, code, name, sort_order, department_id))",
         )
         .eq("classroom.grade_level.department_id", departmentId!)
         .eq("classroom.is_active", true)
@@ -84,6 +84,7 @@ export function useDeptClassroomOverview(departmentId: string | null, academicYe
             code: r.subject.code,
             name: r.subject.name_th,
             coverUrl: subjectCoverUrl(r.subject),
+            coverFocus: { x: r.subject.cover_focus_x, y: r.subject.cover_focus_y },
             areaId: r.subject.learning_area_id,
             teachers: [],
             teacherList: [],

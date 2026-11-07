@@ -1,6 +1,7 @@
 import { FileUp, Plus, Search, SlidersHorizontal, X } from "@/components/icons";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { useAuth } from "@/auth/AuthProvider";
+import { useFocusDrag } from "@/components/BannerAdjust";
 import { ImportSubjectsSheet } from "@/components/ImportSubjectsSheet";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -21,6 +22,7 @@ import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import type { GradingMethod, GradeLevel, LearningArea, Subject, SubjectType } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
+import { cn } from "@/lib/utils";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 
 const EMPTY: Omit<SubjectFilters, "departmentId"> = {
@@ -657,6 +659,11 @@ function EditSubjectSheet({
   const [cover, setCover] = useState<File | null | undefined>(undefined);
   const [coverPreview, setCoverPreview] = useState<string | null | undefined>(undefined);
   const canSetCover = me ? isOrgWide(me.roles) : false;
+  // undefined = unchanged; set when the admin drags, or reset to 50/50 on a new/removed cover.
+  const [coverFocus, setCoverFocus] = useState<{ x: number; y: number } | undefined>(undefined);
+  const savedFocus = target && target !== "new" ? { x: target.cover_focus_x, y: target.cover_focus_y } : { x: 50, y: 50 };
+  const focus = coverFocus ?? savedFocus;
+  const coverDrag = useFocusDrag(focus, setCoverFocus);
 
   const canAddLearningArea = me ? isOrgWide(me.roles) : false;
   const topLevelAreas = useMemo(() => learningAreas.filter((a) => !a.parent_id), [learningAreas]);
@@ -686,6 +693,7 @@ function EditSubjectSheet({
     setAddingSubArea(false);
     setCover(undefined);
     setCoverPreview(undefined);
+    setCoverFocus(undefined);
   }, [target]);
 
   const selectedArea = learningAreas.find((a) => a.id === current?.learning_area_id);
@@ -706,7 +714,7 @@ function EditSubjectSheet({
     if (!current) return;
     if (!current.learning_area_id || !current.subject_type) return;
     save.mutate(
-      { ...current, ...(isNew ? {} : { id: (target as Subject).id }), ...(canSetCover ? { cover } : {}) },
+      { ...current, ...(isNew ? {} : { id: (target as Subject).id }), ...(canSetCover ? { cover, coverFocus } : {}) },
       {
         onSuccess: () => toast("บันทึกวิชาสำเร็จ"),
         onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
@@ -748,8 +756,11 @@ function EditSubjectSheet({
                 const shown = coverPreview !== undefined ? coverPreview : !isNew ? subjectCoverUrl(target as Subject) : null;
                 return (
                   <div className="flex items-center gap-3">
-                    <div className="flex aspect-[16/10] w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted text-sm text-muted-foreground">
-                      {shown ? <img src={shown} alt="" className="size-full object-cover" /> : "ไม่มีปก"}
+                    <div
+                      className={cn("flex aspect-[16/10] w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted text-sm text-muted-foreground", shown && "cursor-grab touch-none select-none active:cursor-grabbing")}
+                      {...(shown ? coverDrag : {})}
+                    >
+                      {shown ? <img src={shown} alt="" draggable={false} className="size-full object-cover" style={{ objectPosition: `${focus.x}% ${focus.y}%` }} /> : "ไม่มีปก"}
                     </div>
                     <div className="flex flex-col items-start gap-2">
                       <label className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-border bg-muted px-3 text-sm font-medium">
@@ -764,12 +775,14 @@ function EditSubjectSheet({
                             if (!f) return;
                             if (f.size > 10 * 1024 * 1024) return toast("ไฟล์ใหญ่เกิน 10 MB", "error");
                             setCover(f);
+                            setCoverFocus({ x: 50, y: 50 });
                             setCoverPreview(URL.createObjectURL(f));
                           }}
                         />
                       </label>
+                      {shown && <p className="text-xs text-muted-foreground">ลากรูปเพื่อปรับตำแหน่ง</p>}
                       {shown && (
-                        <button type="button" className="text-sm font-medium text-destructive" onClick={() => { setCover(null); setCoverPreview(null); }}>
+                        <button type="button" className="text-sm font-medium text-destructive" onClick={() => { setCover(null); setCoverPreview(null); setCoverFocus({ x: 50, y: 50 }); }}>
                           ลบปก
                         </button>
                       )}

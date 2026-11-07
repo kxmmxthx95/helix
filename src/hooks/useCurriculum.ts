@@ -95,12 +95,12 @@ export function useSaveSubject() {
 
   return useMutation({
     // cover: undefined = leave as is, null = remove, File = replace.
-    mutationFn: async ({ id, cover, ...draft }: SubjectDraft & { id?: string; cover?: File | null }) => {
+    mutationFn: async ({ id, cover, coverFocus, ...draft }: SubjectDraft & { id?: string; cover?: File | null; coverFocus?: { x: number; y: number } }) => {
       const { subject_type, learning_area_id, ...rest } = draft;
       if (!learning_area_id || !subject_type) {
         throw new Error("กรุณาเลือกกลุ่มสาระและประเภทวิชา");
       }
-      const row = { ...rest, learning_area_id, subject_type, ...(cover === null ? { cover_path: null } : {}) };
+      const row = { ...rest, learning_area_id, subject_type, ...(cover === null ? { cover_path: null } : {}), ...(coverFocus ? { cover_focus_x: Math.round(coverFocus.x), cover_focus_y: Math.round(coverFocus.y) } : {}) };
       const saved = id
         ? await supabase.from("subjects").update(row).eq("id", id).select("id").single()
         : await supabase.from("subjects").insert(row).select("id").single();

@@ -54,7 +54,7 @@ function Cover({ s, className }: { s: OverviewSubject; className?: string }) {
       <div className="absolute -bottom-12 -left-8 h-1/2 w-1/2 rounded-full bg-black/30 blur-2xl" />
       <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "repeating-linear-gradient(135deg, #fff 0 2px, transparent 2px 22px)" }} />
       <span className="absolute -bottom-[12%] -right-[2%] select-none text-[11rem] font-black leading-none text-white/10">{s.code.trim().charAt(0)}</span>
-      {s.coverUrl && <img src={s.coverUrl} alt="" className="absolute inset-0 size-full object-cover" />}
+      {s.coverUrl && <img src={s.coverUrl} alt="" className="absolute inset-0 size-full object-cover" style={{ objectPosition: `${s.coverFocus.x}% ${s.coverFocus.y}%` }} />}
       <BookIcon className="absolute right-[8%] top-[10%] h-6 w-6 !text-white/40" />
     </div>
   );
