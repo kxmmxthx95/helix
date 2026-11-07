@@ -514,33 +514,28 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
             </div>
           ) : (
             <div className={cn("flex h-full min-h-0 w-full flex-col gap-4", mode === "topup" && "justify-center")}>
-              <div className={cn("flex items-center justify-center gap-4", mode === "sale" && "pt-2")}>
-                <svg viewBox="0 0 120 76" className={cn("w-14 shrink-0", mode === "topup" ? "text-amber-500" : "text-muted-foreground")} aria-hidden>
-                  <rect x="1.5" y="1.5" width="117" height="73" rx="9" fill="none" stroke="currentColor" strokeWidth="3" />
-                  <rect x="1.5" y="14" width="117" height="14" fill="currentColor" opacity="0.5" />
-                  <rect x="12" y="44" width="20" height="14" rx="3" fill="currentColor" opacity="0.35" />
-                </svg>
-                {/* Top-up tab: blinking amber light = reader is waiting for the student's barcode. */}
-                {mode === "topup" && (
-                  <span className="relative flex size-4 shrink-0" role="status" aria-label="รอสแกนบาร์โค้ดนักเรียน">
-                    <span className="absolute inline-flex size-full rounded-full bg-amber-400 opacity-75 motion-safe:animate-ping" />
-                    <span className="relative inline-flex size-4 rounded-full bg-amber-400 motion-safe:animate-pulse" />
-                  </span>
-                )}
-                <div className="text-left">
-                  <p className="font-heading text-2xl font-semibold">{mode === "topup" ? "สแกนบัตรนักเรียนเพื่อเติมเงิน" : price !== null ? "สแกนบัตรนักเรียนเพื่อตัดเงิน" : "สแกนบัตรนักเรียน"}</p>
-                  {mode === "sale" && (
-                    <p className="text-sm text-muted-foreground">{price !== null ? `ยอดชำระ ${formatBaht(price)} ฿` : "หรือสแกน/แตะสินค้าเพื่อเริ่มรายการขาย"}</p>
-                  )}
-                </div>
-              </div>
               {mode === "topup" && (
-                <div className="flex justify-center">
-                  <Button variant="outline" size="lg" onClick={() => setCodeOpen(true)}>
-                    <Search className="mr-2 size-4" />
-                    ค้นหาข้อมูลนักเรียน
-                  </Button>
-                </div>
+                <>
+                  <div className="flex items-center justify-center gap-4">
+                    <svg viewBox="0 0 120 76" className="w-14 shrink-0 text-amber-500" aria-hidden>
+                      <rect x="1.5" y="1.5" width="117" height="73" rx="9" fill="none" stroke="currentColor" strokeWidth="3" />
+                      <rect x="1.5" y="14" width="117" height="14" fill="currentColor" opacity="0.5" />
+                      <rect x="12" y="44" width="20" height="14" rx="3" fill="currentColor" opacity="0.35" />
+                    </svg>
+                    {/* Blinking amber light = reader is waiting for the student's barcode. */}
+                    <span className="relative flex size-4 shrink-0" role="status" aria-label="รอสแกนบาร์โค้ดนักเรียน">
+                      <span className="absolute inline-flex size-full rounded-full bg-amber-400 opacity-75 motion-safe:animate-ping" />
+                      <span className="relative inline-flex size-4 rounded-full bg-amber-400 motion-safe:animate-pulse" />
+                    </span>
+                    <p className="text-left font-heading text-2xl font-semibold">สแกนบัตรนักเรียนเพื่อเติมเงิน</p>
+                  </div>
+                  <div className="flex justify-center">
+                    <Button variant="outline" size="lg" onClick={() => setCodeOpen(true)}>
+                      <Search className="mr-2 size-4" />
+                      ค้นหาข้อมูลนักเรียน
+                    </Button>
+                  </div>
+                </>
               )}
               {mode === "sale" && <ProductGrid products={products} loading={productsLoading} error={productsError} canManage={orgWide} category={category} onCategory={setCategory} onPick={(pr) => editCart(addToCart(cart, pr))} />}
             </div>
