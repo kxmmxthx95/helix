@@ -487,8 +487,8 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               {student.card_status === null && <p className="rounded-xl bg-warning/15 px-4 py-3 text-lg font-medium">นักเรียนยังไม่ได้ผูกบัตร — เติมเงินได้ แต่ขายไม่ได้</p>}
               <RecentTx studentId={student.student_id} />
               <div className="flex justify-center gap-2">
-                <Button variant="outline" size="lg" className="h-14 px-8 text-lg" onClick={() => (setStudent(null), setEntry(""))}>
-                  ยกเลิก / เปลี่ยนนักเรียน
+                <Button variant="outline" size="lg" className="h-14 px-8 text-lg font-bold text-destructive" onClick={() => (setStudent(null), setEntry(""))}>
+                  ยกเลิก
                 </Button>
               </div>
             </div>
