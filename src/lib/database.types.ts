@@ -1299,6 +1299,7 @@ export type CardTransaction = {
   note: string | null;
   voided_at: string | null;
   void_reason: string | null;
+  voided_by: string | null;
   recorded_by: string;
   created_at: string;
   updated_at: string;
@@ -1323,7 +1324,7 @@ export type PinUnlockResult =
   | { ok: true; unlocked_until: string }
   | { ok: false; status: "no_pin" | "bad" | "locked"; attempts_left?: number; locked_until?: string };
 
-export type CardSlipStatus = "pending" | "approved" | "rejected";
+export type CardSlipStatus = "pending" | "approved" | "rejected" | "voided";
 
 export type CardSlipRequest = {
   id: string;
@@ -1370,8 +1371,24 @@ export type CardReport = {
     voided_at: string;
     void_reason: string;
     cashier: string;
+    voided_by_name: string | null; // null on voids from before 0130
     student_name: string;
   }[];
+};
+
+/** card_topup_list() row — a cash / slip top-up, voided or not (migration 0130). */
+export type CardTopupRow = {
+  id: string;
+  type: "topup_cash" | "topup_slip";
+  amount: number;
+  created_at: string;
+  student_id: string;
+  student_code: string;
+  student_name: string;
+  cashier: string;
+  voided_at: string | null;
+  void_reason: string | null;
+  voided_by_name: string | null;
 };
 
 export type PosMyToday = {
@@ -1815,6 +1832,14 @@ export type Database = {
       pos_topup_cash: {
         Args: { p_card_uid: string | null; p_student_id: string | null; p_amount: number; p_terminal_id: string | null; p_client_tx_id: string | null };
         Returns: { ok: true; tx_id: string; amount: number; balance: number };
+      };
+      card_void_topup: {
+        Args: { p_tx_id: string; p_reason: string };
+        Returns: { ok: true; balance: number };
+      };
+      card_topup_list: {
+        Args: { p_from: string; p_to: string; p_q: string | null };
+        Returns: CardTopupRow[];
       };
       pos_void: {
         Args: { p_tx_id: string; p_reason: string };

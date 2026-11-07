@@ -14,6 +14,7 @@ import type {
   PinUnlockResult,
   Student,
   StudentQr,
+  CardTopupRow,
 } from "@/lib/database.types";
 import { compressImage } from "@/lib/image";
 import { supabase } from "@/lib/supabase";
@@ -190,6 +191,29 @@ export function usePosTopupCash() {
         }),
       ),
     onSettled: refresh,
+  });
+}
+
+/** Org-wide: top-ups in a Bangkok date range, optionally filtered by name / student code. */
+export function useTopupList(from: string, to: string, q: string) {
+  return useQuery({
+    queryKey: ["card_transactions", "topup_list", from, to, q],
+    enabled: !!from && !!to && from <= to,
+    queryFn: () => rpc<CardTopupRow[]>(() => supabase.rpc("card_topup_list", { p_from: from, p_to: to, p_q: q.trim() || null })),
+  });
+}
+
+/** Org-wide void of a top-up of any age; the balance may go negative. A slip top-up also marks its slip 'voided'. */
+export function useVoidTopup() {
+  const refresh = useRefreshMoney();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (a: { tx_id: string; reason: string }) =>
+      rpc<{ balance: number }>(() => supabase.rpc("card_void_topup", { p_tx_id: a.tx_id, p_reason: a.reason })),
+    onSettled: () => {
+      refresh();
+      void qc.invalidateQueries({ queryKey: ["card_slip_requests"] });
+    },
   });
 }
 

@@ -207,7 +207,7 @@ export function ReportTab() {
                         {TX_TYPE_LABEL[v.type]} · {v.student_name}
                       </p>
                       <p className="text-base text-muted-foreground">
-                        {new Date(v.voided_at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })} · ยกเลิกโดย {v.cashier}
+                        {new Date(v.voided_at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })} · ยกเลิกโดย {v.voided_by_name ?? v.cashier}
                       </p>
                       <p className="mt-1 text-base">เหตุผล: {v.void_reason}</p>
                     </div>

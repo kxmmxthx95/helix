@@ -40,6 +40,7 @@ import { TerminalsTab } from "@/routes/CardTopupAdmin";
 import { ProductsTab } from "@/routes/CardTopupProducts";
 import { ReportTab } from "@/routes/CardTopupReport";
 import { SlipsTab } from "@/routes/CardTopupSlips";
+import { VoidTopupTab } from "@/routes/CardTopupVoid";
 
 const TERMINAL_KEY = "helix-pos-terminal";
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "ทำรายการไม่สำเร็จ");
@@ -55,6 +56,7 @@ const VIEWS = [
   { key: "sale", label: "ขายสินค้า", icon: CartIcon },
   { key: "topup", label: "เติมเงิน", icon: CoinIcon },
   { key: "slips", label: "อนุมัติสลิป", icon: CheckmarkCircleIcon },
+  { key: "void", label: "ยกเลิกรายการ", icon: AlertTriangle },
   { key: "report", label: "รายงาน", icon: BarChartIcon },
   { key: "products", label: "สินค้า", icon: BarcodeIcon },
   { key: "terminals", label: "เครื่องขาย", icon: DesktopIcon },
@@ -386,6 +388,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const adminView = (
     <div className="min-h-0 flex-1 overflow-y-auto p-4">
       {view === "slips" && <SlipsTab />}
+      {view === "void" && <VoidTopupTab />}
       {view === "report" && <ReportTab />}
       {view === "products" && <ProductsTab />}
       {view === "terminals" && <TerminalsTab />}

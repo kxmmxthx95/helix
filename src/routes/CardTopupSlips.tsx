@@ -10,11 +10,12 @@ import { cn } from "@/lib/utils";
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "ทำรายการไม่สำเร็จ");
 const when = (iso: string) => new Date(iso).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
-export const SLIP_STATUS_LABEL = { pending: "รออนุมัติ", approved: "อนุมัติแล้ว", rejected: "ไม่อนุมัติ" } as const;
+export const SLIP_STATUS_LABEL = { pending: "รออนุมัติ", approved: "อนุมัติแล้ว", rejected: "ไม่อนุมัติ", voided: "ยกเลิกแล้ว" } as const;
 const STATUS_BADGE = {
   pending: "bg-warning/15 text-[#a35a00] dark:text-warning",
   approved: "bg-success/15 text-success",
   rejected: "bg-destructive/10 text-destructive",
+  voided: "bg-destructive/10 text-destructive",
 } as const;
 
 type Filter = SlipRow["status"] | "all";
