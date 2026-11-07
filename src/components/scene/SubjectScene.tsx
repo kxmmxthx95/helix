@@ -60,7 +60,7 @@ function build(W: number, H: number, rows: SceneRow[], seed: string): Built {
   }
   const decor = placed.map((p) => ({ kind: pickKind(rand()), pos: g(p.x, p.y), rot: rand() * Math.PI * 2, scale: 0.8 + rand() * 0.45 }));
 
-  const m = 14;
+  const m = -80; // island runs past the canvas edges so the ground fills the whole view
   const island = [g(m, m), g(W - m, m), g(W - m, H - m), g(m, H - m)];
   return { tiles, decor, arches, island };
 }

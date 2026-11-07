@@ -52,16 +52,16 @@ const areaOf = (code: string) => AREA[code.trim().charAt(0)] ?? OTHER;
 /** Horizontal offsets (% of container width) for the winding path. */
 const OFFSETS = [0, 22, 30, 22, 0, -22, -30, -22];
 const ROW_H = 152;
+const SCENE_TOP = 60; // top bar height above the list in the full-bleed 3D view
 const chip = "inline-flex items-center rounded-full bg-secondary px-2.5 py-1 text-[13px] font-medium text-foreground";
-const coverChip = "inline-flex items-center rounded-full bg-white/20 px-2.5 py-1 text-[13px] font-medium text-white";
 const blueChip = "inline-flex items-center rounded-full bg-accent px-2.5 py-1 text-[13px] font-semibold text-accent-foreground";
 const ring = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 const topicCount = (lessons: { topics: unknown[] }[]) => lessons.reduce((n, l) => n + l.topics.length, 0);
 const teachersOf = (t: string[]) => [...new Set(t)].join(", ");
 
 /** Full-bleed page: cancels the shell's content padding (px-4 pb-4, lg:p-6) and follows the system theme. */
-function Zone({ children }: { children: React.ReactNode }) {
-  return <div className="-mx-4 -mb-4 min-h-full flex-1 overflow-x-hidden bg-background px-4 py-4 text-foreground lg:-m-6 lg:min-h-[calc(100%+3rem)] lg:p-6">{children}</div>;
+function Zone({ children, flush }: { children: React.ReactNode; flush?: boolean }) {
+  return <div className={cn("-mx-4 -mb-4 min-h-full flex-1 overflow-x-hidden bg-background text-foreground lg:-m-6 lg:min-h-[calc(100%+3rem)]", flush ? "flex flex-col" : "px-4 py-4 lg:p-6")}>{children}</div>;
 }
 
 /** Original decorative cover: area gradient + blurred orbs + diagonal stripes + a huge faint prefix letter. */
@@ -268,57 +268,54 @@ export function MyCurriculum() {
     const st = areaOf(open.code);
     const n = open.lessons.length;
     const lessonFiles = lesson ? lesson.files.flatMap((f) => (f.file ? [f.file] : [])) : [];
+    const full = rich && n > 0;
     return (
-      <Zone>
-      <div className="space-y-4">
-        <button
-          type="button"
-          onClick={() => setSubjectId("")}
-          className="-ml-1 inline-flex h-11 items-center gap-1 rounded-lg px-1 text-[17px] text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          <ChevronBack className="h-4 w-4" /> รายวิชาทั้งหมด
-        </button>
-        <div className="relative min-h-[200px] overflow-hidden rounded-3xl sm:min-h-[240px]">
-          <Cover s={open} />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-          <div className="relative flex min-h-[200px] flex-col justify-end p-5 text-white sm:min-h-[240px] sm:p-7">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-white/80">{labelOf(open)} · <span className="font-mono">{open.code}</span></div>
+      <Zone flush={full}>
+      <div className={full ? "relative flex min-h-full flex-1 flex-col bg-gradient-to-b from-[#0b2a2e] to-[#143b3a]" : "space-y-4"}>
+        {full && (
+          <SceneBoundary onError={() => setSceneFailed(true)}>
+            <Suspense fallback={null}>
+              <SubjectScene
+                seed={open.id}
+                theme={open.sceneTheme}
+                accent={GLOW[open.code.trim().charAt(0)] ?? "#8be0d0"}
+                rows={[...open.lessons, null].map((_, i) => ({ off: OFFSETS[i % OFFSETS.length] ?? 0, y: SCENE_TOP + i * ROW_H + 36 }))}
+              />
+            </Suspense>
+          </SceneBoundary>
+        )}
+        <div className={cn("flex items-center justify-between", full && "relative z-20 px-4 pt-4 lg:px-6")}>
+          <button
+            type="button"
+            onClick={() => setSubjectId("")}
+            className={cn("-ml-1 inline-flex h-11 items-center gap-1 rounded-lg px-1 text-[17px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent", full ? "text-white" : "text-accent")}
+          >
+            <ChevronBack className="h-4 w-4" /> รายวิชาทั้งหมด
+          </button>
+          {canRich && n > 0 && (
+            <button type="button" onClick={toggle} className={cn("h-9 rounded-full px-3.5 text-[13px] font-medium", full ? "bg-white/20 text-white" : "bg-secondary text-foreground", ring)}>
+              {rich ? "โหมดเบา" : "โหมดภาพสวย"}
+            </button>
+          )}
+        </div>
+        {!full && (
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{labelOf(open)} · <span className="font-mono">{open.code}</span></div>
             <h2 className="mt-1 text-[28px] font-bold leading-tight sm:text-[36px]">{open.name}</h2>
-            {open.teachers.length > 0 && <div className="mt-1 text-[14px] text-white/80">{teachersOf(open.teachers)}</div>}
+            {open.teachers.length > 0 && <div className="mt-1 text-[14px] text-muted-foreground">{teachersOf(open.teachers)}</div>}
             <div className="mt-3 flex flex-wrap gap-1.5">
-              <span className={n === 0 ? coverChip : blueChip}>{n === 0 ? "ยังไม่มีด่าน" : `${n} ด่าน`}</span>
-              <span className={coverChip}>{topicCount(open.lessons)} หัวข้อ</span>
+              <span className={n === 0 ? chip : blueChip}>{n === 0 ? "ยังไม่มีด่าน" : `${n} ด่าน`}</span>
+              <span className={chip}>{topicCount(open.lessons)} หัวข้อ</span>
             </div>
           </div>
-        </div>
+        )}
         {n === 0 ? (
           <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border px-6 py-12 text-center">
             <BookIcon className="h-8 w-8 text-muted-foreground" />
             <p className="text-[15px] text-muted-foreground">ยังไม่มีบทเรียนในผังการเรียน</p>
           </div>
         ) : (
-          <>
-            {canRich && (
-              <div className="flex justify-end">
-                <button type="button" onClick={toggle} className={cn("h-9 rounded-full bg-secondary px-3.5 text-[13px] font-medium text-foreground", ring)}>
-                  {rich ? "โหมดเบา" : "โหมดภาพสวย"}
-                </button>
-              </div>
-            )}
-            <div className={cn("relative mx-auto", rich && "max-w-3xl overflow-hidden rounded-3xl bg-gradient-to-b from-[#0b2a2e] to-[#143b3a]")}>
-              {rich && (
-                <SceneBoundary onError={() => setSceneFailed(true)}>
-                  <Suspense fallback={null}>
-                    <SubjectScene
-                      seed={open.id}
-                      theme={open.sceneTheme}
-                      accent={GLOW[open.code.trim().charAt(0)] ?? "#8be0d0"}
-                      rows={[...open.lessons, null].map((_, i) => ({ off: OFFSETS[i % OFFSETS.length] ?? 0, y: 16 + i * ROW_H + 36 }))}
-                    />
-                  </Suspense>
-                </SceneBoundary>
-              )}
-          <ol className={cn("relative mx-auto max-w-md pb-6", rich && "pt-4")}>
+          <ol className={cn("relative mx-auto w-full max-w-md pb-6", full && "pt-[60px]")}>
             {open.lessons.map((l, i) => {
               const off = OFFSETS[i % OFFSETS.length] ?? 0;
               const next = OFFSETS[(i + 1) % OFFSETS.length] ?? 0;
@@ -367,8 +364,6 @@ export function MyCurriculum() {
               </div>
             </li>
           </ol>
-            </div>
-          </>
         )}
         <Sheet open={!!lesson} onOpenChange={(o) => !o && setLevelId("")} closable title={lesson ? `ด่าน ${level + 1} · ${lesson.name}` : ""}>
           {lesson && (
