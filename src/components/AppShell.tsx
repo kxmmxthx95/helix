@@ -848,7 +848,7 @@ function AppShellInner() {
                           onClick={() => setNavOpen(false)}
                           className={navDrawerLink}
                         >
-                          <Icon className="h-[18px] w-[18px] shrink-0 text-muted-foreground group-aria-[current=page]:text-accent" />
+                          <Icon className="h-[18px] w-[18px] shrink-0" />
                           <span className="truncate">{label}</span>
                         </NavLink>
                       ))}
