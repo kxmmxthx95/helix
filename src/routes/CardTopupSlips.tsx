@@ -101,11 +101,6 @@ export function SlipsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="font-ui text-2xl font-semibold">อนุมัติสลิป</h2>
-        {counts.pending > 0 && <span className="rounded-full bg-warning/15 px-4 py-1.5 text-lg font-semibold text-[#a35a00] dark:text-warning">รอ {counts.pending} รายการ</span>}
-      </div>
-
       <div className="scrollbar-hidden flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="สถานะสลิป">
         {(
           [
