@@ -97,6 +97,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const mode: "sale" | "topup" = view === "topup" ? "topup" : "sale";
   const [topupAmount, setTopupAmount] = useState("");
   const [pinOpen, setPinOpen] = useState(false);
+  const [pinFor, setPinFor] = useState<"topup" | "void">("topup"); // what the PIN popup unlocks
   const [confirmOpen, setConfirmOpen] = useState(false);
   const topupKey = useRef(crypto.randomUUID());
   const topup = usePosTopupCash();
@@ -232,7 +233,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   // The top-up tab is behind the cashier PIN (valid an hour, server-side).
   function openTopup() {
     if (isUnlocked) setView("topup");
-    else setPinOpen(true);
+    else (setPinFor("topup"), setPinOpen(true));
   }
   async function confirmTopup() {
     if (!student || !terminal || topupValue === null) return;
@@ -256,6 +257,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
       // The hour ran out (or the lock was pressed elsewhere): ask for the PIN again.
       if (e instanceof Error && e.message.includes("PIN")) {
         setView("sale");
+        setPinFor("topup");
         setPinOpen(true);
       }
       toast(errMsg(e), "error");
@@ -388,7 +390,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const adminView = (
     <div className="min-h-0 flex-1 overflow-y-auto p-4">
       {view === "slips" && <SlipsTab />}
-      {view === "void" && <VoidTopupTab />}
+      {view === "void" && <VoidTopupTab unlocked={isUnlocked} onNeedPin={() => (setPinFor("void"), setPinOpen(true))} />}
       {view === "report" && <ReportTab />}
       {view === "products" && <ProductsTab />}
       {view === "terminals" && <TerminalsTab />}
@@ -690,8 +692,9 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         onClose={() => setPinOpen(false)}
         onUnlocked={() => {
           setPinOpen(false);
-          setView("topup");
+          if (pinFor === "topup") setView("topup");
         }}
+        forVoid={pinFor === "void"}
       />
       <Modal
         open={confirmOpen && !!student && topupValue !== null}
@@ -1021,7 +1024,7 @@ function ScannerTest() {
 
 /** PIN popup with an on-screen pad: one correct PIN unlocks cash top-up for an hour (the server keeps the proof).
  *  Six digits submit by themselves. First use sets the PIN: enter it, then enter it again. */
-function PinUnlockModal({ open, onClose, onUnlocked }: { open: boolean; onClose: () => void; onUnlocked: () => void }) {
+function PinUnlockModal({ open, onClose, onUnlocked, forVoid = false }: { open: boolean; onClose: () => void; onUnlocked: () => void; forVoid?: boolean }) {
   const { data: pinStatus } = usePinStatus();
   const unlock = usePinUnlock();
   const setPin = useSetPin();
@@ -1094,7 +1097,8 @@ function PinUnlockModal({ open, onClose, onUnlocked }: { open: boolean; onClose:
   }
 
   const settingUp = !hasPin;
-  const title = settingUp ? "ตั้ง PIN สำหรับเติมเงินสด" : "ใส่ PIN เพื่อเติมเงินสด";
+  const what = forVoid ? "ยกเลิกรายการ" : "เติมเงินสด";
+  const title = settingUp ? `ตั้ง PIN สำหรับ${what}` : `ใส่ PIN เพื่อ${what}`;
   const instruction = locked
     ? "ล็อกชั่วคราว"
     : settingUp

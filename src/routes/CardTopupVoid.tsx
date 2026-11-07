@@ -15,7 +15,7 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86400000).toLocaleDateS
 const when = (iso: string) => new Date(iso).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
 
 /** ยกเลิกรายการ — org-wide voids a past top-up (cash or slip) of any age. The balance may go negative; the student then cannot buy until topped up. */
-export function VoidTopupTab() {
+export function VoidTopupTab({ unlocked, onNeedPin }: { unlocked: boolean; onNeedPin: () => void }) {
   const [from, setFrom] = useState(() => daysAgo(6));
   const [to, setTo] = useState(() => daysAgo(0));
   const [text, setText] = useState("");
@@ -77,12 +77,12 @@ export function VoidTopupTab() {
       )}
       {rows.length >= 300 && <p className="text-center text-base text-muted-foreground">แสดง 300 รายการล่าสุด — ใช้ตัวกรองเพื่อจำกัดผลลัพธ์</p>}
 
-      {target && <VoidDialog row={target} onClose={() => setTarget(null)} />}
+      {target && <VoidDialog row={target} unlocked={unlocked} onNeedPin={onNeedPin} onClose={() => setTarget(null)} />}
     </div>
   );
 }
 
-function VoidDialog({ row, onClose }: { row: CardTopupRow; onClose: () => void }) {
+function VoidDialog({ row, unlocked, onNeedPin, onClose }: { row: CardTopupRow; unlocked: boolean; onNeedPin: () => void; onClose: () => void }) {
   const toast = useToast();
   const voidTopup = useVoidTopup();
   const { data: bal } = usePortalSummary(row.student_id);
@@ -91,12 +91,15 @@ function VoidDialog({ row, onClose }: { row: CardTopupRow; onClose: () => void }
 
   async function confirm() {
     if (!reason.trim()) return;
+    if (!unlocked) return onNeedPin(); // PIN popup; press confirm again once unlocked
     try {
       const r = await voidTopup.mutateAsync({ tx_id: row.id, reason: reason.trim() });
       toast(`ยกเลิกแล้ว · ยอดคงเหลือ ${formatBaht(r.balance)} ฿`);
       onClose();
     } catch (e) {
-      toast(errMsg(e), "error");
+      // The unlock hour ran out on the server: ask for the PIN again.
+      if (e instanceof Error && e.message.includes("PIN")) onNeedPin();
+      else toast(errMsg(e), "error");
     }
   }
 
@@ -112,7 +115,7 @@ function VoidDialog({ row, onClose }: { row: CardTopupRow; onClose: () => void }
             ปิด
           </Button>
           <Button variant="destructive" className="flex-1" disabled={!reason.trim() || voidTopup.isPending} onClick={() => void confirm()}>
-            ยืนยันยกเลิก
+            {unlocked ? "ยืนยันยกเลิก" : "ใส่ PIN เพื่อยกเลิก"}
           </Button>
         </div>
       }
