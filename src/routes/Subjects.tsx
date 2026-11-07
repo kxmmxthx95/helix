@@ -2,6 +2,7 @@ import { FileUp, Plus, Search, SlidersHorizontal, X } from "@/components/icons";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { useFocusDrag } from "@/components/BannerAdjust";
+import { DEFAULT_SCENE_THEME, SCENE_THEMES } from "@/components/scene/themes";
 import { ImportSubjectsSheet } from "@/components/ImportSubjectsSheet";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -663,6 +664,8 @@ function EditSubjectSheet({
   const [coverFocus, setCoverFocus] = useState<{ x: number; y: number } | undefined>(undefined);
   const savedFocus = target && target !== "new" ? { x: target.cover_focus_x, y: target.cover_focus_y } : { x: 50, y: 50 };
   const focus = coverFocus ?? savedFocus;
+  const [sceneTheme, setSceneTheme] = useState<string | undefined>(undefined);
+  const savedTheme = target && target !== "new" ? target.scene_theme : DEFAULT_SCENE_THEME;
   const coverDrag = useFocusDrag(focus, setCoverFocus);
 
   const canAddLearningArea = me ? isOrgWide(me.roles) : false;
@@ -694,6 +697,7 @@ function EditSubjectSheet({
     setCover(undefined);
     setCoverPreview(undefined);
     setCoverFocus(undefined);
+    setSceneTheme(undefined);
   }, [target]);
 
   const selectedArea = learningAreas.find((a) => a.id === current?.learning_area_id);
@@ -714,7 +718,7 @@ function EditSubjectSheet({
     if (!current) return;
     if (!current.learning_area_id || !current.subject_type) return;
     save.mutate(
-      { ...current, ...(isNew ? {} : { id: (target as Subject).id }), ...(canSetCover ? { cover, coverFocus } : {}) },
+      { ...current, ...(isNew ? {} : { id: (target as Subject).id }), ...(canSetCover ? { cover, coverFocus, sceneTheme } : {}) },
       {
         onSuccess: () => toast("บันทึกวิชาสำเร็จ"),
         onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
@@ -792,6 +796,18 @@ function EditSubjectSheet({
                   </div>
                 );
               })()}
+            </Field>
+          )}
+
+          {canSetCover && (
+            <Field label="ธีมฉากด่าน">
+              <Select value={sceneTheme ?? savedTheme} onChange={(e) => setSceneTheme(e.target.value)}>
+                {Object.entries(SCENE_THEMES).map(([key, t]) => (
+                  <option key={key} value={key}>
+                    {t.label}
+                  </option>
+                ))}
+              </Select>
             </Field>
           )}
 

@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { useRef, useState } from "react";
+import { Component, lazy, Suspense, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { BookIcon, CheckmarkCircleIcon, ChevronBack, ChevronForward, DocumentTextIcon, DownloadIcon, RibbonIcon, Search } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
@@ -12,8 +12,27 @@ import { downloadDocFile } from "@/hooks/useDocuments";
 import { useMyCurrentClassroom } from "@/hooks/useExams";
 import { openDocFile } from "@/hooks/usePlan";
 import { useDepartments } from "@/hooks/useProfiles";
+import { useSceneMode } from "@/lib/sceneMode";
 import { cn } from "@/lib/utils";
 
+
+// 3D scene is its own chunk (three.js) — only fetched when a student opens a subject in rich mode.
+const SubjectScene = lazy(() => import("@/components/scene/SubjectScene"));
+/** Glow colour per area prefix for the 3D scene. */
+const GLOW: Record<string, string> = { ท: "#ff6fae", ค: "#4b9bff", ว: "#2de0b5", ส: "#ffb347", พ: "#9be15d", ศ: "#c58bff", ง: "#ff8a6a", อ: "#a98bff", ก: "#94a3b8" };
+/** WebGL can fail after the probe passed (context limits, driver bugs) — report it so the page falls back to lite. */
+class SceneBoundary extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch() {
+    this.props.onError();
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 type AreaStyle = { label: string; card: string; node: string };
 const AREA: Record<string, AreaStyle> = {
@@ -203,6 +222,9 @@ export function MyCurriculum() {
     classroom?.classroomId,
   );
   const [subjectId, setSubjectId] = useState("");
+  const { mode, canRich, toggle } = useSceneMode();
+  const [sceneFailed, setSceneFailed] = useState(false);
+  const rich = mode === "rich" && !sceneFailed;
   const subjects = rooms[0]?.subjects ?? [];
   const open = subjects.find((s) => s.id === subjectId);
   const level = open?.lessons.findIndex((l) => l.id === levelId) ?? -1;
@@ -275,7 +297,28 @@ export function MyCurriculum() {
             <p className="text-[15px] text-muted-foreground">ยังไม่มีบทเรียนในผังการเรียน</p>
           </div>
         ) : (
-          <ol className="mx-auto max-w-md pb-6">
+          <>
+            {canRich && (
+              <div className="flex justify-end">
+                <button type="button" onClick={toggle} className={cn("h-9 rounded-full bg-secondary px-3.5 text-[13px] font-medium text-foreground", ring)}>
+                  {rich ? "โหมดเบา" : "โหมดภาพสวย"}
+                </button>
+              </div>
+            )}
+            <div className={cn("relative mx-auto", rich && "max-w-3xl overflow-hidden rounded-3xl bg-gradient-to-b from-[#0b2a2e] to-[#143b3a]")}>
+              {rich && (
+                <SceneBoundary onError={() => setSceneFailed(true)}>
+                  <Suspense fallback={null}>
+                    <SubjectScene
+                      seed={open.id}
+                      theme={open.sceneTheme}
+                      accent={GLOW[open.code.trim().charAt(0)] ?? "#8be0d0"}
+                      rows={[...open.lessons, null].map((_, i) => ({ off: OFFSETS[i % OFFSETS.length] ?? 0, y: 16 + i * ROW_H + 36 }))}
+                    />
+                  </Suspense>
+                </SceneBoundary>
+              )}
+          <ol className={cn("relative mx-auto max-w-md pb-6", rich && "pt-4")}>
             {open.lessons.map((l, i) => {
               const off = OFFSETS[i % OFFSETS.length] ?? 0;
               const next = OFFSETS[(i + 1) % OFFSETS.length] ?? 0;
@@ -289,9 +332,9 @@ export function MyCurriculum() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(i, 8) * 0.04, duration: 0.25 }}
                 >
-                  <svg aria-hidden className="absolute left-0 z-0 w-full text-foreground/25" style={{ top: 36, height: ROW_H }} viewBox="0 0 100 100" preserveAspectRatio="none">
+                  {!rich && <svg aria-hidden className="absolute left-0 z-0 w-full text-foreground/25" style={{ top: 36, height: ROW_H }} viewBox="0 0 100 100" preserveAspectRatio="none">
                     <path d={`M ${50 + off} 0 C ${50 + off} 50, ${50 + next} 50, ${50 + next} 100`} fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="1 8" vectorEffect="non-scaling-stroke" />
-                  </svg>
+                  </svg>}
                   <div className="absolute top-0 z-10 flex w-40 -translate-x-1/2 flex-col items-center" style={{ left: `${50 + off}%` }}>
                     <button
                       type="button"
@@ -324,6 +367,8 @@ export function MyCurriculum() {
               </div>
             </li>
           </ol>
+            </div>
+          </>
         )}
         <Sheet open={!!lesson} onOpenChange={(o) => !o && setLevelId("")} closable title={lesson ? `ด่าน ${level + 1} · ${lesson.name}` : ""}>
           {lesson && (
