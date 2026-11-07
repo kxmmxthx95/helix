@@ -354,6 +354,18 @@ export function useMyCardStudents() {
 }
 
 export function usePortalSummary(studentId: string | null) {
+  const qc = useQueryClient();
+  // A top-up/sale/void on this student's ledger refreshes balance + history without a reload (RLS filters what we receive).
+  useEffect(() => {
+    if (!studentId) return;
+    const channel = supabase
+      .channel(`card_tx_${studentId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "card_transactions", filter: `student_id=eq.${studentId}` }, () =>
+        void qc.invalidateQueries({ queryKey: ["card_transactions"] }),
+      )
+      .subscribe();
+    return () => void supabase.removeChannel(channel);
+  }, [studentId, qc]);
   return useQuery({
     queryKey: ["card_transactions", "summary", studentId],
     enabled: !!studentId,
