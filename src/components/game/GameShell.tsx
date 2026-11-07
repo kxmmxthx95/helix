@@ -87,7 +87,7 @@ export function GameShell() {
 }
 
 function GameShellInner() {
-  const { actualRoles, viewAsRole, setViewAsRole } = useAuth();
+  const { actualRoles, viewAsRole, setViewAsRole, signOut } = useAuth();
   const { online } = useOutboxSync();
   const location = useLocation();
   const navigate = useNavigate();
@@ -207,6 +207,20 @@ function GameShellInner() {
                 {label}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                void signOut();
+              }}
+              className={cn(
+                "flex items-center gap-3 rounded-xl px-3 py-3 text-left text-[15px] font-medium text-destructive active:bg-destructive/10",
+                FOCUS,
+              )}
+            >
+              <LogOut className="h-5 w-5 shrink-0" />
+              ออกจากระบบ
+            </button>
           </nav>
         </Sheet>
 
