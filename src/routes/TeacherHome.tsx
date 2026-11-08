@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { profileFullName, type Profile, type ProfileWithRoles } from "@/lib/database.types";
-import { ChevronForward, LockIcon, PaletteIcon } from "@/components/icons";
+import { BarChartIcon, ChevronForward, LockIcon, PaletteIcon } from "@/components/icons";
 import { BannerUpload } from "@/components/BannerUpload";
 import { BannerAdjustOverlay, useBannerAdjust } from "@/components/BannerAdjust";
 import { Modal } from "@/components/Modal";
@@ -27,6 +27,7 @@ import { supabase } from "@/lib/supabase";
 import { cn, todayIso } from "@/lib/utils";
 import { AssemblyAttendanceSheet } from "@/routes/AssemblyAttendanceSheet";
 import { LineLinkCard } from "@/routes/Profile";
+import { StaffClockStatsSheet } from "@/routes/StaffClockStatsSheet";
 import { PeriodDaySheet, type DayPeriod, type SheetDay } from "@/routes/PeriodDaySheet";
 import { bangkokTime } from "@/routes/TimeTracking";
 import { TeacherTimetable } from "@/routes/Timetable";
@@ -116,6 +117,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const [lineOpen, setLineOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [clockOpen, setClockOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const [assemblyOpen, setAssemblyOpen] = useState(false);
   const [periodsOpen, setPeriodsOpen] = useState(false);
   const setLeaveStatus = useSetStudentLeaveStatus();
@@ -392,6 +394,23 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         </button>
       );
     }
+    if ("clock" in t) {
+      return (
+        <div key={t.title} className="relative">
+          <button type="button" disabled={t.disabled || t.busy} onClick={t.onClick} className={cn(cls, "w-full pr-4 disabled:opacity-60")}>
+            {body}
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatsOpen(true)}
+            aria-label="ดูสถิติ"
+            className="absolute right-[4.25rem] top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 border-accent text-accent transition-transform active:scale-95"
+          >
+            <BarChartIcon className="h-4 w-4" />
+          </button>
+        </div>
+      );
+    }
     return "onClick" in t ? (
       <button key={t.title} type="button" disabled={t.disabled || t.busy} onClick={t.onClick} className={cn(cls, "disabled:opacity-60")}>
         {body}
@@ -555,6 +574,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
       <Modal open={lineOpen} onOpenChange={setLineOpen} title="เชื่อมต่อไลน์">
         <LineLinkCard />
       </Modal>
+      <StaffClockStatsSheet open={statsOpen} onOpenChange={setStatsOpen} me={me} />
       <Modal open={clockOpen} onOpenChange={setClockOpen} title="ลงเวลาวันนี้">
         <dl className="grid grid-cols-2 gap-3 text-center">
           <div className="rounded-xl bg-muted p-4">

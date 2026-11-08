@@ -1093,9 +1093,39 @@ const STATUS_CELL: Record<AttendanceStatus, string> = {
 };
 const WEEKDAYS = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 
+type AcademicEventRow = NonNullable<ReturnType<typeof useAcademicEvents>["data"]>[number];
+type MonthSource = {
+  data?: { date: string; status: AttendanceStatus | null }[];
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => unknown;
+};
+
 export function AttendanceSummarySection({ student }: { student: Student }) {
+  return (
+    <AttendanceMonthView
+      departmentId={student.department_id}
+      useRecords={(startDate, endDate) => useAttendanceRange({ studentId: student.id, startDate, endDate })}
+      holiday={(iso, events) =>
+        events.find((e) => !e.students_attend && (e.departmentIds.length === 0 || e.departmentIds.includes(student.department_id)) && iso >= e.start_date && iso <= e.end_date)?.name ?? null
+      }
+    />
+  );
+}
+
+/** Month calendar + status counts. Shared by the student attendance panel and the staff clock stats sheet. */
+export function AttendanceMonthView({
+  departmentId,
+  useRecords,
+  holiday,
+}: {
+  departmentId: string | null;
+  useRecords: (startDate: string, endDate: string) => MonthSource;
+  /** Name of the closure covering `iso` for this audience, else null. */
+  holiday: (iso: string, events: AcademicEventRow[]) => string | null;
+}) {
   // Months are browsable within the department's active term; without term dates only the current month shows.
-  const { data: term } = useActiveTerm(student.department_id);
+  const { data: term } = useActiveTerm(departmentId);
   const thisMonth = currentMonthRange().start.slice(0, 7);
   const bounds = term?.start_date && term.end_date ? [term.start_date.slice(0, 7), term.end_date.slice(0, 7)] : null;
   const [picked, setPicked] = useState<string | null>(null);
@@ -1105,20 +1135,16 @@ export function AttendanceSummarySection({ student }: { student: Student }) {
   const shift = (d: number) => setPicked(new Date(Date.UTC(year, month - 1 + d, 1)).toISOString().slice(0, 7));
   const start = `${ym}-01`;
   const end = `${ym}-${pad(new Date(Date.UTC(year, month, 0)).getUTCDate())}`;
-  const { data, isLoading, isError, refetch } = useAttendanceRange({
-    studentId: student.id,
-    startDate: start,
-    endDate: end,
-  });
+  const { data, isLoading, isError, refetch } = useRecords(start, end);
   const { data: events = [] } = useAcademicEvents();
-  const closed = events.filter((e) => !e.students_attend && (e.departmentIds.length === 0 || e.departmentIds.includes(student.department_id)));
   // Outside the active term (ปิดเทอม) counts as closed too.
-  const closedOn = (iso: string): { name: string } | undefined =>
-    term?.start_date && term.end_date && (iso < term.start_date || iso > term.end_date)
-      ? { name: "ปิดเทอม" }
-      : closed.find((e) => iso >= e.start_date && iso <= e.end_date);
-  // Holiday wins over a stray record: not shown, not counted.
-  const records = (data ?? []).filter((r) => !closedOn(r.date));
+  const closedOn = (iso: string): { name: string } | undefined => {
+    if (term?.start_date && term.end_date && (iso < term.start_date || iso > term.end_date)) return { name: "ปิดเทอม" };
+    const name = holiday(iso, events);
+    return name ? { name } : undefined;
+  };
+  // Holiday wins over a stray record: not shown, not counted. Pending (null) rows aren't a status yet.
+  const records = (data ?? []).filter((r): r is typeof r & { status: AttendanceStatus } => !!r.status && !closedOn(r.date));
   const counts = summarizeAttendance(records);
   const byDate = new Map(records.map((r) => [r.date, r.status]));
   const offset = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();

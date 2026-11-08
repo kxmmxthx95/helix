@@ -41,6 +41,7 @@ export function Sheet({
   wide = false,
   side = "right",
   resizable = false,
+  bottomOnPhone = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -68,11 +69,13 @@ export function Sheet({
   side?: "left" | "right";
   /** Adds a header button letting the user toggle between wide and full-screen. Only useful when `wide` is `true` or `"full"`. */
   resizable?: boolean;
+  /** Phones (< lg): open as a bottom card sheet even outside the student portal. */
+  bottomOnPhone?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const effectiveWide = resizable ? (expanded ? "full" : true) : wide;
   const phone = usePhone();
-  const ios = useContext(SheetStyleContext) === "ios" && phone;
+  const ios = (useContext(SheetStyleContext) === "ios" || bottomOnPhone) && phone;
 
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange} direction={ios ? "bottom" : side}>
