@@ -3,17 +3,23 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import App from "@/App";
+import { applyIfIdle } from "@/lib/swUpdate";
 import "@/index.css";
 
-// autoUpdate: a new service worker activates and reloads the page by itself.
-// The browser only re-checks sw.js on navigation, so poll for long-lived tabs / installed PWAs.
-registerSW({
+// registerType "prompt": new SW waits; we activate + reload it ourselves, only when idle
+// (see applyIfIdle). Browser only re-checks sw.js on navigation, so also poll.
+const updateSW = registerSW({
   immediate: true,
   onRegisteredSW(_url, reg) {
     if (!reg) return;
-    const check = () => void reg.update().catch(() => {});
-    setInterval(check, 30 * 60 * 1000);
-    document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && check());
+    const apply = () => void updateSW(true);
+    let hiddenAt = 0;
+    void applyIfIdle(reg, Infinity, apply); // cold start
+    setInterval(() => void reg.update().catch(() => {}), 30 * 60 * 1000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") hiddenAt = Date.now();
+      else if (hiddenAt) void applyIfIdle(reg, Date.now() - hiddenAt, apply);
+    });
   },
 });
 

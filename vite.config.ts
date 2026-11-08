@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      registerType: "prompt",
       includeAssets: ["favicon.png", "apple-touch-icon.png"],
       manifest: {
         name: "Helix",
@@ -37,6 +37,8 @@ export default defineConfig({
         // Allow large vendor chunks (e.g. three) in the precache manifest.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        // 3D map models/textures (public/models) are fetched on demand, never precached on every device.
+        globIgnores: ["models/**"],
         // Cache-as-you-go: Supabase reads served stale-while-revalidate so the
         // app still renders offline. Writes go through the outbox, not here.
         runtimeCaching: [
