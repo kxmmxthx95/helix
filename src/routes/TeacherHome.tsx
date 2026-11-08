@@ -5,6 +5,7 @@ import { profileFullName, type Profile, type ProfileWithRoles } from "@/lib/data
 import { BarChartIcon, ChevronForward, LockIcon, PaletteIcon } from "@/components/icons";
 import { BannerUpload } from "@/components/BannerUpload";
 import { BannerAdjustOverlay, useBannerAdjust } from "@/components/BannerAdjust";
+import { HoldButton } from "@/components/HoldButton";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { Avatar, Spinner } from "@/components/ui";
@@ -317,17 +318,20 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     );
   }
 
+  // Hold-to-confirm guards the irreversible in/out punch; null while locked or already clocked out.
+  const clockHold = !clock?.clock_out_time && !clockLock ? (clock?.clock_in_time ? "ออกงาน" : "เข้างาน") : null;
   const tiles = [
     ...(showClock
       ? [
           {
             clock: true,
       title: clock?.clock_out_time ? "ลงเวลาแล้ว" : clock?.clock_in_time ? "ออกงาน" : "เข้างาน",
-            text: (clock?.clock_in_time && clockLock ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}\n${clockLock}` : clockLock) ?? (clock?.clock_out_time
+            hold: clockHold,
+            text: ((clock?.clock_in_time && clockLock ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}\n${clockLock}` : clockLock) ?? (clock?.clock_out_time
                 ? `เข้า ${bangkokTime(clock.clock_in_time ?? clock.clock_out_time)} · ออก ${bangkokTime(clock.clock_out_time)}`
                 : clock?.clock_in_time
                   ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}`
-                  : "ยังไม่ได้บันทึกเวลาเข้างาน"),
+                  : "ยังไม่ได้บันทึกเวลาเข้างาน")) + (clockHold ? ` · กดค้างเพื่อ${clockHold}` : ""),
             busy: clockIn.isPending || clockOut.isPending,
             disabled: loadingClock || !!clockLock,
             locked: !!clockLock,
@@ -397,9 +401,20 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     if ("clock" in t) {
       return (
         <div key={t.title} className="relative">
-          <button type="button" disabled={t.disabled || t.busy} onClick={t.onClick} className={cn(cls, "w-full pr-4 disabled:opacity-60")}>
-            {body}
-          </button>
+          {t.hold ? (
+            <HoldButton
+              disabled={t.disabled || t.busy}
+              onConfirm={t.onClick}
+              onEarly={() => toast("กดค้างไว้เพื่อลงเวลา")}
+              className={cn(cls, "w-full disabled:opacity-60")}
+            >
+              {body}
+            </HoldButton>
+          ) : (
+            <button type="button" disabled={t.disabled || t.busy} onClick={t.onClick} className={cn(cls, "w-full disabled:opacity-60")}>
+              {body}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setStatsOpen(true)}
