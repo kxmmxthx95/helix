@@ -1,5 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+
+const HoldWater = lazy(() => import("@/components/HoldWater"));
+
+// WebGL water unless unavailable or the user asked for less motion; then a flat tint fill is used.
+function useWater() {
+  const [ok] = useState(() => {
+    if (typeof document === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
+    const c = document.createElement("canvas");
+    return !!(c.getContext("webgl2") ?? c.getContext("webgl"));
+  });
+  return ok;
+}
 
 /**
  * Press-and-hold to confirm (pointer or Enter/Space). A tint fills the button over `ms`;
@@ -21,6 +33,8 @@ export function HoldButton({
   children: React.ReactNode;
 }) {
   const [holding, setHolding] = useState(false);
+  const [burst, setBurst] = useState(0); // bumps on completion so the water can ripple
+  const water = useWater();
   const timer = useRef<number | null>(null);
 
   const stop = (early: boolean) => {
@@ -37,6 +51,7 @@ export function HoldButton({
       timer.current = null;
       setHolding(false);
       navigator.vibrate?.(30);
+      setBurst((b) => b + 1);
       onConfirm();
     }, ms);
   };
@@ -60,15 +75,23 @@ export function HoldButton({
       onBlur={() => stop(false)}
       className={cn("relative select-none overflow-hidden [-webkit-touch-callout:none]", className)}
     >
-      <span
-        aria-hidden
-        className={cn(
-          "absolute inset-0 origin-left bg-accent/15 ease-linear motion-reduce:hidden",
-          holding ? "scale-x-100 transition-transform" : "scale-x-0 transition-transform duration-200",
-        )}
-        style={holding ? { transitionDuration: `${ms}ms` } : undefined}
-      />
-      {holding && <span className="absolute right-16 top-2 hidden text-xs text-accent motion-reduce:block">กำลังบันทึก…</span>}
+      {water ? (
+        <span aria-hidden className="pointer-events-none absolute inset-0">
+          <Suspense fallback={null}>
+            <HoldWater holding={holding} burst={burst} ms={ms} />
+          </Suspense>
+        </span>
+      ) : (
+        <span
+          aria-hidden
+          className={cn(
+            "absolute inset-0 origin-left bg-accent/15 ease-linear motion-reduce:hidden",
+            holding ? "scale-x-100 transition-transform" : "scale-x-0 transition-transform duration-200",
+          )}
+          style={holding ? { transitionDuration: `${ms}ms` } : undefined}
+        />
+      )}
+      {holding && !water && <span className="absolute right-16 top-2 hidden text-xs text-accent motion-reduce:block">กำลังบันทึก…</span>}
       <span className="relative flex w-full items-center gap-3">{children}</span>
     </button>
   );

@@ -404,7 +404,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           {t.hold ? (
             <HoldButton
               disabled={t.disabled || t.busy}
-              onConfirm={t.onClick}
+              onConfirm={() => t.onClick?.()}
               onEarly={() => toast("กดค้างไว้เพื่อลงเวลา")}
               className={cn(cls, "w-full disabled:opacity-60")}
             >
