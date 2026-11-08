@@ -209,17 +209,6 @@ const TABS = [
     hideFromStudent: true,
   },
   {
-    to: "/teaching-plan-overview",
-    label: "ภาพรวมแผนการสอน",
-    icon: ClipboardIcon,
-    section: "การสอนและห้องเรียน",
-    managerOnly: false,
-    orgWideOnly: false,
-    deptManagerOnly: false,
-    academicManagerOnly: true,
-    teacherOrManagerOnly: false,
-  },
-  {
     to: "/score-recording",
     label: "บันทึกคะแนน",
     icon: DocumentTextIcon,

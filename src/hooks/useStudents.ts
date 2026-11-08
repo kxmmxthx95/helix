@@ -131,18 +131,9 @@ export function useSaveStudent() {
       if (error) throw error;
       if (!avatar) return data.id;
       if (avatar === "remove") {
-        const { data: removed, error: rmErr } = await supabase
-          .from("students")
-          .update({ avatar_path: null })
-          .eq("id", data.id)
-          .select("profile_id")
-          .single();
+        const { error: rmErr } = await supabase.from("students").update({ avatar_path: null }).eq("id", data.id);
         if (rmErr) throw rmErr;
-        // The roster falls back to the linked login's photo, so "remove" must clear that one too.
-        if (removed.profile_id) {
-          const { error: pErr } = await supabase.from("profiles").update({ avatar_path: null }).eq("id", removed.profile_id);
-          if (pErr) throw pErr;
-        }
+        // The linked login's avatar_path is cleared by the students_sync_avatar_to_profile trigger (0141).
         return data.id;
       }
       const path = `students/${data.id}`;
@@ -150,18 +141,8 @@ export function useSaveStudent() {
         .from("avatars")
         .upload(path, await compressImage(avatar), { upsert: true, contentType: "image/jpeg" });
       if (upErr) throw upErr;
-      const { data: saved, error: pathErr } = await supabase
-        .from("students")
-        .update({ avatar_path: path })
-        .eq("id", data.id)
-        .select("profile_id")
-        .single();
+      const { error: pathErr } = await supabase.from("students").update({ avatar_path: path }).eq("id", data.id);
       if (pathErr) throw pathErr;
-      // Every other page shows the linked login's photo (profiles.avatar_path), so point it at the same file.
-      if (saved.profile_id) {
-        const { error: pErr } = await supabase.from("profiles").update({ avatar_path: path }).eq("id", saved.profile_id);
-        if (pErr) throw pErr;
-      }
       return data.id;
     },
     onSettled: (_id, _err, vars) => {

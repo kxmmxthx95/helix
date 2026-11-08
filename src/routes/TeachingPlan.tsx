@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronForward, Plus } from "@/components/icons";
 import { Button, Card, EmptyState, Field, Input, Skeleton, Spinner } from "@/components/ui";
@@ -18,9 +19,46 @@ import {
   useUpdatePlanUnit,
 } from "@/hooks/useTeachingPlan";
 import type { TeachingAssignment, TeachingPlanUnit } from "@/lib/database.types";
+import { canManageAcademic } from "@/lib/roles";
 import { cn } from "@/lib/utils";
+import { TeachingPlanOverview } from "@/routes/TeachingPlanOverview";
+
+const TABS = [
+  { id: "mine", label: "แผนของฉัน" },
+  { id: "overview", label: "ภาพรวม" },
+] as const;
 
 export function TeachingPlan() {
+  const { profile: me } = useAuth();
+  const [params, setParams] = useSearchParams();
+  if (!me) return null;
+  if (!canManageAcademic(me.roles)) return <MyTeachingPlan />;
+  const tab = params.get("tab") === "mine" ? "mine" : "overview";
+  return (
+    <div className="page-fill">
+      <div className="flex shrink-0 gap-0 border-b border-border" role="tablist">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setParams({ tab: t.id }, { replace: true })}
+            className={cn(
+              "inline-flex h-8 min-w-0 flex-1 items-center justify-center border-b-2 px-3 text-xs font-medium transition-colors -mb-px",
+              tab === t.id ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === "mine" ? <MyTeachingPlan /> : <TeachingPlanOverview />}
+    </div>
+  );
+}
+
+function MyTeachingPlan() {
   const { profile: me } = useAuth();
   const departmentId = me?.department_id ?? null;
   const { data: assignments = [], isLoading } = useMyTeachingAssignments(me?.id ?? null);

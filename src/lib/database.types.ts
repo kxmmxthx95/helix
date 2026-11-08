@@ -1866,8 +1866,6 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
-      student_lifetime_exp: {
-        Args: Record<string, never>;
       attendance_duties: {
         Args: { p_profile: string; p_date: string };
         Returns: { classroom_id: string | null; schedule_entry_id: string | null; label: string; period_no: number | null }[];
@@ -1889,6 +1887,8 @@ export type Database = {
           subject_name: string | null;
         }[];
       };
+      student_lifetime_exp: {
+        Args: Record<string, never>;
         Returns: {
           sub_on_time: number;
           sub_late: number;
