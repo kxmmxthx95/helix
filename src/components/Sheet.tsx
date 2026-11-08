@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 /** "ios" (student portal): phones get an iPhone-style bottom card sheet with a grabber instead of the side drawer. */
 export const SheetStyleContext = createContext<"drawer" | "ios">("drawer");
 
-function usePhone() {
+/** True below the lg breakpoint (phones and tablets). */
+export function usePhone() {
   const q = "(max-width: 1023px)";
   const [phone, setPhone] = useState(() => typeof window !== "undefined" && window.matchMedia(q).matches);
   useEffect(() => {

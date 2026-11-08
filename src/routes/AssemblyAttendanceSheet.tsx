@@ -111,6 +111,7 @@ export function AssemblyAttendanceSheet({
     <Sheet
       open={open}
       onOpenChange={onOpenChange}
+      bottomOnPhone
       title={new Intl.DateTimeFormat("th-TH", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`))}
       headerEnd={
         classroom && (

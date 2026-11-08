@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { profileFullName, type Profile, type ProfileWithRoles } from "@/lib/database.types";
-import { BarChartIcon, ChevronForward, LockIcon, PaletteIcon } from "@/components/icons";
+import { BarChartIcon, CheckmarkCircleIcon, ChevronForward, DocumentTextIcon, LockIcon, PaletteIcon } from "@/components/icons";
 import { BannerUpload } from "@/components/BannerUpload";
 import { BannerAdjustOverlay, useBannerAdjust } from "@/components/BannerAdjust";
 import { HoldButton } from "@/components/HoldButton";
+import { NewLeaveSheet } from "@/routes/NewLeaveSheet";
 import { Modal } from "@/components/Modal";
+import { Sheet, usePhone } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Avatar, Spinner } from "@/components/ui";
 import { useActiveAcademicYear, useActiveTerm, useAcademicEvents } from "@/hooks/useAcademicTerms";
@@ -116,7 +118,10 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const adjust = useBannerAdjust(me);
   const [timetableOpen, setTimetableOpen] = useState(false);
   const [lineOpen, setLineOpen] = useState(false);
+  const phone = usePhone();
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [newLeaveOpen, setNewLeaveOpen] = useState(false);
+  const [leaveRevealed, setLeaveRevealed] = useState(false);
   const [clockOpen, setClockOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [assemblyOpen, setAssemblyOpen] = useState(false);
@@ -346,7 +351,8 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
       busy: false,
       disabled: false,
       badge: pendingLeave.length,
-      onClick: () => setLeaveOpen(true),
+      reveal: true,
+      onClick: () => setLeaveRevealed((v) => !v),
     },
     {
       title: "เช็คชื่อเข้าแถว",
@@ -422,6 +428,36 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
             className="absolute right-[4.25rem] top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 border-accent text-accent transition-transform active:scale-95"
           >
             <BarChartIcon className="h-4 w-4" />
+          </button>
+        </div>
+      );
+    }
+    if ("reveal" in t) {
+      const act = (open: () => void) => () => {
+        setLeaveRevealed(false);
+        open();
+      };
+      const actionCls = "flex w-20 flex-col items-center justify-center gap-1 text-xs font-medium text-white";
+      return (
+        <div key={t.title} className="relative h-full overflow-hidden rounded-2xl">
+          {leaveRevealed && <button type="button" aria-label="ปิด" tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setLeaveRevealed(false)} />}
+          <div className={cn("absolute inset-y-0 right-0 z-20 flex transition-[visibility] duration-[250ms]", !leaveRevealed && "invisible")}>
+            <button type="button" tabIndex={leaveRevealed ? 0 : -1} onClick={act(() => setLeaveOpen(true))} className={cn(actionCls, "bg-neutral-600")}>
+              <CheckmarkCircleIcon className="h-6 w-6" />
+              รออนุมัติ
+            </button>
+            <button type="button" tabIndex={leaveRevealed ? 0 : -1} onClick={act(() => setNewLeaveOpen(true))} className={cn(actionCls, "bg-accent")}>
+              <DocumentTextIcon className="h-6 w-6" />
+              ยื่นคำลา
+            </button>
+          </div>
+          <button
+            type="button"
+            aria-expanded={leaveRevealed}
+            onClick={t.onClick}
+            className={cn(cls, "z-20 w-full transition-transform duration-[250ms] ease-out motion-reduce:transition-none", leaveRevealed && "-translate-x-40")}
+          >
+            {body}
           </button>
         </div>
       );
@@ -589,6 +625,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
       <Modal open={lineOpen} onOpenChange={setLineOpen} title="เชื่อมต่อไลน์">
         <LineLinkCard />
       </Modal>
+      <NewLeaveSheet profileId={me.id} open={newLeaveOpen} onOpenChange={setNewLeaveOpen} />
       <StaffClockStatsSheet open={statsOpen} onOpenChange={setStatsOpen} me={me} />
       <Modal open={clockOpen} onOpenChange={setClockOpen} title="ลงเวลาวันนี้">
         <dl className="grid grid-cols-2 gap-3 text-center">
@@ -607,12 +644,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         </dl>
       </Modal>
 
-      <Modal
-        open={leaveOpen}
-        onOpenChange={setLeaveOpen}
-        title="ใบลารออนุมัติ"
-        description={pendingLeave.length > 0 ? `นักเรียนที่รออนุมัติ ${pendingLeave.length} ใบ` : undefined}
-        footer={
+      {(() => {
+        const leaveFooter = (
+          <div className="flex justify-end">
           <button
             type="button"
             disabled={pendingLeave.length === 0 || setLeaveStatus.isPending}
@@ -622,8 +656,10 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
             {setLeaveStatus.isPending && <Spinner className="h-4 w-4" />}
             อนุมัติทั้งหมด{pendingLeave.length > 0 && ` (${pendingLeave.length})`}
           </button>
-        }
-      >
+          </div>
+        );
+        const leaveBody = (
+          <>
         {pendingLeave.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีใบลาค้าง</p>
         ) : (
@@ -661,7 +697,20 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
             ))}
           </ul>
         )}
-      </Modal>
+          </>
+        );
+        const title = "ใบลารออนุมัติ";
+        const description = pendingLeave.length > 0 ? `นักเรียนที่รออนุมัติ ${pendingLeave.length} ใบ` : undefined;
+        return phone ? (
+          <Sheet open={leaveOpen} onOpenChange={setLeaveOpen} title={title} description={description} footer={leaveFooter} bottomOnPhone>
+            {leaveBody}
+          </Sheet>
+        ) : (
+          <Modal open={leaveOpen} onOpenChange={setLeaveOpen} title={title} description={description} footer={leaveFooter}>
+            {leaveBody}
+          </Modal>
+        );
+      })()}
 
       <Modal
         open={timetableOpen}
