@@ -346,7 +346,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
       : []),
     { title: "เช็คชื่อเข้าเรียน", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", sheet: true, badge: unchecked },
     {
-      title: "ใบลารออนุมัติ",
+      title: "จัดการใบลา",
       text: pendingLeave.length > 0 ? `มี ${pendingLeave.length} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง",
       busy: false,
       disabled: false,
