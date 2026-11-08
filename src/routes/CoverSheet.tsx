@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Select, Spinner } from "@/components/ui";
+import { Button, Select, Spinner } from "@/components/ui";
 import {
   useAttendanceDuties,
   useLeaveCovers,
@@ -9,10 +9,11 @@ import {
   useSetCoverStatus,
   type ProposeCover,
 } from "@/hooks/useAttendanceCovers";
+import { useMyLeaveRequests } from "@/hooks/useLeave";
 import { useProfiles } from "@/hooks/useProfiles";
 import { profileFullName, type AttendanceCover, type CoverStatus } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
-import { cn } from "@/lib/utils";
+import { cn, todayIso } from "@/lib/utils";
 
 export type CoverLeave = { id: string; profile_id: string; start_date: string; end_date: string };
 
@@ -223,5 +224,56 @@ function DayBlock({
         })}
       </ul>
     </section>
+  );
+}
+
+/**
+ * Home-screen entry: picks which of my live leave requests to assign cover for.
+ * One live request → straight into CoverSheet; none → nudge to file a leave first.
+ */
+export function CoverLeavePicker({
+  profileId,
+  open,
+  onOpenChange,
+  onNewLeave,
+}: {
+  profileId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onNewLeave: () => void;
+}) {
+  const { data: requests = [], isLoading } = useMyLeaveRequests(open ? profileId : null);
+  const [picked, setPicked] = useState<CoverLeave | null>(null);
+  const live = requests.filter((r) => (r.status === "pending" || r.status === "approved") && r.end_date >= todayIso());
+
+  if (!open) return null;
+  const leave = picked ?? (live.length === 1 ? live[0]! : null);
+  if (leave) {
+    return <CoverSheet leave={leave} actorId={profileId} open onOpenChange={(o) => { if (!o) { setPicked(null); onOpenChange(false); } }} />;
+  }
+  return (
+    <Sheet open onOpenChange={onOpenChange} title="มอบงานแทน" description="เลือกใบลาที่ต้องการมอบงานเช็คชื่อ" bottomOnPhone>
+      {isLoading ? (
+        <Spinner />
+      ) : live.length === 0 ? (
+        <div className="space-y-3 text-sm text-muted-foreground">
+          <p>ยังไม่มีใบลาที่มอบงานได้ ยื่นคำลาก่อน</p>
+          <Button onClick={() => { onOpenChange(false); onNewLeave(); }}>ยื่นคำลา</Button>
+        </div>
+      ) : (
+        <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+          {live.map((r) => (
+            <li key={r.id}>
+              <button type="button" className="flex w-full flex-col items-start gap-0.5 px-3 py-3 text-left text-sm" onClick={() => setPicked(r)}>
+                <span className="font-medium">
+                  {r.start_date} – {r.end_date}
+                </span>
+                <span className="text-xs text-muted-foreground">{r.reason}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Sheet>
   );
 }

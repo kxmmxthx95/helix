@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { profileFullName, type Profile, type ProfileWithRoles } from "@/lib/database.types";
-import { BarChartIcon, CheckmarkCircleIcon, ChevronForward, DocumentTextIcon, LockIcon, PaletteIcon } from "@/components/icons";
+import { BarChartIcon, CheckmarkCircleIcon, ChevronForward, DocumentTextIcon, LockIcon, PaletteIcon, Users } from "@/components/icons";
 import { BannerUpload } from "@/components/BannerUpload";
 import { BannerAdjustOverlay, useBannerAdjust } from "@/components/BannerAdjust";
 import { HoldButton } from "@/components/HoldButton";
@@ -30,7 +30,9 @@ import { supabase } from "@/lib/supabase";
 import { cn, todayIso } from "@/lib/utils";
 import { AssemblyAttendanceSheet } from "@/routes/AssemblyAttendanceSheet";
 import { CoverTasks } from "@/routes/CoverTasks";
+import { CoverLeavePicker } from "@/routes/CoverSheet";
 import { useMyCovers } from "@/hooks/useAttendanceCovers";
+import { useMyLeaveRequests } from "@/hooks/useLeave";
 import { LineLinkCard } from "@/routes/Profile";
 import { StaffClockStatsSheet } from "@/routes/StaffClockStatsSheet";
 import { PeriodDaySheet, type DayPeriod, type SheetDay } from "@/routes/PeriodDaySheet";
@@ -123,6 +125,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const phone = usePhone();
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [newLeaveOpen, setNewLeaveOpen] = useState(false);
+  const [coverPickOpen, setCoverPickOpen] = useState(false);
   const [leaveRevealed, setLeaveRevealed] = useState(false);
   const [clockOpen, setClockOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -275,6 +278,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   // Drawer: today's periods only (missed ones stay reachable after school hours).
   // ครูแทน (migration 0139): today's confirmed covers join the same drawers. Their classrooms/subjects can be
   // outside this teacher's department, so labels come from the RPC rather than the department-scoped lookups.
+  // "มอบงาน" only makes sense with a live leave request (pending/approved, not yet over).
+  const { data: myLeaves = [] } = useMyLeaveRequests(me.id);
+  const canAssignCover = myLeaves.some((r) => (r.status === "pending" || r.status === "approved") && r.end_date >= today);
   const { data: covers = [] } = useMyCovers(today, addDays(today, 14));
   const todayCovers = covers.filter((c) => c.status === "confirmed" && c.date === today && c.leave_status === "approved");
   const coverPeriods = todayCovers.flatMap((c) =>
@@ -467,7 +473,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         setLeaveRevealed(false);
         open();
       };
-      const actionCls = "flex w-20 flex-col items-center justify-center gap-1 text-xs font-medium text-white";
+      const actionCls = "flex w-16 flex-col items-center justify-center gap-1 text-xs font-medium text-white";
       return (
         <div key={t.title} className="relative h-full overflow-hidden rounded-2xl">
           {leaveRevealed && <button type="button" aria-label="ปิด" tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setLeaveRevealed(false)} />}
@@ -476,6 +482,12 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
               <CheckmarkCircleIcon className="h-6 w-6" />
               รออนุมัติ
             </button>
+            {canAssignCover && (
+              <button type="button" tabIndex={leaveRevealed ? 0 : -1} onClick={act(() => setCoverPickOpen(true))} className={cn(actionCls, "bg-neutral-500")}>
+                <Users className="h-6 w-6" />
+                มอบงาน
+              </button>
+            )}
             <button type="button" tabIndex={leaveRevealed ? 0 : -1} onClick={act(() => setNewLeaveOpen(true))} className={cn(actionCls, "bg-accent")}>
               <DocumentTextIcon className="h-6 w-6" />
               ยื่นคำลา
@@ -485,7 +497,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
             type="button"
             aria-expanded={leaveRevealed}
             onClick={t.onClick}
-            className={cn(cls, "z-20 w-full transition-transform duration-[250ms] ease-out motion-reduce:transition-none", leaveRevealed && "-translate-x-40")}
+            className={cn(cls, "z-20 w-full transition-[transform,border-radius] duration-[250ms] ease-out motion-reduce:transition-none", leaveRevealed && (canAssignCover ? "-translate-x-48" : "-translate-x-32"), leaveRevealed && "rounded-r-none")}
           >
             {body}
           </button>
@@ -661,6 +673,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         <LineLinkCard />
       </Modal>
       <NewLeaveSheet profileId={me.id} open={newLeaveOpen} onOpenChange={setNewLeaveOpen} />
+      <CoverLeavePicker profileId={me.id} open={coverPickOpen} onOpenChange={setCoverPickOpen} onNewLeave={() => setNewLeaveOpen(true)} />
       <StaffClockStatsSheet open={statsOpen} onOpenChange={setStatsOpen} me={me} />
       <Modal open={clockOpen} onOpenChange={setClockOpen} title="ลงเวลาวันนี้">
         <dl className="grid grid-cols-2 gap-3 text-center">
