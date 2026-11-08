@@ -29,6 +29,8 @@ import { gradeShortLabel } from "@/lib/gradeLevels";
 import { supabase } from "@/lib/supabase";
 import { cn, todayIso } from "@/lib/utils";
 import { AssemblyAttendanceSheet } from "@/routes/AssemblyAttendanceSheet";
+import { CoverTasks } from "@/routes/CoverTasks";
+import { useMyCovers } from "@/hooks/useAttendanceCovers";
 import { LineLinkCard } from "@/routes/Profile";
 import { StaffClockStatsSheet } from "@/routes/StaffClockStatsSheet";
 import { PeriodDaySheet, type DayPeriod, type SheetDay } from "@/routes/PeriodDaySheet";
@@ -271,8 +273,36 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   })();
 
   // Drawer: today's periods only (missed ones stay reachable after school hours).
-  const sheetDays: SheetDay[] =
+  // ครูแทน (migration 0139): today's confirmed covers join the same drawers. Their classrooms/subjects can be
+  // outside this teacher's department, so labels come from the RPC rather than the department-scoped lookups.
+  const { data: covers = [] } = useMyCovers(today, addDays(today, 14));
+  const todayCovers = covers.filter((c) => c.status === "confirmed" && c.date === today && c.leave_status === "approved");
+  const coverPeriods = todayCovers.flatMap((c) =>
+    c.schedule_entry_id && c.period_no != null
+      ? [{
+          entryId: c.schedule_entry_id,
+          classroomId: c.classroom_id,
+          ordinal: c.period_no,
+          time: "",
+          subjectCode: c.subject_code ?? "—",
+          subjectName: `${c.subject_name ?? "—"} (แทน ${c.owner_name})`,
+          room: c.room_label,
+          gradient: "",
+          hex: "#64748b",
+        }]
+      : [],
+  );
+  const coverHomerooms = todayCovers.flatMap((c) =>
+    c.schedule_entry_id ? [] : [{ id: c.classroom_id, grade_level_id: "", department_id: "", label: c.room_label }],
+  );
+  const ownDays: SheetDay[] =
     !isHoliday(today) && timedOf(today).length > 0 ? [{ date: today, label: "วันนี้", periods: periodsOf(today) }] : [];
+  const sheetDays: SheetDay[] =
+    coverPeriods.length === 0
+      ? ownDays
+      : ownDays.length > 0
+        ? ownDays.map((d) => ({ ...d, periods: [...d.periods, ...coverPeriods].sort((a, b) => a.ordinal - b.ordinal) }))
+        : [{ date: today, label: "วันนี้", periods: coverPeriods }];
 
   const taught = [...new Map(
     entries.flatMap((e) => {
@@ -597,12 +627,17 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
               )}
             </div>
           </div>
+          <CoverTasks
+            today={today}
+            covers={covers}
+            onCheck={(c) => (c.schedule_entry_id ? setPeriodsOpen(true) : setAssemblyOpen(true))}
+          />
           <div className={cn("grid grid-cols-1 items-stretch gap-3 px-4 pb-4 sm:grid-cols-2 sm:px-8 sm:pb-8", showClock ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
             {tiles.map((t) => renderTile(t, "bg-muted/70 hover:bg-muted"))}
           </div>
         </section>
       </div>
-      {upNext && (
+      {(upNext || coverPeriods.length > 0) && (
         <PeriodDaySheet
           open={periodsOpen}
           onOpenChange={setPeriodsOpen}
@@ -614,12 +649,12 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
       <AssemblyAttendanceSheet
         open={assemblyOpen}
         onOpenChange={setAssemblyOpen}
-        homerooms={homerooms}
+        homerooms={[...homerooms, ...coverHomerooms.filter((c) => !homeroomIds.includes(c.id))]}
         academicYear={academicYear}
         departmentId={departmentId}
         recorderId={me.id}
         date={today}
-        roomLabel={roomLabel}
+        roomLabel={(id) => coverHomerooms.find((c) => c.id === id)?.label ?? roomLabel(id)}
       />
 
       <Modal open={lineOpen} onOpenChange={setLineOpen} title="เชื่อมต่อไลน์">

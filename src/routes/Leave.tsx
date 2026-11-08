@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button, EmptyState, Select, Skeleton } from "@/components/ui";
 import { NewLeaveSheet } from "@/routes/NewLeaveSheet";
+import { CoverSheet, type CoverLeave } from "@/routes/CoverSheet";
 import { useProfiles } from "@/hooks/useProfiles";
 import {
   leaveAttachmentUrl,
@@ -134,6 +135,7 @@ function MyRequestsSection({
   const { data: types = [] } = useLeaveTypes();
   const { data: requests = [], isLoading } = useMyLeaveRequests(profileId);
   const cancel = useCancelLeaveRequest();
+  const [coverFor, setCoverFor] = useState<CoverLeave | null>(null);
 
   const typeName = (id: string) => types.find((t) => t.id === id)?.name ?? "—";
 
@@ -207,16 +209,23 @@ function MyRequestsSection({
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      {cancellable && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => cancel.mutate(r.id)}
-                          disabled={cancel.isPending}
-                        >
-                          ยกเลิก
-                        </Button>
-                      )}
+                      <div className="flex gap-2">
+                        {(r.status === "pending" || r.status === "approved") && r.end_date >= todayIso() && (
+                          <Button size="sm" variant="outline" onClick={() => setCoverFor(r)}>
+                            มอบงานแทน
+                          </Button>
+                        )}
+                        {cancellable && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => cancel.mutate(r.id)}
+                            disabled={cancel.isPending}
+                          >
+                            ยกเลิก
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -227,6 +236,9 @@ function MyRequestsSection({
       )}
 
       <NewLeaveSheet profileId={profileId} open={open} onOpenChange={onOpenChange} />
+      {coverFor && (
+        <CoverSheet leave={coverFor} actorId={profileId} open onOpenChange={(o) => !o && setCoverFor(null)} />
+      )}
     </div>
   );
 }
@@ -236,6 +248,7 @@ function ApprovalsSection({ approverId, status }: { approverId: string; status: 
   const { data: types = [] } = useLeaveTypes();
   const { data: profiles = [] } = useProfiles({ search: "", departmentId: "", role: "", active: "" });
   const setStatus = useSetLeaveStatus();
+  const [coverFor, setCoverFor] = useState<CoverLeave | null>(null);
   const nameById = new Map(profiles.map((p) => [p.id, profileFullName(p)]));
   const typeName = (id: string) => types.find((t) => t.id === id)?.name ?? "—";
 
@@ -335,6 +348,11 @@ function ApprovalsSection({ approverId, status }: { approverId: string; status: 
                     </span>
                   </td>
                   <td className="px-3 py-2">
+                    {(r.status === "pending" || r.status === "approved") && r.end_date >= todayIso() && (
+                      <Button size="sm" variant="outline" className="mb-1" onClick={() => setCoverFor(r)}>
+                        มอบงานแทน
+                      </Button>
+                    )}
                     {r.status === "pending" && (
                       <div className="flex gap-2">
                         <Button
@@ -360,6 +378,9 @@ function ApprovalsSection({ approverId, status }: { approverId: string; status: 
             </tbody>
           </table>
         </div>
+      )}
+      {coverFor && (
+        <CoverSheet leave={coverFor} actorId={approverId} open onOpenChange={(o) => !o && setCoverFor(null)} />
       )}
     </div>
   );

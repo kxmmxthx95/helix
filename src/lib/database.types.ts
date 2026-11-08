@@ -1213,6 +1213,24 @@ export type PeriodAttendanceRecord = {
   updated_at: string;
 };
 
+/**
+ * ครูแทนเช็คชื่อ (เข้าแถว = classroom_id | รายคาบ = schedule_entry_id) —
+ * migration 0139. มีผลเมื่อ status='confirmed' และใบลา approved.
+ */
+export type CoverStatus = "pending" | "confirmed" | "declined" | "cancelled";
+export type AttendanceCover = {
+  id: string;
+  leave_request_id: string;
+  date: string;
+  classroom_id: string | null;
+  schedule_entry_id: string | null;
+  cover_staff_id: string;
+  proposed_by: string;
+  status: CoverStatus;
+  created_at: string;
+  updated_at: string;
+};
+
 // ----------------------------------------------------------------- behavior
 // คะแนนพฤติกรรม — event log, not one row per day. See
 // supabase/migrations/0027_behavior_records.sql.
@@ -1745,6 +1763,7 @@ export type Database = {
       >;
       attendance_records: Table<AttendanceRecord, InsertOf<AttendanceRecord, "note">>;
       period_attendance_records: Table<PeriodAttendanceRecord, InsertOf<PeriodAttendanceRecord, "note">>;
+      attendance_covers: Table<AttendanceCover, InsertOf<AttendanceCover, "status" | "classroom_id" | "schedule_entry_id">>;
       behavior_records: Table<BehaviorRecord, InsertOf<BehaviorRecord, never>>;
       behavior_categories: Table<BehaviorCategory, InsertOf<BehaviorCategory, "severity">>;
       tuition_invoices: Table<TuitionInvoice, InsertOf<TuitionInvoice, "due_date" | "status">>;
@@ -1849,6 +1868,27 @@ export type Database = {
     Functions: {
       student_lifetime_exp: {
         Args: Record<string, never>;
+      attendance_duties: {
+        Args: { p_profile: string; p_date: string };
+        Returns: { classroom_id: string | null; schedule_entry_id: string | null; label: string; period_no: number | null }[];
+      };
+      my_attendance_covers: {
+        Args: { p_from: string; p_to: string };
+        Returns: {
+          id: string;
+          date: string;
+          status: CoverStatus;
+          classroom_id: string;
+          schedule_entry_id: string | null;
+          label: string;
+          owner_name: string;
+          leave_status: LeaveStatus;
+          room_label: string;
+          period_no: number | null;
+          subject_code: string | null;
+          subject_name: string | null;
+        }[];
+      };
         Returns: {
           sub_on_time: number;
           sub_late: number;
