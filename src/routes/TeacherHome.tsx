@@ -712,14 +712,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         );
       })()}
 
-      <Modal
-        open={timetableOpen}
-        onOpenChange={setTimetableOpen}
-        title="ตารางสอน"
-        className="max-w-6xl"
-      >
-        {timetableOpen && (
-          <div className="scrollbar-hidden overflow-auto pb-4 sm:p-4">
+      {(() => {
+        const timetable = timetableOpen && (
+          <div className={phone ? "overflow-x-hidden touch-pan-y pb-4" : "scrollbar-hidden overflow-auto pb-4 sm:p-4"}>
             <TeacherTimetable
               departmentId={departmentId}
               teacherId={me.id}
@@ -731,8 +726,17 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
               teachers={[]}
             />
           </div>
-        )}
-      </Modal>
+        );
+        return phone ? (
+          <Sheet open={timetableOpen} onOpenChange={setTimetableOpen} title="ตารางสอน" bottomOnPhone>
+            {timetable}
+          </Sheet>
+        ) : (
+          <Modal open={timetableOpen} onOpenChange={setTimetableOpen} title="ตารางสอน" className="max-w-6xl">
+            {timetable}
+          </Modal>
+        );
+      })()}
     </div>
   );
 }

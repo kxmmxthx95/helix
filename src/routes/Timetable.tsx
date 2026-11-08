@@ -1243,7 +1243,7 @@ function TimetableGrid({
               const time = `${hhmm(pd.start_time)} – ${hhmm(pd.end_time)}`;
               if (pd.period_type === "break") {
                 return (
-                  <li key={pd.period_no} className="flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                  <li key={pd.period_no} className="flex items-center justify-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
                     <RestaurantIcon className="h-3.5 w-3.5" />
                     {pd.label} {time}
                   </li>
@@ -1258,14 +1258,14 @@ function TimetableGrid({
                   </div>
                   <div className="min-w-0 flex-1 space-y-1">
                     {cell.length === 0 ? (
-                      <p className="rounded-xl bg-muted/40 px-3 py-3 text-xs text-muted-foreground">ว่าง</p>
+                      <p className="flex min-h-[4.25rem] items-center rounded-xl bg-muted/40 px-3 text-xs text-muted-foreground">ว่าง</p>
                     ) : (
                       cell.map((e) => {
                         const sid = e.teaching_assignment.subject_id;
                         return (
                           <div key={e.id} className={cn("rounded-xl px-3 py-2 leading-snug", styling.gradient(sid, e.teaching_assignment.classroom_id))}>
-                            <p className="text-sm font-semibold">{subjectLabel(sid)}</p>
-                            <p className="truncate text-xs">{subjectName(sid)}</p>
+                            <p className="text-xs opacity-70">{subjectLabel(sid)}</p>
+                            <p className="truncate text-[15px] font-semibold">{subjectName(sid)}</p>
                             <p className="text-[11px] opacity-70">
                               {mode === "classroom" ? teacherLabel(e.teaching_assignment.teacher_id) : roomLabel(e.teaching_assignment.classroom_id)}
                             </p>
@@ -1481,46 +1481,14 @@ function TimetableGrid({
         onClose={() => setPlacing(null)}
       />
     </div>
-    <TimetableLegend styling={styling} subjectIds={[...new Set(entries.map((e) => e.teaching_assignment.subject_id))]} action={legendAction} />
+    <TimetableLegend action={legendAction} />
     </div>
   );
 }
 
-/** Colour key under the grid: the areas in view, the shade ramp for grade, and the subject-type labels. */
-function TimetableLegend({ styling, subjectIds, action }: { styling: TimetableStyling; subjectIds: string[]; action?: ReactNode }) {
-  const areas = styling.legend(subjectIds);
-  if (areas.length === 0) return action ? <div className="flex justify-end">{action}</div> : null;
-  const sample = areas[0]!.id;
-  return (
-    <div className="max-sm:mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[11px] text-muted-foreground">
-      <span className="font-medium text-foreground">สีการ์ด</span>
-      {areas.map((a) => (
-        <span key={a.id} className="inline-flex items-center gap-1.5">
-          <span className={cn("h-2.5 w-2.5 rounded-full", a.dot)} />
-          {a.name}
-        </span>
-      ))}
-      <span className="inline-flex items-center gap-1.5">
-        ความเข้ม: ชั้นต่ำ
-        <span className="flex overflow-hidden rounded">
-          {([0, 1, 2] as const).map((step) => (
-            <span key={step} className={cn("h-3 w-5", styling.step(sample, step))} />
-          ))}
-        </span>
-        ชั้นสูง
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        ประเภท:
-        {(Object.keys(SUBJECT_TYPE_LABEL) as (keyof typeof SUBJECT_TYPE_LABEL)[]).map((t) => (
-          <span key={t} className="inline-flex items-center gap-1">
-            <span className={cn("h-2 w-2 rounded-full", SUBJECT_TYPE_BADGE[t])} />
-            {SUBJECT_TYPE_LABEL[t]}
-          </span>
-        ))}
-      </span>
-      {action && <span className="ml-auto">{action}</span>}
-    </div>
-  );
+/** Only the optional action (e.g. a button) sits under the grid; the colour key was removed. */
+function TimetableLegend({ action }: { action?: ReactNode }) {
+  return action ? <div className="flex justify-end">{action}</div> : null;
 }
 
 type PlaceFilter = "all" | "open" | "done";
