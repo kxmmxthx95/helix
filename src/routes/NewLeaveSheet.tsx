@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Field, FormSection, Input, Select, Spinner } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { useLeaveTypes, useRequestLeave } from "@/hooks/useLeave";
 
 export function dayCount(start: string, end: string) {
@@ -21,6 +22,7 @@ export function NewLeaveSheet({ profileId, open, onOpenChange }: { profileId: st
   const [reason, setReason] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [attempted, setAttempted] = useState(false);
 
   const selectedType = types.find((t) => t.id === leaveTypeId);
   const days = startDate && endDate ? dayCount(startDate, endDate) : 0;
@@ -29,17 +31,25 @@ export function NewLeaveSheet({ profileId, open, onOpenChange }: { profileId: st
     days > selectedType.requires_attachment_after_days &&
     !file;
 
+  const err = (bad: boolean, msg: string) => (attempted && bad ? msg : undefined);
+
   function reset() {
     setLeaveTypeId("");
     setStartDate("");
     setEndDate("");
     setReason("");
     setFile(null);
+    setAttempted(false);
   }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!leaveTypeId || !startDate || !endDate || !reason.trim()) return;
+    const invalid = [!leaveTypeId, !startDate, !endDate || (!!startDate && endDate < startDate), !reason.trim(), needsAttachment].filter(Boolean).length;
+    if (invalid) {
+      setAttempted(true);
+      toast(`กรอกข้อมูลให้ถูกต้อง (${invalid} ช่อง)`, "error");
+      return;
+    }
     request.mutate(
       { profileId, leaveTypeId, startDate, endDate, reason: reason.trim(), file },
       {
@@ -61,7 +71,7 @@ export function NewLeaveSheet({ profileId, open, onOpenChange }: { profileId: st
         if (!o) reset();
       }}
       title="ลาใหม่"
-    bottomOnPhone
+      bottomOnPhone
       footer={
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
@@ -71,73 +81,55 @@ export function NewLeaveSheet({ profileId, open, onOpenChange }: { profileId: st
             type="submit"
             form="request-leave"
             className="flex-1"
-            disabled={!leaveTypeId || !startDate || !endDate || !reason.trim() || request.isPending}
+            disabled={request.isPending}
           >
             {request.isPending ? <Spinner className="h-3 w-3" /> : "ส่งคำขอ"}
           </Button>
         </div>
       }
     >
-      <form id="request-leave" className="space-y-4" onSubmit={submit}>
-        <Field label="ประเภทการลา">
-          <Select
-            value={leaveTypeId}
-            onChange={(e) => setLeaveTypeId(e.target.value)}
-            required
-            placeholder="เลือกประเภท"
-          >
-            {types.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="วันเริ่ม">
-            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+      <form id="request-leave" className="space-y-4" onSubmit={submit} noValidate>
+        <FormSection>
+          <Field label="ประเภทการลา" required error={err(!leaveTypeId, "เลือกประเภทการลา")}>
+            <Select value={leaveTypeId} onChange={(e) => setLeaveTypeId(e.target.value)} placeholder="เลือกประเภท">
+              {types.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </Select>
           </Field>
-          <Field label="วันสิ้นสุด">
-            <Input
-              type="date"
-              value={endDate}
-              min={startDate || undefined}
-              onChange={(e) => setEndDate(e.target.value)}
-              required
-            />
+          <Field label="วันเริ่ม" required error={err(!startDate, "เลือกวันเริ่ม")}>
+            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </Field>
-        </div>
-        {days > 0 && <p className="text-xs text-muted-foreground">รวม {days} วัน</p>}
-        <Field label="เหตุผล">
-          <Input
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            required
-            placeholder="เช่น ลาป่วย มีไข้"
-          />
-        </Field>
-        <Field
-          label={
-            selectedType?.requires_attachment_after_days
-              ? `ไฟล์แนบ (บังคับถ้าลาเกิน ${selectedType.requires_attachment_after_days} วัน)`
-              : "ไฟล์แนบ (ถ้ามี)"
-          }
-        >
-          <input
-            ref={fileRef}
-            type="file"
-            className="hidden"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
-          <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-            {file ? file.name : "เลือกไฟล์"}
-          </Button>
-        </Field>
-        {needsAttachment && (
-          <p className="text-xs text-destructive">
-            ลาต่อเนื่องเกิน {selectedType!.requires_attachment_after_days} วัน ต้องแนบเอกสารประกอบ
+          <Field label="วันสิ้นสุด" required error={err(!endDate, "เลือกวันสิ้นสุด") ?? err(!!startDate && !!endDate && endDate < startDate, "ต้องไม่ก่อนวันเริ่ม")}>
+            <Input type="date" value={endDate} min={startDate || undefined} onChange={(e) => setEndDate(e.target.value)} />
+          </Field>
+          <div className="flex min-h-[3.25rem] items-center justify-between gap-4 text-sm leading-5">
+            <span>รวม</span>
+            <span className="text-muted-foreground">{days > 0 ? `${days} วัน` : "—"}</span>
+          </div>
+        </FormSection>
+        <FormSection>
+          <Field label="เหตุผล" required error={err(!reason.trim(), "กรอกเหตุผล")}>
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="เช่น ลาป่วย มีไข้" />
+          </Field>
+          <div className="flex min-h-[3.25rem] items-center justify-between gap-4 text-sm leading-5">
+            <span>
+              ไฟล์แนบ
+              {selectedType?.requires_attachment_after_days ? <span className="text-destructive" aria-hidden> *</span> : null}
+            </span>
+            <input ref={fileRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <button type="button" onClick={() => fileRef.current?.click()} className="min-w-0 truncate text-muted-foreground hover:text-foreground">
+              {file ? file.name : "เลือกไฟล์"}
+            </button>
+          </div>
+        </FormSection>
+        {selectedType?.requires_attachment_after_days ? (
+          <p className={cn("px-1 text-xs", attempted && needsAttachment ? "text-destructive" : "text-muted-foreground")}>
+            ลาต่อเนื่องเกิน {selectedType.requires_attachment_after_days} วัน ต้องแนบเอกสารประกอบ
           </p>
-        )}
+        ) : null}
       </form>
     </Sheet>
   );

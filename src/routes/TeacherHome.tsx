@@ -10,7 +10,7 @@ import { NewLeaveSheet } from "@/routes/NewLeaveSheet";
 import { Modal } from "@/components/Modal";
 import { Sheet, usePhone } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Avatar, Spinner } from "@/components/ui";
+import { Avatar, Button, Spinner } from "@/components/ui";
 import { useActiveAcademicYear, useActiveTerm, useAcademicEvents } from "@/hooks/useAcademicTerms";
 import { useHomeroomClassrooms } from "@/hooks/useAttendance";
 import { useSubjects } from "@/hooks/useCurriculum";
@@ -646,16 +646,13 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
 
       {(() => {
         const leaveFooter = (
-          <div className="flex justify-end">
-          <button
-            type="button"
-            disabled={pendingLeave.length === 0 || setLeaveStatus.isPending}
-            onClick={approveAllLeave}
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-50"
-          >
-            {setLeaveStatus.isPending && <Spinner className="h-4 w-4" />}
-            อนุมัติทั้งหมด{pendingLeave.length > 0 && ` (${pendingLeave.length})`}
-          </button>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setLeaveOpen(false)}>
+              ปิด
+            </Button>
+            <Button type="button" className="flex-1" disabled={pendingLeave.length === 0 || setLeaveStatus.isPending} onClick={approveAllLeave}>
+              {setLeaveStatus.isPending ? <Spinner className="h-3 w-3" /> : `อนุมัติทั้งหมด${pendingLeave.length > 0 ? ` (${pendingLeave.length})` : ""}`}
+            </Button>
           </div>
         );
         const leaveBody = (
