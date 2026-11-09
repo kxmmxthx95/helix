@@ -16,12 +16,10 @@ export function Login() {
   // Login is always dark, but html bg follows the app theme (--shell, light = #f2f2f7):
   // iOS bars/strips outside the fixed layer would show light. Force black while mounted.
   useEffect(() => {
-    const el = document.documentElement;
-    const prev = el.style.backgroundColor;
-    el.style.backgroundColor = "#000";
-    return () => {
-      el.style.backgroundColor = prev;
-    };
+    const els = [document.documentElement, document.body];
+    const prev = els.map((e) => e.style.backgroundColor);
+    for (const e of els) e.style.backgroundColor = "#000";
+    return () => els.forEach((e, i) => (e.style.backgroundColor = prev[i] ?? ""));
   }, []);
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -71,7 +69,7 @@ export function Login() {
 
   return (
     // Login is always dark — Beams + glass; ignores app ThemeProvider.
-    <div className="dark fixed inset-0 flex flex-col overflow-hidden overscroll-none bg-black">
+    <div className="dark fixed inset-0 flex flex-col overflow-hidden overscroll-none bg-black shadow-[0_0_0_100vmax_#000]">
       <div className="pointer-events-none absolute inset-0" aria-hidden>
         <Suspense fallback={null}>
           <Beams
