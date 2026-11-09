@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { BuildingIcon, CalendarIcon, CheckmarkCircleIcon, ChevronBack, ChevronForward, DownloadIcon, InfoIcon, Plus } from "@/components/icons";
+import { CheckmarkCircleIcon, ChevronBack, ChevronForward, DownloadIcon, Plus } from "@/components/icons";
 import { Sheet, SheetStyleContext } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, Field, FormSection, Input, Select, Skeleton, Spinner } from "@/components/ui";
+import { Button, Card, Field, FormSection, Input, Select, Skeleton, Spinner, Switch } from "@/components/ui";
 import {
   useAcademicEvents,
   useDeleteAcademicEvent,
   useSaveAcademicEvent,
   useAcademicTerms,
+  useAllAcademicTerms,
   useSyncHolidays,
   type AcademicEventDraft,
   type AcademicEventRow,
@@ -45,6 +46,14 @@ const EVENT_TYPE_CHIP: Record<AcademicEventType, string> = {
   teacher_workday: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
   school_event: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
 };
+
+// Term open/close markers are derived from academic_terms, not stored events: read-only, own indigo hue.
+type CalEvent = AcademicEventRow & { isTerm?: true };
+const TERM_DOT = "bg-indigo-500";
+const TERM_CHIP = "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300";
+const dotOf = (ev: CalEvent) => (ev.isTerm ? TERM_DOT : EVENT_TYPE_DOT[ev.event_type]);
+const chipOf = (ev: CalEvent) => (ev.isTerm ? TERM_CHIP : EVENT_TYPE_CHIP[ev.event_type]);
+const TERM_NAME = { term1: "ภาคเรียนที่ 1", term2: "ภาคเรียนที่ 2", summer: "ภาคฤดูร้อน" } as const;
 
 const WEEKDAY_LABEL = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
 
@@ -139,6 +148,7 @@ export function AcademicEvents() {
   const navigate = useNavigate();
   const phone = useIsPhone();
   const { data: events = [], isLoading } = useAcademicEvents();
+  const { data: terms = [] } = useAllAcademicTerms();
   const del = useDeleteAcademicEvent();
   const syncHolidays = useSyncHolidays();
   const toast = useToast();
@@ -155,16 +165,49 @@ export function AcademicEvents() {
   // A dept_head may only edit events linked to their own department — a
   // whole-school event (no links) is org-wide only. UI hides what the role
   // can't do; RLS is the real boundary (see migration 0018).
-  function canEditRow(row: AcademicEventRow) {
+  function canEditRow(row: CalEvent) {
+    if (row.isTerm) return false;
     if (orgWide) return true;
     if (!mayEdit || !me?.department_id) return false;
     return row.departmentIds.includes(me.department_id);
   }
 
-  const visibleEvents = useMemo(() => events.filter((ev) => !hidden.has(ev.event_type)), [events, hidden]);
+  const termEvents = useMemo(() => {
+    const out = new Map<string, CalEvent>();
+    for (const tm of terms) {
+      const name = `${TERM_NAME[tm.term_type]}/${tm.academic_year}`;
+      for (const [verb, date] of [["เปิด", tm.start_date], ["ปิด", tm.end_date]] as const) {
+        if (!date) continue;
+        const label = `${verb}${name}`;
+        out.set(`${label}#${date}`, {
+          id: `term:${label}#${date}`,
+          name: label,
+          event_type: "school_event",
+          start_date: date,
+          end_date: date,
+          students_attend: true,
+          staff_attend: true,
+          description: null,
+          show_in_schedule: false,
+          notify_users: false,
+          external_ref: null,
+          created_at: "",
+          updated_at: "",
+          departmentIds: [],
+          isTerm: true,
+        });
+      }
+    }
+    return [...out.values()];
+  }, [terms]);
+
+  const visibleEvents = useMemo<CalEvent[]>(
+    () => [...events.filter((ev) => !hidden.has(ev.event_type)), ...termEvents],
+    [events, hidden, termEvents],
+  );
 
   const eventsByDay = useMemo(() => {
-    const map = new Map<string, AcademicEventRow[]>();
+    const map = new Map<string, CalEvent[]>();
     for (const ev of visibleEvents) {
       for (let d = fromISODate(ev.start_date); toISODate(d) <= ev.end_date; d = addDays(d, 1)) {
         const key = toISODate(d);
@@ -207,7 +250,7 @@ export function AcademicEvents() {
     else setFocus(withMonth(focus, focus.getFullYear(), focus.getMonth() + dir));
   }
 
-  function chip(ev: AcademicEventRow) {
+  function chip(ev: CalEvent) {
     return (
       <button
         key={ev.id}
@@ -218,19 +261,19 @@ export function AcademicEvents() {
         }}
         className={cn(
           "font-sarabun flex w-full items-center gap-1.5 truncate rounded-lg px-2 py-1 text-left text-xs font-medium hover:opacity-80",
-          EVENT_TYPE_CHIP[ev.event_type],
+          chipOf(ev),
           canEditRow(ev) ? "cursor-pointer" : "cursor-default",
         )}
         title={ev.name}
       >
-        <span className={cn("h-2 w-2 shrink-0 rounded-full", EVENT_TYPE_DOT[ev.event_type])} />
+        <span className={cn("h-2 w-2 shrink-0 rounded-full", dotOf(ev))} />
         <span className="truncate">{ev.name}</span>
       </button>
     );
   }
 
   /** Date tile + name + type/range row, shared by the list view and "กิจกรรมที่ใกล้ถึง". */
-  function eventRow(ev: AcademicEventRow) {
+  function eventRow(ev: CalEvent) {
     const start = fromISODate(ev.start_date);
     return (
       <button
@@ -242,7 +285,7 @@ export function AcademicEvents() {
         <span
           className={cn(
             "flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl leading-tight",
-            EVENT_TYPE_CHIP[ev.event_type],
+            chipOf(ev),
           )}
         >
           <span className="text-base font-bold">{start.getDate()}</span>
@@ -251,7 +294,7 @@ export function AcademicEvents() {
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold">{ev.name}</span>
           <span className="block text-muted-foreground">
-            {EVENT_TYPE_LABEL[ev.event_type]}
+            {ev.isTerm ? "ภาคเรียน" : EVENT_TYPE_LABEL[ev.event_type]}
             {ev.end_date !== ev.start_date && ` · ${shortDate(ev.start_date)} - ${shortDate(ev.end_date)}`}
           </span>
         </span>
@@ -311,7 +354,8 @@ export function AcademicEvents() {
             .map((day) => {
               const iso = toISODate(day);
               const dayEvents = eventsByDay.get(iso) ?? [];
-              const top = TYPE_PRIORITY.find((t) => dayEvents.some((e) => e.event_type === t));
+              const top = TYPE_PRIORITY.find((t) => dayEvents.some((e) => !e.isTerm && e.event_type === t));
+              const termOnly = !top && dayEvents.some((e) => e.isTerm);
               return (
                 <button
                   key={iso}
@@ -321,7 +365,7 @@ export function AcademicEvents() {
                   onClick={() => setFocus(day)}
                   className={cn(
                     "relative flex aspect-square items-center justify-center rounded-xl text-sm tabular-nums",
-                    top ? cn("font-semibold text-white", EVENT_TYPE_DOT[top]) : isWeekend(day) ? "bg-muted/30 text-muted-foreground/70" : "bg-muted/60 text-muted-foreground",
+                    top ? cn("font-semibold text-white", EVENT_TYPE_DOT[top]) : termOnly ? cn("font-semibold text-white", TERM_DOT) : isWeekend(day) ? "bg-muted/30 text-muted-foreground/70" : "bg-muted/60 text-muted-foreground",
                     iso === todayISO && "font-bold underline underline-offset-2",
                     iso === focusISO && "ring-2 ring-foreground ring-offset-1 ring-offset-background",
                   )}
@@ -603,6 +647,11 @@ export function AcademicEvents() {
               {EVENT_TYPE_LABEL[t]}
             </label>
           ))}
+          <p className="flex items-center gap-2.5 text-xs text-muted-foreground">
+            <span aria-hidden className="inline-block h-4 w-4 shrink-0" />
+            <span className={cn("h-2 w-2 rounded-full", TERM_DOT)} />
+            เปิด-ปิดภาคเรียน (แสดงเสมอ)
+          </p>
         </Card>
         <Card className="space-y-3">
           <div className="flex items-center justify-between">
@@ -740,7 +789,6 @@ function EventSheet({
       onOpenChange={(o) => !o && onClose()}
       title={mode === "create" ? "เพิ่ม Event ใหม่" : "แก้ไข Event"}
       description="ตั้งชื่อ ประเภท และช่วงวันที่ของ Event"
-      icon={<CalendarIcon className="h-5 w-5" />}
       closable
       footer={
         <div className="flex gap-2">
@@ -758,43 +806,43 @@ function EventSheet({
         </div>
       }
     >
-      <form id="event-form" onSubmit={submit} className="space-y-3">
-        <FormSection icon={<CalendarIcon className="h-4 w-4" />} title="รายละเอียด">
+      <form id="event-form" onSubmit={submit} className="space-y-4">
+        <FormSection>
           <Field label="ชื่อ Event" required>
             <Input
               value={draft.name}
               maxLength={100}
-              placeholder="เช่น วันหยุด, ประชุมผู้ปกครอง, สอบกลางภาค..."
+              placeholder="เช่น วันหยุด, สอบกลางภาค"
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               required
             />
-            <span className="block text-right text-xs text-muted-foreground">{draft.name.length}/100</span>
           </Field>
-
-          <div role="radiogroup" aria-label="ประเภท" className="space-y-1">
-            <span className="font-ui text-xs font-medium">
-              ประเภท<span className="text-destructive"> *</span>
-            </span>
-            <div className="grid grid-cols-2 gap-2">
+          <Field label="ประเภท" required>
+            <Select value={draft.event_type} onChange={(e) => setEventType(e.target.value as AcademicEventType)}>
               {(Object.keys(EVENT_TYPE_LABEL) as AcademicEventType[]).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.event_type === t}
-                  onClick={() => setEventType(t)}
-                  className={cn(
-                    "flex items-center gap-2 rounded-xl border bg-background px-3 py-2.5 text-left text-sm transition-colors",
-                    draft.event_type === t ? "border-primary ring-1 ring-primary" : "border-border hover:bg-muted",
-                  )}
-                >
-                  <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", EVENT_TYPE_DOT[t])} />
+                <option key={t} value={t}>
                   {EVENT_TYPE_LABEL[t]}
-                </button>
+                </option>
               ))}
-            </div>
-          </div>
-
+            </Select>
+          </Field>
+          <Field label="วันที่เริ่ม" required>
+            <Input
+              type="date"
+              value={draft.start_date}
+              onChange={(e) => setDraft({ ...draft, start_date: e.target.value })}
+              required
+            />
+          </Field>
+          <Field label="วันที่สิ้นสุด" required>
+            <Input
+              type="date"
+              value={draft.end_date}
+              min={draft.start_date || undefined}
+              onChange={(e) => setDraft({ ...draft, end_date: e.target.value })}
+              required
+            />
+          </Field>
           <Field label="รายละเอียด (ถ้ามี)">
             <textarea
               value={draft.description ?? ""}
@@ -804,89 +852,34 @@ function EventSheet({
               onChange={(e) => setDraft({ ...draft, description: e.target.value || null })}
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
-            <span className="block text-right text-xs text-muted-foreground">{draft.description?.length ?? 0}/300</span>
           </Field>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="วันที่เริ่ม" required>
-              <Input
-                type="date"
-                value={draft.start_date}
-                onChange={(e) => setDraft({ ...draft, start_date: e.target.value })}
-                required
-              />
-            </Field>
-            <Field label="วันที่สิ้นสุด" required>
-              <Input
-                type="date"
-                value={draft.end_date}
-                min={draft.start_date || undefined}
-                onChange={(e) => setDraft({ ...draft, end_date: e.target.value })}
-                required
-              />
-            </Field>
-          </div>
         </FormSection>
 
         {orgWide && (
-          <FormSection
-            icon={<BuildingIcon className="h-4 w-4" />}
-            title="แผนกที่เกี่ยวข้อง"
-            description="ไม่เลือก = ทั้งโรงเรียน"
-          >
-            <div className="grid grid-cols-2 gap-2">
-              {departments.map((d) => (
-                <label key={d.id} className="flex items-center gap-2 rounded-xl bg-background px-3 py-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={draft.departmentIds.includes(d.id)}
-                    onChange={(e) => toggleDepartment(d.id, e.target.checked)}
-                    className="h-5 w-5 accent-[hsl(var(--accent))]"
-                  />
-                  {d.name}
-                </label>
-              ))}
-            </div>
+          <FormSection title="แผนกที่เกี่ยวข้อง (ไม่เลือก = ทั้งโรงเรียน)">
+            {departments.map((d) => (
+              <div key={d.id} className="flex items-center justify-between gap-4 text-sm leading-5">
+                <span>{d.name}</span>
+                <Switch size="sm" checked={draft.departmentIds.includes(d.id)} onChange={(on) => toggleDepartment(d.id, on)} label={d.name} />
+              </div>
+            ))}
           </FormSection>
         )}
 
-        <FormSection icon={<InfoIcon className="h-4 w-4" />} title="ตัวเลือกเพิ่มเติม">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.students_attend}
-              onChange={(e) => setDraft({ ...draft, students_attend: e.target.checked })}
-              className="h-5 w-5 accent-[hsl(var(--accent))]"
-            />
-            นักเรียนมาเรียน
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.staff_attend}
-              onChange={(e) => setDraft({ ...draft, staff_attend: e.target.checked })}
-              className="h-5 w-5 accent-[hsl(var(--accent))]"
-            />
-            ครูทำงาน
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.show_in_schedule}
-              onChange={(e) => setDraft({ ...draft, show_in_schedule: e.target.checked })}
-              className="h-5 w-5 accent-[hsl(var(--accent))]"
-            />
-            แสดงในตารางของผู้ใช้ที่เกี่ยวข้อง
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={draft.notify_users}
-              onChange={(e) => setDraft({ ...draft, notify_users: e.target.checked })}
-              className="h-5 w-5 accent-[hsl(var(--accent))]"
-            />
-            ส่งการแจ้งเตือนให้ผู้ใช้ที่เกี่ยวข้อง
-          </label>
+        <FormSection>
+          {(
+            [
+              ["students_attend", "นักเรียนมาเรียน"],
+              ["staff_attend", "ครูทำงาน"],
+              ["show_in_schedule", "แสดงในตารางของผู้ใช้ที่เกี่ยวข้อง"],
+              ["notify_users", "ส่งการแจ้งเตือนให้ผู้ใช้ที่เกี่ยวข้อง"],
+            ] as const
+          ).map(([k, label]) => (
+            <div key={k} className="flex items-center justify-between gap-4 text-sm leading-5">
+              <span>{label}</span>
+              <Switch size="sm" checked={draft[k]} onChange={(on) => setDraft({ ...draft, [k]: on })} label={label} />
+            </div>
+          ))}
         </FormSection>
       </form>
     </Sheet>
