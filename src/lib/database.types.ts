@@ -1851,6 +1851,8 @@ export type Database = {
         InsertOf<ExamAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
       >;
       exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
+      study_map_library: Table<{ id: string; name: string; theme: "forest" }>;
+      study_map_assignments: Table<{ plan_subject_id: string; grade_level_id: string; map_id: string }, { plan_subject_id: string; grade_level_id: string; map_id: string }>;
       plan_subjects: Table<PlanSubject, InsertOf<PlanSubject, "color" | "icon">>;
       plan_lessons: Table<PlanLesson, InsertOf<PlanLesson, "sort_order">>;
       plan_lesson_subjects: Table<PlanLessonSubject, InsertOf<PlanLessonSubject, never>>;

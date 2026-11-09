@@ -24,6 +24,7 @@ import { Classrooms } from "@/routes/Classrooms";
 import { Curriculum } from "@/routes/Curriculum";
 import { CurriculumMap } from "@/routes/CurriculumMap";
 import { MyCurriculum } from "@/routes/MyCurriculum";
+import { StudyMap } from "@/routes/StudyMap";
 import { Employees } from "@/routes/Employees";
 import { StaffAttendance } from "@/routes/StaffAttendance";
 import { Enrollment } from "@/routes/Enrollment";
@@ -112,6 +113,7 @@ function Gate() {
         <Route path="subjects" element={<Subjects />} />
         <Route path="curriculum" element={<Curriculum />} />
         <Route path="curriculum-map" element={<CurriculumMap />} />
+        <Route path="map" element={<StudyMap />} />
         <Route path="my-curriculum" element={<MyCurriculum />} />
         <Route path="enrollment" element={<Enrollment />} />
         <Route path="teaching-load" element={<TeachingLoad />} />
