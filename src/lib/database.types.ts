@@ -1174,6 +1174,20 @@ export type TeachingPlanUnit = {
   updated_at: string;
 };
 
+/** A topic placed into a real teaching period; taught-state lives per slot. See migration 0142. */
+export type TeachingPlanSlot = {
+  id: string;
+  teaching_assignment_id: string;
+  slot_date: string; // YYYY-MM-DD
+  period_no: number;
+  topic_id: string | null;
+  completed_at: string | null;
+  completed_on_plan: boolean | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // ---------------------------------------------------------------- attendance
 // เช็คชื่อเข้าโรงเรียน — homeroom, once per student per day. See
 // supabase/migrations/0026_attendance.sql for the full grill rationale.
@@ -1690,6 +1704,10 @@ export type Database = {
       teaching_plan_units: Table<
         TeachingPlanUnit,
         InsertOf<TeachingPlanUnit, "description" | "completed_at" | "completed_on_plan" | "note">
+      >;
+      teaching_plan_slots: Table<
+        TeachingPlanSlot,
+        InsertOf<TeachingPlanSlot, "topic_id" | "completed_at" | "completed_on_plan" | "note">
       >;
       period_definitions: Table<PeriodDefinition, InsertOf<PeriodDefinition, never>>;
       schedule_entries: Table<ScheduleEntry, InsertOf<ScheduleEntry, never>>;

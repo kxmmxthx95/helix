@@ -34,6 +34,7 @@ import { StatusManagement } from "@/routes/StatusManagement";
 import { Subjects } from "@/routes/Subjects";
 import { TeachingLoad } from "@/routes/TeachingLoad";
 import { TeachingPlan } from "@/routes/TeachingPlan";
+import { TeachingPlanCalendar } from "@/routes/TeachingPlanCalendar";
 import { Timetable } from "@/routes/Timetable";
 import { TimeTracking } from "@/routes/TimeTracking";
 import { canUsePos, isCashierOnly } from "@/lib/roles";
@@ -115,6 +116,7 @@ function Gate() {
         <Route path="enrollment" element={<Enrollment />} />
         <Route path="teaching-load" element={<TeachingLoad />} />
         <Route path="teaching-plan" element={<TeachingPlan />} />
+        <Route path="teaching-plan/:assignmentId" element={<TeachingPlanCalendar />} />
         <Route path="timetable" element={<Timetable />} />
         <Route path="academic-events" element={<AcademicEvents />} />
         <Route path="time-tracking" element={<TimeTracking />} />
