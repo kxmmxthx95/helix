@@ -30,7 +30,7 @@ const EVENT_TYPE_LABEL: Record<AcademicEventType, string> = {
 };
 
 const EVENT_TYPE_DOT: Record<AcademicEventType, string> = {
-  holiday: "bg-pink-500",
+  holiday: "bg-red-500",
   suspended: "bg-orange-500",
   exam_period: "bg-blue-500",
   teacher_workday: "bg-violet-500",
@@ -39,7 +39,7 @@ const EVENT_TYPE_DOT: Record<AcademicEventType, string> = {
 
 // Tinted chip per type — same hue as the dot, used on the grids and event rows.
 const EVENT_TYPE_CHIP: Record<AcademicEventType, string> = {
-  holiday: "bg-pink-100 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300",
+  holiday: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
   suspended: "bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
   exam_period: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
   teacher_workday: "bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
