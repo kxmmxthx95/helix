@@ -634,6 +634,8 @@ function AppShellInner() {
     <div
       className={cn(
         "fixed inset-0 flex overflow-hidden overscroll-none max-lg:flex-col max-lg:gap-0 max-lg:p-0 lg:flex-row lg:p-2",
+        // iPad/touch: full-bleed, no floating-card frame (p-2 strip showed as a bottom border)
+        "[@media(pointer:coarse)]:p-0 [@media(pointer:coarse)]:gap-0",
         collapsed ? "lg:gap-0" : "lg:gap-2",
       )}
     >
@@ -760,7 +762,7 @@ function AppShellInner() {
       {avatarInput}
 
       {/* Main pane */}
-      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden bg-background max-lg:rounded-none max-lg:shadow-none lg:rounded-2xl lg:shadow-card">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden bg-background max-lg:rounded-none max-lg:shadow-none lg:rounded-2xl lg:shadow-card [@media(pointer:coarse)]:rounded-none [@media(pointer:coarse)]:shadow-none">
         <header
           className={cn(
             "glass sticky top-0 z-20 shrink-0 pt-safe lg:hidden",
