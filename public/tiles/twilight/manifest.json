@@ -1,0 +1,379 @@
+{
+  "tiles": [
+    {
+      "id": "grass_plain",
+      "file": "grass_plain.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "grass_white_flowers",
+      "file": "grass_white_flowers.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "grass_pink_flowers",
+      "file": "grass_pink_flowers.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "foliage_plain",
+      "file": "foliage_plain.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "foliage_white_flowers",
+      "file": "foliage_white_flowers.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "foliage_pink_flowers",
+      "file": "foliage_pink_flowers.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "dirt_rocks_01",
+      "file": "dirt_rocks_01.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "dirt_rocks_02",
+      "file": "dirt_rocks_02.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "grass_dirt_transition_01",
+      "file": "grass_dirt_transition_01.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "grass_dirt_transition_02",
+      "file": "grass_dirt_transition_02.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "grass_dirt_transition_03",
+      "file": "grass_dirt_transition_03.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "grass_dirt_clearing",
+      "file": "grass_dirt_clearing.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "stone_floor_01",
+      "file": "stone_floor_01.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "stone_floor_02",
+      "file": "stone_floor_02.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "stone_floor_cracked",
+      "file": "stone_floor_cracked.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "stone_star_large",
+      "file": "stone_star_large.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "stone_star_small",
+      "file": "stone_star_small.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "stone_floor_moss",
+      "file": "stone_floor_moss.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "rubble_ground",
+      "file": "rubble_ground.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "water_01",
+      "file": "water_01.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "water_02",
+      "file": "water_02.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    },
+    {
+      "id": "water_bank",
+      "file": "water_bank.png",
+      "canvas": [
+        128,
+        74
+      ],
+      "tile": [
+        128,
+        64
+      ],
+      "anchor": [
+        64,
+        32
+      ],
+      "sideDepth": 10
+    }
+  ],
+  "note": "Trial normalization: nearest-neighbour resizing and silhouette mask, not hand-retouched seamless tiles. Cliff, stairs and waterfall excluded until separate anchors/heights are authored."
+}

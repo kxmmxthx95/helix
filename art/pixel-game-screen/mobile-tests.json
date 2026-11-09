@@ -1,0 +1,171 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "count": 39,
+  "checks": [
+    {
+      "name": "all 54 source props loaded",
+      "pass": true
+    },
+    {
+      "name": "shared sprite / architecture contact-depth ordering",
+      "pass": true
+    },
+    {
+      "name": "fixed perspective; no island skirts or orbit",
+      "pass": true
+    },
+    {
+      "name": "stage 1: button reaches settled target",
+      "pass": true
+    },
+    {
+      "name": "stage 1: every viewport pixel opaque (no blank wedges)",
+      "pass": true
+    },
+    {
+      "name": "stage 1: camera crop wholly within extended terrain",
+      "pass": true
+    },
+    {
+      "name": "stage 1: route marker outside HUD safe areas",
+      "pass": true
+    },
+    {
+      "name": "stage 2: button reaches settled target",
+      "pass": true
+    },
+    {
+      "name": "stage 2: every viewport pixel opaque (no blank wedges)",
+      "pass": true
+    },
+    {
+      "name": "stage 2: camera crop wholly within extended terrain",
+      "pass": true
+    },
+    {
+      "name": "stage 2: route marker outside HUD safe areas",
+      "pass": true
+    },
+    {
+      "name": "stage 3: button reaches settled target",
+      "pass": true
+    },
+    {
+      "name": "stage 3: every viewport pixel opaque (no blank wedges)",
+      "pass": true
+    },
+    {
+      "name": "stage 3: camera crop wholly within extended terrain",
+      "pass": true
+    },
+    {
+      "name": "stage 3: route marker outside HUD safe areas",
+      "pass": true
+    },
+    {
+      "name": "stage 4: button reaches settled target",
+      "pass": true
+    },
+    {
+      "name": "stage 4: every viewport pixel opaque (no blank wedges)",
+      "pass": true
+    },
+    {
+      "name": "stage 4: camera crop wholly within extended terrain",
+      "pass": true
+    },
+    {
+      "name": "stage 4: route marker outside HUD safe areas",
+      "pass": true
+    },
+    {
+      "name": "stage 5: button reaches settled target",
+      "pass": true
+    },
+    {
+      "name": "stage 5: every viewport pixel opaque (no blank wedges)",
+      "pass": true
+    },
+    {
+      "name": "stage 5: camera crop wholly within extended terrain",
+      "pass": true
+    },
+    {
+      "name": "stage 5: route marker outside HUD safe areas",
+      "pass": true
+    },
+    {
+      "name": "last-stage next disabled",
+      "pass": true
+    },
+    {
+      "name": "right arrow clamps at final stage",
+      "pass": true
+    },
+    {
+      "name": "Home + first-stage boundary",
+      "pass": true
+    },
+    {
+      "name": "left arrow clamps at entrance",
+      "pass": true
+    },
+    {
+      "name": "number keyboard selection",
+      "pass": true
+    },
+    {
+      "name": "right keyboard navigation",
+      "pass": true
+    },
+    {
+      "name": "left keyboard navigation",
+      "pass": true
+    },
+    {
+      "name": "End selects temple",
+      "pass": true
+    },
+    {
+      "name": "previous button",
+      "pass": true
+    },
+    {
+      "name": "next button",
+      "pass": true
+    },
+    {
+      "name": "drag and wheel do not orbit, pan or zoom",
+      "pass": true
+    },
+    {
+      "name": "complete elevated sanctuary fits between HUD safe areas",
+      "pass": true
+    },
+    {
+      "name": "HUD stays inside viewport",
+      "pass": true
+    },
+    {
+      "name": "title and sample disclosure do not overlap",
+      "pass": true
+    },
+    {
+      "name": "extended canopy leaves walking-lane centre clear (0 opaque overlaps)",
+      "pass": true
+    },
+    {
+      "name": "no captured errors or unhandled rejections",
+      "pass": true
+    }
+  ],
+  "state": {
+    "stage": "temple",
+    "scale": 0.5,
+    "placements": 1680,
+    "errors": []
+  }
+}

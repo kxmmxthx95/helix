@@ -1,0 +1,33 @@
+{
+  "desktop": {
+    "checks": 39,
+    "screenshots": [
+      "art/pixel-game-screen/desktop-entrance.png",
+      "art/pixel-game-screen/desktop-grove.png",
+      "art/pixel-game-screen/desktop-bridge.png",
+      "art/pixel-game-screen/desktop-ruins.png",
+      "art/pixel-game-screen/desktop-temple.png"
+    ],
+    "diorama_checks": 21
+  },
+  "mobile": {
+    "checks": 39,
+    "screenshots": [
+      "art/pixel-game-screen/mobile-entrance.png",
+      "art/pixel-game-screen/mobile-grove.png",
+      "art/pixel-game-screen/mobile-bridge.png",
+      "art/pixel-game-screen/mobile-ruins.png",
+      "art/pixel-game-screen/mobile-temple.png"
+    ],
+    "diorama_checks": 21
+  },
+  "source_files_preserved": 83,
+  "fullscreen": {
+    "entered": true,
+    "exit": {
+      "fullscreen": false,
+      "errors": [],
+      "url": "http://localhost:5555/pixel-game-screen.html"
+    }
+  }
+}

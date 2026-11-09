@@ -1,16 +1,17 @@
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronForward, Users } from "@/components/icons";
+import { PlanProgress } from "@/components/TeachingPlanParts";
 import { Card, EmptyState, Select, Skeleton } from "@/components/ui";
 import { useActiveAcademicYear, useCurrentTerm } from "@/hooks/useAcademicTerms";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
-import { useLearningAreas } from "@/hooks/useCurriculum";
 import { useDepartments, useProfiles } from "@/hooks/useProfiles";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import { useDepartmentTeachingAssignments } from "@/hooks/useTeachingLoad";
-import { planUnitStatus, useTeachingPlanUnitsForAssignments } from "@/hooks/useTeachingPlan";
-import { profileFullName, type TeachingAssignment, type TeachingPlanUnit } from "@/lib/database.types";
+import { useAssignmentProgress } from "@/hooks/useTeachingPlanSlots";
+import { profileFullName, type TeachingAssignment } from "@/lib/database.types";
 import { canManageAcademic, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
@@ -89,7 +90,14 @@ export function TeachingPlanOverview() {
   );
 }
 
-type Row = { assignment: TeachingAssignment; total: number; completed: number; offPlan: number };
+function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card px-4 py-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={cn("text-2xl font-semibold tabular-nums", tone)}>{value}</p>
+    </div>
+  );
+}
 
 function OverviewBoard({
   departmentId,
@@ -113,61 +121,35 @@ function OverviewBoard({
   });
   const { data: classrooms = [] } = useClassroomsByDepartment(departmentId);
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
-  const { data: learningAreas = [] } = useLearningAreas();
-  const { data: departments = [] } = useDepartments();
 
-  const assignmentIds = useMemo(() => assignments.map((a) => a.id), [assignments]);
-  const { data: units = [] } = useTeachingPlanUnitsForAssignments(assignmentIds);
-
-  const [selectedId, setSelectedId] = useState("");
+  const { progress } = useAssignmentProgress(assignments, departmentId);
 
   function label(a: TeachingAssignment) {
     const t = teachers.find((x) => x.id === a.teacher_id);
     const s = subjects.find((x) => x.id === a.subject_id);
     const c = classrooms.find((x) => x.id === a.classroom_id);
     const g = gradeLevels.find((x) => x.id === c?.grade_level_id);
-    const la = learningAreas.find((x) => x.id === s?.learning_area_id);
-    const dept = departments.find((x) => x.id === s?.department_id);
     return {
       teacher: t ? profileFullName(t) : a.teacher_id === null ? "ไม่มีครู" : "—",
       code: s?.code ?? "—",
-      learningArea: la?.name ?? "—",
       name: s?.name_th ?? "—",
-      department: dept?.name ?? "—",
-      gradeLevel: g?.name ?? "—",
-      classroom: c?.name ?? "—",
+      where: [g?.name, c?.name].filter(Boolean).join(" · ") || "—",
     };
   }
 
-  const rows: Row[] = useMemo(
-    () =>
-      assignments.map((a) => {
-        const rowUnits = units.filter((u) => u.teaching_assignment_id === a.id);
-        return {
-          assignment: a,
-          total: rowUnits.length,
-          completed: rowUnits.filter((u) => u.completed_at !== null).length,
-          offPlan: rowUnits.filter((u) => u.completed_on_plan === false).length,
-        };
-      }),
-    [assignments, units],
-  );
-
-  const tableHead = (
-    <thead className="bg-muted text-left text-xs text-muted-foreground">
-      <tr>
-        <th className="w-8 px-3 py-2" />
-        <th className="px-3 py-2 font-medium">ครูผู้สอน</th>
-        <th className="px-3 py-2 font-medium">รหัสวิชา</th>
-        <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
-        <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
-        <th className="px-3 py-2 font-medium">แผนก</th>
-        <th className="px-3 py-2 font-medium">ระดับชั้น</th>
-        <th className="px-3 py-2 font-medium">ห้อง</th>
-        <th className="px-3 py-2 font-medium">ความคืบหน้า</th>
-      </tr>
-    </thead>
-  );
+  const rows = assignments;
+  const all = useMemo(() => {
+    const ps = [...progress.values()].map((p) => p.stats);
+    const total = ps.reduce((n, p) => n + p.total, 0);
+    const completed = ps.reduce((n, p) => n + p.completed, 0);
+    return {
+      total,
+      completed,
+      offPlan: ps.reduce((n, p) => n + p.offPlan, 0),
+      noPlan: ps.filter((p) => p.planned === 0).length,
+      pct: total ? Math.round((completed / total) * 100) : 0,
+    };
+  }, [progress]);
 
   if (!isLoading && rows.length === 0) {
     return (
@@ -178,118 +160,59 @@ function OverviewBoard({
   }
 
   return (
-    <Card className="overflow-hidden p-0">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[56rem] text-xs">
-          {tableHead}
-          <tbody>
-            {isLoading
-              ? [0, 1, 2, 3].map((i) => (
-                  <tr key={i} className="h-[40px] border-t border-border" role="status" aria-label="กำลังโหลด">
-                    <td className="px-3 py-0">
-                      <Skeleton className="h-3 w-3" />
-                    </td>
-                    <td className="px-3 py-0">
-                      <Skeleton className="h-3 w-24" />
-                    </td>
-                    <td className="px-3 py-0">
-                      <Skeleton className="h-3 w-12" />
-                    </td>
-                    <td className="px-3 py-0">
-                      <Skeleton className="h-3 w-20" />
-                    </td>
-                    <td className="px-3 py-0">
-                      <Skeleton className="h-3 w-28" />
-                    </td>
-                    <td className="px-3 py-0">
-                      <Skeleton className="h-3 w-16" />
-                    </td>
-                    <td className="px-3 py-0">
-                      <Skeleton className="h-3 w-14" />
-                    </td>
-                    <td className="px-3 py-0">
-                      <Skeleton className="h-3 w-10" />
-                    </td>
-                    <td className="px-3 py-0">
-                      <Skeleton className="h-4 w-20 rounded-full" />
-                    </td>
-                  </tr>
-                ))
-              : rows.map((r) => {
-                  const l = label(r.assignment);
-                  const open = selectedId === r.assignment.id;
-                  const rowUnits = units.filter((u) => u.teaching_assignment_id === r.assignment.id);
-                  return (
-                    <Fragment key={r.assignment.id}>
-                      <tr
-                        onClick={() => setSelectedId(open ? "" : r.assignment.id)}
-                        className={cn(
-                          "h-[40px] cursor-pointer border-t border-border transition-colors",
-                          open ? "bg-foreground/10" : "hover:bg-muted",
-                        )}
-                      >
-                        <td className="px-3 py-0">
-                          <ChevronForward
-                            className={cn("h-3 w-3 shrink-0 rotate-90 text-muted-foreground transition-transform", open && "-rotate-90")}
-                          />
-                        </td>
-                        <td className="px-3 py-0 font-medium">{l.teacher}</td>
-                        <td className="px-3 py-0 text-xs">{l.code}</td>
-                        <td className="px-3 py-0">{l.learningArea}</td>
-                        <td className="px-3 py-0">{l.name}</td>
-                        <td className="px-3 py-0">{l.department}</td>
-                        <td className="px-3 py-0">{l.gradeLevel}</td>
-                        <td className="px-3 py-0">{l.classroom}</td>
-                        <td className="px-3 py-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                              {r.completed}/{r.total} หน่วย
-                            </span>
-                            {r.offPlan > 0 && (
-                              <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs text-warning">
-                                ไม่ตามแผน {r.offPlan} ครั้ง
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                      {open && (
-                        <tr className="border-t border-border">
-                          <td colSpan={9} className="bg-muted/20 p-3">
-                            <PlanDetail units={rowUnits} />
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-          </tbody>
-        </table>
+    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <Stat label="ความคืบหน้ารวม" value={`${all.pct}%`} />
+        <Stat label="คาบที่สอนแล้ว" value={`${all.completed}/${all.total}`} />
+        <Stat label="สอนไม่ตามแผน" value={String(all.offPlan)} tone={all.offPlan ? "text-warning" : undefined} />
+        <Stat label="วิชาที่ยังไม่วางหัวข้อ" value={String(all.noPlan)} tone={all.noPlan ? "text-warning" : undefined} />
       </div>
-    </Card>
-  );
-}
 
-/** Read-only — oversight view, no edit/mark actions (grill decision). */
-function PlanDetail({ units }: { units: TeachingPlanUnit[] }) {
-  return (
-    <ul className="divide-y divide-border rounded-lg border border-border bg-background text-sm">
-      {units.map((u) => {
-        const s = planUnitStatus(u);
-        return (
-          <li key={u.id} className="flex items-center justify-between gap-2 px-3 py-1.5">
-            <span className="min-w-0 flex-1">
-              <span className="block truncate">
-                หน่วยที่ {u.unit_no} · {u.title}
-              </span>
-              {u.description && <span className="text-xs text-muted-foreground">{u.description}</span>}
-              {u.note && <span className="block text-xs text-muted-foreground">บันทึก: {u.note}</span>}
-            </span>
-            <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs", s.className)}>{s.text}</span>
-          </li>
-        );
-      })}
-      {units.length === 0 && <li className="px-3 py-2 text-sm text-muted-foreground">ยังไม่มีการแบ่งหน่วยการสอน</li>}
-    </ul>
+      <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
+        {isLoading
+          ? [0, 1, 2, 3].map((i) => (
+              <Card key={i} role="status" aria-label="กำลังโหลด" className="space-y-2 p-3">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-1.5 w-full" />
+              </Card>
+            ))
+          : rows.map((a) => {
+              const l = label(a);
+              const st = progress.get(a.id)?.stats;
+              return (
+                <Link
+                  key={a.id}
+                  to={`/teaching-plan/${a.id}`}
+                  className="block rounded-2xl border border-border bg-card p-3 text-left transition-colors hover:bg-muted/60"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-xs font-medium">{l.teacher}</span>
+                    <ChevronForward className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  </div>
+                  <p className="mt-1 text-sm font-semibold leading-snug">{l.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {l.code} · {l.where}
+                  </p>
+                  {st && <PlanProgress stats={st} className="mt-2" />}
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {st && st.planned === 0 && (
+                      <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs text-warning">ยังไม่วางหัวข้อ</span>
+                    )}
+                    {st && st.offPlan > 0 && (
+                      <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs text-warning">
+                        ไม่ตามแผน {st.offPlan} ครั้ง
+                      </span>
+                    )}
+                    {st && st.total > 0 && st.completed === st.total && (
+                      <span className="rounded-full bg-success/15 px-2 py-0.5 text-xs text-success">สอนครบ</span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+      </div>
+
+    </div>
   );
 }

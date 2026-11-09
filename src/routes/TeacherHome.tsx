@@ -427,7 +427,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         )}
       </>
     );
-    const cls = cn("relative flex h-full items-center gap-3 rounded-2xl p-4 text-left transition-colors", surface);
+    const cls = cn("relative flex h-full items-center gap-3 rounded-2xl p-4 text-left transition-[background-color,transform] duration-200 ease-[var(--ease-ios)] active:scale-[0.98]", surface);
     if ("sheet" in t && upNext) {
       return (
         <button

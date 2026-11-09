@@ -1174,6 +1174,20 @@ export type TeachingPlanUnit = {
   updated_at: string;
 };
 
+/** A topic placed into a real teaching period; taught-state lives per slot. See migration 0142. */
+export type TeachingPlanSlot = {
+  id: string;
+  teaching_assignment_id: string;
+  slot_date: string; // YYYY-MM-DD
+  period_no: number;
+  topic_id: string | null;
+  completed_at: string | null;
+  completed_on_plan: boolean | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // ---------------------------------------------------------------- attendance
 // เช็คชื่อเข้าโรงเรียน — homeroom, once per student per day. See
 // supabase/migrations/0026_attendance.sql for the full grill rationale.
@@ -1691,6 +1705,10 @@ export type Database = {
         TeachingPlanUnit,
         InsertOf<TeachingPlanUnit, "description" | "completed_at" | "completed_on_plan" | "note">
       >;
+      teaching_plan_slots: Table<
+        TeachingPlanSlot,
+        InsertOf<TeachingPlanSlot, "topic_id" | "completed_at" | "completed_on_plan" | "note">
+      >;
       period_definitions: Table<PeriodDefinition, InsertOf<PeriodDefinition, never>>;
       schedule_entries: Table<ScheduleEntry, InsertOf<ScheduleEntry, never>>;
       time_clock_records: Table<
@@ -1833,6 +1851,8 @@ export type Database = {
         InsertOf<ExamAttemptAnswer, "choice_id" | "short_answer" | "is_correct" | "points_awarded" | "answered_at">
       >;
       exam_attempt_events: Table<ExamAttemptEvent, InsertOf<ExamAttemptEvent, "at">>;
+      study_map_library: Table<{ id: string; name: string; theme: "forest" }>;
+      study_map_assignments: Table<{ plan_subject_id: string; grade_level_id: string; map_id: string }, { plan_subject_id: string; grade_level_id: string; map_id: string }>;
       plan_subjects: Table<PlanSubject, InsertOf<PlanSubject, "color" | "icon">>;
       plan_lessons: Table<PlanLesson, InsertOf<PlanLesson, "sort_order">>;
       plan_lesson_subjects: Table<PlanLessonSubject, InsertOf<PlanLessonSubject, never>>;

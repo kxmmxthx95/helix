@@ -1,0 +1,8 @@
+{
+  "entered": true,
+  "exit": {
+    "fullscreen": false,
+    "errors": [],
+    "url": "http://localhost:5555/pixel-game-screen.html"
+  }
+}

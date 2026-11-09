@@ -54,6 +54,7 @@ import {
 } from "@/hooks/useSchedule";
 import { TimetableExportSheet } from "@/routes/TimetableExport";
 import { generatePeriods } from "@/lib/periodGenerator";
+import { hhmm, mergePeriods, teachingOrdinal } from "@/lib/periods";
 import {
   profileFullName,
   type Classroom,
@@ -519,7 +520,7 @@ function classroomLabelOf(c: Classroom, gradeLevels: GradeLevel[]) {
   return `${code ? gradeShortLabel(code) : "—"}/${c.name}`;
 }
 
-type TimetableStyling = {
+export type TimetableStyling = {
   /** Class string for a subject's card: area hue, grade shade. */
   color: (subjectId: string, classroomId: string) => string;
   /** Same hue and shade as `color`, as a gradient — for the timetable grid cards. */
@@ -533,7 +534,7 @@ type TimetableStyling = {
   legend: (subjectIds: string[]) => { id: string; name: string; dot: string }[];
 };
 
-function useTimetableStyling(
+export function useTimetableStyling(
   subjects: { id: string; learning_area_id: string; subject_type: keyof typeof SUBJECT_TYPE_LABEL }[],
   classrooms: Classroom[],
   gradeLevels: GradeLevel[],
@@ -1035,21 +1036,7 @@ function BackHeader({ label, onBack }: { label: string; onBack: () => void }) {
   );
 }
 
-const hhmm = (t: string) => t.slice(0, 5);
-
-/** Grade-specific rows (0031) override the department default at the same day+period_no. */
-function mergePeriods(defaults: PeriodDefinition[], grade: PeriodDefinition[]) {
-  const map = new Map(defaults.map((p) => [`${p.day_of_week}-${p.period_no}`, p]));
-  for (const p of grade) map.set(`${p.day_of_week}-${p.period_no}`, p);
-  return [...map.values()];
-}
-
 const countTeachingSlots = (periods: PeriodDefinition[]) => periods.filter((p) => p.period_type === "teaching").length;
-
-/** Breaks share period_no's sequence in the DB but aren't "คาบ" — this is the number users see (teaching periods only). */
-function teachingOrdinal(periods: { day_of_week: number; period_no: number; period_type: PeriodType }[], day: number, periodNo: number) {
-  return periods.filter((p) => p.day_of_week === day && p.period_type === "teaching" && p.period_no <= periodNo).length;
-}
 
 function TimetableGrid({
   periods,

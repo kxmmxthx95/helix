@@ -18,6 +18,7 @@ import {
   GraduationCap,
   HomeIcon,
   LayoutDashboard,
+  LocationIcon,
   LibraryIcon,
   LogOut,
   MenuIcon,
@@ -63,9 +64,9 @@ import { cn } from "@/lib/utils";
 const TABS = [
   {
     to: "/",
-    label: "หน้าหลัก",
+    label: "Dashboard",
     icon: LayoutDashboard,
-    section: "ภาพรวม",
+    section: "", // bare top-level link: no group header / collapsible
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: false,
@@ -137,6 +138,17 @@ const TABS = [
     managerOnly: false,
     orgWideOnly: false,
     deptManagerOnly: true,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: false,
+  },
+  {
+    to: "/map",
+    label: "แผนที่",
+    icon: LocationIcon,
+    section: "งานวิชาการ",
+    managerOnly: true, // canManageUsers = super_admin only
+    orgWideOnly: false,
+    deptManagerOnly: false,
     academicManagerOnly: false,
     teacherOrManagerOnly: false,
   },
@@ -651,7 +663,7 @@ function AppShellInner() {
         >
           {tabSections.map(({ section, items }) => (
             <div key={section}>
-              {collapsed ? (
+              {!section ? null : collapsed ? (
                 <div className="mx-2 mb-2 border-t border-border/60" />
               ) : (
                 <p className="px-2.5 pb-1.5 text-xs font-medium text-muted-foreground">{section}</p>
@@ -809,10 +821,10 @@ function AppShellInner() {
         >
           <nav className="flex flex-col gap-4">
             {tabSections.map(({ section, items }) => {
-              const open = openSections.has(section);
+              const open = !section || openSections.has(section);
               return (
                 <div key={section}>
-                  <button
+                  {section && <button
                     type="button"
                     aria-expanded={open}
                     onClick={() =>
@@ -826,7 +838,7 @@ function AppShellInner() {
                   >
                     {section}
                     <ChevronDown className={cn("h-3 w-3 transition-transform", !open && "-rotate-90")} />
-                  </button>
+                  </button>}
                   {open && (
                     <div className="flex flex-col gap-0.5">
                       {items.map(({ to, label, icon: Icon }) => (

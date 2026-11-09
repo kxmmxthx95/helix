@@ -1,0 +1,978 @@
+{
+  "count": 54,
+  "note": "Trial crops; glow trimmed, alpha cleaned, anchors are provisional bottom-centre. Not all sprites visually approved.",
+  "assets": [
+    {
+      "id": "oak_large",
+      "file": "oak_large.png",
+      "size": [
+        287,
+        266
+      ],
+      "anchor": [
+        143.5,
+        262
+      ],
+      "sourceRect": [
+        25,
+        17,
+        312,
+        283
+      ]
+    },
+    {
+      "id": "oak_medium",
+      "file": "oak_medium.png",
+      "size": [
+        196,
+        216
+      ],
+      "anchor": [
+        98.0,
+        212
+      ],
+      "sourceRect": [
+        328,
+        64,
+        524,
+        280
+      ]
+    },
+    {
+      "id": "oak_small",
+      "file": "oak_small.png",
+      "size": [
+        169,
+        171
+      ],
+      "anchor": [
+        84.5,
+        167
+      ],
+      "sourceRect": [
+        537,
+        102,
+        706,
+        273
+      ]
+    },
+    {
+      "id": "oak_tiny",
+      "file": "oak_tiny.png",
+      "size": [
+        121,
+        137
+      ],
+      "anchor": [
+        60.5,
+        133
+      ],
+      "sourceRect": [
+        723,
+        133,
+        844,
+        270
+      ]
+    },
+    {
+      "id": "pine_large",
+      "file": "pine_large.png",
+      "size": [
+        227,
+        265
+      ],
+      "anchor": [
+        113.5,
+        261
+      ],
+      "sourceRect": [
+        888,
+        18,
+        1115,
+        283
+      ]
+    },
+    {
+      "id": "pine_medium",
+      "file": "pine_medium.png",
+      "size": [
+        160,
+        228
+      ],
+      "anchor": [
+        80.0,
+        224
+      ],
+      "sourceRect": [
+        1134,
+        49,
+        1294,
+        277
+      ]
+    },
+    {
+      "id": "pine_small",
+      "file": "pine_small.png",
+      "size": [
+        104,
+        174
+      ],
+      "anchor": [
+        52.0,
+        170
+      ],
+      "sourceRect": [
+        1318,
+        99,
+        1422,
+        273
+      ]
+    },
+    {
+      "id": "pine_tiny",
+      "file": "pine_tiny.png",
+      "size": [
+        68,
+        121
+      ],
+      "anchor": [
+        34.0,
+        117
+      ],
+      "sourceRect": [
+        1442,
+        150,
+        1510,
+        271
+      ]
+    },
+    {
+      "id": "cherry_large",
+      "file": "cherry_large.png",
+      "size": [
+        236,
+        212
+      ],
+      "anchor": [
+        118.0,
+        208
+      ],
+      "sourceRect": [
+        12,
+        309,
+        248,
+        521
+      ]
+    },
+    {
+      "id": "cherry_medium",
+      "file": "cherry_medium.png",
+      "size": [
+        146,
+        163
+      ],
+      "anchor": [
+        73.0,
+        159
+      ],
+      "sourceRect": [
+        253,
+        354,
+        399,
+        517
+      ]
+    },
+    {
+      "id": "cherry_small",
+      "file": "cherry_small.png",
+      "size": [
+        92,
+        115
+      ],
+      "anchor": [
+        46.0,
+        111
+      ],
+      "sourceRect": [
+        406,
+        401,
+        498,
+        516
+      ]
+    },
+    {
+      "id": "gold_large",
+      "file": "gold_large.png",
+      "size": [
+        187,
+        204
+      ],
+      "anchor": [
+        93.5,
+        200
+      ],
+      "sourceRect": [
+        511,
+        313,
+        698,
+        517
+      ]
+    },
+    {
+      "id": "gold_medium",
+      "file": "gold_medium.png",
+      "size": [
+        125,
+        153
+      ],
+      "anchor": [
+        62.5,
+        149
+      ],
+      "sourceRect": [
+        705,
+        359,
+        830,
+        512
+      ]
+    },
+    {
+      "id": "gold_small",
+      "file": "gold_small.png",
+      "size": [
+        82,
+        112
+      ],
+      "anchor": [
+        41.0,
+        108
+      ],
+      "sourceRect": [
+        839,
+        395,
+        921,
+        507
+      ]
+    },
+    {
+      "id": "blue_tree",
+      "file": "blue_tree.png",
+      "size": [
+        209,
+        202
+      ],
+      "anchor": [
+        104.5,
+        198
+      ],
+      "sourceRect": [
+        930,
+        319,
+        1139,
+        521
+      ]
+    },
+    {
+      "id": "wisteria_large",
+      "file": "wisteria_large.png",
+      "size": [
+        213,
+        193
+      ],
+      "anchor": [
+        106.5,
+        189
+      ],
+      "sourceRect": [
+        1156,
+        330,
+        1369,
+        523
+      ]
+    },
+    {
+      "id": "wisteria_small",
+      "file": "wisteria_small.png",
+      "size": [
+        138,
+        147
+      ],
+      "anchor": [
+        69.0,
+        143
+      ],
+      "sourceRect": [
+        1382,
+        370,
+        1520,
+        517
+      ]
+    },
+    {
+      "id": "dead_large",
+      "file": "dead_large.png",
+      "size": [
+        203,
+        176
+      ],
+      "anchor": [
+        101.5,
+        172
+      ],
+      "sourceRect": [
+        17,
+        536,
+        220,
+        712
+      ]
+    },
+    {
+      "id": "dead_medium",
+      "file": "dead_medium.png",
+      "size": [
+        122,
+        132
+      ],
+      "anchor": [
+        61.0,
+        128
+      ],
+      "sourceRect": [
+        220,
+        574,
+        342,
+        706
+      ]
+    },
+    {
+      "id": "dead_small",
+      "file": "dead_small.png",
+      "size": [
+        79,
+        102
+      ],
+      "anchor": [
+        39.5,
+        98
+      ],
+      "sourceRect": [
+        355,
+        604,
+        434,
+        706
+      ]
+    },
+    {
+      "id": "fallen_log",
+      "file": "fallen_log.png",
+      "size": [
+        123,
+        85
+      ],
+      "anchor": [
+        61.5,
+        81
+      ],
+      "sourceRect": [
+        455,
+        618,
+        578,
+        703
+      ]
+    },
+    {
+      "id": "stump_large",
+      "file": "stump_large.png",
+      "size": [
+        101,
+        75
+      ],
+      "anchor": [
+        50.5,
+        71
+      ],
+      "sourceRect": [
+        591,
+        630,
+        692,
+        705
+      ]
+    },
+    {
+      "id": "stump_small",
+      "file": "stump_small.png",
+      "size": [
+        77,
+        64
+      ],
+      "anchor": [
+        38.5,
+        60
+      ],
+      "sourceRect": [
+        707,
+        639,
+        784,
+        703
+      ]
+    },
+    {
+      "id": "stump_hollow",
+      "file": "stump_hollow.png",
+      "size": [
+        72,
+        60
+      ],
+      "anchor": [
+        36.0,
+        56
+      ],
+      "sourceRect": [
+        802,
+        644,
+        874,
+        704
+      ]
+    },
+    {
+      "id": "root_bridge",
+      "file": "root_bridge.png",
+      "size": [
+        209,
+        96
+      ],
+      "anchor": [
+        104.5,
+        92
+      ],
+      "sourceRect": [
+        894,
+        614,
+        1103,
+        710
+      ]
+    },
+    {
+      "id": "vine_arch_large",
+      "file": "vine_arch_large.png",
+      "size": [
+        202,
+        138
+      ],
+      "anchor": [
+        101.0,
+        134
+      ],
+      "sourceRect": [
+        1126,
+        569,
+        1328,
+        707
+      ]
+    },
+    {
+      "id": "vine_arch_small",
+      "file": "vine_arch_small.png",
+      "size": [
+        74,
+        100
+      ],
+      "anchor": [
+        37.0,
+        96
+      ],
+      "sourceRect": [
+        1346,
+        603,
+        1420,
+        703
+      ]
+    },
+    {
+      "id": "vine_arch_low",
+      "file": "vine_arch_low.png",
+      "size": [
+        103,
+        98
+      ],
+      "anchor": [
+        51.5,
+        94
+      ],
+      "sourceRect": [
+        1420,
+        604,
+        1523,
+        702
+      ]
+    },
+    {
+      "id": "bush_large",
+      "file": "bush_large.png",
+      "size": [
+        175,
+        132
+      ],
+      "anchor": [
+        87.5,
+        128
+      ],
+      "sourceRect": [
+        18,
+        724,
+        193,
+        856
+      ]
+    },
+    {
+      "id": "bush_flower_large",
+      "file": "bush_flower_large.png",
+      "size": [
+        136,
+        106
+      ],
+      "anchor": [
+        68.0,
+        102
+      ],
+      "sourceRect": [
+        209,
+        744,
+        345,
+        850
+      ]
+    },
+    {
+      "id": "bush_flower_small",
+      "file": "bush_flower_small.png",
+      "size": [
+        106,
+        81
+      ],
+      "anchor": [
+        53.0,
+        77
+      ],
+      "sourceRect": [
+        360,
+        766,
+        466,
+        847
+      ]
+    },
+    {
+      "id": "bush_tiny",
+      "file": "bush_tiny.png",
+      "size": [
+        69,
+        55
+      ],
+      "anchor": [
+        34.5,
+        51
+      ],
+      "sourceRect": [
+        479,
+        789,
+        548,
+        844
+      ]
+    },
+    {
+      "id": "plant_pink",
+      "file": "plant_pink.png",
+      "size": [
+        110,
+        100
+      ],
+      "anchor": [
+        55.0,
+        96
+      ],
+      "sourceRect": [
+        567,
+        745,
+        677,
+        845
+      ]
+    },
+    {
+      "id": "plant_curled",
+      "file": "plant_curled.png",
+      "size": [
+        111,
+        98
+      ],
+      "anchor": [
+        55.5,
+        94
+      ],
+      "sourceRect": [
+        687,
+        751,
+        798,
+        849
+      ]
+    },
+    {
+      "id": "plant_broad",
+      "file": "plant_broad.png",
+      "size": [
+        102,
+        87
+      ],
+      "anchor": [
+        51.0,
+        83
+      ],
+      "sourceRect": [
+        807,
+        760,
+        909,
+        847
+      ]
+    },
+    {
+      "id": "plant_fern",
+      "file": "plant_fern.png",
+      "size": [
+        113,
+        85
+      ],
+      "anchor": [
+        56.5,
+        81
+      ],
+      "sourceRect": [
+        922,
+        761,
+        1035,
+        846
+      ]
+    },
+    {
+      "id": "plant_flower",
+      "file": "plant_flower.png",
+      "size": [
+        154,
+        91
+      ],
+      "anchor": [
+        77.0,
+        87
+      ],
+      "sourceRect": [
+        1035,
+        758,
+        1189,
+        849
+      ]
+    },
+    {
+      "id": "blue_leaves",
+      "file": "blue_leaves.png",
+      "size": [
+        128,
+        95
+      ],
+      "anchor": [
+        64.0,
+        91
+      ],
+      "sourceRect": [
+        1200,
+        752,
+        1328,
+        847
+      ]
+    },
+    {
+      "id": "crystal",
+      "file": "crystal.png",
+      "size": [
+        98,
+        95
+      ],
+      "anchor": [
+        49.0,
+        91
+      ],
+      "sourceRect": [
+        1348,
+        754,
+        1446,
+        849
+      ]
+    },
+    {
+      "id": "sprout",
+      "file": "sprout.png",
+      "size": [
+        46,
+        53
+      ],
+      "anchor": [
+        23.0,
+        49
+      ],
+      "sourceRect": [
+        1468,
+        790,
+        1514,
+        843
+      ]
+    },
+    {
+      "id": "rocks_large",
+      "file": "rocks_large.png",
+      "size": [
+        169,
+        133
+      ],
+      "anchor": [
+        84.5,
+        129
+      ],
+      "sourceRect": [
+        18,
+        872,
+        187,
+        1005
+      ]
+    },
+    {
+      "id": "rocks_medium",
+      "file": "rocks_medium.png",
+      "size": [
+        137,
+        106
+      ],
+      "anchor": [
+        68.5,
+        102
+      ],
+      "sourceRect": [
+        198,
+        894,
+        335,
+        1000
+      ]
+    },
+    {
+      "id": "rocks_small",
+      "file": "rocks_small.png",
+      "size": [
+        118,
+        91
+      ],
+      "anchor": [
+        59.0,
+        87
+      ],
+      "sourceRect": [
+        349,
+        906,
+        467,
+        997
+      ]
+    },
+    {
+      "id": "pebbles",
+      "file": "pebbles.png",
+      "size": [
+        103,
+        76
+      ],
+      "anchor": [
+        51.5,
+        72
+      ],
+      "sourceRect": [
+        491,
+        918,
+        594,
+        994
+      ]
+    },
+    {
+      "id": "grass_large",
+      "file": "grass_large.png",
+      "size": [
+        123,
+        87
+      ],
+      "anchor": [
+        61.5,
+        83
+      ],
+      "sourceRect": [
+        615,
+        906,
+        738,
+        993
+      ]
+    },
+    {
+      "id": "grass_medium",
+      "file": "grass_medium.png",
+      "size": [
+        90,
+        67
+      ],
+      "anchor": [
+        45.0,
+        63
+      ],
+      "sourceRect": [
+        755,
+        922,
+        845,
+        989
+      ]
+    },
+    {
+      "id": "grass_small",
+      "file": "grass_small.png",
+      "size": [
+        59,
+        48
+      ],
+      "anchor": [
+        29.5,
+        44
+      ],
+      "sourceRect": [
+        867,
+        937,
+        926,
+        985
+      ]
+    },
+    {
+      "id": "grass_tiny",
+      "file": "grass_tiny.png",
+      "size": [
+        39,
+        37
+      ],
+      "anchor": [
+        19.5,
+        33
+      ],
+      "sourceRect": [
+        943,
+        949,
+        982,
+        986
+      ]
+    },
+    {
+      "id": "mushroom_red_large",
+      "file": "mushroom_red_large.png",
+      "size": [
+        79,
+        76
+      ],
+      "anchor": [
+        39.5,
+        72
+      ],
+      "sourceRect": [
+        1007,
+        918,
+        1086,
+        994
+      ]
+    },
+    {
+      "id": "mushroom_red_medium",
+      "file": "mushroom_red_medium.png",
+      "size": [
+        58,
+        56
+      ],
+      "anchor": [
+        29.0,
+        52
+      ],
+      "sourceRect": [
+        1105,
+        933,
+        1163,
+        989
+      ]
+    },
+    {
+      "id": "mushroom_red_small",
+      "file": "mushroom_red_small.png",
+      "size": [
+        42,
+        40
+      ],
+      "anchor": [
+        21.0,
+        36
+      ],
+      "sourceRect": [
+        1187,
+        946,
+        1229,
+        986
+      ]
+    },
+    {
+      "id": "mushroom_blue_large",
+      "file": "mushroom_blue_large.png",
+      "size": [
+        73,
+        71
+      ],
+      "anchor": [
+        36.5,
+        67
+      ],
+      "sourceRect": [
+        1259,
+        923,
+        1332,
+        994
+      ]
+    },
+    {
+      "id": "mushroom_blue_small",
+      "file": "mushroom_blue_small.png",
+      "size": [
+        55,
+        54
+      ],
+      "anchor": [
+        27.5,
+        50
+      ],
+      "sourceRect": [
+        1356,
+        936,
+        1411,
+        990
+      ]
+    },
+    {
+      "id": "glow_plant",
+      "file": "glow_plant.png",
+      "size": [
+        64,
+        64
+      ],
+      "anchor": [
+        32.0,
+        60
+      ],
+      "sourceRect": [
+        1435,
+        928,
+        1499,
+        992
+      ]
+    }
+  ]
+}
