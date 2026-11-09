@@ -1,0 +1,104 @@
+{
+ "pack": "overgrown-city",
+ "style": "bright cartoon 3D",
+ "assets": [
+  {
+   "id": "statue-head",
+   "label": "Giant statue head (original stylization)",
+   "file": "statue-head.glb",
+   "triangles": 23358,
+   "bytes": 1755008
+  },
+  {
+   "id": "building-ivy-a",
+   "label": "Ivy tower (cream, 7 floors)",
+   "file": "building-ivy-a.glb",
+   "triangles": 12956,
+   "bytes": 2725272
+  },
+  {
+   "id": "building-ivy-b",
+   "label": "Ivy block (green-grey, 5 floors)",
+   "file": "building-ivy-b.glb",
+   "triangles": 11220,
+   "bytes": 2646088
+  },
+  {
+   "id": "building-ivy-c",
+   "label": "Ivy low-rise (peach, 3 floors)",
+   "file": "building-ivy-c.glb",
+   "triangles": 7888,
+   "bytes": 2420672
+  },
+  {
+   "id": "shop-awning",
+   "label": "Small shop with striped awning",
+   "file": "shop-awning.glb",
+   "triangles": 6504,
+   "bytes": 3289152
+  },
+  {
+   "id": "van-wrecked",
+   "label": "Abandoned moss-covered van",
+   "file": "van-wrecked.glb",
+   "triangles": 1964,
+   "bytes": 1500440
+  },
+  {
+   "id": "car-wrecked",
+   "label": "Abandoned teal car",
+   "file": "car-wrecked.glb",
+   "triangles": 1552,
+   "bytes": 1109852
+  },
+  {
+   "id": "stairs-stone",
+   "label": "Overgrown stone stairs",
+   "file": "stairs-stone.glb",
+   "triangles": 4836,
+   "bytes": 1677980
+  },
+  {
+   "id": "ground-grass",
+   "label": "Grass ground tile 8x8 m",
+   "file": "ground-grass.glb",
+   "triangles": 512,
+   "bytes": 374288
+  },
+  {
+   "id": "ground-path",
+   "label": "Dirt path tile 8x8 m (continues along Y)",
+   "file": "ground-path.glb",
+   "triangles": 512,
+   "bytes": 388384
+  },
+  {
+   "id": "pond-small",
+   "label": "Small pond with rim stones",
+   "file": "pond-small.glb",
+   "triangles": 4312,
+   "bytes": 1761804
+  },
+  {
+   "id": "waterfall-stream",
+   "label": "Thin waterfall ribbon",
+   "file": "waterfall-stream.glb",
+   "triangles": 1052,
+   "bytes": 186956
+  },
+  {
+   "id": "tree-round",
+   "label": "Round cartoon tree",
+   "file": "tree-round.glb",
+   "triangles": 568,
+   "bytes": 563812
+  },
+  {
+   "id": "bush-round",
+   "label": "Round bush",
+   "file": "bush-round.glb",
+   "triangles": 320,
+   "bytes": 744248
+  }
+ ]
+}

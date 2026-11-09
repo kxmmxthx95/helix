@@ -1,0 +1,583 @@
+{
+  "name": "Moonfen \u2014 original textured forest samples",
+  "version": 4,
+  "units": "meters",
+  "upAxis": "Y",
+  "license": "CC0-1.0 (new generated assets only)",
+  "assets": [
+    {
+      "id": "elder-canopy",
+      "title": "Layered elder \u2022 large",
+      "file": "elder-canopy.glb",
+      "bytes": 1047432,
+      "meshes": 2,
+      "triangles": 13624
+    },
+    {
+      "id": "young-canopy",
+      "title": "Layered elder \u2022 small",
+      "file": "young-canopy.glb",
+      "bytes": 1047444,
+      "meshes": 2,
+      "triangles": 13624
+    },
+    {
+      "id": "gnarled-tree",
+      "title": "Gnarled elder",
+      "file": "gnarled-tree.glb",
+      "bytes": 387728,
+      "meshes": 1,
+      "triangles": 1640
+    },
+    {
+      "id": "tiered-pine",
+      "title": "Tiered moonpine",
+      "file": "tiered-pine.glb",
+      "bytes": 1037876,
+      "meshes": 2,
+      "triangles": 13326
+    },
+    {
+      "id": "fern-bush",
+      "title": "Forest undergrowth",
+      "file": "fern-bush.glb",
+      "bytes": 614916,
+      "meshes": 1,
+      "triangles": 9952
+    },
+    {
+      "id": "moonflower",
+      "title": "Moonflower rosette",
+      "file": "moonflower.glb",
+      "bytes": 1259468,
+      "meshes": 3,
+      "triangles": 3258
+    },
+    {
+      "id": "mossy-rocks",
+      "title": "Mossy rock cluster",
+      "file": "mossy-rocks.glb",
+      "bytes": 946524,
+      "meshes": 2,
+      "triangles": 5400
+    },
+    {
+      "id": "teal-crystals",
+      "title": "Teal crystal cluster",
+      "file": "teal-crystals.glb",
+      "bytes": 1229000,
+      "meshes": 3,
+      "triangles": 1396
+    },
+    {
+      "id": "living-arch",
+      "title": "Living vine arch",
+      "file": "living-arch.glb",
+      "bytes": 1284836,
+      "meshes": 3,
+      "triangles": 5858
+    },
+    {
+      "id": "ruined-column",
+      "title": "Ruined stone column",
+      "file": "ruined-column.glb",
+      "bytes": 1330856,
+      "meshes": 3,
+      "triangles": 3482
+    },
+    {
+      "id": "ruined-gateway",
+      "title": "Ruined stone gateway",
+      "file": "ruined-gateway.glb",
+      "bytes": 1505472,
+      "meshes": 3,
+      "triangles": 8214
+    },
+    {
+      "id": "pink-bud-rosette",
+      "title": "Pink bud rosette",
+      "file": "pink-bud-rosette.glb",
+      "bytes": 1986740,
+      "meshes": 4,
+      "triangles": 21626,
+      "collection": "ground-vegetation",
+      "variant": "distinct topology; not a uniform scale copy"
+    },
+    {
+      "id": "unopened-bud",
+      "title": "Unopened golden bud",
+      "file": "unopened-bud.glb",
+      "bytes": 1052720,
+      "meshes": 2,
+      "triangles": 14060,
+      "collection": "ground-vegetation",
+      "variant": "distinct topology; not a uniform scale copy"
+    },
+    {
+      "id": "golden-crozier-large",
+      "title": "Twin golden crozier \u2022 broad leaves",
+      "file": "golden-crozier-large.glb",
+      "bytes": 979440,
+      "meshes": 2,
+      "triangles": 10828,
+      "collection": "ground-vegetation",
+      "variant": "distinct topology; not a uniform scale copy"
+    },
+    {
+      "id": "golden-crozier-small",
+      "title": "Single golden crozier \u2022 compact",
+      "file": "golden-crozier-small.glb",
+      "bytes": 884096,
+      "meshes": 2,
+      "triangles": 6542,
+      "collection": "ground-vegetation",
+      "variant": "distinct topology; not a uniform scale copy"
+    },
+    {
+      "id": "spiky-rosette",
+      "title": "Low spiky rosette",
+      "file": "spiky-rosette.glb",
+      "bytes": 778080,
+      "meshes": 1,
+      "triangles": 18800,
+      "collection": "ground-vegetation",
+      "variant": "distinct topology; not a uniform scale copy"
+    },
+    {
+      "id": "dense-jade-shrub",
+      "title": "Dense jade shrub",
+      "file": "dense-jade-shrub.glb",
+      "bytes": 2346548,
+      "meshes": 2,
+      "triangles": 72432,
+      "collection": "ground-vegetation",
+      "variant": "distinct topology; not a uniform scale copy"
+    },
+    {
+      "id": "low-jade-shrub",
+      "title": "Low spreading jade shrub",
+      "file": "low-jade-shrub.glb",
+      "bytes": 1347024,
+      "meshes": 2,
+      "triangles": 27192,
+      "collection": "ground-vegetation",
+      "variant": "distinct topology; not a uniform scale copy"
+    },
+    {
+      "id": "thorn-root-arches",
+      "title": "Triple thorned moss roots",
+      "file": "thorn-root-arches.glb",
+      "bytes": 1297656,
+      "meshes": 3,
+      "triangles": 7410,
+      "collection": "ground-vegetation",
+      "variant": "distinct topology; not a uniform scale copy"
+    },
+    {
+      "id": "thorn-root-hook",
+      "title": "Single hooked thorn root",
+      "file": "thorn-root-hook.glb",
+      "bytes": 1182864,
+      "meshes": 3,
+      "triangles": 2564,
+      "collection": "ground-vegetation",
+      "variant": "distinct topology; not a uniform scale copy"
+    },
+    {
+      "id": "blue-heart-large",
+      "title": "Blue heart leaves \u2022 five stems",
+      "file": "blue-heart-large.glb",
+      "bytes": 699640,
+      "meshes": 1,
+      "triangles": 14570,
+      "collection": "ground-vegetation",
+      "variant": "distinct topology; not a uniform scale copy"
+    },
+    {
+      "id": "blue-heart-small",
+      "title": "Blue heart leaves \u2022 three stems",
+      "file": "blue-heart-small.glb",
+      "bytes": 571048,
+      "meshes": 1,
+      "triangles": 8742,
+      "collection": "ground-vegetation",
+      "variant": "distinct topology; not a uniform scale copy"
+    },
+    {
+      "id": "moss-standing-rock",
+      "title": "Mossy standing rock \u2022 tall",
+      "file": "moss-standing-rock.glb",
+      "bytes": 386356,
+      "meshes": 3,
+      "triangles": 871,
+      "collection": "rocks-bones-crystals",
+      "variant": "distinct authored layout and topology; not a scaled alias"
+    },
+    {
+      "id": "moss-boulder-group",
+      "title": "Mossy boulder group \u2022 medium",
+      "file": "moss-boulder-group.glb",
+      "bytes": 397184,
+      "meshes": 3,
+      "triangles": 977,
+      "collection": "rocks-bones-crystals",
+      "variant": "distinct authored layout and topology; not a scaled alias"
+    },
+    {
+      "id": "moss-low-patch",
+      "title": "Low mossy rock patch \u2022 small",
+      "file": "moss-low-patch.glb",
+      "bytes": 387588,
+      "meshes": 3,
+      "triangles": 883,
+      "collection": "rocks-bones-crystals",
+      "variant": "distinct authored layout and topology; not a scaled alias"
+    },
+    {
+      "id": "animal-skeleton-large",
+      "title": "Whimsical animal skeleton \u2022 large",
+      "file": "animal-skeleton-large.glb",
+      "bytes": 513868,
+      "meshes": 3,
+      "triangles": 3910,
+      "collection": "rocks-bones-crystals",
+      "variant": "distinct authored layout and topology; not a scaled alias"
+    },
+    {
+      "id": "animal-ribs-medium",
+      "title": "Scattered animal ribs \u2022 medium",
+      "file": "animal-ribs-medium.glb",
+      "bytes": 408884,
+      "meshes": 3,
+      "triangles": 1812,
+      "collection": "rocks-bones-crystals",
+      "variant": "distinct authored layout and topology; not a scaled alias"
+    },
+    {
+      "id": "animal-skull-small",
+      "title": "Weathered animal skull \u2022 small",
+      "file": "animal-skull-small.glb",
+      "bytes": 416512,
+      "meshes": 3,
+      "triangles": 1328,
+      "collection": "rocks-bones-crystals",
+      "variant": "distinct authored layout and topology; not a scaled alias"
+    },
+    {
+      "id": "teal-grove-large",
+      "title": "Teal crystal grove \u2022 large",
+      "file": "teal-grove-large.glb",
+      "bytes": 494208,
+      "meshes": 4,
+      "triangles": 1010,
+      "collection": "rocks-bones-crystals",
+      "variant": "distinct authored layout and topology; not a scaled alias"
+    },
+    {
+      "id": "teal-cluster-small",
+      "title": "Teal crystal sprout cluster \u2022 small",
+      "file": "teal-cluster-small.glb",
+      "bytes": 485408,
+      "meshes": 4,
+      "triangles": 894,
+      "collection": "rocks-bones-crystals",
+      "variant": "distinct authored layout and topology; not a scaled alias"
+    },
+    {
+      "id": "temple-floor-tile",
+      "title": "Mossy cracked floor \u00b7 2m",
+      "file": "temple-floor-tile.glb",
+      "bytes": 833144,
+      "meshes": 2,
+      "triangles": 206,
+      "collection": "temple",
+      "pivot": "ground grid origin",
+      "boundsBlender": {
+        "min": [
+          -1.0,
+          -1.0,
+          0.0
+        ],
+        "max": [
+          1.0,
+          1.0,
+          0.41499999165534973
+        ]
+      }
+    },
+    {
+      "id": "temple-plaza",
+      "title": "Raised plaza \u00b7 4m / 1m rise",
+      "file": "temple-plaza.glb",
+      "bytes": 975416,
+      "meshes": 2,
+      "triangles": 2064,
+      "collection": "temple",
+      "pivot": "ground grid origin",
+      "boundsBlender": {
+        "min": [
+          -2.0,
+          -2.0,
+          0.0
+        ],
+        "max": [
+          2.0,
+          2.0,
+          1.0149999856948853
+        ]
+      }
+    },
+    {
+      "id": "temple-stairs",
+      "title": "Stone staircase \u00b7 five rises",
+      "file": "temple-stairs.glb",
+      "bytes": 836536,
+      "meshes": 2,
+      "triangles": 247,
+      "collection": "temple",
+      "pivot": "ground grid origin",
+      "boundsBlender": {
+        "min": [
+          -1.0,
+          -1.0,
+          0.0
+        ],
+        "max": [
+          1.0,
+          1.0,
+          1.0149999856948853
+        ]
+      }
+    },
+    {
+      "id": "temple-parapet",
+      "title": "Low parapet \u00b7 straight 2m",
+      "file": "temple-parapet.glb",
+      "bytes": 844732,
+      "meshes": 2,
+      "triangles": 361,
+      "collection": "temple",
+      "pivot": "ground grid origin",
+      "boundsBlender": {
+        "min": [
+          -1.0,
+          -0.25,
+          0.0
+        ],
+        "max": [
+          1.0,
+          0.25,
+          0.8149999976158142
+        ]
+      }
+    },
+    {
+      "id": "temple-parapet-corner",
+      "title": "Low parapet \u00b7 L corner",
+      "file": "temple-parapet-corner.glb",
+      "bytes": 878108,
+      "meshes": 2,
+      "triangles": 801,
+      "collection": "temple",
+      "pivot": "ground grid origin",
+      "boundsBlender": {
+        "min": [
+          -1.0,
+          -1.0,
+          0.0
+        ],
+        "max": [
+          1.0,
+          1.0,
+          0.8149999976158142
+        ]
+      }
+    },
+    {
+      "id": "temple-cyan-pedestal",
+      "title": "Cyan rune pedestal",
+      "file": "temple-cyan-pedestal.glb",
+      "bytes": 1081936,
+      "meshes": 3,
+      "triangles": 625,
+      "collection": "temple",
+      "pivot": "ground grid origin",
+      "boundsBlender": {
+        "min": [
+          -0.550000011920929,
+          -0.550000011920929,
+          0.0
+        ],
+        "max": [
+          0.550000011920929,
+          0.550000011920929,
+          1.2799999713897705
+        ]
+      }
+    },
+    {
+      "id": "temple-broken-wall",
+      "title": "Broken stepped wall",
+      "file": "temple-broken-wall.glb",
+      "bytes": 869984,
+      "meshes": 2,
+      "triangles": 687,
+      "collection": "temple",
+      "pivot": "ground grid origin",
+      "boundsBlender": {
+        "min": [
+          -1.0,
+          -0.32499998807907104,
+          0.0
+        ],
+        "max": [
+          1.0727683305740356,
+          0.32499998807907104,
+          1.8350000381469727
+        ]
+      }
+    },
+    {
+      "id": "temple-rubble",
+      "title": "Rubble scatter",
+      "file": "temple-rubble.glb",
+      "bytes": 865356,
+      "meshes": 2,
+      "triangles": 617,
+      "collection": "temple",
+      "pivot": "ground grid origin",
+      "boundsBlender": {
+        "min": [
+          -0.8866915106773376,
+          -0.7073069214820862,
+          0.0
+        ],
+        "max": [
+          0.9040049910545349,
+          0.7272476553916931,
+          0.3139893412590027
+        ]
+      }
+    },
+    {
+      "id": "river-root-bridge",
+      "title": "Moss log & root bridge \u00b7 4m span",
+      "file": "river-root-bridge.glb",
+      "bytes": 899632,
+      "meshes": 2,
+      "triangles": 6038,
+      "collection": "river-transition",
+      "pivot": "ground grid origin",
+      "boundsBlender": {
+        "min": [
+          -2.03505539894104,
+          -1.053274154663086,
+          0.0
+        ],
+        "max": [
+          2.033362627029419,
+          1.053297996520996,
+          0.8077367544174194
+        ]
+      }
+    },
+    {
+      "id": "river-grass-bank",
+      "title": "Grass riverbank \u00b7 2 \u00d7 4m",
+      "file": "river-grass-bank.glb",
+      "bytes": 758044,
+      "meshes": 2,
+      "triangles": 200,
+      "collection": "river-transition",
+      "pivot": "ground grid origin",
+      "boundsBlender": {
+        "min": [
+          -1.0,
+          -2.0,
+          0.0
+        ],
+        "max": [
+          1.0,
+          2.0,
+          0.579391598701477
+        ]
+      }
+    },
+    {
+      "id": "river-stream",
+      "title": "Turquoise stream \u00b7 4 \u00d7 4m",
+      "file": "river-stream.glb",
+      "bytes": 607784,
+      "meshes": 2,
+      "triangles": 14,
+      "collection": "river-transition",
+      "pivot": "ground grid origin",
+      "boundsBlender": {
+        "min": [
+          -2.0,
+          -2.0,
+          0.0
+        ],
+        "max": [
+          2.0,
+          2.0,
+          0.11999999731779099
+        ]
+      }
+    }
+  ],
+  "baselineAssetIds": [
+    "elder-canopy",
+    "young-canopy",
+    "gnarled-tree",
+    "tiered-pine",
+    "fern-bush",
+    "moonflower",
+    "mossy-rocks",
+    "teal-crystals",
+    "living-arch",
+    "ruined-column",
+    "ruined-gateway"
+  ],
+  "additionalAssetIds": [
+    "pink-bud-rosette",
+    "unopened-bud",
+    "golden-crozier-large",
+    "golden-crozier-small",
+    "spiky-rosette",
+    "dense-jade-shrub",
+    "low-jade-shrub",
+    "thorn-root-arches",
+    "thorn-root-hook",
+    "blue-heart-large",
+    "blue-heart-small"
+  ],
+  "totals": {
+    "assets": 41,
+    "bytes": 37758088,
+    "triangles": 308085
+  },
+  "propAssetIds": [
+    "moss-standing-rock",
+    "moss-boulder-group",
+    "moss-low-patch",
+    "animal-skeleton-large",
+    "animal-ribs-medium",
+    "animal-skull-small",
+    "teal-grove-large",
+    "teal-cluster-small"
+  ],
+  "templeAssetIds": [
+    "temple-floor-tile",
+    "temple-plaza",
+    "temple-stairs",
+    "temple-parapet",
+    "temple-parapet-corner",
+    "temple-cyan-pedestal",
+    "temple-broken-wall",
+    "temple-rubble",
+    "river-root-bridge",
+    "river-grass-bank",
+    "river-stream"
+  ]
+}

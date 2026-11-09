@@ -1,0 +1,417 @@
+{
+  "assetCount": 41,
+  "totalBytes": 37758088,
+  "totalTriangles": 308085,
+  "results": [
+    {
+      "id": "elder-canopy",
+      "bytes": 1047432,
+      "meshes": 2,
+      "triangles": 13624,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "young-canopy",
+      "bytes": 1047444,
+      "meshes": 2,
+      "triangles": 13624,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "gnarled-tree",
+      "bytes": 387728,
+      "meshes": 1,
+      "triangles": 1640,
+      "images": 1,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "tiered-pine",
+      "bytes": 1037876,
+      "meshes": 2,
+      "triangles": 13326,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "fern-bush",
+      "bytes": 614916,
+      "meshes": 1,
+      "triangles": 9952,
+      "images": 1,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "moonflower",
+      "bytes": 1259468,
+      "meshes": 3,
+      "triangles": 3258,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "mossy-rocks",
+      "bytes": 946524,
+      "meshes": 2,
+      "triangles": 5400,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "teal-crystals",
+      "bytes": 1229000,
+      "meshes": 3,
+      "triangles": 1396,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "living-arch",
+      "bytes": 1284836,
+      "meshes": 3,
+      "triangles": 5858,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "ruined-column",
+      "bytes": 1330856,
+      "meshes": 3,
+      "triangles": 3482,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "ruined-gateway",
+      "bytes": 1505472,
+      "meshes": 3,
+      "triangles": 8214,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "pink-bud-rosette",
+      "bytes": 1986740,
+      "meshes": 4,
+      "triangles": 21626,
+      "images": 4,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "unopened-bud",
+      "bytes": 1052720,
+      "meshes": 2,
+      "triangles": 14060,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "golden-crozier-large",
+      "bytes": 979440,
+      "meshes": 2,
+      "triangles": 10828,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "golden-crozier-small",
+      "bytes": 884096,
+      "meshes": 2,
+      "triangles": 6542,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "spiky-rosette",
+      "bytes": 778080,
+      "meshes": 1,
+      "triangles": 18800,
+      "images": 1,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "dense-jade-shrub",
+      "bytes": 2346548,
+      "meshes": 2,
+      "triangles": 72432,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "low-jade-shrub",
+      "bytes": 1347024,
+      "meshes": 2,
+      "triangles": 27192,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "thorn-root-arches",
+      "bytes": 1297656,
+      "meshes": 3,
+      "triangles": 7410,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "thorn-root-hook",
+      "bytes": 1182864,
+      "meshes": 3,
+      "triangles": 2564,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "blue-heart-large",
+      "bytes": 699640,
+      "meshes": 1,
+      "triangles": 14570,
+      "images": 1,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "blue-heart-small",
+      "bytes": 571048,
+      "meshes": 1,
+      "triangles": 8742,
+      "images": 1,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "moss-standing-rock",
+      "bytes": 386356,
+      "meshes": 3,
+      "triangles": 871,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "moss-boulder-group",
+      "bytes": 397184,
+      "meshes": 3,
+      "triangles": 977,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "moss-low-patch",
+      "bytes": 387588,
+      "meshes": 3,
+      "triangles": 883,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "animal-skeleton-large",
+      "bytes": 513868,
+      "meshes": 3,
+      "triangles": 3910,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "animal-ribs-medium",
+      "bytes": 408884,
+      "meshes": 3,
+      "triangles": 1812,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "animal-skull-small",
+      "bytes": 416512,
+      "meshes": 3,
+      "triangles": 1328,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "teal-grove-large",
+      "bytes": 494208,
+      "meshes": 4,
+      "triangles": 1010,
+      "images": 4,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "teal-cluster-small",
+      "bytes": 485408,
+      "meshes": 4,
+      "triangles": 894,
+      "images": 4,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "temple-floor-tile",
+      "bytes": 833144,
+      "meshes": 2,
+      "triangles": 206,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "temple-plaza",
+      "bytes": 975416,
+      "meshes": 2,
+      "triangles": 2064,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "temple-stairs",
+      "bytes": 836536,
+      "meshes": 2,
+      "triangles": 247,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "temple-parapet",
+      "bytes": 844732,
+      "meshes": 2,
+      "triangles": 361,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "temple-parapet-corner",
+      "bytes": 878108,
+      "meshes": 2,
+      "triangles": 801,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "temple-cyan-pedestal",
+      "bytes": 1081936,
+      "meshes": 3,
+      "triangles": 625,
+      "images": 3,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "temple-broken-wall",
+      "bytes": 869984,
+      "meshes": 2,
+      "triangles": 687,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "temple-rubble",
+      "bytes": 865356,
+      "meshes": 2,
+      "triangles": 617,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "river-root-bridge",
+      "bytes": 899632,
+      "meshes": 2,
+      "triangles": 6038,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "river-grass-bank",
+      "bytes": 758044,
+      "meshes": 2,
+      "triangles": 200,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "id": "river-stream",
+      "bytes": 607784,
+      "meshes": 2,
+      "triangles": 14,
+      "images": 2,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    }
+  ]
+}

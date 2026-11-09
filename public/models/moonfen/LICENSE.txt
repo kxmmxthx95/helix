@@ -1,0 +1,8 @@
+Moonfen original generated asset pack
+SPDX-License-Identifier: CC0-1.0
+
+To the extent possible under law, the creator dedicates the new Moonfen geometry, textures and generator to the public domain under CC0 1.0 Universal, without warranty. You may copy, modify, distribute and use these new assets, including commercially, without asking permission.
+
+Legal instrument: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+Scope: new public/models/moonfen/*.glb, textures/*.png and scripts/forest-assets/generate.py, scripts/forest-assets/generate-ground.py and scripts/forest-assets/generate-props.py only (including eleven ground-vegetation additions, eight rock/bone/crystal additions, five ground-* textures and five props-* textures). This does not license the reference image, Helix application, Blender, three.js or any other third-party material. The supplied concept sheet was not redistributed or incorporated in these files. No trademark or endorsement is granted.

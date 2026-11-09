@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "textures": [
+    {
+      "id": "grass",
+      "file": "grass.png",
+      "source": "../grass_plain.png",
+      "sourceSha256": "a16ab5e1e2a94ef0e3c4f8fafe08aeb0fa3e98584f33e4b11f7eabe8d355ff75",
+      "size": [
+        64,
+        64
+      ],
+      "sampling": "central 0.2\u20130.8 diamond UV, nearest pixel, mirrored repeat"
+    },
+    {
+      "id": "dirt",
+      "file": "dirt.png",
+      "source": "../dirt_rocks_01.png",
+      "sourceSha256": "892141ae6297e3d9b5ba17e098cf6a25eff3e5ebbf3ede2398fe47413e66792e",
+      "size": [
+        64,
+        64
+      ],
+      "sampling": "central 0.2\u20130.8 diamond UV, nearest pixel, mirrored repeat"
+    },
+    {
+      "id": "water",
+      "file": "water.png",
+      "source": "../water_01.png",
+      "sourceSha256": "7e3e34773149b825b6ad3f564af96f55793380fcebf0f3c5e233ff2889bb1bf5",
+      "size": [
+        64,
+        64
+      ],
+      "sampling": "central 0.2\u20130.8 diamond UV, nearest pixel, mirrored repeat"
+    },
+    {
+      "id": "stone",
+      "file": "stone.png",
+      "source": "../stone_floor_moss.png",
+      "sourceSha256": "eafe2e326ba4bb11c527620a75a901e2f80799984c89ec317c3c6cd45cf4847d",
+      "size": [
+        64,
+        64
+      ],
+      "sampling": "central 0.2\u20130.8 diamond UV, nearest pixel, mirrored repeat"
+    }
+  ],
+  "note": "Preview-only mirrored interior samples. Exact opposite texture edges; repetition and AI lighting remain. No originals modified."
+}

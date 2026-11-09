@@ -1,0 +1,142 @@
+[
+ {
+  "id": "statue-head",
+  "e": 0,
+  "w": 0,
+  "tris": 23358,
+  "mats": 4,
+  "tex": 5,
+  "bytes": 1755008,
+  "msgs": []
+ },
+ {
+  "id": "building-ivy-a",
+  "e": 0,
+  "w": 0,
+  "tris": 12956,
+  "mats": 8,
+  "tex": 9,
+  "bytes": 2725272,
+  "msgs": []
+ },
+ {
+  "id": "building-ivy-b",
+  "e": 0,
+  "w": 0,
+  "tris": 11220,
+  "mats": 8,
+  "tex": 9,
+  "bytes": 2646088,
+  "msgs": []
+ },
+ {
+  "id": "building-ivy-c",
+  "e": 0,
+  "w": 0,
+  "tris": 7888,
+  "mats": 8,
+  "tex": 9,
+  "bytes": 2420672,
+  "msgs": []
+ },
+ {
+  "id": "shop-awning",
+  "e": 0,
+  "w": 0,
+  "tris": 6504,
+  "mats": 13,
+  "tex": 14,
+  "bytes": 3289152,
+  "msgs": []
+ },
+ {
+  "id": "van-wrecked",
+  "e": 0,
+  "w": 0,
+  "tris": 1964,
+  "mats": 6,
+  "tex": 7,
+  "bytes": 1500440,
+  "msgs": []
+ },
+ {
+  "id": "car-wrecked",
+  "e": 0,
+  "w": 0,
+  "tris": 1552,
+  "mats": 5,
+  "tex": 6,
+  "bytes": 1109852,
+  "msgs": []
+ },
+ {
+  "id": "stairs-stone",
+  "e": 0,
+  "w": 0,
+  "tris": 4836,
+  "mats": 4,
+  "tex": 5,
+  "bytes": 1677980,
+  "msgs": []
+ },
+ {
+  "id": "ground-grass",
+  "e": 0,
+  "w": 0,
+  "tris": 512,
+  "mats": 1,
+  "tex": 2,
+  "bytes": 374288,
+  "msgs": []
+ },
+ {
+  "id": "ground-path",
+  "e": 0,
+  "w": 0,
+  "tris": 512,
+  "mats": 1,
+  "tex": 2,
+  "bytes": 388384,
+  "msgs": []
+ },
+ {
+  "id": "pond-small",
+  "e": 0,
+  "w": 0,
+  "tris": 4312,
+  "mats": 5,
+  "tex": 6,
+  "bytes": 1761804,
+  "msgs": []
+ },
+ {
+  "id": "waterfall-stream",
+  "e": 0,
+  "w": 0,
+  "tris": 1052,
+  "mats": 1,
+  "tex": 2,
+  "bytes": 186956,
+  "msgs": []
+ },
+ {
+  "id": "tree-round",
+  "e": 0,
+  "w": 0,
+  "tris": 568,
+  "mats": 2,
+  "tex": 3,
+  "bytes": 563812,
+  "msgs": []
+ },
+ {
+  "id": "bush-round",
+  "e": 0,
+  "w": 0,
+  "tris": 320,
+  "mats": 2,
+  "tex": 3,
+  "bytes": 744248,
+  "msgs": []
+ }
+]

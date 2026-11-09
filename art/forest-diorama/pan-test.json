@@ -1,0 +1,15 @@
+{
+  "before": {
+    "left": 865,
+    "top": 250,
+    "selected": null
+  },
+  "after": {
+    "left": 1005,
+    "top": 360,
+    "selected": null,
+    "scale": 1,
+    "errors": []
+  },
+  "pass": true
+}

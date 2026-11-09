@@ -1,0 +1,82 @@
+{
+  "checks": [
+    {
+      "name": "all 22 terrain + 54 original props + 4 derived textures loaded",
+      "pass": true
+    },
+    {
+      "name": "props sorted by actual ground-contact Y",
+      "pass": true
+    },
+    {
+      "name": "all sprite bounds fit without clipping",
+      "pass": true
+    },
+    {
+      "name": "trail centre visible at every sample (blocked=0)",
+      "pass": true
+    },
+    {
+      "name": "grass_plain: opaque plane including all internal tile borders",
+      "pass": true
+    },
+    {
+      "name": "dirt_rocks_01: opaque plane including all internal tile borders",
+      "pass": true
+    },
+    {
+      "name": "stone_floor_01: opaque plane including all internal tile borders",
+      "pass": true
+    },
+    {
+      "name": "water_01: opaque plane including all internal tile borders",
+      "pass": true
+    },
+    {
+      "name": "grid toggles on",
+      "pass": true
+    },
+    {
+      "name": "1\u00d7 is native integer scale",
+      "pass": true
+    },
+    {
+      "name": "2\u00d7 is native integer scale",
+      "pass": true
+    },
+    {
+      "name": "fit is entirely inside scene viewport",
+      "pass": true
+    },
+    {
+      "name": "picking survives fit scale and anchor-aware origin",
+      "pass": true
+    }
+  ],
+  "count": 13,
+  "state": {
+    "ready": true,
+    "loaded": 22,
+    "props": 54,
+    "derived": 4,
+    "placements": 40,
+    "grid": false,
+    "showDecor": true,
+    "scale": 0.8741044012282497,
+    "zoom": "fit",
+    "mode": "scene",
+    "selected": null,
+    "errors": [],
+    "bounds": {
+      "minX": -792,
+      "maxX": 792,
+      "minY": -207,
+      "maxY": 770
+    },
+    "canvas": {
+      "width": 1584,
+      "height": 977
+    }
+  },
+  "capturedErrors": []
+}

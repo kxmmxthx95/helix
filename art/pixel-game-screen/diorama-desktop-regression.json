@@ -1,0 +1,200 @@
+{
+  "result": {
+    "checks": [
+      {
+        "name": "22 terrain + all 54 originals + 4 derived textures loaded",
+        "pass": true
+      },
+      {
+        "name": "long strip: lower-left entrance to upper-right sanctuary",
+        "pass": true
+      },
+      {
+        "name": "mixed sprite/architecture queue sorts by world contact depth",
+        "pass": true
+      },
+      {
+        "name": "all sprite rectangles inside canvas",
+        "pass": true
+      },
+      {
+        "name": "all prop ground contacts inside island footprint",
+        "pass": true
+      },
+      {
+        "name": "bridge, arches, crooked tree, crystals and editable ruins assembled",
+        "pass": true
+      },
+      {
+        "name": "real root bridge pixels cover centre from bank to bank (19 samples)",
+        "pass": true
+      },
+      {
+        "name": "architecture, flames, cliff and sprites leave transparent canvas perimeter",
+        "pass": true
+      },
+      {
+        "name": "walking-lane centre free of opaque non-crossing props (0)",
+        "pass": true
+      },
+      {
+        "name": "continuous walkable route (510 samples)",
+        "pass": true
+      },
+      {
+        "name": "grass_plain: no internal transparent seams",
+        "pass": true
+      },
+      {
+        "name": "dirt_rocks_01: no internal transparent seams",
+        "pass": true
+      },
+      {
+        "name": "stone_floor_01: no internal transparent seams",
+        "pass": true
+      },
+      {
+        "name": "water_01: no internal transparent seams",
+        "pass": true
+      },
+      {
+        "name": "grid toggles on",
+        "pass": true
+      },
+      {
+        "name": "decor and modular temple can be hidden independently of terrain",
+        "pass": true
+      },
+      {
+        "name": "1\u00d7 is native integer scale",
+        "pass": true
+      },
+      {
+        "name": "2\u00d7 is native integer scale",
+        "pass": true
+      },
+      {
+        "name": "fit entirely inside scene viewport",
+        "pass": true
+      },
+      {
+        "name": "tile picking survives fit and non-square bounds",
+        "pass": true
+      },
+      {
+        "name": "no browser errors or rejected promises",
+        "pass": true
+      }
+    ],
+    "count": 21,
+    "state": {
+      "ready": true,
+      "loaded": 22,
+      "props": 54,
+      "derived": 4,
+      "placements": 119,
+      "architecture": [
+        {
+          "id": "ruined-gateway",
+          "i": 0.65,
+          "j": 3.75
+        },
+        {
+          "id": "broken-column",
+          "i": 1,
+          "j": 5.5
+        },
+        {
+          "id": "front-column",
+          "i": 4.85,
+          "j": 5.15
+        },
+        {
+          "id": "parapet-back",
+          "i": 0.55,
+          "j": 1.1
+        },
+        {
+          "id": "parapet-front",
+          "i": 4.9,
+          "j": 1.1
+        },
+        {
+          "id": "cyan-brazier-0",
+          "i": 0.55,
+          "j": 1.2
+        },
+        {
+          "id": "cyan-brazier-1",
+          "i": 4.9,
+          "j": 1.2
+        },
+        {
+          "id": "cyan-brazier-2",
+          "i": 0.55,
+          "j": -0.05
+        },
+        {
+          "id": "cyan-brazier-3",
+          "i": 4.9,
+          "j": -0.05
+        },
+        {
+          "id": "cyan-brazier-4",
+          "i": 4.9,
+          "j": 3.1
+        }
+      ],
+      "grid": false,
+      "showDecor": true,
+      "scale": 0.6755725190839694,
+      "zoom": "fit",
+      "mode": "scene",
+      "selected": null,
+      "errors": [],
+      "bounds": {
+        "minX": -1688,
+        "minY": -234,
+        "maxX": 408,
+        "maxY": 822
+      },
+      "canvas": {
+        "width": 2096,
+        "height": 1056
+      },
+      "dimensions": {
+        "cols": 6,
+        "rows": 26
+      },
+      "reused": [
+        "oak_large",
+        "pine_medium",
+        "oak_medium",
+        "pine_large",
+        "oak_small",
+        "pine_small",
+        "mushroom_red_medium",
+        "plant_fern",
+        "crystal",
+        "mushroom_blue_small",
+        "rocks_small",
+        "bush_flower_small",
+        "grass_medium",
+        "glow_plant",
+        "dead_large",
+        "dead_medium",
+        "vine_arch_large",
+        "root_bridge",
+        "rocks_large",
+        "rocks_medium",
+        "bush_large",
+        "bush_flower_large"
+      ]
+    }
+  },
+  "failure": null,
+  "viewport": [
+    1440,
+    900
+  ]
+}
