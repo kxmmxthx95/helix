@@ -13,6 +13,16 @@ const inputClass =
 export function Login() {
   const { signIn, resetPassword } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
+  // Login is always dark, but html bg follows the app theme (--shell, light = #f2f2f7):
+  // iOS bars/strips outside the fixed layer would show light. Force black while mounted.
+  useEffect(() => {
+    const el = document.documentElement;
+    const prev = el.style.backgroundColor;
+    el.style.backgroundColor = "#000";
+    return () => {
+      el.style.backgroundColor = prev;
+    };
+  }, []);
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [nationalId, setNationalId] = useState("");
