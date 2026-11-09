@@ -129,9 +129,9 @@ export function PeriodDaySheet({
   const pickedDay = days.find((d) => d.periods.some((p) => p.entryId === pickedId));
   const picked = pickedDay?.periods.find((p) => p.entryId === pickedId);
   const date = pickedDay?.date ?? todayIso();
-  const entryId = open ? (picked?.entryId ?? null) : null;
+  const entryId = picked?.entryId ?? null;
 
-  const { data: roster = [], isLoading: loadingRoster } = useClassroomRoster(picked && open ? picked.classroomId : null, academicYear);
+  const { data: roster = [], isLoading: loadingRoster } = useClassroomRoster(picked ? picked.classroomId : null, academicYear);
   const { data: records, isLoading: loadingRecords } = usePeriodAttendance(entryId, date);
   const { data: onLeave, isLoading: loadingLeave } = useApprovedLeaveOnDate(roster.map((s) => s.id), date);
 
@@ -185,7 +185,8 @@ export function PeriodDaySheet({
       open={open}
       onOpenChange={(o) => {
         onOpenChange(o);
-        if (!o) setPickedId(null);
+        // Reset after the close animation so the content doesn't jump back to the list mid-slide.
+        if (!o) setTimeout(() => setPickedId(null), 500);
       }}
       title={picked ? thaiDate(date, { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "เช็คชื่อเข้าเรียน"}
       closable
