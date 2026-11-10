@@ -180,7 +180,7 @@ export function TeachingPlanCalendar() {
                   ? new Date(`${first}T00:00:00Z`).toLocaleDateString("th-TH", { month: "long", year: "numeric", timeZone: "UTC" })
                   : `${fmt(week)} – ${fmt(addDays(week, 5))}`}
               </span>
-              <div className="ml-auto flex gap-1 rounded-xl bg-fill p-1" role="radiogroup" aria-label="มุมมอง">
+              <div className="ml-auto flex gap-1 rounded-xl bg-fill p-1 max-sm:hidden" role="radiogroup" aria-label="มุมมอง">
                 {(["week", "month"] as const).map((v) => (
                   <button
                     key={v}
@@ -195,8 +195,8 @@ export function TeachingPlanCalendar() {
                 ))}
               </div>
               {!readOnly && (
-                <Button size="sm" onClick={() => setTopicsOpen(true)}>
-                  หัวข้อ ({topics.length})
+                <Button size="sm" className="max-sm:ml-auto" onClick={() => setTopicsOpen(true)}>
+                  หัวข้อ
                 </Button>
               )}
             </div>
@@ -255,7 +255,7 @@ export function TeachingPlanCalendar() {
                     setArmed(t);
                     setTopicsOpen(false);
                   }}
-                  className={cn("block w-full rounded-xl border bg-card px-3 py-2 text-left text-sm hover:bg-muted/60", n === 0 ? "border-warning/50" : "border-border")}
+                  className={cn("block w-full rounded-md border bg-card px-3 py-2 text-left text-sm hover:bg-muted/60", n === 0 ? "border-warning/50" : "border-border")}
                 >
                   <p className="font-medium leading-snug">{t.title}</p>
                   <p className={cn("text-xs", n === 0 ? "text-warning" : "text-muted-foreground")}>{n === 0 ? "ยังไม่ได้วาง" : `${n} คาบ`}</p>
@@ -320,7 +320,7 @@ function SlotSheet({
                 disabled={busy}
                 onClick={() => place.mutate({ ...key, topic_id: t.id }, { onSuccess: onClose, onError: fail })}
                 className={cn(
-                  "block w-full rounded-xl border px-3 py-2 text-left text-sm hover:bg-muted/60",
+                  "block w-full rounded-md border px-3 py-2 text-left text-sm hover:bg-muted/60",
                   slot?.topic_id === t.id ? "border-foreground/40 ring-1 ring-foreground/20" : "border-border",
                 )}
               >
@@ -352,7 +352,7 @@ function LessonCards({
   return (
     <>
       {groupByLesson(topics).map(([lesson, items]) => (
-        <details key={lesson} open={items.some((t) => t.id === openId)} className="group rounded-2xl border border-border bg-card">
+        <details key={lesson} open={items.some((t) => t.id === openId)} className="group rounded-lg border border-border bg-card">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
             <span className="text-sm font-semibold leading-snug">{lesson}</span>
             <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
