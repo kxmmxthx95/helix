@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { LeaveRequest, LeaveStatus, LeaveType } from "@/lib/database.types";
+import type { LeaveRequest, LeaveStatus, LeaveType, Profile } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
 // ------------------------------------------------------------------ leave_types
@@ -77,6 +77,28 @@ export function useLeaveApprovals(status: LeaveStatus | "") {
       const { data, error } = await query;
       if (error) throw error;
       return data;
+    },
+  });
+}
+
+export type PendingStaffLeave = LeaveRequest & {
+  profile: Pick<Profile, "prefix" | "first_name" | "last_name" | "avatar_path" | "updated_at"> | null;
+};
+
+/** Teacher/staff leave waiting for a decision, within the caller's scope (RLS) minus their own requests (a requester never approves their own; DB: 0148). */
+export function usePendingStaffLeave(approverId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["leave_requests", "pending_for_home", approverId],
+    enabled,
+    queryFn: async (): Promise<PendingStaffLeave[]> => {
+      const { data, error } = await supabase
+        .from("leave_requests")
+        .select("*, profile:profiles!profile_id(prefix, first_name, last_name, avatar_path, updated_at)")
+        .eq("status", "pending")
+        .neq("profile_id", approverId)
+        .order("start_date");
+      if (error) throw error;
+      return data as unknown as PendingStaffLeave[];
     },
   });
 }

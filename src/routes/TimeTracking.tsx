@@ -129,6 +129,7 @@ function MyClockCard({
             <p className="text-xs text-muted-foreground">ออกงาน</p>
             <p className="text-lg font-semibold">
               {record?.clock_out_time ? bangkokTime(record.clock_out_time) : "—"}
+              {record?.auto_clock_out && <span className="ml-1.5 text-xs font-normal text-muted-foreground">ออกอัตโนมัติ</span>}
             </p>
           </div>
         </div>
@@ -206,10 +207,11 @@ function PremisesExitCard({ profileId, date }: { profileId: string; date: string
                 <p className="truncate">{r.reason}</p>
                 <p className="text-xs text-muted-foreground">
                   ออก {bangkokTime(r.exit_time)}
+                  {r.no_return ? " · ไม่กลับ" : r.planned_return_time ? ` · คาดว่ากลับ ${bangkokTime(r.planned_return_time)}` : ""}
                   {r.return_time ? ` · กลับ ${bangkokTime(r.return_time)}` : ""} · {STATUS_LABEL[r.status]}
                 </p>
               </div>
-              {!r.return_time && (
+              {!r.return_time && !r.no_return && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -330,6 +332,7 @@ function HistoryCard({ profileId, departmentId }: { profileId: string; departmen
                     </td>
                     <td className="py-1.5 tabular-nums">
                       {r.clock_out_time ? bangkokTime(r.clock_out_time) : "—"}
+                      {r.auto_clock_out && <span className="ml-1 text-muted-foreground">ออกอัตโนมัติ</span>}
                     </td>
                   </tr>
                 );
@@ -373,6 +376,7 @@ function ApprovalsCard({ approverId }: { approverId: string }) {
             <p className="font-medium">{nameById.get(r.profile_id) ?? "—"}</p>
             <p className="text-xs text-muted-foreground">
               {r.reason} · ออก {bangkokTime(r.exit_time)}
+              {r.no_return ? " · ไม่กลับ" : r.planned_return_time ? ` · คาดว่ากลับ ${bangkokTime(r.planned_return_time)}` : ""}
             </p>
             <div className="flex gap-2">
               <Button

@@ -271,6 +271,14 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Crect x='2' y='3' width='12' height='11' rx='1.5' stroke='%23a3a3a3' stroke-width='1.5'/%3E%3Cpath d='M2 6.5h12M5.5 2v2M10.5 2v2' stroke='%23a3a3a3' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
   }
 
+  .ui-time {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Ccircle cx='8' cy='8' r='6' stroke='%23737373' stroke-width='1.5'/%3E%3Cpath d='M8 4.5V8l2.5 1.5' stroke='%23737373' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+
+  .dark .ui-time {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none'%3E%3Ccircle cx='8' cy='8' r='6' stroke='%23a3a3a3' stroke-width='1.5'/%3E%3Cpath d='M8 4.5V8l2.5 1.5' stroke='%23a3a3a3' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+
   .ui-date-empty {
     color: hsl(var(--muted-foreground));
   }

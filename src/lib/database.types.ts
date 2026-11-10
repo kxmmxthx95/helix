@@ -105,6 +105,7 @@ export type TimeClockRecord = {
   clock_out_time: string | null;
   clock_out_lat: number | null;
   clock_out_lng: number | null;
+  auto_clock_out: boolean;
   recorded_by: string;
   created_at: string;
   updated_at: string;
@@ -120,6 +121,8 @@ export type PremisesExitRequest = {
   exit_lat: number | null;
   exit_lng: number | null;
   return_time: string | null;
+  planned_return_time: string | null;
+  no_return: boolean;
   status: PremisesExitStatus;
   approved_by: string | null;
   approved_at: string | null;
@@ -1715,12 +1718,12 @@ export type Database = {
         TimeClockRecord,
         InsertOf<
           TimeClockRecord,
-          "clock_in_lat" | "clock_in_lng" | "clock_out_time" | "clock_out_lat" | "clock_out_lng"
+          "clock_in_lat" | "clock_in_lng" | "clock_out_time" | "clock_out_lat" | "clock_out_lng" | "auto_clock_out"
         >
       >;
       premises_exit_requests: Table<
         PremisesExitRequest,
-        InsertOf<PremisesExitRequest, "status" | "approved_by" | "approved_at" | "return_time">
+        InsertOf<PremisesExitRequest, "status" | "approved_by" | "approved_at" | "return_time" | "planned_return_time" | "no_return">
       >;
       leave_types: Table<LeaveType, InsertOf<LeaveType, never>>;
       leave_requests: Table<

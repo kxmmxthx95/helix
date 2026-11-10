@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { profileFullName, type Profile, type ProfileWithRoles } from "@/lib/database.types";
-import { BarChartIcon, CheckmarkCircleIcon, ChevronForward, DocumentTextIcon, LockIcon, PaletteIcon, Users } from "@/components/icons";
+import { BarChartIcon, CheckmarkCircleIcon, ChevronForward, DocumentTextIcon, LockIcon, LogOut, PaletteIcon, Users } from "@/components/icons";
 import { BannerUpload } from "@/components/BannerUpload";
 import { BannerAdjustOverlay, useBannerAdjust } from "@/components/BannerAdjust";
-import { HoldButton } from "@/components/HoldButton";
+import SwipeRow, { type SwipeAction } from "@/components/SwipeRow";
 import { NewLeaveSheet } from "@/routes/NewLeaveSheet";
 import { Modal } from "@/components/Modal";
 import { Sheet, usePhone } from "@/components/Sheet";
@@ -32,12 +32,14 @@ import { AssemblyAttendanceSheet } from "@/routes/AssemblyAttendanceSheet";
 import { CoverTasks } from "@/routes/CoverTasks";
 import { CoverLeavePicker } from "@/routes/CoverSheet";
 import { useMyCovers } from "@/hooks/useAttendanceCovers";
-import { useLeaveTypes, useMyLeaveRequests } from "@/hooks/useLeave";
+import { leaveAttachmentUrl, useLeaveTypes, useMyLeaveRequests, usePendingStaffLeave, useSetLeaveStatus } from "@/hooks/useLeave";
+import { canManage } from "@/lib/roles";
 import { LEAVE_STATUS_LABEL, LEAVE_STATUS_STYLE } from "@/routes/Leave";
 import { LineLinkCard } from "@/routes/Profile";
 import { StaffClockStatsSheet } from "@/routes/StaffClockStatsSheet";
 import { PeriodDaySheet, type DayPeriod, type SheetDay } from "@/routes/PeriodDaySheet";
 import { bangkokTime } from "@/routes/TimeTracking";
+import { PremisesExitSheet } from "@/routes/PremisesExitSheet";
 import { TeacherTimetable } from "@/routes/Timetable";
 
 // Teacher home: "what do I teach today" first, open work second. Cards are widget-style (macOS).
@@ -134,7 +136,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const [newLeaveOpen, setNewLeaveOpen] = useState(false);
   const [coverPickOpen, setCoverPickOpen] = useState(false);
   const [leaveRevealed, setLeaveRevealed] = useState(false);
-  const [clockOpen, setClockOpen] = useState(false);
+  const [clockRevealed, setClockRevealed] = useState(false);
+  const [exitOpen, setExitOpen] = useState(false);
+  const [clockConfirm, setClockConfirm] = useState<"in" | "out" | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
   const [assemblyOpen, setAssemblyOpen] = useState(false);
   const [periodsOpen, setPeriodsOpen] = useState(false);
@@ -345,6 +349,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   });
   const assemblyPending = assemblyDone ? homerooms.filter((h) => !assemblyDone.has(h.id)) : [];
   const { data: pendingLeave = [] } = usePendingStudentLeaveApprovals();
+  const { data: staffLeave = [] } = usePendingStaffLeave(me.id, canManage(me.roles));
+  const setStaffLeaveStatus = useSetLeaveStatus();
+  const pendingTotal = pendingLeave.length + staffLeave.length;
 
   async function approveAllLeave() {
     if (!confirm(`อนุมัติใบลา ${pendingLeave.length} ใบทั้งหมดหรือไม่?`)) return;
@@ -369,34 +376,39 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     );
   }
 
-  // Hold-to-confirm guards the irreversible in/out punch; null while locked or already clocked out.
-  const clockHold = !clock?.clock_out_time && !clockLock ? (clock?.clock_in_time ? "ออกงาน" : "เข้างาน") : null;
+  function decideStaffLeave(id: string, status: "approved" | "rejected") {
+    const verb = status === "approved" ? "อนุมัติ" : "ไม่อนุมัติ";
+    if (status === "rejected" && !confirm("ไม่อนุมัติใบลานี้หรือไม่?")) return;
+    setStaffLeaveStatus.mutate(
+      { id, status, approvedBy: me.id },
+      { onSuccess: () => toast(`${verb}ใบลาเรียบร้อย`), onError: () => toast(`${verb}ไม่สำเร็จ`, "error") },
+    );
+  }
+
   const tiles = [
     ...(showClock
       ? [
           {
             clock: true,
-      title: clock?.clock_out_time ? "ลงเวลาแล้ว" : clock?.clock_in_time ? "ออกงาน" : "เข้างาน",
-            hold: clockHold,
-            text: ((clock?.clock_in_time && clockLock ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}\n${clockLock}` : clockLock) ?? (clock?.clock_out_time
-                ? `เข้า ${bangkokTime(clock.clock_in_time ?? clock.clock_out_time)} · ออก ${bangkokTime(clock.clock_out_time)}`
-                : clock?.clock_in_time
-                  ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}`
-                  : "ยังไม่ได้บันทึกเวลาเข้างาน")) + (clockHold ? ` · กดค้างเพื่อ${clockHold}` : ""),
+            title: clock?.clock_out_time ? "ลงเวลาแล้ว" : clock?.clock_in_time ? "ออกงาน" : "เข้างาน",
+            text: clock?.clock_out_time
+              ? `เข้า ${bangkokTime(clock.clock_in_time ?? clock.clock_out_time)} · ออก ${bangkokTime(clock.clock_out_time)}`
+              : clock?.clock_in_time
+                ? `เข้างาน : ${bangkokTime(clock.clock_in_time)}`
+                : "ยังไม่ได้บันทึกเวลาเข้างาน",
             busy: clockIn.isPending || clockOut.isPending,
-            disabled: loadingClock || !!clockLock,
-            locked: !!clockLock,
-            onClick: () => (clock?.clock_out_time ? setClockOpen(true) : onClock(clock?.clock_in_time ? "out" : "in")),
+            disabled: false,
+            onClick: () => setClockRevealed((v) => !v),
           },
         ]
       : []),
     { title: "เช็คชื่อเข้าเรียน", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", sheet: true, badge: unchecked },
     {
       title: "จัดการใบลา",
-      text: pendingLeave.length > 0 ? `มี ${pendingLeave.length} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง",
+      text: pendingTotal > 0 ? `มี ${pendingTotal} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง",
       busy: false,
       disabled: false,
-      badge: pendingLeave.length,
+      badge: pendingTotal,
       reveal: true,
       onClick: () => setLeaveRevealed((v) => !v),
     },
@@ -450,67 +462,70 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         </button>
       );
     }
-    if ("clock" in t) {
+    if ("clock" in t || "reveal" in t) {
+      const isClock = "clock" in t;
+      const open = isClock ? clockRevealed : leaveRevealed;
+      const setOpen = isClock ? setClockRevealed : setLeaveRevealed;
+      const done = !!clock?.clock_out_time;
+      const kind = clock?.clock_in_time ? "out" : "in";
+      const canExit = !done && !!clock?.clock_in_time;
+      // First action sits on the outer edge (SwipeRow's "primary", takes actionColor); the rest follow inward.
+      const actions: SwipeAction[] = isClock
+        ? [
+            { id: "stats", label: "ประวัติ", icon: <BarChartIcon className="h-5 w-5" />, onSelect: () => setStatsOpen(true) },
+            ...(canExit ? [{ id: "exit", label: "ออกนอก", icon: <LogOut className="h-5 w-5" />, color: "#737373", onSelect: () => setExitOpen(true) }] : []),
+            ...(!done
+              ? [
+                  {
+                    id: "clock",
+                    label: kind === "out" ? "ออกงาน" : "เข้างาน",
+                    icon: clockLock ? <LockIcon className="h-5 w-5" /> : <CheckmarkCircleIcon className="h-5 w-5" />,
+                    color: clockLock ? "#a3a3a3" : "hsl(var(--accent))",
+                    onSelect: () => {
+                      if (loadingClock || t.busy) return;
+                      if (clockLock) toast(clockLock);
+                      else setClockConfirm(kind);
+                    },
+                  },
+                ]
+              : []),
+          ]
+        : [
+            { id: "new", label: "ยื่นคำลา", icon: <DocumentTextIcon className="h-5 w-5" />, onSelect: () => setNewLeaveOpen(true) },
+            ...(canAssignCover ? [{ id: "cover", label: "มอบงาน", icon: <Users className="h-5 w-5" />, color: "#737373", onSelect: () => setCoverPickOpen(true) }] : []),
+            { id: "pending", label: "รออนุมัติ", icon: <CheckmarkCircleIcon className="h-5 w-5" />, color: "#525252", onSelect: () => setLeaveOpen(true) },
+          ];
+      // SwipeRow captures the pointer, so a tap's click lands on its surface, not on our content: listen on this
+      // wrapper instead. Skip clicks from the action buttons, taps that end a drag, and taps that close an open row.
       return (
-        <div key={t.title} className="relative">
-          {t.hold ? (
-            <HoldButton
-              disabled={t.disabled || t.busy}
-              onConfirm={() => t.onClick?.()}
-              onEarly={() => toast("กดค้างไว้เพื่อลงเวลา")}
-              className={cn(cls, "w-full disabled:opacity-60")}
-            >
-              {body}
-            </HoldButton>
-          ) : (
-            <button type="button" disabled={t.disabled || t.busy} onClick={t.onClick} className={cn(cls, "w-full disabled:opacity-60")}>
-              {body}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setStatsOpen(true)}
-            aria-label="ดูสถิติ"
-            className="absolute right-[4.25rem] top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 border-accent text-accent transition-transform active:scale-95"
-          >
-            <BarChartIcon className="h-4 w-4" />
-          </button>
-        </div>
-      );
-    }
-    if ("reveal" in t) {
-      const act = (open: () => void) => () => {
-        setLeaveRevealed(false);
-        open();
-      };
-      const actionCls = "flex w-16 flex-col items-center justify-center gap-1 text-xs font-medium text-white";
-      return (
-        <div key={t.title} className="relative h-full overflow-hidden rounded-2xl">
-          {leaveRevealed && <button type="button" aria-label="ปิด" tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setLeaveRevealed(false)} />}
-          <div className={cn("absolute inset-y-0 right-0 z-20 flex transition-[visibility] duration-[250ms]", !leaveRevealed && "invisible")}>
-            <button type="button" tabIndex={leaveRevealed ? 0 : -1} onClick={act(() => setLeaveOpen(true))} className={cn(actionCls, "bg-neutral-600")}>
-              <CheckmarkCircleIcon className="h-6 w-6" />
-              รออนุมัติ
-            </button>
-            {canAssignCover && (
-              <button type="button" tabIndex={leaveRevealed ? 0 : -1} onClick={act(() => setCoverPickOpen(true))} className={cn(actionCls, "bg-neutral-500")}>
-                <Users className="h-6 w-6" />
-                มอบงาน
-              </button>
-            )}
-            <button type="button" tabIndex={leaveRevealed ? 0 : -1} onClick={act(() => setNewLeaveOpen(true))} className={cn(actionCls, "bg-accent")}>
-              <DocumentTextIcon className="h-6 w-6" />
-              ยื่นคำลา
-            </button>
-          </div>
-          <button
-            type="button"
-            aria-expanded={leaveRevealed}
-            onClick={t.onClick}
-            className={cn(cls, "z-20 w-full transition-[transform,border-radius] duration-[250ms] ease-out motion-reduce:transition-none", leaveRevealed && (canAssignCover ? "-translate-x-48" : "-translate-x-32"), leaveRevealed && "rounded-r-none")}
-          >
-            {body}
-          </button>
+        <div
+          key={t.title}
+          className="h-full"
+          onPointerDownCapture={(e) => {
+            e.currentTarget.dataset.open = open ? "1" : "";
+            e.currentTarget.dataset.x = String(e.clientX);
+          }}
+          onClick={(e) => {
+            const d = e.currentTarget.dataset;
+            if (d.open || (e.target as HTMLElement).closest(".swipe-row__rail") || Math.abs(e.clientX - Number(d.x)) > 8) return;
+            setOpen(true);
+          }}
+        >
+        <SwipeRow
+          label={t.title}
+          actions={actions}
+          open={open}
+          onOpenChange={setOpen}
+          height={76}
+          radius={16}
+          actionWidth={64}
+          actionColor={isClock ? "#525252" : "hsl(var(--accent))"}
+          fullSwipe={false}
+          haptic={false}
+          style={{ "--sr-row": "color-mix(in srgb, hsl(var(--muted)) 70%, hsl(var(--background)))", "--sr-text": "hsl(var(--foreground))" } as React.CSSProperties}
+        >
+          <div className="relative flex h-full w-full items-center gap-3 text-left">{body}</div>
+        </SwipeRow>
         </div>
       );
     }
@@ -654,7 +669,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
             covers={covers}
             onCheck={(c) => (c.schedule_entry_id ? setPeriodsOpen(true) : setAssemblyOpen(true))}
           />
-          <div className={cn("grid grid-cols-1 items-stretch gap-3 px-4 pb-4 sm:grid-cols-2 sm:px-8 sm:pb-8", showClock ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
+          <div className={cn("grid grid-cols-1 items-stretch gap-3 px-3 pb-4 sm:grid-cols-2 sm:px-8 sm:pb-8", showClock ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
             {tiles.map((t) => renderTile(t, "bg-muted/70 hover:bg-muted"))}
           </div>
         </section>
@@ -684,22 +699,34 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
       </Modal>
       <NewLeaveSheet profileId={me.id} open={newLeaveOpen} onOpenChange={setNewLeaveOpen} />
       <CoverLeavePicker profileId={me.id} open={coverPickOpen} onOpenChange={setCoverPickOpen} onNewLeave={() => setNewLeaveOpen(true)} />
+      <PremisesExitSheet profileId={me.id} date={today} open={exitOpen} onOpenChange={setExitOpen} />
       <StaffClockStatsSheet open={statsOpen} onOpenChange={setStatsOpen} me={me} />
-      <Modal open={clockOpen} onOpenChange={setClockOpen} title="ลงเวลาวันนี้">
-        <dl className="grid grid-cols-2 gap-3 text-center">
-          <div className="rounded-xl bg-muted p-4">
-            <dt className="text-sm text-muted-foreground">เข้างาน</dt>
-            <dd className="mt-1 font-mono text-2xl font-semibold tabular-nums">
-              {clock?.clock_in_time ? bangkokTime(clock.clock_in_time) : "—"}
-            </dd>
+      <Modal
+        open={clockConfirm !== null}
+        onOpenChange={(o) => !o && setClockConfirm(null)}
+        title={clockConfirm === "out" ? "ยืนยันออกงาน" : "ยืนยันเข้างาน"}
+        footer={
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setClockConfirm(null)}>
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
+              disabled={clockIn.isPending || clockOut.isPending}
+              onClick={() => {
+                if (clockConfirm) onClock(clockConfirm);
+                setClockConfirm(null);
+              }}
+            >
+              ยืนยัน
+            </Button>
           </div>
-          <div className="rounded-xl bg-muted p-4">
-            <dt className="text-sm text-muted-foreground">ออกงาน</dt>
-            <dd className="mt-1 font-mono text-2xl font-semibold tabular-nums">
-              {clock?.clock_out_time ? bangkokTime(clock.clock_out_time) : "—"}
-            </dd>
-          </div>
-        </dl>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          {clockConfirm === "out" ? "บันทึกเวลาออกงานตอนนี้ — แก้ไขเองไม่ได้หลังบันทึก" : "บันทึกเวลาเข้างานตอนนี้ — แก้ไขเองไม่ได้หลังบันทึก"}
+        </p>
       </Modal>
 
       {(() => {
@@ -717,38 +744,83 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         );
         const listBody = (
           <>
+        {staffLeave.length > 0 && (
+          <>
+            <h3 className="mb-1 text-xs font-medium text-muted-foreground">ใบลาครู</h3>
+            <ul className="-my-1 mb-3 divide-y divide-border">
+              {staffLeave.map((l) => (
+                <li key={l.id} className="flex gap-4 py-5">
+                  <Avatar name={l.profile ? profileFullName(l.profile) : "—"} src={l.profile ? avatarUrl(l.profile) : null} className="h-12 w-12 shrink-0 text-sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate text-base font-semibold leading-6">{l.profile ? profileFullName(l.profile) : "—"}</p>
+                      <span className="shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">{l.days} วัน</span>
+                    </div>
+                    <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                      {leaveTypes.find((t) => t.id === l.leave_type_id)?.name ?? "—"} · {leaveDate(l.start_date)}
+                      {l.end_date !== l.start_date && ` – ${leaveDate(l.end_date)}`}
+                    </p>
+                    {l.reason && <p className="mt-3 text-sm leading-6">{l.reason}</p>}
+                    {l.attachment_path && (
+                      <button type="button" className="mt-2 text-sm text-accent underline" onClick={() => leaveAttachmentUrl(l.attachment_path!).then((u) => window.open(u, "_blank")).catch(() => {})}>
+                        ดูไฟล์แนบ
+                      </button>
+                    )}
+                    <p className="mt-3 text-xs text-muted-foreground">ยื่นเมื่อ {leaveSubmittedAt(l.created_at)}</p>
+                    <div className="mt-4 flex gap-2">
+                      {(["approved", "rejected"] as const).map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          disabled={setStaffLeaveStatus.isPending}
+                          onClick={() => decideStaffLeave(l.id, st)}
+                          className={`inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full border border-input px-4 text-sm font-medium transition-colors hover:bg-muted active:scale-[0.98] disabled:opacity-50 ${st === "rejected" ? "text-destructive" : ""}`}
+                        >
+                          {setStaffLeaveStatus.isPending && setStaffLeaveStatus.variables?.id === l.id && setStaffLeaveStatus.variables.status === st && <Spinner className="h-3.5 w-3.5" />}
+                          {st === "approved" ? "อนุมัติ" : "ไม่อนุมัติ"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
         {pendingLeave.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีใบลาค้าง</p>
+          staffLeave.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีใบลาค้าง</p>
         ) : (
+          <>
+          {staffLeave.length > 0 && <h3 className="mb-1 text-xs font-medium text-muted-foreground">ใบลานักเรียน</h3>}
           <ul className="-my-1 divide-y divide-border">
             {pendingLeave.map((l) => (
-              <li key={l.id} className="flex gap-3 py-3">
+              <li key={l.id} className="flex gap-4 py-5">
                 <Avatar
                   name={l.student ? `${l.student.first_name} ${l.student.last_name}` : "—"}
                   src={l.student ? (studentAvatarUrl(l.student) ?? (l.student.profile ? avatarUrl(l.student.profile) : null)) : null}
-                  className="h-11 w-11 shrink-0 text-sm"
+                  className="h-12 w-12 shrink-0 text-sm"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-3">
-                    <p className="min-w-0 truncate text-[15px] font-semibold">
+                    <p className="min-w-0 truncate text-base font-semibold leading-6">
                       {l.student ? `${l.student.first_name} ${l.student.last_name}` : "—"}
                     </p>
                     <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{l.student?.student_code}</span>
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="mt-1 text-sm leading-5 text-muted-foreground">
                     {leaveDate(l.start_date)}
                     {l.end_date !== l.start_date && ` – ${leaveDate(l.end_date)}`} · {l.days} วัน
                   </p>
-                  {l.reason && <p className="mt-0.5 text-sm">{l.reason}</p>}
-                  <p className="mt-0.5 text-xs text-muted-foreground">ยื่นเมื่อ {leaveSubmittedAt(l.created_at)}</p>
-                  <div className="mt-2 flex gap-2">
+                  {l.reason && <p className="mt-3 text-sm leading-6">{l.reason}</p>}
+                  <p className="mt-3 text-xs text-muted-foreground">ยื่นเมื่อ {leaveSubmittedAt(l.created_at)}</p>
+                  <div className="mt-4 flex gap-2">
                     {(["approved", "rejected"] as const).map((st) => (
                       <button
                         key={st}
                         type="button"
                         disabled={setLeaveStatus.isPending}
                         onClick={() => decideLeave(l.id, st)}
-                        className={`inline-flex h-8 items-center gap-1.5 rounded-full border border-input px-4 text-sm font-medium transition-colors hover:bg-muted active:scale-[0.98] disabled:opacity-50 ${st === "rejected" ? "text-destructive" : ""}`}
+                        className={`inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full border border-input px-4 text-sm font-medium transition-colors hover:bg-muted active:scale-[0.98] disabled:opacity-50 ${st === "rejected" ? "text-destructive" : ""}`}
                       >
                         {setLeaveStatus.isPending && setLeaveStatus.variables?.id === l.id && setLeaveStatus.variables.status === st && <Spinner className="h-3.5 w-3.5" />}
                         {st === "approved" ? "อนุมัติ" : "ไม่อนุมัติ"}
@@ -759,6 +831,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
               </li>
             ))}
           </ul>
+          </>
         )}
           </>
         );
@@ -805,7 +878,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           </>
         );
         const title = "ใบลารออนุมัติ";
-        const description = leaveTab === "list" && pendingLeave.length > 0 ? `นักเรียนที่รออนุมัติ ${pendingLeave.length} ใบ` : undefined;
+        const description = leaveTab === "list" && pendingTotal > 0 ? `รออนุมัติ ${pendingTotal} ใบ` : undefined;
         return phone ? (
           <Sheet open={leaveOpen} onOpenChange={setLeaveOpen} title={title} description={description} footer={leaveFooter} bottomOnPhone>
             {leaveBody}

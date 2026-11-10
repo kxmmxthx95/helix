@@ -81,6 +81,7 @@ export function CoverSheet({
       onOpenChange={onOpenChange}
       title="มอบงานเช็คชื่อให้ครูแทน"
       description="ครูแทนต้องกดยืนยัน และจะเช็คชื่อได้เฉพาะวัน/คาบที่ยืนยัน หลังใบลาได้รับอนุมัติ"
+      bottomOnPhone
     >
       {isLoading ? (
         <Spinner />
