@@ -92,6 +92,8 @@ export function useBannerColors(profileId: string) {
 /** ISO yyyy-mm-dd → "14 ต.ค." (formatted in UTC so the day never shifts). */
 const leaveDate = (iso: string) =>
   new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
+const leaveSubmittedAt = (iso: string) =>
+  `${new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }).format(new Date(iso))} น.`;
 const DAY_NAME = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 
 const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
@@ -730,6 +732,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                     {l.end_date !== l.start_date && ` – ${leaveDate(l.end_date)}`} · {l.days} วัน
                   </p>
                   {l.reason && <p className="mt-0.5 text-sm">{l.reason}</p>}
+                  <p className="mt-0.5 text-xs text-muted-foreground">ยื่นเมื่อ {leaveSubmittedAt(l.created_at)}</p>
                   <div className="mt-2 flex gap-2">
                     {(["approved", "rejected"] as const).map((st) => (
                       <button
