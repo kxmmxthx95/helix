@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Select, Spinner } from "@/components/ui";
+import { Button, Field, FormSection, Select, Spinner } from "@/components/ui";
 import {
   useAttendanceDuties,
   useLeaveCovers,
@@ -13,6 +13,7 @@ import { useMyLeaveRequests } from "@/hooks/useLeave";
 import { useProfiles } from "@/hooks/useProfiles";
 import { profileFullName, type AttendanceCover, type CoverStatus } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
+import { isEmployeeRole } from "@/lib/roles";
 import { cn, todayIso } from "@/lib/utils";
 
 export type CoverLeave = { id: string; profile_id: string; start_date: string; end_date: string };
@@ -72,7 +73,8 @@ export function CoverSheet({
 }) {
   const { data: covers = [], isLoading } = useLeaveCovers(open ? leave.id : null);
   const { data: profiles = [] } = useProfiles({ search: "", departmentId: "", role: "", active: "true" });
-  const teachers = useMemo(() => profiles.filter((p) => p.id !== leave.profile_id), [profiles, leave.profile_id]);
+  // Only employees can cover (the list also holds students/parents of the department).
+  const teachers = useMemo(() => profiles.filter((p) => p.id !== leave.profile_id && isEmployeeRole(p.roles)), [profiles, leave.profile_id]);
   const dates = useMemo(() => leaveDates(leave.start_date, leave.end_date), [leave.start_date, leave.end_date]);
 
   return (
@@ -82,11 +84,16 @@ export function CoverSheet({
       title="มอบงานเช็คชื่อให้ครูแทน"
       description="ครูแทนต้องกดยืนยัน และจะเช็คชื่อได้เฉพาะวัน/คาบที่ยืนยัน หลังใบลาได้รับอนุมัติ"
       bottomOnPhone
+      footer={
+        <Button type="button" variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
+          ปิด
+        </Button>
+      }
     >
       {isLoading ? (
         <Spinner />
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-4">
           {dates.map((date) => (
             <DayBlock
               key={date}
@@ -162,69 +169,59 @@ function DayBlock({
   if (duties.length === 0) return null;
   const free = duties.filter((d) => !activeOf(d));
 
+  const teacherOptions = teachers.map((t) => (
+    <option key={t.id} value={t.id}>
+      {name(t.id)}
+    </option>
+  ));
+
+  // Same look as NewLeaveSheet: one grouped card per day, label left / value right, borderless controls.
   return (
-    <section className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">{date}</h3>
-        {free.length > 1 && (
-          <Select
-            className="w-44"
-            value=""
-            placeholder="มอบทั้งวันให้…"
-            onChange={(e) => void assign(free, e.target.value)}
-            disabled={propose.isPending}
-          >
-            {teachers.map((t) => (
-              <option key={t.id} value={t.id}>
-                {name(t.id)}
-              </option>
-            ))}
+    <FormSection title={date}>
+      {free.length > 1 && (
+        <Field label="มอบทั้งวันให้">
+          <Select value="" placeholder="เลือกครูแทน" onChange={(e) => void assign(free, e.target.value)} disabled={propose.isPending}>
+            {teacherOptions}
           </Select>
-        )}
-      </div>
-      <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-        {duties.map((d) => {
-          const active = activeOf(d);
-          const declined = declinedOf(d);
+        </Field>
+      )}
+      {duties.map((d) => {
+        const active = activeOf(d);
+        const declined = declinedOf(d);
+        const key = `${d.classroom_id}-${d.schedule_entry_id}`;
+        if (!active) {
           return (
-            <li key={`${d.classroom_id}-${d.schedule_entry_id}`} className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs">
-              <span className="min-w-0 flex-1 font-medium">{d.label}</span>
-              {active ? (
-                <>
-                  <span className="text-muted-foreground">{name(active.cover_staff_id)}</span>
-                  <span className={cn("rounded-full px-2 py-0.5", STATUS_STYLE[active.status])}>{STATUS_LABEL[active.status]}</span>
-                  <button
-                    type="button"
-                    className="text-muted-foreground underline"
-                    disabled={setStatus.isPending}
-                    onClick={() => setStatus.mutate({ id: active.id, status: "cancelled" })}
-                  >
-                    ยกเลิก
-                  </button>
-                </>
-              ) : (
-                <>
-                  {declined && <span className={cn("rounded-full px-2 py-0.5", STATUS_STYLE.declined)}>{name(declined.cover_staff_id)} ปฏิเสธ</span>}
-                  <Select
-                    className="w-40"
-                    value=""
-                    placeholder="เลือกครูแทน"
-                    onChange={(e) => void assign([d], e.target.value)}
-                    disabled={propose.isPending}
-                  >
-                    {teachers.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {name(t.id)}
-                      </option>
-                    ))}
-                  </Select>
-                </>
+            <div key={key}>
+              {declined && (
+                <p className="pb-1 text-xs text-destructive">{name(declined.cover_staff_id)} ปฏิเสธ</p>
               )}
-            </li>
+              <Field label={d.label}>
+                <Select value="" placeholder="เลือกครูแทน" onChange={(e) => void assign([d], e.target.value)} disabled={propose.isPending}>
+                  {teacherOptions}
+                </Select>
+              </Field>
+            </div>
           );
-        })}
-      </ul>
-    </section>
+        }
+        return (
+          <div key={key} className="flex min-h-10 items-center gap-4 text-sm leading-5 md:min-h-7">
+            <span className="w-[42%] shrink-0">{d.label}</span>
+            <span className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-2 gap-y-1">
+              <span className="truncate text-muted-foreground">{name(active.cover_staff_id)}</span>
+              <span className={cn("rounded-full px-2 py-0.5 text-xs", STATUS_STYLE[active.status])}>{STATUS_LABEL[active.status]}</span>
+              <button
+                type="button"
+                className="text-xs text-muted-foreground underline"
+                disabled={setStatus.isPending}
+                onClick={() => setStatus.mutate({ id: active.id, status: "cancelled" })}
+              >
+                ยกเลิก
+              </button>
+            </span>
+          </div>
+        );
+      })}
+    </FormSection>
   );
 }
 
