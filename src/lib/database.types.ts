@@ -1905,6 +1905,8 @@ export type Database = {
           period_no: number | null;
           subject_code: string | null;
           subject_name: string | null;
+          owner_avatar_path: string | null;
+          owner_updated_at: string | null;
         }[];
       };
       student_lifetime_exp: {

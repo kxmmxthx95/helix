@@ -32,7 +32,8 @@ import { AssemblyAttendanceSheet } from "@/routes/AssemblyAttendanceSheet";
 import { CoverTasks } from "@/routes/CoverTasks";
 import { CoverLeavePicker } from "@/routes/CoverSheet";
 import { useMyCovers } from "@/hooks/useAttendanceCovers";
-import { useMyLeaveRequests } from "@/hooks/useLeave";
+import { useLeaveTypes, useMyLeaveRequests } from "@/hooks/useLeave";
+import { LEAVE_STATUS_LABEL, LEAVE_STATUS_STYLE } from "@/routes/Leave";
 import { LineLinkCard } from "@/routes/Profile";
 import { StaffClockStatsSheet } from "@/routes/StaffClockStatsSheet";
 import { PeriodDaySheet, type DayPeriod, type SheetDay } from "@/routes/PeriodDaySheet";
@@ -92,6 +93,8 @@ export function useBannerColors(profileId: string) {
 /** ISO yyyy-mm-dd → "14 ต.ค." (formatted in UTC so the day never shifts). */
 const leaveDate = (iso: string) =>
   new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
+const leaveSubmittedAt = (iso: string) =>
+  `${new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok" }).format(new Date(iso))} น.`;
 const DAY_NAME = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
 
 const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
@@ -124,6 +127,10 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const [lineOpen, setLineOpen] = useState(false);
   const phone = usePhone();
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [leaveTab, setLeaveTab] = useState<"list" | "history">("list");
+  useEffect(() => {
+    if (leaveOpen) setLeaveTab("list");
+  }, [leaveOpen]);
   const [newLeaveOpen, setNewLeaveOpen] = useState(false);
   const [coverPickOpen, setCoverPickOpen] = useState(false);
   const [leaveRevealed, setLeaveRevealed] = useState(false);
@@ -280,6 +287,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   // outside this teacher's department, so labels come from the RPC rather than the department-scoped lookups.
   // "มอบงาน" only makes sense with a live leave request (pending/approved, not yet over).
   const { data: myLeaves = [] } = useMyLeaveRequests(me.id);
+  const { data: leaveTypes = [] } = useLeaveTypes();
   const canAssignCover = myLeaves.some((r) => (r.status === "pending" || r.status === "approved") && r.end_date >= today);
   const { data: covers = [] } = useMyCovers(today, addDays(today, 14));
   const todayCovers = covers.filter((c) => c.status === "confirmed" && c.date === today && c.leave_status === "approved");
@@ -700,12 +708,14 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
             <Button type="button" variant="outline" className="flex-1" onClick={() => setLeaveOpen(false)}>
               ปิด
             </Button>
-            <Button type="button" className="flex-1" disabled={pendingLeave.length === 0 || setLeaveStatus.isPending} onClick={approveAllLeave}>
-              {setLeaveStatus.isPending ? <Spinner className="h-3 w-3" /> : `อนุมัติทั้งหมด${pendingLeave.length > 0 ? ` (${pendingLeave.length})` : ""}`}
-            </Button>
+            {leaveTab === "list" && (
+              <Button type="button" className="flex-1" disabled={pendingLeave.length === 0 || setLeaveStatus.isPending} onClick={approveAllLeave}>
+                {setLeaveStatus.isPending ? <Spinner className="h-3 w-3" /> : `อนุมัติทั้งหมด${pendingLeave.length > 0 ? ` (${pendingLeave.length})` : ""}`}
+              </Button>
+            )}
           </div>
         );
-        const leaveBody = (
+        const listBody = (
           <>
         {pendingLeave.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีใบลาค้าง</p>
@@ -730,6 +740,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                     {l.end_date !== l.start_date && ` – ${leaveDate(l.end_date)}`} · {l.days} วัน
                   </p>
                   {l.reason && <p className="mt-0.5 text-sm">{l.reason}</p>}
+                  <p className="mt-0.5 text-xs text-muted-foreground">ยื่นเมื่อ {leaveSubmittedAt(l.created_at)}</p>
                   <div className="mt-2 flex gap-2">
                     {(["approved", "rejected"] as const).map((st) => (
                       <button
@@ -751,8 +762,50 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         )}
           </>
         );
+        const historyBody =
+          myLeaves.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">ยังไม่มีประวัติการลา</p>
+          ) : (
+            <ul className="-my-1 divide-y divide-border">
+              {myLeaves.map((r) => (
+                <li key={r.id} className="py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="min-w-0 truncate text-[15px] font-semibold">{leaveTypes.find((t) => t.id === r.leave_type_id)?.name ?? "—"}</p>
+                    <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs", LEAVE_STATUS_STYLE[r.status])}>{LEAVE_STATUS_LABEL[r.status]}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {leaveDate(r.start_date)}
+                    {r.end_date !== r.start_date && ` – ${leaveDate(r.end_date)}`} · {r.days} วัน
+                  </p>
+                  {r.reason && <p className="mt-0.5 text-sm">{r.reason}</p>}
+                </li>
+              ))}
+            </ul>
+          );
+        const leaveBody = (
+          <>
+            <div className="mb-2 flex border-b border-border" role="tablist">
+              {([["list", "รายการ"], ["history", "ประวัติ"]] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={leaveTab === id}
+                  onClick={() => setLeaveTab(id)}
+                  className={cn(
+                    "-mb-px inline-flex h-9 flex-1 items-center justify-center border-b-2 text-sm font-medium transition-colors",
+                    leaveTab === id ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {leaveTab === "list" ? listBody : historyBody}
+          </>
+        );
         const title = "ใบลารออนุมัติ";
-        const description = pendingLeave.length > 0 ? `นักเรียนที่รออนุมัติ ${pendingLeave.length} ใบ` : undefined;
+        const description = leaveTab === "list" && pendingLeave.length > 0 ? `นักเรียนที่รออนุมัติ ${pendingLeave.length} ใบ` : undefined;
         return phone ? (
           <Sheet open={leaveOpen} onOpenChange={setLeaveOpen} title={title} description={description} footer={leaveFooter} bottomOnPhone>
             {leaveBody}

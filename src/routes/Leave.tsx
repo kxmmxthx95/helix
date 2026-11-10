@@ -19,14 +19,14 @@ import { cn } from "@/lib/utils";
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const currentYear = () => new Date().getFullYear();
 
-const LEAVE_STATUS_LABEL: Record<LeaveStatus, string> = {
+export const LEAVE_STATUS_LABEL: Record<LeaveStatus, string> = {
   pending: "รออนุมัติ",
   approved: "อนุมัติแล้ว",
   rejected: "ไม่อนุมัติ",
   cancelled: "ยกเลิกแล้ว",
 };
 
-const LEAVE_STATUS_STYLE: Record<LeaveStatus, string> = {
+export const LEAVE_STATUS_STYLE: Record<LeaveStatus, string> = {
   pending: "bg-warning/15 text-warning",
   approved: "bg-success/15 text-success",
   rejected: "bg-destructive/15 text-destructive",
