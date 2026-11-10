@@ -1,5 +1,5 @@
--- Verifies 0139 against a real project; every write rolls back. NOT run in CI —
--- execute manually against the verified Helix project after applying 0139.
+-- Verifies 0139 + 0150 against a real project; every write rolls back. NOT run in CI —
+-- execute manually against the verified Helix project after applying 0139/0150.
 begin;
 do $$
 declare
@@ -18,12 +18,25 @@ begin
   insert into attendance_covers (leave_request_id, date, classroom_id, cover_staff_id, proposed_by)
     values (leave_id, d, room, cover_id, owner_id) returning id into cov;
 
-  -- cover cannot write attendance while leave is still pending / cover unconfirmed
+  -- request -> LINE to the cover (0139)
   reset role;
+  select count(*) into n from line_notifications
+    where profile_id = cover_id and message like 'มีการขอให้คุณเช็คชื่อแทน%' and created_at >= now() - interval '1 minute';
+  if n < 1 then raise exception 'no LINE to cover on request'; end if;
+
+  -- cover cannot write attendance while leave is still pending / cover unconfirmed
   perform set_config('request.jwt.claim.sub', cover_id::text, true);
   set local role authenticated;
   update attendance_covers set status = 'confirmed' where id = cov;
   if has_cover_for_classroom(room, d) then raise exception 'cover active before leave approved'; end if;
+
+  -- confirm -> LINE back to the requester (0150)
+  reset role;
+  select count(*) into n from line_notifications
+    where profile_id = owner_id and message like '%รับเช็คชื่อแทน%แล้ว%' and created_at >= now() - interval '1 minute';
+  if n < 1 then raise exception 'no LINE to requester on confirm'; end if;
+  perform set_config('request.jwt.claim.sub', cover_id::text, true);
+  set local role authenticated;
 
   -- approve leave -> cover becomes effective; a different date stays denied
   reset role;
