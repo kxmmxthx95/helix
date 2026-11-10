@@ -45,14 +45,15 @@ export function usePendingApprovals() {
 export function useRequestPremisesExit() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ profileId, date, reason }: { profileId: string; date: string; reason: string }) => {
+    mutationFn: async ({ profileId, date, reason, exitTime, plannedReturnTime }: { profileId: string; date: string; reason: string; exitTime?: string; plannedReturnTime?: string | null }) => {
       // Best-effort location — a denied/unavailable GPS doesn't block the request (unlike clock-in/out).
       const pos = await getCurrentPosition();
       const { error } = await supabase.from("premises_exit_requests").insert({
         profile_id: profileId,
         date,
         reason,
-        exit_time: new Date().toISOString(),
+        exit_time: exitTime ?? new Date().toISOString(),
+        planned_return_time: plannedReturnTime ?? null,
         exit_lat: "error" in pos ? null : pos.lat,
         exit_lng: "error" in pos ? null : pos.lng,
       });

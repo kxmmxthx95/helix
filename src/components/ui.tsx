@@ -47,6 +47,7 @@ Button.displayName = "Button";
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   ({ className, type, value, onClick, onKeyDown, inputMode, ...props }, ref) => {
     const isDate = type === "date" || type === "datetime-local";
+    const isTime = type === "time";
     return (
       <input
         ref={ref}
@@ -55,8 +56,9 @@ export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTML
         inputMode={isDate ? "none" : inputMode}
         className={cn(
           "ui-control flex h-8 w-full min-w-0 rounded-md border border-input bg-field px-3 text-base outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground/80 hover:border-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/20 disabled:opacity-50 md:text-[13px]",
-          isDate && "ui-date pr-8",
-          isDate && (value === "" || value === undefined) && "ui-date-empty",
+          (isDate || isTime) && "ui-date pr-8",
+          isTime && "ui-time",
+          (isDate || isTime) && (value === "" || value === undefined) && "ui-date-empty",
           className,
         )}
         onClick={(e) => {

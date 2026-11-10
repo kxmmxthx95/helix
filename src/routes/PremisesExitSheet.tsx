@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Field, FormSection, Input, Spinner } from "@/components/ui";
@@ -14,19 +14,28 @@ export function PremisesExitSheet({ profileId, date, open, onOpenChange }: { pro
   const request = useRequestPremisesExit();
   const confirmReturn = useConfirmReturn();
   const [reason, setReason] = useState("");
+  const [exitAt, setExitAt] = useState("");
+  const [returnAt, setReturnAt] = useState("");
   const [attempted, setAttempted] = useState(false);
+  useEffect(() => {
+    if (open) setExitAt(bangkokTime(new Date().toISOString()));
+  }, [open]);
+
+  const returnBad = !!returnAt && returnAt <= exitAt;
+  const iso = (hhmm: string) => `${date}T${hhmm}:00+07:00`;
 
   const reset = () => {
     setReason("");
+    setReturnAt("");
     setAttempted(false);
   };
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setAttempted(true);
-    if (!reason.trim()) return;
+    if (!reason.trim() || !exitAt || returnBad) return;
     request.mutate(
-      { profileId, date, reason: reason.trim() },
+      { profileId, date, reason: reason.trim(), exitTime: iso(exitAt), plannedReturnTime: returnAt ? iso(returnAt) : null },
       {
         onSuccess: () => {
           toast("ส่งคำขอออกนอกโรงเรียนสำเร็จ");
@@ -63,6 +72,12 @@ export function PremisesExitSheet({ profileId, date, open, onOpenChange }: { pro
           <Field label="เหตุผล" required error={attempted && !reason.trim() ? "กรอกเหตุผล" : undefined}>
             <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="เช่น ไปธนาคาร" />
           </Field>
+          <Field label="เวลาออก" required error={attempted && !exitAt ? "เลือกเวลาออก" : undefined}>
+            <Input type="time" value={exitAt} onChange={(e) => setExitAt(e.target.value)} />
+          </Field>
+          <Field label="เวลากลับ" error={attempted && returnBad ? "ต้องหลังเวลาออก" : undefined}>
+            <Input type="time" value={returnAt} onChange={(e) => setReturnAt(e.target.value)} />
+          </Field>
         </FormSection>
         {requests.length > 0 && (
           <FormSection>
@@ -72,6 +87,7 @@ export function PremisesExitSheet({ profileId, date, open, onOpenChange }: { pro
                   <p className="truncate">{r.reason}</p>
                   <p className="text-xs text-muted-foreground">
                     ออก {bangkokTime(r.exit_time)}
+                    {r.planned_return_time ? ` · คาดว่ากลับ ${bangkokTime(r.planned_return_time)}` : ""}
                     {r.return_time ? ` · กลับ ${bangkokTime(r.return_time)}` : ""} · {STATUS_LABEL[r.status]}
                   </p>
                 </div>
