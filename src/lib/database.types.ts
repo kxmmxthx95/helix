@@ -122,6 +122,7 @@ export type PremisesExitRequest = {
   exit_lng: number | null;
   return_time: string | null;
   planned_return_time: string | null;
+  no_return: boolean;
   status: PremisesExitStatus;
   approved_by: string | null;
   approved_at: string | null;
@@ -1722,7 +1723,7 @@ export type Database = {
       >;
       premises_exit_requests: Table<
         PremisesExitRequest,
-        InsertOf<PremisesExitRequest, "status" | "approved_by" | "approved_at" | "return_time" | "planned_return_time">
+        InsertOf<PremisesExitRequest, "status" | "approved_by" | "approved_at" | "return_time" | "planned_return_time" | "no_return">
       >;
       leave_types: Table<LeaveType, InsertOf<LeaveType, never>>;
       leave_requests: Table<

@@ -207,11 +207,11 @@ function PremisesExitCard({ profileId, date }: { profileId: string; date: string
                 <p className="truncate">{r.reason}</p>
                 <p className="text-xs text-muted-foreground">
                   ออก {bangkokTime(r.exit_time)}
-                  {r.planned_return_time ? ` · คาดว่ากลับ ${bangkokTime(r.planned_return_time)}` : ""}
+                  {r.no_return ? " · ไม่กลับ" : r.planned_return_time ? ` · คาดว่ากลับ ${bangkokTime(r.planned_return_time)}` : ""}
                   {r.return_time ? ` · กลับ ${bangkokTime(r.return_time)}` : ""} · {STATUS_LABEL[r.status]}
                 </p>
               </div>
-              {!r.return_time && (
+              {!r.return_time && !r.no_return && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -376,7 +376,7 @@ function ApprovalsCard({ approverId }: { approverId: string }) {
             <p className="font-medium">{nameById.get(r.profile_id) ?? "—"}</p>
             <p className="text-xs text-muted-foreground">
               {r.reason} · ออก {bangkokTime(r.exit_time)}
-              {r.planned_return_time ? ` · คาดว่ากลับ ${bangkokTime(r.planned_return_time)}` : ""}
+              {r.no_return ? " · ไม่กลับ" : r.planned_return_time ? ` · คาดว่ากลับ ${bangkokTime(r.planned_return_time)}` : ""}
             </p>
             <div className="flex gap-2">
               <Button

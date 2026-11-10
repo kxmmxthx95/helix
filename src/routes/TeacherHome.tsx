@@ -5,6 +5,7 @@ import { profileFullName, type Profile, type ProfileWithRoles } from "@/lib/data
 import { BarChartIcon, CheckmarkCircleIcon, ChevronForward, DocumentTextIcon, LockIcon, LogOut, PaletteIcon, Users } from "@/components/icons";
 import { BannerUpload } from "@/components/BannerUpload";
 import { BannerAdjustOverlay, useBannerAdjust } from "@/components/BannerAdjust";
+import SwipeRow, { type SwipeAction } from "@/components/SwipeRow";
 import { NewLeaveSheet } from "@/routes/NewLeaveSheet";
 import { Modal } from "@/components/Modal";
 import { Sheet, usePhone } from "@/components/Sheet";
@@ -31,7 +32,8 @@ import { AssemblyAttendanceSheet } from "@/routes/AssemblyAttendanceSheet";
 import { CoverTasks } from "@/routes/CoverTasks";
 import { CoverLeavePicker } from "@/routes/CoverSheet";
 import { useMyCovers } from "@/hooks/useAttendanceCovers";
-import { useLeaveTypes, useMyLeaveRequests } from "@/hooks/useLeave";
+import { leaveAttachmentUrl, useLeaveTypes, useMyLeaveRequests, usePendingStaffLeave, useSetLeaveStatus } from "@/hooks/useLeave";
+import { canManage } from "@/lib/roles";
 import { LEAVE_STATUS_LABEL, LEAVE_STATUS_STYLE } from "@/routes/Leave";
 import { LineLinkCard } from "@/routes/Profile";
 import { StaffClockStatsSheet } from "@/routes/StaffClockStatsSheet";
@@ -347,6 +349,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   });
   const assemblyPending = assemblyDone ? homerooms.filter((h) => !assemblyDone.has(h.id)) : [];
   const { data: pendingLeave = [] } = usePendingStudentLeaveApprovals();
+  const { data: staffLeave = [] } = usePendingStaffLeave(me.id, canManage(me.roles));
+  const setStaffLeaveStatus = useSetLeaveStatus();
+  const pendingTotal = pendingLeave.length + staffLeave.length;
 
   async function approveAllLeave() {
     if (!confirm(`อนุมัติใบลา ${pendingLeave.length} ใบทั้งหมดหรือไม่?`)) return;
@@ -366,6 +371,15 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     const verb = status === "approved" ? "อนุมัติ" : "ไม่อนุมัติ";
     if (status === "rejected" && !confirm("ไม่อนุมัติใบลานี้หรือไม่?")) return;
     setLeaveStatus.mutate(
+      { id, status, approvedBy: me.id },
+      { onSuccess: () => toast(`${verb}ใบลาเรียบร้อย`), onError: () => toast(`${verb}ไม่สำเร็จ`, "error") },
+    );
+  }
+
+  function decideStaffLeave(id: string, status: "approved" | "rejected") {
+    const verb = status === "approved" ? "อนุมัติ" : "ไม่อนุมัติ";
+    if (status === "rejected" && !confirm("ไม่อนุมัติใบลานี้หรือไม่?")) return;
+    setStaffLeaveStatus.mutate(
       { id, status, approvedBy: me.id },
       { onSuccess: () => toast(`${verb}ใบลาเรียบร้อย`), onError: () => toast(`${verb}ไม่สำเร็จ`, "error") },
     );
@@ -391,10 +405,10 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     { title: "เช็คชื่อเข้าเรียน", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", sheet: true, badge: unchecked },
     {
       title: "จัดการใบลา",
-      text: pendingLeave.length > 0 ? `มี ${pendingLeave.length} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง",
+      text: pendingTotal > 0 ? `มี ${pendingTotal} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง",
       busy: false,
       disabled: false,
-      badge: pendingLeave.length,
+      badge: pendingTotal,
       reveal: true,
       onClick: () => setLeaveRevealed((v) => !v),
     },
@@ -419,10 +433,10 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     const body = (
       <>
         <span className="min-w-0 flex-1">
-          <span className="block text-[15px] font-semibold group-aria-expanded:truncate">{t.title}</span>
-          <span className="block whitespace-pre-line text-sm text-muted-foreground group-aria-expanded:truncate">{t.text}</span>
+          <span className="block text-[15px] font-semibold">{t.title}</span>
+          <span className="block whitespace-pre-line text-sm text-muted-foreground">{t.text}</span>
         </span>
-        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 group-aria-expanded:hidden", "locked" in t && t.locked ? "border-muted-foreground/50 text-muted-foreground" : "border-accent text-accent")}>
+        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2", "locked" in t && t.locked ? "border-muted-foreground/50 text-muted-foreground" : "border-accent text-accent")}>
           {"busy" in t && t.busy ? <Spinner className="h-4 w-4" /> : "locked" in t && t.locked ? <LockIcon className="h-4 w-4" /> : <ChevronForward className="h-4 w-4" />}
         </span>
         {"badge" in t && !!t.badge && (
@@ -448,86 +462,70 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         </button>
       );
     }
-    if ("clock" in t) {
+    if ("clock" in t || "reveal" in t) {
+      const isClock = "clock" in t;
+      const open = isClock ? clockRevealed : leaveRevealed;
+      const setOpen = isClock ? setClockRevealed : setLeaveRevealed;
       const done = !!clock?.clock_out_time;
       const kind = clock?.clock_in_time ? "out" : "in";
       const canExit = !done && !!clock?.clock_in_time;
-      const act = (open: () => void) => () => {
-        setClockRevealed(false);
-        open();
-      };
-      const actionCls = "flex w-16 flex-col items-center justify-center gap-1 text-xs font-medium text-white";
+      // First action sits on the outer edge (SwipeRow's "primary", takes actionColor); the rest follow inward.
+      const actions: SwipeAction[] = isClock
+        ? [
+            { id: "stats", label: "ประวัติ", icon: <BarChartIcon className="h-5 w-5" />, onSelect: () => setStatsOpen(true) },
+            ...(canExit ? [{ id: "exit", label: "ออกนอก", icon: <LogOut className="h-5 w-5" />, color: "#737373", onSelect: () => setExitOpen(true) }] : []),
+            ...(!done
+              ? [
+                  {
+                    id: "clock",
+                    label: kind === "out" ? "ออกงาน" : "เข้างาน",
+                    icon: clockLock ? <LockIcon className="h-5 w-5" /> : <CheckmarkCircleIcon className="h-5 w-5" />,
+                    color: clockLock ? "#a3a3a3" : "hsl(var(--accent))",
+                    onSelect: () => {
+                      if (loadingClock || t.busy) return;
+                      if (clockLock) toast(clockLock);
+                      else setClockConfirm(kind);
+                    },
+                  },
+                ]
+              : []),
+          ]
+        : [
+            { id: "new", label: "ยื่นคำลา", icon: <DocumentTextIcon className="h-5 w-5" />, onSelect: () => setNewLeaveOpen(true) },
+            ...(canAssignCover ? [{ id: "cover", label: "มอบงาน", icon: <Users className="h-5 w-5" />, color: "#737373", onSelect: () => setCoverPickOpen(true) }] : []),
+            { id: "pending", label: "รออนุมัติ", icon: <CheckmarkCircleIcon className="h-5 w-5" />, color: "#525252", onSelect: () => setLeaveOpen(true) },
+          ];
+      // SwipeRow captures the pointer, so a tap's click lands on its surface, not on our content: listen on this
+      // wrapper instead. Skip clicks from the action buttons, taps that end a drag, and taps that close an open row.
       return (
-        <div key={t.title} className="relative h-full overflow-hidden rounded-2xl">
-          {clockRevealed && <button type="button" aria-label="ปิด" tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setClockRevealed(false)} />}
-          <div className={cn("absolute inset-y-0 right-0 z-20 flex transition-[visibility] duration-[250ms]", !clockRevealed && "invisible")}>
-            {!done && (
-              <button
-                type="button"
-                tabIndex={clockRevealed ? 0 : -1}
-                disabled={loadingClock || t.busy}
-                onClick={act(() => (clockLock ? toast(clockLock) : setClockConfirm(kind)))}
-                className={cn(actionCls, "disabled:opacity-60", clockLock ? "bg-neutral-400" : "bg-accent")}
-              >
-                {clockLock ? <LockIcon className="h-6 w-6" /> : <CheckmarkCircleIcon className="h-6 w-6" />}
-                {kind === "out" ? "ออกงาน" : "เข้างาน"}
-              </button>
-            )}
-            {canExit && (
-              <button type="button" tabIndex={clockRevealed ? 0 : -1} onClick={act(() => setExitOpen(true))} className={cn(actionCls, "bg-neutral-500")}>
-                <LogOut className="h-6 w-6" />
-                ออกนอก
-              </button>
-            )}
-            <button type="button" tabIndex={clockRevealed ? 0 : -1} onClick={act(() => setStatsOpen(true))} className={cn(actionCls, "bg-neutral-600")}>
-              <BarChartIcon className="h-6 w-6" />
-              ประวัติ
-            </button>
-          </div>
-          <button
-            type="button"
-            aria-expanded={clockRevealed}
-            onClick={t.onClick}
-            className={cn(cls, "group z-20 transition-[width,border-radius] duration-[250ms] ease-out motion-reduce:transition-none", !clockRevealed ? "w-full" : done ? "w-[calc(100%-4rem)] rounded-r-none" : canExit ? "w-[calc(100%-12rem)] rounded-r-none" : "w-[calc(100%-8rem)] rounded-r-none")}
-          >
-            {body}
-          </button>
-        </div>
-      );
-    }
-    if ("reveal" in t) {
-      const act = (open: () => void) => () => {
-        setLeaveRevealed(false);
-        open();
-      };
-      const actionCls = "flex w-16 flex-col items-center justify-center gap-1 text-xs font-medium text-white";
-      return (
-        <div key={t.title} className="relative h-full overflow-hidden rounded-2xl">
-          {leaveRevealed && <button type="button" aria-label="ปิด" tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setLeaveRevealed(false)} />}
-          <div className={cn("absolute inset-y-0 right-0 z-20 flex transition-[visibility] duration-[250ms]", !leaveRevealed && "invisible")}>
-            <button type="button" tabIndex={leaveRevealed ? 0 : -1} onClick={act(() => setLeaveOpen(true))} className={cn(actionCls, "bg-neutral-600")}>
-              <CheckmarkCircleIcon className="h-6 w-6" />
-              รออนุมัติ
-            </button>
-            {canAssignCover && (
-              <button type="button" tabIndex={leaveRevealed ? 0 : -1} onClick={act(() => setCoverPickOpen(true))} className={cn(actionCls, "bg-neutral-500")}>
-                <Users className="h-6 w-6" />
-                มอบงาน
-              </button>
-            )}
-            <button type="button" tabIndex={leaveRevealed ? 0 : -1} onClick={act(() => setNewLeaveOpen(true))} className={cn(actionCls, "bg-accent")}>
-              <DocumentTextIcon className="h-6 w-6" />
-              ยื่นคำลา
-            </button>
-          </div>
-          <button
-            type="button"
-            aria-expanded={leaveRevealed}
-            onClick={t.onClick}
-            className={cn(cls, "group z-20 transition-[width,border-radius] duration-[250ms] ease-out motion-reduce:transition-none", !leaveRevealed ? "w-full" : canAssignCover ? "w-[calc(100%-12rem)] rounded-r-none" : "w-[calc(100%-8rem)] rounded-r-none")}
-          >
-            {body}
-          </button>
+        <div
+          key={t.title}
+          className="h-full"
+          onPointerDownCapture={(e) => {
+            e.currentTarget.dataset.open = open ? "1" : "";
+            e.currentTarget.dataset.x = String(e.clientX);
+          }}
+          onClick={(e) => {
+            const d = e.currentTarget.dataset;
+            if (d.open || (e.target as HTMLElement).closest(".swipe-row__rail") || Math.abs(e.clientX - Number(d.x)) > 8) return;
+            setOpen(true);
+          }}
+        >
+        <SwipeRow
+          label={t.title}
+          actions={actions}
+          open={open}
+          onOpenChange={setOpen}
+          height={76}
+          radius={16}
+          actionWidth={64}
+          actionColor={isClock ? "#525252" : "hsl(var(--accent))"}
+          fullSwipe={false}
+          haptic={false}
+          style={{ "--sr-row": "color-mix(in srgb, hsl(var(--muted)) 70%, hsl(var(--background)))", "--sr-text": "hsl(var(--foreground))" } as React.CSSProperties}
+        >
+          <div className="relative flex h-full w-full items-center gap-3 text-left">{body}</div>
+        </SwipeRow>
         </div>
       );
     }
@@ -746,38 +744,83 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         );
         const listBody = (
           <>
+        {staffLeave.length > 0 && (
+          <>
+            <h3 className="mb-1 text-xs font-medium text-muted-foreground">ใบลาครู</h3>
+            <ul className="-my-1 mb-3 divide-y divide-border">
+              {staffLeave.map((l) => (
+                <li key={l.id} className="flex gap-4 py-5">
+                  <Avatar name={l.profile ? profileFullName(l.profile) : "—"} src={l.profile ? avatarUrl(l.profile) : null} className="h-12 w-12 shrink-0 text-sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate text-base font-semibold leading-6">{l.profile ? profileFullName(l.profile) : "—"}</p>
+                      <span className="shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">{l.days} วัน</span>
+                    </div>
+                    <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                      {leaveTypes.find((t) => t.id === l.leave_type_id)?.name ?? "—"} · {leaveDate(l.start_date)}
+                      {l.end_date !== l.start_date && ` – ${leaveDate(l.end_date)}`}
+                    </p>
+                    {l.reason && <p className="mt-3 text-sm leading-6">{l.reason}</p>}
+                    {l.attachment_path && (
+                      <button type="button" className="mt-2 text-sm text-accent underline" onClick={() => leaveAttachmentUrl(l.attachment_path!).then((u) => window.open(u, "_blank")).catch(() => {})}>
+                        ดูไฟล์แนบ
+                      </button>
+                    )}
+                    <p className="mt-3 text-xs text-muted-foreground">ยื่นเมื่อ {leaveSubmittedAt(l.created_at)}</p>
+                    <div className="mt-4 flex gap-2">
+                      {(["approved", "rejected"] as const).map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          disabled={setStaffLeaveStatus.isPending}
+                          onClick={() => decideStaffLeave(l.id, st)}
+                          className={`inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full border border-input px-4 text-sm font-medium transition-colors hover:bg-muted active:scale-[0.98] disabled:opacity-50 ${st === "rejected" ? "text-destructive" : ""}`}
+                        >
+                          {setStaffLeaveStatus.isPending && setStaffLeaveStatus.variables?.id === l.id && setStaffLeaveStatus.variables.status === st && <Spinner className="h-3.5 w-3.5" />}
+                          {st === "approved" ? "อนุมัติ" : "ไม่อนุมัติ"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
         {pendingLeave.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีใบลาค้าง</p>
+          staffLeave.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีใบลาค้าง</p>
         ) : (
+          <>
+          {staffLeave.length > 0 && <h3 className="mb-1 text-xs font-medium text-muted-foreground">ใบลานักเรียน</h3>}
           <ul className="-my-1 divide-y divide-border">
             {pendingLeave.map((l) => (
-              <li key={l.id} className="flex gap-3 py-3">
+              <li key={l.id} className="flex gap-4 py-5">
                 <Avatar
                   name={l.student ? `${l.student.first_name} ${l.student.last_name}` : "—"}
                   src={l.student ? (studentAvatarUrl(l.student) ?? (l.student.profile ? avatarUrl(l.student.profile) : null)) : null}
-                  className="h-11 w-11 shrink-0 text-sm"
+                  className="h-12 w-12 shrink-0 text-sm"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-3">
-                    <p className="min-w-0 truncate text-[15px] font-semibold">
+                    <p className="min-w-0 truncate text-base font-semibold leading-6">
                       {l.student ? `${l.student.first_name} ${l.student.last_name}` : "—"}
                     </p>
                     <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{l.student?.student_code}</span>
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="mt-1 text-sm leading-5 text-muted-foreground">
                     {leaveDate(l.start_date)}
                     {l.end_date !== l.start_date && ` – ${leaveDate(l.end_date)}`} · {l.days} วัน
                   </p>
-                  {l.reason && <p className="mt-0.5 text-sm">{l.reason}</p>}
-                  <p className="mt-0.5 text-xs text-muted-foreground">ยื่นเมื่อ {leaveSubmittedAt(l.created_at)}</p>
-                  <div className="mt-2 flex gap-2">
+                  {l.reason && <p className="mt-3 text-sm leading-6">{l.reason}</p>}
+                  <p className="mt-3 text-xs text-muted-foreground">ยื่นเมื่อ {leaveSubmittedAt(l.created_at)}</p>
+                  <div className="mt-4 flex gap-2">
                     {(["approved", "rejected"] as const).map((st) => (
                       <button
                         key={st}
                         type="button"
                         disabled={setLeaveStatus.isPending}
                         onClick={() => decideLeave(l.id, st)}
-                        className={`inline-flex h-8 items-center gap-1.5 rounded-full border border-input px-4 text-sm font-medium transition-colors hover:bg-muted active:scale-[0.98] disabled:opacity-50 ${st === "rejected" ? "text-destructive" : ""}`}
+                        className={`inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full border border-input px-4 text-sm font-medium transition-colors hover:bg-muted active:scale-[0.98] disabled:opacity-50 ${st === "rejected" ? "text-destructive" : ""}`}
                       >
                         {setLeaveStatus.isPending && setLeaveStatus.variables?.id === l.id && setLeaveStatus.variables.status === st && <Spinner className="h-3.5 w-3.5" />}
                         {st === "approved" ? "อนุมัติ" : "ไม่อนุมัติ"}
@@ -788,6 +831,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
               </li>
             ))}
           </ul>
+          </>
         )}
           </>
         );
@@ -834,7 +878,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           </>
         );
         const title = "ใบลารออนุมัติ";
-        const description = leaveTab === "list" && pendingLeave.length > 0 ? `นักเรียนที่รออนุมัติ ${pendingLeave.length} ใบ` : undefined;
+        const description = leaveTab === "list" && pendingTotal > 0 ? `รออนุมัติ ${pendingTotal} ใบ` : undefined;
         return phone ? (
           <Sheet open={leaveOpen} onOpenChange={setLeaveOpen} title={title} description={description} footer={leaveFooter} bottomOnPhone>
             {leaveBody}
