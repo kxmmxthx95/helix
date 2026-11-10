@@ -105,6 +105,7 @@ export type TimeClockRecord = {
   clock_out_time: string | null;
   clock_out_lat: number | null;
   clock_out_lng: number | null;
+  auto_clock_out: boolean;
   recorded_by: string;
   created_at: string;
   updated_at: string;
@@ -1715,7 +1716,7 @@ export type Database = {
         TimeClockRecord,
         InsertOf<
           TimeClockRecord,
-          "clock_in_lat" | "clock_in_lng" | "clock_out_time" | "clock_out_lat" | "clock_out_lng"
+          "clock_in_lat" | "clock_in_lng" | "clock_out_time" | "clock_out_lat" | "clock_out_lng" | "auto_clock_out"
         >
       >;
       premises_exit_requests: Table<

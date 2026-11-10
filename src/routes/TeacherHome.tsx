@@ -2,10 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { profileFullName, type Profile, type ProfileWithRoles } from "@/lib/database.types";
-import { BarChartIcon, CheckmarkCircleIcon, ChevronForward, DocumentTextIcon, LockIcon, PaletteIcon, Users } from "@/components/icons";
+import { BarChartIcon, CheckmarkCircleIcon, ChevronForward, DocumentTextIcon, LockIcon, LogOut, PaletteIcon, Users } from "@/components/icons";
 import { BannerUpload } from "@/components/BannerUpload";
 import { BannerAdjustOverlay, useBannerAdjust } from "@/components/BannerAdjust";
-import { HoldButton } from "@/components/HoldButton";
 import { NewLeaveSheet } from "@/routes/NewLeaveSheet";
 import { Modal } from "@/components/Modal";
 import { Sheet, usePhone } from "@/components/Sheet";
@@ -38,6 +37,7 @@ import { LineLinkCard } from "@/routes/Profile";
 import { StaffClockStatsSheet } from "@/routes/StaffClockStatsSheet";
 import { PeriodDaySheet, type DayPeriod, type SheetDay } from "@/routes/PeriodDaySheet";
 import { bangkokTime } from "@/routes/TimeTracking";
+import { PremisesExitSheet } from "@/routes/PremisesExitSheet";
 import { TeacherTimetable } from "@/routes/Timetable";
 
 // Teacher home: "what do I teach today" first, open work second. Cards are widget-style (macOS).
@@ -134,7 +134,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const [newLeaveOpen, setNewLeaveOpen] = useState(false);
   const [coverPickOpen, setCoverPickOpen] = useState(false);
   const [leaveRevealed, setLeaveRevealed] = useState(false);
-  const [clockOpen, setClockOpen] = useState(false);
+  const [clockRevealed, setClockRevealed] = useState(false);
+  const [exitOpen, setExitOpen] = useState(false);
+  const [clockConfirm, setClockConfirm] = useState<"in" | "out" | null>(null);
   const [statsOpen, setStatsOpen] = useState(false);
   const [assemblyOpen, setAssemblyOpen] = useState(false);
   const [periodsOpen, setPeriodsOpen] = useState(false);
@@ -369,24 +371,20 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     );
   }
 
-  // Hold-to-confirm guards the irreversible in/out punch; null while locked or already clocked out.
-  const clockHold = !clock?.clock_out_time && !clockLock ? (clock?.clock_in_time ? "ออกงาน" : "เข้างาน") : null;
   const tiles = [
     ...(showClock
       ? [
           {
             clock: true,
-      title: clock?.clock_out_time ? "ลงเวลาแล้ว" : clock?.clock_in_time ? "ออกงาน" : "เข้างาน",
-            hold: clockHold,
-            text: ((clock?.clock_in_time && clockLock ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}\n${clockLock}` : clockLock) ?? (clock?.clock_out_time
-                ? `เข้า ${bangkokTime(clock.clock_in_time ?? clock.clock_out_time)} · ออก ${bangkokTime(clock.clock_out_time)}`
-                : clock?.clock_in_time
-                  ? `เข้างานเวลา ${bangkokTime(clock.clock_in_time)}`
-                  : "ยังไม่ได้บันทึกเวลาเข้างาน")) + (clockHold ? ` · กดค้างเพื่อ${clockHold}` : ""),
+            title: clock?.clock_out_time ? "ลงเวลาแล้ว" : clock?.clock_in_time ? "ออกงาน" : "เข้างาน",
+            text: clock?.clock_out_time
+              ? `เข้า ${bangkokTime(clock.clock_in_time ?? clock.clock_out_time)} · ออก ${bangkokTime(clock.clock_out_time)}`
+              : clock?.clock_in_time
+                ? `เข้างาน : ${bangkokTime(clock.clock_in_time)}`
+                : "ยังไม่ได้บันทึกเวลาเข้างาน",
             busy: clockIn.isPending || clockOut.isPending,
-            disabled: loadingClock || !!clockLock,
-            locked: !!clockLock,
-            onClick: () => (clock?.clock_out_time ? setClockOpen(true) : onClock(clock?.clock_in_time ? "out" : "in")),
+            disabled: false,
+            onClick: () => setClockRevealed((v) => !v),
           },
         ]
       : []),
@@ -421,10 +419,10 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     const body = (
       <>
         <span className="min-w-0 flex-1">
-          <span className="block text-[15px] font-semibold">{t.title}</span>
-          <span className="block whitespace-pre-line text-sm text-muted-foreground">{t.text}</span>
+          <span className="block text-[15px] font-semibold group-aria-expanded:truncate">{t.title}</span>
+          <span className="block whitespace-pre-line text-sm text-muted-foreground group-aria-expanded:truncate">{t.text}</span>
         </span>
-        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2", "locked" in t && t.locked ? "border-muted-foreground/50 text-muted-foreground" : "border-accent text-accent")}>
+        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 group-aria-expanded:hidden", "locked" in t && t.locked ? "border-muted-foreground/50 text-muted-foreground" : "border-accent text-accent")}>
           {"busy" in t && t.busy ? <Spinner className="h-4 w-4" /> : "locked" in t && t.locked ? <LockIcon className="h-4 w-4" /> : <ChevronForward className="h-4 w-4" />}
         </span>
         {"badge" in t && !!t.badge && (
@@ -451,29 +449,48 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
       );
     }
     if ("clock" in t) {
+      const done = !!clock?.clock_out_time;
+      const kind = clock?.clock_in_time ? "out" : "in";
+      const canExit = !done && !!clock?.clock_in_time;
+      const act = (open: () => void) => () => {
+        setClockRevealed(false);
+        open();
+      };
+      const actionCls = "flex w-16 flex-col items-center justify-center gap-1 text-xs font-medium text-white";
       return (
-        <div key={t.title} className="relative">
-          {t.hold ? (
-            <HoldButton
-              disabled={t.disabled || t.busy}
-              onConfirm={() => t.onClick?.()}
-              onEarly={() => toast("กดค้างไว้เพื่อลงเวลา")}
-              className={cn(cls, "w-full disabled:opacity-60")}
-            >
-              {body}
-            </HoldButton>
-          ) : (
-            <button type="button" disabled={t.disabled || t.busy} onClick={t.onClick} className={cn(cls, "w-full disabled:opacity-60")}>
-              {body}
+        <div key={t.title} className="relative h-full overflow-hidden rounded-2xl">
+          {clockRevealed && <button type="button" aria-label="ปิด" tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setClockRevealed(false)} />}
+          <div className={cn("absolute inset-y-0 right-0 z-20 flex transition-[visibility] duration-[250ms]", !clockRevealed && "invisible")}>
+            {!done && (
+              <button
+                type="button"
+                tabIndex={clockRevealed ? 0 : -1}
+                disabled={loadingClock || t.busy}
+                onClick={act(() => (clockLock ? toast(clockLock) : setClockConfirm(kind)))}
+                className={cn(actionCls, "disabled:opacity-60", clockLock ? "bg-neutral-400" : "bg-accent")}
+              >
+                {clockLock ? <LockIcon className="h-6 w-6" /> : <CheckmarkCircleIcon className="h-6 w-6" />}
+                {kind === "out" ? "ออกงาน" : "เข้างาน"}
+              </button>
+            )}
+            {canExit && (
+              <button type="button" tabIndex={clockRevealed ? 0 : -1} onClick={act(() => setExitOpen(true))} className={cn(actionCls, "bg-neutral-500")}>
+                <LogOut className="h-6 w-6" />
+                ออกนอก
+              </button>
+            )}
+            <button type="button" tabIndex={clockRevealed ? 0 : -1} onClick={act(() => setStatsOpen(true))} className={cn(actionCls, "bg-neutral-600")}>
+              <BarChartIcon className="h-6 w-6" />
+              ประวัติ
             </button>
-          )}
+          </div>
           <button
             type="button"
-            onClick={() => setStatsOpen(true)}
-            aria-label="ดูสถิติ"
-            className="absolute right-[4.25rem] top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border-2 border-accent text-accent transition-transform active:scale-95"
+            aria-expanded={clockRevealed}
+            onClick={t.onClick}
+            className={cn(cls, "group z-20 transition-[width,border-radius] duration-[250ms] ease-out motion-reduce:transition-none", !clockRevealed ? "w-full" : done ? "w-[calc(100%-4rem)] rounded-r-none" : canExit ? "w-[calc(100%-12rem)] rounded-r-none" : "w-[calc(100%-8rem)] rounded-r-none")}
           >
-            <BarChartIcon className="h-4 w-4" />
+            {body}
           </button>
         </div>
       );
@@ -507,7 +524,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
             type="button"
             aria-expanded={leaveRevealed}
             onClick={t.onClick}
-            className={cn(cls, "z-20 w-full transition-[transform,border-radius] duration-[250ms] ease-out motion-reduce:transition-none", leaveRevealed && (canAssignCover ? "-translate-x-48" : "-translate-x-32"), leaveRevealed && "rounded-r-none")}
+            className={cn(cls, "group z-20 transition-[width,border-radius] duration-[250ms] ease-out motion-reduce:transition-none", !leaveRevealed ? "w-full" : canAssignCover ? "w-[calc(100%-12rem)] rounded-r-none" : "w-[calc(100%-8rem)] rounded-r-none")}
           >
             {body}
           </button>
@@ -654,7 +671,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
             covers={covers}
             onCheck={(c) => (c.schedule_entry_id ? setPeriodsOpen(true) : setAssemblyOpen(true))}
           />
-          <div className={cn("grid grid-cols-1 items-stretch gap-3 px-4 pb-4 sm:grid-cols-2 sm:px-8 sm:pb-8", showClock ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
+          <div className={cn("grid grid-cols-1 items-stretch gap-3 px-3 pb-4 sm:grid-cols-2 sm:px-8 sm:pb-8", showClock ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
             {tiles.map((t) => renderTile(t, "bg-muted/70 hover:bg-muted"))}
           </div>
         </section>
@@ -684,22 +701,34 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
       </Modal>
       <NewLeaveSheet profileId={me.id} open={newLeaveOpen} onOpenChange={setNewLeaveOpen} />
       <CoverLeavePicker profileId={me.id} open={coverPickOpen} onOpenChange={setCoverPickOpen} onNewLeave={() => setNewLeaveOpen(true)} />
+      <PremisesExitSheet profileId={me.id} date={today} open={exitOpen} onOpenChange={setExitOpen} />
       <StaffClockStatsSheet open={statsOpen} onOpenChange={setStatsOpen} me={me} />
-      <Modal open={clockOpen} onOpenChange={setClockOpen} title="ลงเวลาวันนี้">
-        <dl className="grid grid-cols-2 gap-3 text-center">
-          <div className="rounded-xl bg-muted p-4">
-            <dt className="text-sm text-muted-foreground">เข้างาน</dt>
-            <dd className="mt-1 font-mono text-2xl font-semibold tabular-nums">
-              {clock?.clock_in_time ? bangkokTime(clock.clock_in_time) : "—"}
-            </dd>
+      <Modal
+        open={clockConfirm !== null}
+        onOpenChange={(o) => !o && setClockConfirm(null)}
+        title={clockConfirm === "out" ? "ยืนยันออกงาน" : "ยืนยันเข้างาน"}
+        footer={
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setClockConfirm(null)}>
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
+              disabled={clockIn.isPending || clockOut.isPending}
+              onClick={() => {
+                if (clockConfirm) onClock(clockConfirm);
+                setClockConfirm(null);
+              }}
+            >
+              ยืนยัน
+            </Button>
           </div>
-          <div className="rounded-xl bg-muted p-4">
-            <dt className="text-sm text-muted-foreground">ออกงาน</dt>
-            <dd className="mt-1 font-mono text-2xl font-semibold tabular-nums">
-              {clock?.clock_out_time ? bangkokTime(clock.clock_out_time) : "—"}
-            </dd>
-          </div>
-        </dl>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          {clockConfirm === "out" ? "บันทึกเวลาออกงานตอนนี้ — แก้ไขเองไม่ได้หลังบันทึก" : "บันทึกเวลาเข้างานตอนนี้ — แก้ไขเองไม่ได้หลังบันทึก"}
+        </p>
       </Modal>
 
       {(() => {

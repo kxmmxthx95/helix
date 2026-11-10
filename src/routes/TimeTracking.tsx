@@ -129,6 +129,7 @@ function MyClockCard({
             <p className="text-xs text-muted-foreground">ออกงาน</p>
             <p className="text-lg font-semibold">
               {record?.clock_out_time ? bangkokTime(record.clock_out_time) : "—"}
+              {record?.auto_clock_out && <span className="ml-1.5 text-xs font-normal text-muted-foreground">ออกอัตโนมัติ</span>}
             </p>
           </div>
         </div>
@@ -330,6 +331,7 @@ function HistoryCard({ profileId, departmentId }: { profileId: string; departmen
                     </td>
                     <td className="py-1.5 tabular-nums">
                       {r.clock_out_time ? bangkokTime(r.clock_out_time) : "—"}
+                      {r.auto_clock_out && <span className="ml-1 text-muted-foreground">ออกอัตโนมัติ</span>}
                     </td>
                   </tr>
                 );
