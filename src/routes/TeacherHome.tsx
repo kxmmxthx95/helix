@@ -352,10 +352,12 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     }
   }
 
-  function approveOneLeave(id: string) {
+  function decideLeave(id: string, status: "approved" | "rejected") {
+    const verb = status === "approved" ? "อนุมัติ" : "ไม่อนุมัติ";
+    if (status === "rejected" && !confirm("ไม่อนุมัติใบลานี้หรือไม่?")) return;
     setLeaveStatus.mutate(
-      { id, status: "approved", approvedBy: me.id },
-      { onSuccess: () => toast("อนุมัติใบลาเรียบร้อย"), onError: () => toast("อนุมัติไม่สำเร็จ", "error") },
+      { id, status, approvedBy: me.id },
+      { onSuccess: () => toast(`${verb}ใบลาเรียบร้อย`), onError: () => toast(`${verb}ไม่สำเร็จ`, "error") },
     );
   }
 
@@ -728,15 +730,20 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                     {l.end_date !== l.start_date && ` – ${leaveDate(l.end_date)}`} · {l.days} วัน
                   </p>
                   {l.reason && <p className="mt-0.5 text-sm">{l.reason}</p>}
-                  <button
-                    type="button"
-                    disabled={setLeaveStatus.isPending}
-                    onClick={() => approveOneLeave(l.id)}
-                    className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-full border border-input px-4 text-sm font-medium transition-colors hover:bg-muted active:scale-[0.98] disabled:opacity-50"
-                  >
-                    {setLeaveStatus.isPending && setLeaveStatus.variables?.id === l.id && <Spinner className="h-3.5 w-3.5" />}
-                    อนุมัติ
-                  </button>
+                  <div className="mt-2 flex gap-2">
+                    {(["approved", "rejected"] as const).map((st) => (
+                      <button
+                        key={st}
+                        type="button"
+                        disabled={setLeaveStatus.isPending}
+                        onClick={() => decideLeave(l.id, st)}
+                        className={`inline-flex h-8 items-center gap-1.5 rounded-full border border-input px-4 text-sm font-medium transition-colors hover:bg-muted active:scale-[0.98] disabled:opacity-50 ${st === "rejected" ? "text-destructive" : ""}`}
+                      >
+                        {setLeaveStatus.isPending && setLeaveStatus.variables?.id === l.id && setLeaveStatus.variables.status === st && <Spinner className="h-3.5 w-3.5" />}
+                        {st === "approved" ? "อนุมัติ" : "ไม่อนุมัติ"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </li>
             ))}
