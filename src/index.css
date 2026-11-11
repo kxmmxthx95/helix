@@ -255,7 +255,7 @@
   }
 
   /* Native date — calendar icon + empty placeholder tone (matches ui-select).
-     Indicator covers the whole field so a click anywhere opens the picker. */
+     Click anywhere opens the picker (Input onClick -> showPicker). */
   .ui-date {
     color-scheme: light;
     position: relative;
@@ -283,15 +283,17 @@
     color: hsl(var(--muted-foreground));
   }
 
+  /* Native indicator hidden: the bg icon above is the only one; Input's onClick opens the picker via showPicker(). */
   .ui-date::-webkit-calendar-picker-indicator {
-    cursor: pointer;
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    opacity: 0;
+    display: none;
+  }
+
+  /* Firefox can't hide its native date icon, so drop ours there to avoid a doubled icon. */
+  @supports (-moz-appearance: none) {
+    .ui-date:not(.ui-time),
+    .dark .ui-date:not(.ui-time) {
+      background-image: none;
+    }
   }
 
   /* Floating frosted chrome — flat fill, no gradient */

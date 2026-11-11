@@ -35,6 +35,7 @@ import { useMyIslands } from "@/lib/islands";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { SubmitSheet } from "@/routes/Assignments";
+import { Timetable } from "@/routes/Timetable";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
 import { gradeShortLabel } from "@/lib/gradeLevels";
@@ -50,7 +51,7 @@ import {
 } from "@/routes/Dashboard";
 
 type Icon = typeof BookIcon;
-type Panel = "attendance" | "behavior" | "leave" | "bag" | "subjects";
+type Panel = "attendance" | "behavior" | "leave" | "bag" | "subjects" | "timetable";
 
 const PANEL_TITLE: Record<Panel, string> = {
   attendance: "เช็คชื่อเข้าแถว",
@@ -58,6 +59,7 @@ const PANEL_TITLE: Record<Panel, string> = {
   leave: "ลา",
   bag: "กระเป๋า",
   subjects: "วิชาของฉัน",
+  timetable: "ตารางเรียน",
 };
 
 
@@ -222,7 +224,7 @@ export function GameHud() {
   const menu: { label: string; icon: Icon; color: string; onClick: () => void; badge?: number }[] = [
     { label: "งาน", icon: ClipboardIcon, color: "linear-gradient(160deg,#ff7a7a,#ff3b30)", onClick: () => navigate("/assignments"), badge: pending },
     { label: "สอบ", icon: DocumentTextIcon, color: "linear-gradient(160deg,#ffb84d,#ff9500)", onClick: () => navigate("/exams") },
-    { label: "ตารางเรียน", icon: TimetableIcon, color: "linear-gradient(160deg,#5ac8fa,#007aff)", onClick: () => navigate("/timetable") },
+    { label: "ตารางเรียน", icon: TimetableIcon, color: "linear-gradient(160deg,#5ac8fa,#007aff)", onClick: () => setPanel("timetable") },
     { label: "ผังการเรียน", icon: ListIcon, color: "linear-gradient(160deg,#ff9f7a,#ff6a3d)", onClick: () => navigate("/my-curriculum") },
     { label: "แบบฝึกหัด", icon: BookIcon, color: "linear-gradient(160deg,#6ee08a,#34c759)", onClick: () => navigate("/practice") },
     { label: "ปฏิทิน", icon: CalendarIcon, color: "linear-gradient(160deg,#ff8aa8,#ff2d55)", onClick: () => navigate("/academic-events") },
@@ -405,10 +407,17 @@ export function GameHud() {
         document.body,
       )}
 
-      <Sheet open={panel !== null} onOpenChange={(o) => !o && setPanel(null)} title={panel ? PANEL_TITLE[panel] : ""}>
+      <Sheet
+        open={panel !== null}
+        onOpenChange={(o) => !o && setPanel(null)}
+        title={panel ? PANEL_TITLE[panel] : ""}
+        wide={panel === "timetable" ? "full" : false}
+        bodyClassName="[&_.page-fill]:min-h-0 [&_.page-fill]:pb-0"
+      >
+        {panel === "timetable" && <Timetable />}
         {myStudent && profile && panel === "attendance" && <AttendanceSummarySection student={myStudent} />}
         {myStudent && profile && panel === "behavior" && <BehaviorScoreSection student={myStudent} showName={false} />}
-        {myStudent && profile && panel === "leave" && <StudentLeaveSection student={myStudent} submittedBy={profile.id} />}
+        {myStudent && profile && panel === "leave" && <StudentLeaveSection student={myStudent} submittedBy={profile.id} showName={false} />}
         {panel === "bag" && <Inventory badges={badges} rank={rank} exp={lifeExp} />}
         {panel === "subjects" && (
           <div className="space-y-3">

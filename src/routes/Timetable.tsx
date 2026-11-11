@@ -137,7 +137,7 @@ export function Timetable() {
           academicYear={academicYear}
           term={scheduleTerm}
           legendAction={
-            <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={() => setExportOpen(true)}>
+            <Button size="sm" className="h-8 shrink-0" onClick={() => setExportOpen(true)}>
               <DownloadIcon className="h-3.5 w-3.5" />
               ส่งออก PDF
             </Button>

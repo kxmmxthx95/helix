@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { Modal } from "@/components/Modal";
 import { Sheet } from "@/components/Sheet";
-import { Avatar, Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
+import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions } from "@/hooks/useAssignments";
 import { summarizeAttendance, useAttendanceRange, useMyChildren } from "@/hooks/useAttendance";
@@ -42,6 +42,7 @@ import { avatarUrl } from "@/hooks/useAvatar";
 import { cn, todayIso } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
 import { bangkokTime } from "@/routes/TimeTracking";
+import { dayCount } from "@/routes/NewLeaveSheet";
 import { TeacherHome } from "@/routes/TeacherHome";
 
 const LEAVE_STATUS_LABEL: Record<StudentLeaveStatus, string> = {
@@ -1322,33 +1323,42 @@ export function BehaviorScoreSection({ student, showName = true }: { student: St
 }
 
 /** role="student"/"parent" only — teacher/admin approve these at Attendance.tsx's "คำขอลา" view instead. */
-export function StudentLeaveSection({ student, submittedBy }: { student: Student; submittedBy: string }) {
+export function StudentLeaveSection({ student, submittedBy, showName = true }: { student: Student; submittedBy: string; showName?: boolean }) {
   const toast = useToast();
   const { data, isLoading, isError, refetch } = useStudentLeaveRequests(student.id);
   const requests = data ?? [];
   const request = useRequestStudentLeave();
   const cancel = useCancelStudentLeaveRequest();
-  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"form" | "history">("form");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
+  const [attempted, setAttempted] = useState(false);
+  const days = startDate && endDate ? dayCount(startDate, endDate) : 0;
+  const err = (bad: boolean, msg: string) => (attempted && bad ? msg : undefined);
 
   function reset() {
     setStartDate("");
     setEndDate("");
     setReason("");
+    setAttempted(false);
   }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!startDate || !endDate || !reason.trim()) return;
+    const invalid = [!startDate, !endDate || (!!startDate && endDate < startDate), !reason.trim()].filter(Boolean).length;
+    if (invalid) {
+      setAttempted(true);
+      toast(`กรอกข้อมูลให้ถูกต้อง (${invalid} ช่อง)`, "error");
+      return;
+    }
     request.mutate(
       { studentId: student.id, submittedBy, startDate, endDate, reason: reason.trim() },
       {
         onSuccess: () => {
           toast("ส่งคำขอลาสำเร็จ");
           reset();
-          setOpen(false);
+          setTab("history");
         },
         onError: (err) => toast(err instanceof Error ? err.message : "ส่งคำขอไม่สำเร็จ", "error"),
       },
@@ -1356,120 +1366,111 @@ export function StudentLeaveSection({ student, submittedBy }: { student: Student
   }
 
   return (
-    <section className="space-y-2">
-      <div className="flex items-center justify-between">
+    <section className="space-y-3">
+      {showName && (
         <h2 className={SECTION_TITLE}>
           การลาของ {student.first_name} {student.last_name}
         </h2>
-        <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-          ขอลา
-        </Button>
+      )}
+
+      <div className="flex w-full gap-0 border-b border-border" role="tablist">
+        {(
+          [
+            ["form", "ฟอร์มขอลา"],
+            ["history", "ประวัติการลา"],
+          ] as const
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            aria-selected={tab === k}
+            onClick={() => setTab(k)}
+            className={cn(
+              "-mb-px inline-flex h-9 min-w-0 flex-1 items-center justify-center border-b-2 px-3 text-sm font-medium transition-colors",
+              tab === k ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      {isLoading && (
-        <ul className="divide-y divide-border" role="status" aria-label="กำลังโหลดการลา">
-          {[0, 1].map((i) => (
-            <li key={i} className="flex items-center justify-between gap-2 py-2">
-              <Skeleton className="h-3 w-28" />
-              <Skeleton className="h-4 w-14 rounded-full" />
-            </li>
-          ))}
-        </ul>
-      )}
-      {isError && !data && <LoadError onRetry={() => void refetch()} />}
-      {!isLoading && !isError && requests.length === 0 && (
-        <p className="text-sm text-muted-foreground">ยังไม่มีคำขอลา</p>
-      )}
-      {requests.length > 0 && (
-        <ul className="divide-y divide-border text-sm">
-          {requests.slice(0, 5).map((r) => {
-            const cancellable = r.status === "pending";
-            return (
-              <li key={r.id} className="space-y-1 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    {leaveDate(r.start_date)} – {leaveDate(r.end_date)} ({r.days} วัน)
-                  </span>
-                  <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs", LEAVE_STATUS_STYLE[r.status])}>
-                    {LEAVE_STATUS_LABEL[r.status]}
-                  </span>
-                </div>
-                {cancellable && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (!confirm("ยกเลิกคำขอลานี้?")) return;
-                      cancel.mutate(r.id, {
-                        onSuccess: () => toast("ยกเลิกคำขอลาแล้ว"),
-                        onError: (err) => toast(err instanceof Error ? err.message : "ยกเลิกไม่สำเร็จ", "error"),
-                      });
-                    }}
-                    disabled={cancel.isPending}
-                  >
-                    ยกเลิกคำขอ
-                  </Button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+      {tab === "form" && (
+        <form className="space-y-4" onSubmit={submit} noValidate>
+          <FormSection>
+            <Field label="วันเริ่ม" required error={err(!startDate, "เลือกวันเริ่ม")}>
+              <Input type="date" value={startDate} min={todayIso()} onChange={(e) => setStartDate(e.target.value)} />
+            </Field>
+            <Field label="วันสิ้นสุด" required error={err(!endDate, "เลือกวันสิ้นสุด") ?? err(!!startDate && !!endDate && endDate < startDate, "ต้องไม่ก่อนวันเริ่ม")}>
+              <Input type="date" value={endDate} min={startDate || todayIso()} onChange={(e) => setEndDate(e.target.value)} />
+            </Field>
+            <div className="flex min-h-[3.25rem] items-center justify-between gap-4 text-sm leading-5">
+              <span>รวม</span>
+              <span className="text-muted-foreground">{days > 0 ? `${days} วัน` : "—"}</span>
+            </div>
+          </FormSection>
+          <FormSection>
+            <Field label="เหตุผล" required error={err(!reason.trim(), "กรอกเหตุผล")}>
+              <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="เช่น ลาป่วย มีไข้" />
+            </Field>
+          </FormSection>
+          <Button type="submit" className="w-full" disabled={request.isPending}>
+            {request.isPending ? <Spinner className="h-3 w-3" /> : "ส่งคำขอ"}
+          </Button>
+        </form>
       )}
 
-      <Sheet
-        open={open}
-        onOpenChange={(o) => {
-          setOpen(o);
-          if (!o) reset();
-        }}
-        title={`ขอลา — ${student.first_name} ${student.last_name}`}
-        footer={
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => setOpen(false)}>
-              ยกเลิก
-            </Button>
-            <Button
-              type="submit"
-              form={`request-student-leave-${student.id}`}
-              className="flex-1"
-              disabled={!startDate || !endDate || !reason.trim() || request.isPending}
-            >
-              {request.isPending ? <Spinner className="h-3 w-3" /> : "ส่งคำขอ"}
-            </Button>
-          </div>
-        }
-      >
-        <form id={`request-student-leave-${student.id}`} className="space-y-4" onSubmit={submit}>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="วันเริ่ม">
-              <Input
-                type="date"
-                value={startDate}
-                min={todayIso()}
-                onChange={(e) => setStartDate(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="วันสิ้นสุด">
-              <Input
-                type="date"
-                value={endDate}
-                min={startDate || todayIso()}
-                onChange={(e) => setEndDate(e.target.value)}
-                required
-              />
-            </Field>
-          </div>
-          <Field label="เหตุผล">
-            <Input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              required
-              placeholder="เช่น ลาป่วย มีไข้"
-            />
-          </Field>
-        </form>
-      </Sheet>
+      {tab === "history" && (
+        <>
+          {isLoading && (
+            <ul className="divide-y divide-border" role="status" aria-label="กำลังโหลดการลา">
+              {[0, 1].map((i) => (
+                <li key={i} className="flex items-center justify-between gap-2 py-2">
+                  <Skeleton className="h-3 w-28" />
+                  <Skeleton className="h-4 w-14 rounded-full" />
+                </li>
+              ))}
+            </ul>
+          )}
+          {isError && !data && <LoadError onRetry={() => void refetch()} />}
+          {!isLoading && !isError && requests.length === 0 && (
+            <p className="text-sm text-muted-foreground">ยังไม่มีคำขอลา</p>
+          )}
+          {requests.length > 0 && (
+            <ul className="divide-y divide-border text-sm">
+              {requests.map((r) => (
+                <li key={r.id} className="space-y-1 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {leaveDate(r.start_date)} – {leaveDate(r.end_date)} ({r.days} วัน)
+                    </span>
+                    <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs", LEAVE_STATUS_STYLE[r.status])}>
+                      {LEAVE_STATUS_LABEL[r.status]}
+                    </span>
+                  </div>
+                  {r.status === "pending" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (!confirm("ยกเลิกคำขอลานี้?")) return;
+                        cancel.mutate(r.id, {
+                          onSuccess: () => toast("ยกเลิกคำขอลาแล้ว"),
+                          onError: (err) => toast(err instanceof Error ? err.message : "ยกเลิกไม่สำเร็จ", "error"),
+                        });
+                      }}
+                      disabled={cancel.isPending}
+                    >
+                      ยกเลิกคำขอ
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
     </section>
   );
 }
