@@ -344,7 +344,8 @@ const SwipeRow: React.FC<SwipeRowProps> = ({
   const act = (a: SwipeAction, e: React.MouseEvent<HTMLButtonElement>) => {
     if (phase !== 'idle') return;
     onAction?.(a);
-    if (a === primary || a.dismiss) {
+    // Primary only slides the row away (delete-style) when full swipe is on; otherwise it is a normal action.
+    if ((a === primary && fullSwipe) || a.dismiss) {
       commit(a, e.detail === 0);
       return;
     }
