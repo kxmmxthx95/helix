@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/auth/AuthProvider";
 import { profileFullName, type Profile, type ProfileWithRoles } from "@/lib/database.types";
 import { BarChartIcon, CheckmarkCircleIcon, ChevronForward, DocumentTextIcon, LockIcon, LogOut, PaletteIcon, Users } from "@/components/icons";
 import { BannerUpload } from "@/components/BannerUpload";
@@ -69,27 +70,43 @@ export const bannerStyle = (
   const f = focus ?? { x: profile.banner_focus_x, y: profile.banner_focus_y };
   return url ? { backgroundImage: `url("${url}")`, backgroundSize: "cover", backgroundPosition: `${f.x}% ${f.y}%` } : bannerBackground(colors);
 };
-// ponytail: stored per device in localStorage — move to a profiles column if it should follow the teacher across devices
-export function useBannerColors(profileId: string) {
-  const key = `helix:home-banner:${profileId}`;
-  const [colors, setColors] = useState<string[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(key) ?? "null");
-      if (Array.isArray(saved) && saved.length === 5 && saved.every((c) => typeof c === "string")) return saved;
-    } catch {
-      /* private mode or corrupt value: fall back to the default */
-    }
-    return BANNER_PRESETS[0]!.colors;
-  });
-  const update = (next: string[]) => {
-    setColors(next);
-    try {
-      localStorage.setItem(key, JSON.stringify(next));
-    } catch {
-      /* not persisted this session */
-    }
+const legacyKey = (id: string) => `helix:home-banner:${id}`;
+/** Banner colours live in profiles.banner_colors (follow the user across devices). State updates instantly; the DB write is debounced. */
+export function useBannerColors(profile: Pick<Profile, "id" | "banner_colors"> | null | undefined) {
+  const { refreshProfile } = useAuth();
+  const id = profile?.id;
+  const saved = profile?.banner_colors;
+  const [draft, setDraft] = useState<string[] | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+  const persist = (next: string[]) => {
+    if (!id) return;
+    void supabase.from("profiles").update({ banner_colors: next }).eq("id", id).then(({ error }) => {
+      if (!error) void refreshProfile();
+    });
   };
-  return [colors, update] as const;
+  // One-time move of the old per-device localStorage choice into the DB.
+  useEffect(() => {
+    if (!id || saved) return;
+    try {
+      const old = JSON.parse(localStorage.getItem(legacyKey(id)) ?? "null");
+      if (Array.isArray(old) && old.length === 5 && old.every((c) => typeof c === "string")) {
+        setDraft(old);
+        persist(old);
+      }
+      localStorage.removeItem(legacyKey(id));
+    } catch {
+      /* private mode or corrupt value: ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, saved]);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const update = (next: string[], immediate = false) => {
+    setDraft(next);
+    window.clearTimeout(timer.current);
+    if (immediate) persist(next);
+    else timer.current = window.setTimeout(() => persist(next), 600);
+  };
+  return [draft ?? saved ?? BANNER_PRESETS[0]!.colors, update] as const;
 }
 
 /** ISO yyyy-mm-dd → "14 ต.ค." (formatted in UTC so the day never shifts). */
@@ -122,7 +139,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const departmentId = me.department_id ?? "";
   const today = todayIso();
   const nowMin = useNowMinutes();
-  const [bannerColors, setBannerColors] = useBannerColors(me.id);
+  const [bannerColors, setBannerColors] = useBannerColors(me);
   const [pickerOpen, setPickerOpen] = useState(false);
   const adjust = useBannerAdjust(me);
   const [timetableOpen, setTimetableOpen] = useState(false);
@@ -567,7 +584,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                         type="button"
                         title={p.name}
                         aria-label={p.name}
-                        onClick={() => setBannerColors(p.colors)}
+                        onClick={() => setBannerColors(p.colors, true)}
                         className={cn(
                           "h-10 rounded-xl ring-offset-2 ring-offset-card transition-shadow",
                           p.colors.join() === bannerColors.join() && "ring-2 ring-accent",

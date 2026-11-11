@@ -163,7 +163,7 @@ export function GameHud() {
   const { data: departments = [] } = useDepartments();
   const { data: gradeLevels = [] } = useGradeLevels(myStudent?.department_id ?? null);
   const gradeLevel = gradeLevels.find((g) => g.id === myStudent?.grade_level_id);
-  const [bannerColors, setBannerColors] = useBannerColors(profile?.id ?? "");
+  const [bannerColors, setBannerColors] = useBannerColors(profile);
   const adjust = useBannerAdjust(profile);
 
   const studentId = myStudent?.id ?? null;
@@ -272,7 +272,7 @@ export function GameHud() {
                             type="button"
                             title={p.name}
                             aria-label={p.name}
-                            onClick={() => setBannerColors(p.colors)}
+                            onClick={() => setBannerColors(p.colors, true)}
                             className={cn(
                               "h-10 rounded-xl ring-offset-2 ring-offset-card transition-shadow",
                               p.colors.join() === bannerColors.join() && "ring-2 ring-accent",

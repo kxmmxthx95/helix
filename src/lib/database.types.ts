@@ -42,6 +42,8 @@ export type Profile = {
   /** Focal point of the banner image, % (0–100), used as background-position — migration 0135. */
   banner_focus_x: number;
   banner_focus_y: number;
+  /** 5 hex colours of the home-banner gradient; null = default preset — migration 0151. */
+  banner_colors: string[] | null;
   created_at: string;
   updated_at: string;
 } & AddressFields; // self-editable ที่อยู่ — see migration 0061
@@ -1579,6 +1581,7 @@ export type Database = {
           | "banner_path"
           | "banner_focus_x"
           | "banner_focus_y"
+          | "banner_colors"
           | "house_no"
           | "village_no"
           | "alley"
@@ -1607,6 +1610,7 @@ export type Database = {
               | "banner_path"
               | "banner_focus_x"
               | "banner_focus_y"
+              | "banner_colors"
               | "house_no"
               | "village_no"
               | "alley"
