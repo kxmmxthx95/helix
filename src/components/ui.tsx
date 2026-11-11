@@ -588,15 +588,15 @@ export function Switch({
       onClick={() => onChange(!checked)}
       className={cn(
         "relative inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-ios focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-40",
-        xs ? "h-5 w-8" : sm ? "h-6 w-10" : "h-[31px] w-[51px]",
+        xs ? "h-5 w-[40px]" : sm ? "h-6 w-[50px]" : "h-[31px] w-[64px]",
         checked ? "bg-accent" : "bg-fill-strong",
       )}
     >
       <span
         className={cn(
           "pointer-events-none block rounded-full bg-white shadow-thumb ring-0 transition-transform duration-200 ease-ios",
-          xs ? "h-4 w-4" : sm ? "h-5 w-5" : "h-[27px] w-[27px]",
-          checked ? (xs ? "translate-x-3" : sm ? "translate-x-4" : "translate-x-5") : "translate-x-0",
+          xs ? "h-4 w-[25px]" : sm ? "h-5 w-[31px]" : "h-[27px] w-[40px]",
+          checked ? (xs ? "translate-x-[11px]" : sm ? "translate-x-[15px]" : "translate-x-5") : "translate-x-0",
         )}
       />
     </button>
