@@ -139,8 +139,8 @@ export function TeachingPlanCalendar() {
   }
 
   return (
-    <div className="page-fill">
-      <div data-slot="plan-banner" className="shrink-0 space-y-1">
+    <div className="page-fill gap-3">
+      <div data-slot="plan-banner" className="shrink-0">
         <div className="flex items-center gap-1">
           <Link
             to="/teaching-plan?tab=mine"
@@ -178,7 +178,7 @@ export function TeachingPlanCalendar() {
           <EmptyState title="วิชานี้ยังไม่อยู่ในตารางสอน" description="ให้ผู้ดูแลจัดคาบสอนในตารางสอนก่อน" />
         </div>
       ) : (
-        <div className="mt-3 flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 min-w-0 flex-1 space-y-2 overflow-y-auto">
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" aria-label="ก่อนหน้า" onClick={() => step(-1)}>
