@@ -430,15 +430,15 @@ function TeacherPractice({
           />
         </div>
       ) : (
-        <div className="space-y-3">
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
-            <table className="w-full min-w-[24rem] text-xs">
-              <thead className="bg-muted text-left text-xs text-muted-foreground">
+        <div className="table-panel flex-1">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[24rem] text-[13px]">
+              <thead className="text-left text-xs">
                 <tr>
-                  <th className="px-3 py-2 font-medium">รหัสวิชา</th>
-                  <th className="px-3 py-2 font-medium">วิชา</th>
-                  <th className="px-3 py-2 font-medium">ประเภทวิชา</th>
-                  <th className="px-3 py-2 font-medium">ระดับชั้น</th>
+                  <th className="px-4 py-3">รหัสวิชา</th>
+                  <th className="px-4 py-3">วิชา</th>
+                  <th className="px-4 py-3">ประเภทวิชา</th>
+                  <th className="px-4 py-3">ระดับชั้น</th>
                 </tr>
               </thead>
               <tbody>
@@ -450,13 +450,13 @@ function TeacherPractice({
                     <tr
                       key={s.id}
                       onClick={() => setSubjectId(s.id)}
-                      className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
+                      className="h-14 cursor-pointer border-t border-border first:border-t-0"
                     >
-                      <td className="px-3 py-3">{s.code}</td>
-                      <td className="max-w-xs truncate px-3 py-3">
+                      <td className="px-4 py-0">{s.code}</td>
+                      <td className="max-w-xs truncate px-4 py-0">
                         {s.name_th}
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-4 py-0">
                         <span className="inline-flex items-center gap-1.5">
                           <span
                             className={`size-2 rounded-full ${SUBJECT_TYPE_DOT[s.subject_type]}`}
@@ -464,7 +464,7 @@ function TeacherPractice({
                           {SUBJECT_TYPE_LABEL[s.subject_type]}
                         </span>
                       </td>
-                      <td className="px-3 py-3">
+                      <td className="px-4 py-0">
                         {gradeLevel && (
                           <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent">
                             {gradeShortLabel(gradeLevel.code)}
@@ -477,7 +477,9 @@ function TeacherPractice({
               </tbody>
             </table>
           </div>
-          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+          <div className="shrink-0 border-t border-border px-4">
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+          </div>
         </div>
       )}
     </div>
