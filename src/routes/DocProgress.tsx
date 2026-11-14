@@ -154,10 +154,6 @@ export function DocProgressTab() {
     return teachers.map((t) => ({ teacher: t, p: teacherLessonProgress(pairsByTeacher.get(t.id) ?? [], byKey) }));
   }, [teachers, coverage, pairsByTeacher]);
 
-  const counts: Record<LessonStatus, number> = { complete: 0, partial: 0, none: 0, nodata: 0 };
-  for (const { p } of rows) counts[p.status]++;
-  const pct = (n: number) => (rows.length ? Math.round((n / rows.length) * 1000) / 10 : 0);
-
   const q = search.trim().toLowerCase();
   const filtered = rows.filter(
     ({ teacher, p }) =>
@@ -166,23 +162,8 @@ export function DocProgressTab() {
   );
   const { page, setPage, pageCount, pageRows } = usePagination(filtered, [search, deptId, statusFilter]);
 
-  const cards: { status: "" | LessonStatus; tone: "accent" | "success" | "warning" | "destructive"; icon: React.ReactNode; label: string; value: number; percent?: number }[] = [
-    { status: "", tone: "accent", icon: <DocumentTextIcon className="h-5 w-5" />, label: "ครูทั้งหมด", value: rows.length },
-    { status: "complete", tone: "success", icon: <CheckmarkCircleIcon className="h-5 w-5" />, label: "ครบถ้วน", value: counts.complete, percent: pct(counts.complete) },
-    { status: "partial", tone: "warning", icon: <TimeIcon className="h-5 w-5" />, label: "ไม่ครบ", value: counts.partial, percent: pct(counts.partial) },
-    { status: "none", tone: "destructive", icon: <X className="h-5 w-5" />, label: "ยังไม่อัปโหลด", value: counts.none, percent: pct(counts.none) },
-  ];
-
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        {cards.map((c) => (
-          <button key={c.label} type="button" aria-pressed={statusFilter === c.status} onClick={() => setStatusFilter(c.status)} className="group text-left">
-            <SummaryCard tone={c.tone} icon={c.icon} label={c.label} value={c.value} percent={c.percent} unit="คน" active={statusFilter === c.status} />
-          </button>
-        ))}
-      </div>
-
       <div className="flex flex-wrap gap-2">
         <div className="relative min-w-40 flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
