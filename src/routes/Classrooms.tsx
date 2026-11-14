@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { BarChartIcon, BookIcon, CheckmarkCircleIcon, ChevronForward, HomeIcon, Plus, Search, SlidersHorizontal, TimeIcon, Users, X } from "@/components/icons";
+import { BarChartIcon, BookIcon, CheckmarkCircleIcon, DownloadIcon, PrintIcon, ChevronForward, HomeIcon, Plus, Search, SlidersHorizontal, TimeIcon, Users, X } from "@/components/icons";
 import { Modal } from "@/components/Modal";
 import { Sheet } from "@/components/Sheet";
 import { Avatar, Button, EmptyState, Field, FormSection, Input, Pagination, Select, Skeleton } from "@/components/ui";
@@ -11,7 +11,8 @@ import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useProfilesByIds, useTeacherContact } from "@/hooks/usePractice";
 import { useLearningAreas } from "@/hooks/useCurriculum";
-import { useStudents } from "@/hooks/useStudents";
+import { fetchClassroomStudents, useStudents } from "@/hooks/useStudents";
+import { downloadRosterPdf, rosterHtml } from "@/lib/rosterPdf";
 import {
   useClassroomsByDepartment,
   useCurrentClassroomEnrollmentsByDepartment,
@@ -129,6 +130,18 @@ export function Classrooms() {
       />
     );
   }
+
+  const [preview, setPreview] = useState<{ label: string; students: Student[] } | null>(null);
+  const previewFrame = useRef<HTMLIFrameElement>(null);
+  const openRosterPreview = async (c: Classroom) => {
+    const grade = gradeLevelById.get(c.grade_level_id);
+    const label = grade ? `${gradeShortLabel(grade.code)}/${c.name}` : c.name;
+    try {
+      setPreview({ label, students: await fetchClassroomStudents(c.id) });
+    } catch {
+      alert("สร้างใบรายชื่อไม่สำเร็จ");
+    }
+  };
 
   const homeroomCell = (c: Classroom) => {
     const homerooms = homeroomsByClassroomId.get(c.id) ?? [];
@@ -365,7 +378,21 @@ export function Classrooms() {
                         {c.is_active ? "ใช้งานอยู่" : "ปิดใช้งาน"}
                       </span>
                     </div>
-                    <div className="mt-2.5 border-t border-border pt-2.5 text-xs">{homeroomCell(c)}</div>
+                    <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border pt-2.5 text-xs">
+                      <div className="min-w-0">{homeroomCell(c)}</div>
+                      <button
+                        type="button"
+                        aria-label="พิมพ์ใบรายชื่อนักเรียน"
+                        title="พิมพ์ใบรายชื่อนักเรียน"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void openRosterPreview(c);
+                        }}
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                        <PrintIcon className="h-4 w-4" />
+                        </button>
+                    </div>
                   </div>
                 </li>
               );
@@ -381,6 +408,7 @@ export function Classrooms() {
                   <th className="px-3 py-2 font-medium">ครูประจำชั้น</th>
                   <th className="px-3 py-2 font-medium">จำนวนนักเรียน</th>
                   <th className="px-3 py-2 font-medium">สถานะ</th>
+                  <th className="w-10 px-3 py-2"><span className="sr-only">พิมพ์</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -424,6 +452,20 @@ export function Classrooms() {
                           {c.is_active ? "ใช้งานอยู่" : "ปิดใช้งาน"}
                         </span>
                       </td>
+                      <td className="px-3 py-3 text-right">
+                        <button
+                          type="button"
+                          aria-label="พิมพ์ใบรายชื่อนักเรียน"
+                          title="พิมพ์ใบรายชื่อนักเรียน"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void openRosterPreview(c);
+                          }}
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          <PrintIcon className="h-4 w-4" />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -449,6 +491,27 @@ export function Classrooms() {
           <StatCard tone="muted" icon={<Users className="h-5 w-5" />} label="จำนวนนักเรียนรวม" value={totalStudents} unit="คน" />
         </div>
       </Sheet>
+
+      <Modal
+        open={preview !== null}
+        onOpenChange={(o) => !o && setPreview(null)}
+        title={`ใบรายชื่อ ${preview?.label ?? ""}`}
+        className="max-w-4xl"
+        footer={
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => preview && void downloadRosterPdf(preview.label, preview.students)}>
+              <DownloadIcon className="mr-2 h-4 w-4" />
+              ดาวน์โหลด PDF
+            </Button>
+            <Button className="flex-1" onClick={() => previewFrame.current?.contentWindow?.print()}>
+              <PrintIcon className="mr-2 h-4 w-4" />
+              พิมพ์
+            </Button>
+          </div>
+        }
+      >
+        {preview && <iframe ref={previewFrame} srcDoc={rosterHtml(preview.label, preview.students)} title="ตัวอย่างใบรายชื่อ" className="h-[60vh] w-full rounded-lg border border-border" />}
+      </Modal>
 
       <Modal
         open={filtersOpen}

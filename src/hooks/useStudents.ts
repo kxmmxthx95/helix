@@ -70,6 +70,15 @@ async function studentIdsCurrentlyInClassroom(classroomId: string): Promise<stri
   return candidateIds.filter((id) => latestByStudent.get(id) === classroomId);
 }
 
+/** Students currently in a classroom, ordered by student_code — for the roster export. */
+export async function fetchClassroomStudents(classroomId: string): Promise<Student[]> {
+  const ids = await studentIdsCurrentlyInClassroom(classroomId);
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase.from("students").select("*").in("id", ids).order("student_code");
+  if (error) throw error;
+  return data;
+}
+
 export function useStudents(filters: StudentFilters) {
   return useQuery({
     queryKey: ["students", filters],
