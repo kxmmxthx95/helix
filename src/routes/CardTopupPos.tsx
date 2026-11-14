@@ -6,7 +6,7 @@ import { FiSidebar } from "react-icons/fi";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { AlertTriangle, HomeIcon, LockIcon, BarChartIcon, BarcodeIcon, CartIcon, CheckmarkCircleIcon, CoinIcon, DesktopIcon, LogOut, Moon, Monitor, Search, Sun } from "@/components/icons";
+import { AlertTriangle, HomeIcon, LockIcon, BarChartIcon, BarcodeIcon, CartIcon, CheckmarkCircleIcon, CoinIcon, DesktopIcon, LogOut, Moon, Monitor, Search, Sun, SwapIcon } from "@/components/icons";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { useTheme } from "@/components/ThemeProvider";
@@ -100,7 +100,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const mode: "sale" | "topup" = view === "topup" ? "topup" : "sale";
   const [topupAmount, setTopupAmount] = useState("");
   const [pinOpen, setPinOpen] = useState(false);
-  const [pinFor, setPinFor] = useState<"topup" | "void">("topup"); // what the PIN popup unlocks
+  const [pinFor, setPinFor] = useState<"topup" | "void" | "saleTopup">("topup"); // what the PIN popup unlocks; saleTopup = top-up from the sale popup
   const [confirmOpen, setConfirmOpen] = useState(false);
   const topupKey = useRef(crypto.randomUUID());
   const topup = usePosTopupCash();
@@ -249,6 +249,12 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
     if (isUnlocked) setView("topup");
     else (setPinFor("topup"), setPinOpen(true));
   }
+  // Sale popup, balance too low: quick top-up amounts. Needs the PIN hour; the confirm popup follows.
+  function startSaleTopup(amount: number) {
+    setTopupAmount(String(amount));
+    if (isUnlocked) setConfirmOpen(true);
+    else (setPinFor("saleTopup"), setPinOpen(true));
+  }
   async function confirmTopup() {
     if (!student || !terminal || topupValue === null) return;
     try {
@@ -260,18 +266,23 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         client_tx_id: topupKey.current,
       });
       topupKey.current = crypto.randomUUID();
+      setConfirmOpen(false);
+      setTopupAmount("");
+      if (mode === "sale") {
+        // From the sale popup: keep the student + their tapped card, show the new balance, cashier confirms the charge.
+        setStudent((s) => s && { ...s, balance: r.balance });
+        return;
+      }
       // Stay on the top-up tab, ready for the next student.
       setStudent(null);
       setEntry("");
-      setConfirmOpen(false);
-      setTopupAmount("");
       setDone({ kind: "topup", amount: r.amount, balance: r.balance });
     } catch (e) {
       setConfirmOpen(false);
       // The hour ran out (or the lock was pressed elsewhere): ask for the PIN again.
       if (e instanceof Error && e.message.includes("PIN")) {
-        setView("sale");
-        setPinFor("topup");
+        if (mode === "sale") setPinFor("saleTopup");
+        else (setView("sale"), setPinFor("topup"));
         setPinOpen(true);
       }
       toast(errMsg(e), "error");
@@ -356,7 +367,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 <div className="flex flex-col gap-0.5">
                   {VIEWS.filter((v) => orgWide || isCounterView(v.key)).map(({ key, label, icon: Icon }) => (
                     <button key={key} type="button" aria-current={view === key ? "page" : undefined} onClick={() => (key === "topup" ? openTopup() : setView(key), setDrawer(false))} className={itemClass(view === key)}>
-                      <Icon className="h-6 w-6 shrink-0 group-aria-[current=page]:text-accent" />
+                      <Icon className="h-6 w-6 shrink-0" />
                       <span className="truncate">{label}</span>
                       {key === "topup" && isUnlocked && <span className={cn("ml-auto shrink-0 text-base font-semibold tabular-nums", minutesLeft <= 5 ? "font-semibold text-destructive motion-safe:animate-pulse" : "text-muted-foreground")}>เหลือ {minutesLeft} นาที</span>}
                     </button>
@@ -376,9 +387,12 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               </button>
             )}
             {terminal && (
-              <button type="button" className="tappable min-h-12 rounded-xl border border-border bg-card px-4 py-2 text-left text-base font-semibold" onClick={() => (setTerminalId(""), setDrawer(false))}>
-                {terminal.name} · เปลี่ยนเครื่อง
-              </button>
+              <div className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-card py-1 pl-4 pr-1 text-base font-semibold">
+                <span className="min-w-0 flex-1 truncate">{terminal.name}</span>
+                <button type="button" className="tappable flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted" aria-label="เปลี่ยนเครื่อง" title="เปลี่ยนเครื่อง" onClick={() => (setTerminalId(""), setDrawer(false))}>
+                  <SwapIcon className="h-6 w-6" />
+                </button>
+              </div>
             )}
             <div className="flex items-center gap-2.5 rounded-xl bg-card p-2.5 shadow-card">
               {/* Connection status: pulsing ring around the photo — green online, red offline. */}
@@ -635,8 +649,20 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 )}
                 {price !== null && over && (
                   <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-xl font-semibold text-destructive">
-                    ยอดคงเหลือไม่พอหรือเกินวงเงินต่อวัน
+                    {price > student.balance ? "ยอดคงเหลือไม่พอ" : "เกินวงเงินต่อวัน"}
                   </p>
+                )}
+                {price !== null && price > student.balance && (
+                  <div className="space-y-2">
+                    <p className="text-xl text-muted-foreground">เติมเงินสด</p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {topupChoices(price - student.balance).map((v) => (
+                        <Button key={v} variant="outline" className="h-16 px-6 text-2xl font-bold tabular-nums text-success" disabled={!online || topup.isPending} onClick={() => startSaleTopup(v)}>
+                          +{formatBaht(v)} ฿
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
                 )}
                 {student.card_status === "frozen" && <p className="rounded-xl bg-destructive/10 px-4 py-3 text-xl font-semibold text-destructive">บัตรนี้ถูกระงับ — ขายไม่ได้</p>}
                 {student.card_status === null && <p className="rounded-xl bg-warning/15 px-4 py-3 text-lg font-medium">นักเรียนยังไม่ได้ผูกบัตร — ขายไม่ได้</p>}
@@ -784,6 +810,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         onUnlocked={() => {
           setPinOpen(false);
           if (pinFor === "topup") setView("topup");
+          else if (pinFor === "saleTopup") setConfirmOpen(true);
         }}
         forVoid={pinFor === "void"}
       />
@@ -850,6 +877,12 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
     </div>,
     document.body,
   );
+}
+
+/** Quick top-up amounts: the shortfall (never below the minimum), then 50 / 100 / 200 that still cover it. */
+function topupChoices(shortfall: number): number[] {
+  const exact = Math.min(TOPUP_MAX, Math.max(TOPUP_MIN, Math.ceil(shortfall)));
+  return [...new Set([exact, ...[50, 100, 200].filter((v) => v >= exact)])];
 }
 
 /** Tap-to-add tiles for the active catalogue, filtered by category chip. */

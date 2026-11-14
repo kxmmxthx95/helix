@@ -1,3 +1,4 @@
+import SwapHorizontalOutline from "react-ionicons/lib/SwapHorizontalOutline";
 import FlaskOutline from "react-ionicons/lib/FlaskOutline";
 import GlobeOutline from "react-ionicons/lib/GlobeOutline";
 import LanguageOutline from "react-ionicons/lib/LanguageOutline";
@@ -148,6 +149,7 @@ export const Upload = wrap(CloudUpload);
 export const UploadOutlineIcon = wrap(CloudUploadOutline);
 export const Monitor = wrap(Desktop);
 export const DesktopIcon = wrap(DesktopOutline);
+export const SwapIcon = wrap(SwapHorizontalOutline);
 export const CartIcon = wrap(CartOutline);
 export const AppsIcon = wrap(AppsOutline);
 export const BarChartIcon = wrap(BarChartOutline);

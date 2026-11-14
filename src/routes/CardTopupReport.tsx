@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, CartIcon, CoinIcon, DesktopIcon, DownloadIcon, ImageIcon, PersonIcon, PricetagIcon } from "@/components/icons";
+import { CartIcon, CoinIcon, DownloadIcon, ImageIcon, PricetagIcon } from "@/components/icons";
 import { Button, Field, Input, Skeleton } from "@/components/ui";
 import { useCardReport } from "@/hooks/useCardTopup";
 import { reportCsv, TX_TYPE_LABEL } from "@/lib/cardTopup";
@@ -49,27 +49,26 @@ export function ReportTab() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex items-center gap-3">
+        <div className="scrollbar-hidden flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1" role="tablist" aria-label="ช่วงวันที่">
+          {PRESETS.map((p) => (
+            <button key={p.key} type="button" role="tab" aria-selected={preset === p.key} className={chip(preset === p.key)} onClick={() => pick(p.key)}>
+              {p.label}
+            </button>
+          ))}
+          <button type="button" role="tab" aria-selected={preset === "custom"} className={chip(preset === "custom")} onClick={() => setPreset("custom")}>
+            เลือกวันที่เอง
+          </button>
+        </div>
         <Button
           variant="outline"
-          className="ml-auto h-14 px-5 text-lg"
+          className="h-14 shrink-0 px-5 text-lg"
           disabled={!r}
           onClick={() => r && downloadCsv(`card-report-${from}_${to}.csv`, reportCsv(r))}
         >
           <DownloadIcon className="mr-2 h-5 w-5" />
           ส่งออก CSV
         </Button>
-      </div>
-
-      <div className="scrollbar-hidden flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="ช่วงวันที่">
-        {PRESETS.map((p) => (
-          <button key={p.key} type="button" role="tab" aria-selected={preset === p.key} className={chip(preset === p.key)} onClick={() => pick(p.key)}>
-            {p.label}
-          </button>
-        ))}
-        <button type="button" role="tab" aria-selected={preset === "custom"} className={chip(preset === "custom")} onClick={() => setPreset("custom")}>
-          เลือกวันที่เอง
-        </button>
       </div>
       {preset === "custom" && (
         <div className="grid gap-3 rounded-2xl border border-border bg-card p-4 sm:grid-cols-2">
@@ -139,75 +138,61 @@ export function ReportTab() {
             ))}
           </div>
 
-          {section === "cashier" && (
-            <ul className="grid gap-3 md:grid-cols-2">
-              {r.by_cashier.map((c) => (
-                <li key={c.profile_id} className="rounded-2xl border border-border bg-card p-5">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted">
-                      <PersonIcon className="h-6 w-6 text-muted-foreground" />
-                    </span>
-                    <p className="min-w-0 flex-1 truncate text-xl font-semibold">{c.name}</p>
-                  </div>
-                  <div className="mt-4 rounded-xl bg-success/10 px-4 py-3">
-                    <p className="text-base font-medium text-success">เงินสดที่ต้องนำส่ง</p>
-                    <p className="font-heading text-4xl font-bold tabular-nums">{formatBaht(c.cash_topup_total)} ฿</p>
-                  </div>
-                  <dl className="mt-3 grid grid-cols-2 gap-3 text-lg">
-                    <Pair label="ยอดขาย" value={`${formatBaht(c.sales_total)} ฿`} />
-                    <Pair label="จำนวนครั้งที่ขาย" value={`${c.sales_count} ครั้ง`} />
-                  </dl>
-                </li>
-              ))}
-              {r.by_cashier.length === 0 && <Empty text="ไม่มีรายการของแคชเชียร์ในช่วงนี้" />}
-            </ul>
-          )}
+          {section === "cashier" &&
+            (r.by_cashier.length === 0 ? (
+              <Empty text="ไม่มีรายการของแคชเชียร์ในช่วงนี้" />
+            ) : (
+              <DataTable
+                head={["แคชเชียร์", "ยอดขาย", "จำนวนครั้งที่ขาย", "เงินสดที่ต้องนำส่ง"]}
+                rows={r.by_cashier.map((c) => ({
+                  key: c.profile_id,
+                  cells: [
+                    <span key="n" className="font-semibold">{c.name}</span>,
+                    `${formatBaht(c.sales_total)} ฿`,
+                    `${c.sales_count} ครั้ง`,
+                    <span key="c" className="text-xl font-bold text-success">{formatBaht(c.cash_topup_total)} ฿</span>,
+                  ],
+                }))}
+              />
+            ))}
 
-          {section === "terminal" && (
-            <ul className="grid gap-3 md:grid-cols-2">
-              {r.by_terminal.map((t) => (
-                <li key={t.terminal_id ?? "none"} className="rounded-2xl border border-border bg-card p-5">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-muted">
-                      <DesktopIcon className="h-6 w-6 text-muted-foreground" />
-                    </span>
-                    <p className="min-w-0 flex-1 truncate text-xl font-semibold">{t.name ?? "ไม่ระบุเครื่อง (สลิป)"}</p>
-                  </div>
-                  <dl className="mt-4 grid grid-cols-2 gap-3 text-lg">
-                    <Pair label="ยอดขาย" value={`${formatBaht(t.sales_total)} ฿`} strong />
-                    <Pair label="จำนวนครั้งที่ขาย" value={`${t.sales_count} ครั้ง`} />
-                    <Pair label="เติมเงินสด" value={`${formatBaht(t.cash_topup_total)} ฿`} />
-                    <Pair label="เติมผ่านสลิป" value={`${formatBaht(t.slip_topup_total)} ฿`} />
-                  </dl>
-                </li>
-              ))}
-              {r.by_terminal.length === 0 && <Empty text="ไม่มีรายการในช่วงนี้" />}
-            </ul>
-          )}
+          {section === "terminal" &&
+            (r.by_terminal.length === 0 ? (
+              <Empty text="ไม่มีรายการในช่วงนี้" />
+            ) : (
+              <DataTable
+                head={["เครื่องขาย", "ยอดขาย", "จำนวนครั้งที่ขาย", "เติมเงินสด", "เติมผ่านสลิป"]}
+                rows={r.by_terminal.map((t) => ({
+                  key: t.terminal_id ?? "none",
+                  cells: [
+                    <span key="n" className="font-semibold">{t.name ?? "ไม่ระบุเครื่อง (สลิป)"}</span>,
+                    <span key="s" className="font-semibold">{formatBaht(t.sales_total)} ฿</span>,
+                    `${t.sales_count} ครั้ง`,
+                    `${formatBaht(t.cash_topup_total)} ฿`,
+                    `${formatBaht(t.slip_topup_total)} ฿`,
+                  ],
+                }))}
+              />
+            ))}
 
           {section === "voids" &&
             (r.voids.length === 0 ? (
               <Empty text="ไม่มีรายการที่ยกเลิก" />
             ) : (
-              <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-                {r.voids.map((v) => (
-                  <li key={v.id} className="flex flex-wrap items-start gap-x-4 gap-y-1 px-5 py-4">
-                    <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/15 text-destructive">
-                      <AlertTriangle className="h-5 w-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-lg font-semibold">
-                        {TX_TYPE_LABEL[v.type]} · {v.student_name}
-                      </p>
-                      <p className="text-base text-muted-foreground">
-                        {new Date(v.voided_at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })} · ยกเลิกโดย {v.voided_by_name ?? v.cashier}
-                      </p>
-                      <p className="mt-1 text-base">เหตุผล: {v.void_reason}</p>
-                    </div>
-                    <p className="shrink-0 text-2xl font-bold tabular-nums text-destructive line-through decoration-2">{formatBaht(Math.abs(v.amount))} ฿</p>
-                  </li>
-                ))}
-              </ul>
+              <DataTable
+                head={["เวลายกเลิก", "รายการ", "นักเรียน", "ยกเลิกโดย", "เหตุผล", "ยอด"]}
+                rows={r.voids.map((v) => ({
+                  key: v.id,
+                  cells: [
+                    new Date(v.voided_at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" }),
+                    TX_TYPE_LABEL[v.type],
+                    v.student_name,
+                    v.voided_by_name ?? v.cashier,
+                    v.void_reason,
+                    <span key="a" className="font-bold text-destructive line-through decoration-2">{formatBaht(Math.abs(v.amount))} ฿</span>,
+                  ],
+                }))}
+              />
             ))}
         </>
       )}
@@ -232,11 +217,32 @@ function Stat({ icon: I, tone, label, sub, value }: { icon: Icon; tone: string; 
   );
 }
 
-function Pair({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+/** Plain list table: first column left-aligned, the rest right-aligned (amounts) except free text in voids. */
+function DataTable({ head, rows }: { head: string[]; rows: { key: string; cells: React.ReactNode[] }[] }) {
   return (
-    <div>
-      <dt className="text-base text-muted-foreground">{label}</dt>
-      <dd className={cn("font-semibold tabular-nums", strong ? "text-2xl" : "text-xl")}>{value}</dd>
+    <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+      <table className="w-full text-lg">
+        <thead>
+          <tr className="border-b border-border bg-muted/50 text-left text-base text-muted-foreground">
+            {head.map((h, i) => (
+              <th key={h} scope="col" className={cn("whitespace-nowrap px-5 py-3 font-medium", i > 0 && "text-right")}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {rows.map((row) => (
+            <tr key={row.key}>
+              {row.cells.map((c, i) => (
+                <td key={i} className={cn("px-5 py-3.5 tabular-nums", i > 0 && "text-right")}>
+                  {c}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
