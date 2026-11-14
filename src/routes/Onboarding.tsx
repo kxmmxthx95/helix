@@ -1,10 +1,10 @@
 import { normalizeNationalId } from "@/lib/nationalId";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { X } from "@/components/icons";
 import { useToast } from "@/components/Toast";
 import { MapPicker } from "@/components/MapPicker";
-import { BuddhistDateSelect, Button, Card, Field, Input, PasswordInput, Select, Spinner } from "@/components/ui";
+import { BuddhistDateSelect, Button, Field, FormSection, Input, PasswordInput, Select, SheetFormContext, Spinner } from "@/components/ui";
 import {
   useDeleteStudentContact,
   useSaveStudentContact,
@@ -31,8 +31,16 @@ import { cn } from "@/lib/utils";
  * migration 0022 / src/lib/onboarding.ts. Rendered from App.tsx's Gate(),
  * not a routed page — it blocks every path, not just one.
  */
-export function Onboarding({ step }: { step: OnboardingStep }) {
-  const { myStudent, refreshOnboarding, signOut } = useAuth();
+export function Onboarding({ step: dataStep }: { step: OnboardingStep }) {
+  const { myStudent, refreshOnboarding: refresh, signOut } = useAuth();
+  // "ย้อนกลับ" override — the data-derived step is always the first incomplete one,
+  // so going back is purely a view state; saving anywhere clears it.
+  const [back, setBack] = useState<OnboardingStep | null>(null);
+  const step = back ?? dataStep;
+  const refreshOnboarding = async () => {
+    setBack(null);
+    await refresh();
+  };
   const currentIndex = ONBOARDING_STEPS.findIndex((s) => s.key === step);
   // Non-students only ever hit the "password" step (see AuthProvider.loadOnboarding)
   // — the rest of the stepper below is student-only, so skip its chrome for them.
@@ -67,7 +75,8 @@ export function Onboarding({ step }: { step: OnboardingStep }) {
           </ol>
         )}
 
-        <Card>
+        <SheetFormContext.Provider value>
+        <div>
           <h2 className="mb-4 text-sm font-semibold">{ONBOARDING_STEPS[currentIndex]?.label}</h2>
           {step === "password" && <PasswordStep onDone={refreshOnboarding} />}
           {step === "identity" && myStudent && <IdentityStep student={myStudent} onDone={refreshOnboarding} />}
@@ -76,7 +85,15 @@ export function Onboarding({ step }: { step: OnboardingStep }) {
             <GuardiansStep studentId={myStudent.id} onDone={refreshOnboarding} />
           )}
           {step === "health" && myStudent && <HealthStep student={myStudent} onDone={refreshOnboarding} />}
-        </Card>
+        </div>
+        </SheetFormContext.Provider>
+
+        {/* index 0 = password, mandatory and not revisitable */}
+        {isStudentStepper && currentIndex > 1 && (
+          <Button type="button" variant="outline" className="w-full" onClick={() => setBack(ONBOARDING_STEPS[currentIndex - 1]!.key)}>
+            ย้อนกลับ
+          </Button>
+        )}
 
         <button
           type="button"
@@ -201,40 +218,41 @@ function IdentityStep({ student, onDone }: { student: Student; onDone: () => Pro
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <Field label="เลขบัตรประชาชน / เลขต่างชาติ">
-        <Input
-          value={draft.national_id}
-          onChange={(e) => setDraft({ ...draft, national_id: normalizeNationalId(e.target.value).slice(0, 20) })}
-          required
-        />
-      </Field>
-      <Field label="วันเดือนปีเกิด">
-        <BuddhistDateSelect
-          value={draft.date_of_birth}
-          onChange={(v) => setDraft({ ...draft, date_of_birth: v })}
-          required
-        />
-      </Field>
-      {age && (
-        <p className="-mt-2 text-xs text-muted-foreground">
-          อายุ {age.years} ปี {age.months} เดือน
-        </p>
-      )}
-      <div>
-        <p className="mb-1.5 text-xs font-medium text-muted-foreground">ที่อยู่</p>
+      <FormSection>
+        <Field label="เลขบัตรประจำตัวประชาชน">
+          <Input
+            autoComplete="off"
+            value={draft.national_id}
+            onChange={(e) => setDraft({ ...draft, national_id: normalizeNationalId(e.target.value).slice(0, 20) })}
+            maxLength={20}
+            required
+          />
+        </Field>
+        <Field label="วันเดือนปีเกิด">
+          <BuddhistDateSelect
+            value={draft.date_of_birth}
+            onChange={(v) => setDraft({ ...draft, date_of_birth: v })}
+            required
+          />
+        </Field>
+        <div className="form-row flex min-h-7 items-center justify-between gap-4 text-sm leading-5">
+          <span>อายุ</span>
+          <span className="text-muted-foreground">{age ? `${age.years} ปี ${age.months} เดือน` : "—"}</span>
+        </div>
+      </FormSection>
+      <FormSection>
         <AddressInputs
           value={draft}
           onChange={(patch) => setDraft({ ...draft, ...patch })}
           required={REQUIRED_ADDRESS_KEYS}
         />
-      </div>
-      <div className="space-y-3">
-        <p className="text-xs font-medium text-muted-foreground">ตำแหน่งบ้าน (ไม่บังคับ)</p>
+      </FormSection>
+      <FormSection>
         <MapPicker
           value={draft.latitude !== null && draft.longitude !== null ? { lat: draft.latitude, lng: draft.longitude } : null}
           onChange={(p) => setDraft({ ...draft, latitude: p?.lat ?? null, longitude: p?.lng ?? null })}
         />
-      </div>
+      </FormSection>
       <ErrorText error={error} />
       <Button type="submit" className="w-full" disabled={pending}>
         {pending ? <Spinner className="h-3 w-3" /> : "บันทึกและถัดไป"}
@@ -268,17 +286,58 @@ function ContactStep({ student, onDone }: { student: Student; onDone: () => Prom
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <Field label="เบอร์โทรศัพท์">
-        <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required />
-      </Field>
-      <Field label="อีเมล">
-        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-      </Field>
+      <FormSection>
+        <Field label="เบอร์โทรศัพท์">
+          <DigitBoxes value={phone} onChange={setPhone} length={10} />
+        </Field>
+        <Field label="อีเมล">
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </Field>
+      </FormSection>
       <ErrorText error={error} />
-      <Button type="submit" className="w-full" disabled={pending}>
+      <Button type="submit" className="w-full" disabled={pending || phone.length !== 10}>
         {pending ? <Spinner className="h-3 w-3" /> : "บันทึกและถัดไป"}
       </Button>
     </form>
+  );
+}
+
+/** One square box per digit; typing advances, backspace retreats, paste fills. */
+function DigitBoxes({ value, onChange, length }: { value: string; onChange: (v: string) => void; length: number }) {
+  const refs = useRef<(HTMLInputElement | null)[]>([]);
+  const set = (i: number, digits: string) => {
+    const next = (value.slice(0, i) + digits + value.slice(i + (digits ? digits.length : 1))).slice(0, length);
+    onChange(next);
+    refs.current[Math.min(i + digits.length, length - 1)]?.focus();
+  };
+  return (
+    <div className="flex gap-1.5">
+      {Array.from({ length }, (_, i) => (
+        <input
+          key={i}
+          ref={(el) => {
+            refs.current[i] = el;
+          }}
+          inputMode="numeric"
+          autoComplete={i === 0 ? "tel" : "off"}
+          aria-label={`เบอร์โทรศัพท์หลักที่ ${i + 1}`}
+          value={value[i] ?? ""}
+          onChange={(e) => {
+            const d = e.target.value.replace(/\D/g, "");
+            if (d) set(i, d);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Backspace") {
+              e.preventDefault();
+              onChange(value.slice(0, value[i] ? i : Math.max(i - 1, 0)));
+              refs.current[value[i] ? i : Math.max(i - 1, 0)]?.focus();
+            }
+          }}
+          onFocus={(e) => e.target.select()}
+          className="aspect-square min-w-0 flex-1 rounded-md border border-border bg-background text-center text-base"
+        />
+      ))}
+    </div>
   );
 }
 
@@ -504,6 +563,7 @@ function HealthStep({ student, onDone }: { student: Student; onDone: () => Promi
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      <FormSection>
       <Field label="หมู่เลือด">
         <Select
           value={draft.blood_type ?? ""}
@@ -563,6 +623,7 @@ function HealthStep({ student, onDone }: { student: Student; onDone: () => Promi
           required
         />
       </Field>
+      </FormSection>
 
       <ErrorText error={error} />
       <Button type="submit" className="w-full" disabled={pending}>

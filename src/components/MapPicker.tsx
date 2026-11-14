@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ExpandIcon, X } from "@/components/icons";
 import { Field, Input } from "@/components/ui";
 
 export type LatLng = { lat: number; lng: number };
@@ -67,6 +68,7 @@ export function MapPicker({
   onChangeRef.current = onChange;
   const [text, setText] = useState(fmt(value));
   const [error, setError] = useState<string | null>(null);
+  const [big, setBig] = useState(false);
 
   // Keep the text in step with map clicks / external changes.
   useEffect(() => setText(fmt(value)), [value]);
@@ -137,8 +139,16 @@ export function MapPicker({
   return (
     <>
       {API_KEY ? (
-        <div className="!p-2">
-          <div ref={el} className="h-56 w-full overflow-hidden rounded-lg bg-secondary" />
+        <div className={big ? "fixed inset-0 z-50 bg-background !p-0" : "relative !p-2"}>
+          <div ref={el} className={big ? "h-full w-full bg-secondary" : "h-56 w-full overflow-hidden rounded-lg bg-secondary"} />
+          <button
+            type="button"
+            onClick={() => setBig(!big)}
+            aria-label={big ? "ปิดแผนที่ขนาดเต็ม" : "ขยายแผนที่"}
+            className={`tappable absolute flex size-9 items-center justify-center rounded-full bg-background text-foreground shadow-md ${big ? "right-3 top-3" : "right-4 top-4"}`}
+          >
+            {big ? <X className="h-4 w-4" /> : <ExpandIcon className="h-4 w-4" />}
+          </button>
           {error && <p className="px-4 py-2 text-xs text-destructive">{error}</p>}
         </div>
       ) : (
