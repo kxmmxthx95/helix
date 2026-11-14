@@ -969,12 +969,6 @@ export function EditStudentSheet({
       toast(`บันทึกไม่ได้: ${Object.values(errors).slice(0, 3).join(" · ")}${invalid.length > 3 ? ` (+${invalid.length - 3})` : ""}`, "error");
       return;
     }
-    const problem = guardianProblem(currentGuardians, currentSource);
-    if (problem) {
-      setTab("guardian");
-      toast(`บันทึกไม่ได้ — ${problem}`, "error");
-      return;
-    }
     // Guardians are only rewritten once edited, so a slow-loading list can never be mistaken for "cleared".
     const guardiansEdited = guardians !== null || guardianSource !== null;
     const guardianDrafts = currentGuardians;
@@ -1374,19 +1368,6 @@ type GuardianSource = GuardianSlot;
 // A lone prefix doesn't count: picking "นาย" without a name shouldn't force the rest of the form.
 const guardianFilled = (g: GuardianDraft) => Object.entries(g).some(([k, v]) => k !== "prefix" && v.trim());
 
-/** Why a half-filled guardian can't be saved, or null. Guardians are optional, but a started one needs both names; "other" also needs the relationship. */
-function guardianProblem(drafts: GuardianDrafts, source: GuardianSource): string | null {
-  for (const { slot, title } of GUARDIAN_SLOTS) {
-    const g = drafts[slot];
-    if (slot === "other" && source !== "other") continue; // ignored while the guardian is a parent
-    if (!guardianFilled(g)) continue;
-    if (!g.first_name.trim() || !g.last_name.trim()) return `${title}: กรอกชื่อและนามสกุลให้ครบ`;
-    if (g.phone.trim() && !phoneOk(g.phone)) return `${title}: เบอร์โทรต้องเป็นตัวเลข 9-10 หลัก`;
-    if (slot === "other" && !g.relationship_note.trim()) return `${title}: ระบุความสัมพันธ์`;
-  }
-  return null;
-}
-
 /** A student's saved father / mother / first other-guardian as drafts, plus the rows they came from. `ready` is false until they have loaded. */
 function useLoadedGuardians(studentId: string | null) {
   const { data: contacts, isLoading } = useStudentContacts(studentId);
@@ -1437,6 +1418,8 @@ function useSaveGuardians() {
         if (prev) await deleteContact.mutateAsync(prev.id);
         continue;
       }
+      // Guardians are optional: a half-filled one (no first/last name) is skipped, leaving any saved row untouched.
+      if (!g.first_name.trim() || !g.last_name.trim()) continue;
       const contact = await saveContact.mutateAsync({
         ...(prev ? { id: prev.id, ...pickAddress(prev) } : NO_ADDRESS),
         student_id: studentId,
