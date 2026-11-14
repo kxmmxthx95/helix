@@ -1483,6 +1483,18 @@ export type CardTopupRow = {
   voided_by_name: string | null;
 };
 
+export type CardSaleRow = {
+  id: string;
+  amount: number;
+  created_at: string;
+  student_code: string;
+  student_name: string;
+  cashier: string;
+  terminal: string | null;
+  voided_at: string | null;
+  items: { name: string; qty: number; price: number }[];
+};
+
 export type PosMyToday = {
   sales_count: number;
   sales_total: number;
@@ -1997,6 +2009,10 @@ export type Database = {
       card_topup_list: {
         Args: { p_from: string; p_to: string; p_q: string | null };
         Returns: CardTopupRow[];
+      };
+      card_sales_list: {
+        Args: { p_from: string; p_to: string; p_q: string | null };
+        Returns: CardSaleRow[];
       };
       pos_void: {
         Args: { p_tx_id: string; p_reason: string };

@@ -138,43 +138,62 @@ export function VoidTopupTab({ unlocked, onNeedPin }: { unlocked: boolean; onNee
       )}
 
       {shown.length > 0 && (
-        <ul className="grid gap-3 lg:grid-cols-2">
-          {shown.map((r) => (
-            <li key={r.id} className={cn("flex flex-col rounded-2xl border border-border bg-card p-5", r.voided_at && "bg-muted/60")}>
-              <div className="flex items-start gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className={cn("truncate text-xl font-semibold", r.voided_at && "text-muted-foreground")}>{r.student_name}</p>
-                  <p className="text-lg text-muted-foreground">รหัส {r.student_code}</p>
-                </div>
-                <p className={cn("shrink-0 text-3xl font-bold tabular-nums", r.voided_at && "text-muted-foreground line-through")}>{formatBaht(r.amount)} ฿</p>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-base text-muted-foreground">
-                <span className={cn("rounded-full px-3 py-0.5 text-sm font-semibold", typeBadge(r.type))}>{TX_TYPE_LABEL[r.type]}</span>
-                <span>{when(r.created_at)}</span>
-                <span>· เติมโดย {r.cashier || "—"}</span>
-              </div>
-              {r.voided_at ? (
-                <div className="mt-3 rounded-xl bg-destructive/10 px-4 py-3 text-base">
-                  <p className="font-semibold text-destructive">ยกเลิกแล้ว · {when(r.voided_at)}</p>
-                  <p className="text-foreground">
-                    โดย {r.voided_by_name ?? "ไม่ระบุ"} · เหตุผล: {r.void_reason ?? "—"}
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-3 flex justify-end border-t border-border pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setTarget(r)}
-                    aria-label={`ยกเลิกการเติมเงินของ ${r.student_name} ${formatBaht(r.amount)} บาท`}
-                    className="tappable h-12 rounded-xl border border-destructive/40 px-5 text-lg font-semibold text-destructive hover:bg-destructive/10"
-                  >
-                    ยกเลิกรายการ
-                  </button>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+          <table className="w-full text-lg">
+            <thead>
+              <tr className="border-b border-border bg-muted/50 text-left text-base text-muted-foreground">
+                {["เวลา", "นักเรียน", "รายการ", "เติมโดย"].map((h) => (
+                  <th key={h} scope="col" className="whitespace-nowrap px-5 py-3 font-medium">
+                    {h}
+                  </th>
+                ))}
+                <th scope="col" className="whitespace-nowrap px-5 py-3 text-right font-medium">
+                  ยอด
+                </th>
+                <th scope="col" className="whitespace-nowrap px-5 py-3 text-right font-medium">
+                  สถานะ
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {shown.map((r) => (
+                <tr key={r.id} className={cn(r.voided_at && "bg-muted/60 text-muted-foreground")}>
+                  <td className="whitespace-nowrap px-5 py-3.5">{when(r.created_at)}</td>
+                  <td className="px-5 py-3.5">
+                    <p className={cn("font-semibold", !r.voided_at && "text-foreground")}>{r.student_name}</p>
+                    <p className="text-base text-muted-foreground">รหัส {r.student_code}</p>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <span className={cn("whitespace-nowrap rounded-full px-3 py-0.5 text-sm font-semibold", typeBadge(r.type))}>{TX_TYPE_LABEL[r.type]}</span>
+                  </td>
+                  <td className="whitespace-nowrap px-5 py-3.5">{r.cashier || "—"}</td>
+                  <td className={cn("whitespace-nowrap px-5 py-3.5 text-right text-xl font-bold tabular-nums", r.voided_at ? "line-through" : "text-foreground")}>
+                    {formatBaht(r.amount)} ฿
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    {r.voided_at ? (
+                      <div className="text-base">
+                        <p className="font-semibold text-destructive">ยกเลิกแล้ว · {when(r.voided_at)}</p>
+                        <p>
+                          โดย {r.voided_by_name ?? "ไม่ระบุ"} · เหตุผล: {r.void_reason ?? "—"}
+                        </p>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setTarget(r)}
+                        aria-label={`ยกเลิกการเติมเงินของ ${r.student_name} ${formatBaht(r.amount)} บาท`}
+                        className="tappable h-12 whitespace-nowrap rounded-xl border border-destructive/40 px-5 text-lg font-semibold text-destructive hover:bg-destructive/10"
+                      >
+                        ยกเลิกรายการ
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {rows.length >= 300 && <p className="text-center text-lg text-muted-foreground">แสดง 300 รายการล่าสุด — ใช้การค้นหาหรือช่วงวันที่เพื่อจำกัดผลลัพธ์</p>}
 

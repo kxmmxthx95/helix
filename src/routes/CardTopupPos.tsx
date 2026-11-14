@@ -6,7 +6,7 @@ import { FiSidebar } from "react-icons/fi";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { AlertTriangle, HomeIcon, LockIcon, BarChartIcon, BarcodeIcon, CartIcon, CheckmarkCircleIcon, CoinIcon, DesktopIcon, LogOut, Moon, Monitor, Search, Sun, SwapIcon } from "@/components/icons";
+import { AlertTriangle, HomeIcon, LockIcon, BarChartIcon, BarcodeIcon, CartIcon, CheckmarkCircleIcon, CoinIcon, DesktopIcon, ListIcon, LogOut, Moon, Monitor, Search, Sun, SwapIcon } from "@/components/icons";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { useTheme } from "@/components/ThemeProvider";
@@ -42,6 +42,7 @@ import { TerminalsTab } from "@/routes/CardTopupAdmin";
 import { ProductsTab } from "@/routes/CardTopupProducts";
 import { ReportTab } from "@/routes/CardTopupReport";
 import { SlipsTab } from "@/routes/CardTopupSlips";
+import { SalesHistoryTab } from "@/routes/CardTopupSales";
 import { VoidTopupTab } from "@/routes/CardTopupVoid";
 
 const TERMINAL_KEY = "helix-pos-terminal";
@@ -58,6 +59,7 @@ const VIEWS = [
   { key: "sale", label: "ขายสินค้า", icon: CartIcon },
   { key: "topup", label: "เติมเงิน", icon: CoinIcon },
   { key: "slips", label: "อนุมัติสลิป", icon: CheckmarkCircleIcon },
+  { key: "sales", label: "ประวัติการขาย", icon: ListIcon },
   { key: "void", label: "ยกเลิกรายการ", icon: AlertTriangle },
   { key: "report", label: "รายงาน", icon: BarChartIcon },
   { key: "products", label: "สินค้า", icon: BarcodeIcon },
@@ -424,6 +426,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const adminView = (
     <div className="min-h-0 flex-1 overflow-y-auto p-4">
       {view === "slips" && <SlipsTab />}
+      {view === "sales" && <SalesHistoryTab />}
       {view === "void" && <VoidTopupTab unlocked={isUnlocked} onNeedPin={() => (setPinFor("void"), setPinOpen(true))} />}
       {view === "report" && <ReportTab />}
       {view === "products" && <ProductsTab />}

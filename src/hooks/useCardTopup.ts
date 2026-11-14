@@ -14,6 +14,7 @@ import type {
   PinUnlockResult,
   Student,
   StudentQr,
+  CardSaleRow,
   CardTopupRow,
   CardHistoryRow,
   CardKind,
@@ -212,6 +213,15 @@ export function useTopupList(from: string, to: string, q: string) {
     queryKey: ["card_transactions", "topup_list", from, to, q],
     enabled: !!from && !!to && from <= to,
     queryFn: () => rpc<CardTopupRow[]>(() => supabase.rpc("card_topup_list", { p_from: from, p_to: to, p_q: q.trim() || null })),
+  });
+}
+
+/** Org-wide: sales (with their product lines) in a Bangkok date range, optionally filtered by name / student code. */
+export function useSalesList(from: string, to: string, q: string) {
+  return useQuery({
+    queryKey: ["card_transactions", "sales_list", from, to, q],
+    enabled: !!from && !!to && from <= to,
+    queryFn: () => rpc<CardSaleRow[]>(() => supabase.rpc("card_sales_list", { p_from: from, p_to: to, p_q: q.trim() || null })),
   });
 }
 
