@@ -1,4 +1,4 @@
-import { AlertTriangle, BarcodeIcon, CallIcon, CheckmarkCircleIcon, HomeIcon, KeyIcon, ProfileIcon, ShieldIcon, Users as UsersIcon, Plus, Search, SlidersHorizontal, Upload, X } from "@/components/icons";
+import { AlertTriangle, BarChartIcon, BarcodeIcon, CallIcon, CheckmarkCircleIcon, HomeIcon, KeyIcon, ProfileIcon, ShieldIcon, Users as UsersIcon, Plus, Search, SlidersHorizontal, Upload, X } from "@/components/icons";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { MapPicker } from "@/components/MapPicker";
@@ -91,7 +91,7 @@ export function studentErrors(d: StudentDraft): Partial<Record<keyof StudentDraf
 }
 
 /** Derive เพศ from Thai student name title (no separate gender column). */
-function studentGender(prefix: string | null): "ชาย" | "หญิง" | null {
+export function studentGender(prefix: string | null): "ชาย" | "หญิง" | null {
   if (prefix === "เด็กชาย" || prefix === "นาย") return "ชาย";
   if (prefix === "เด็กหญิง" || prefix === "นางสาว") return "หญิง";
   return null;
@@ -361,6 +361,7 @@ export function Roster() {
   const { profile: me } = useAuth();
   const [filters, setFilters] = useState<StudentFilters>(EMPTY);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<Student | "new" | null>(null);
   const [creatingLoginFor, setCreatingLoginFor] = useState<Student | null>(null);
@@ -438,6 +439,11 @@ export function Roster() {
             </span>
           )}
         </Button>
+        {hasSearch && rows && (
+          <Button variant="outline" size="icon" className="shrink-0" onClick={() => setStatsOpen(true)} aria-label="สรุปจำนวนนักเรียน">
+            <BarChartIcon className="h-3 w-3" />
+          </Button>
+        )}
         {mayManageUsers && (
           <Button
             variant="outline"
@@ -468,7 +474,7 @@ export function Roster() {
 
       {hasSearch && isLoading && (
         <div className="space-y-2" role="status" aria-label="กำลังโหลด">
-          <ul className="space-y-2 lg:hidden">
+          <ul className="space-y-2 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden">
             {[0, 1, 2].map((i) => (
               <li key={i} className="rounded-xl bg-card p-3.5 shadow-card">
                 <div className="flex items-start gap-3">
@@ -525,7 +531,7 @@ export function Roster() {
 
       {hasSearch && rows && rows.length > 0 && (
         <div className="flex shrink-0 flex-col gap-2 lg:min-h-0 lg:flex-1 lg:shrink">
-          <ul className="space-y-2 lg:hidden">
+          <ul className="space-y-2 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden">
             {rows.map((row) => {
               const gender = studentGender(row.prefix);
               const fullName = `${row.first_name} ${row.last_name}`;
@@ -741,14 +747,16 @@ export function Roster() {
         </div>
       )}
 
-      {hasSearch && rows && (
-        <div className={`sticky bottom-0 z-10 mt-auto grid shrink-0 grid-cols-2 gap-2 bg-background pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 lg:grid-cols-4`}>
-          <StatCard tone="accent" icon={<UsersIcon className="h-5 w-5" />} label="ทั้งหมด" value={rows.length} unit="คน" />
-          <StatCard tone="success" icon={<CheckmarkCircleIcon className="h-5 w-5" />} label="กำลังศึกษา" value={rows.filter((r) => r.status === "studying").length} unit="คน" />
-          <StatCard tone="muted" icon={<ProfileIcon className="h-5 w-5" />} label="มีบัญชีแล้ว" value={rows.filter((r) => r.profile_id).length} unit="คน" />
-          <StatCard tone="warning" icon={<KeyIcon className="h-5 w-5" />} label="ยังไม่มีบัญชี" value={rows.filter((r) => !r.profile_id).length} unit="คน" />
-        </div>
-      )}
+      <Sheet open={statsOpen && !!rows} onOpenChange={setStatsOpen} title="สรุปจำนวนนักเรียน" bottomOnPhone>
+        {rows && (
+          <div className="grid grid-cols-2 gap-2">
+            <StatCard tone="accent" icon={<UsersIcon className="h-5 w-5" />} label="ทั้งหมด" value={rows.length} unit="คน" />
+            <StatCard tone="warning" icon={<ProfileIcon className="h-5 w-5" />} label="หญิง" value={rows.filter((r) => studentGender(r.prefix) === "หญิง").length} unit="คน" />
+            <StatCard tone="success" icon={<ProfileIcon className="h-5 w-5" />} label="ชาย" value={rows.filter((r) => studentGender(r.prefix) === "ชาย").length} unit="คน" />
+            <StatCard tone="muted" icon={<KeyIcon className="h-5 w-5" />} label="มีบัญชี" value={rows.filter((r) => r.profile_id).length} unit="คน" />
+          </div>
+        )}
+      </Sheet>
 
       <Modal
         open={filtersOpen}

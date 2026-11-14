@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { BookIcon, CheckmarkCircleIcon, ChevronForward, HomeIcon, Plus, Search, TimeIcon, Users, X } from "@/components/icons";
-import { Avatar, Button, EmptyState, Input, Pagination, Select, Skeleton } from "@/components/ui";
+import { BarChartIcon, BookIcon, CheckmarkCircleIcon, ChevronForward, HomeIcon, Plus, Search, SlidersHorizontal, TimeIcon, Users, X } from "@/components/icons";
+import { Modal } from "@/components/Modal";
+import { Sheet } from "@/components/Sheet";
+import { Avatar, Button, EmptyState, Field, FormSection, Input, Pagination, Select, Skeleton } from "@/components/ui";
 import { useActiveAcademicYear } from "@/hooks/useAcademicTerms";
-import { avatarUrl } from "@/hooks/useAvatar";
+import { avatarUrl, studentAvatarUrl } from "@/hooks/useAvatar";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
-import { useProfilesByIds } from "@/hooks/usePractice";
+import { useProfilesByIds, useTeacherContact } from "@/hooks/usePractice";
+import { useLearningAreas } from "@/hooks/useCurriculum";
 import { useStudents } from "@/hooks/useStudents";
 import {
   useClassroomsByDepartment,
@@ -16,10 +19,10 @@ import {
   useHomeroomTeachersByDepartment,
   useRemoveHomeroomTeacher,
 } from "@/hooks/useStatusManagement";
-import { gradeShortLabel } from "@/lib/gradeLevels";
+import { departmentTone, gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { isDeptHead, isOrgWide } from "@/lib/roles";
 import type { Classroom, Student } from "@/lib/database.types";
-import { EditStudentSheet } from "@/routes/Roster";
+import { EditStudentSheet, studentGender } from "@/routes/Roster";
 import { HomeroomSheet } from "@/routes/StatusManagement";
 
 /** อ่านอย่างเดียว — org-wide list ของทุกห้องเรียนในแผนก, ตรงข้ามกับ ClassroomPanel ใน StatusManagement.tsx ที่จัดการทีละระดับชั้นและมี CRUD. */
@@ -48,10 +51,9 @@ export function Classrooms() {
   const teacherIds = [...new Set(homeroomTeachers.map((h) => h.teacher_id))];
   const { data: teacherProfiles = [] } = useProfilesByIds(teacherIds);
   const teacherById = new Map(
-    teacherProfiles.map((p) => [p.id, { name: `${p.first_name} ${p.last_name}`, avatar: avatarUrl(p) }]),
+    teacherProfiles.map((p) => [p.id, { id: p.id, name: `${p.first_name} ${p.last_name}`, avatar: avatarUrl(p) }]),
   );
-  const teacherByClassroomId = new Map(homeroomTeachers.map((h) => [h.classroom_id, h.teacher_id]));
-  const homeroomsByClassroomId = new Map<string, typeof homeroomTeachers>();
+    const homeroomsByClassroomId = new Map<string, typeof homeroomTeachers>();
   for (const h of homeroomTeachers) {
     homeroomsByClassroomId.set(h.classroom_id, [...(homeroomsByClassroomId.get(h.classroom_id) ?? []), h]);
   }
@@ -68,6 +70,14 @@ export function Classrooms() {
   const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">("");
   const searchTerm = search.trim().toLowerCase();
   const hasFilter = !!(search || gradeFilter || statusFilter);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const activeFilterCount = [gradeFilter, statusFilter].filter(Boolean).length;
+  const resetFilters = () => {
+    setSearch("");
+    setGradeFilter("");
+    setStatusFilter("");
+  };
 
   const scoped = isHomeroomTeacherOnly
     ? classrooms.filter((c) => myHomeroomClassroomIds.includes(c.id))
@@ -98,18 +108,135 @@ export function Classrooms() {
   const openClassroom = classrooms.find((c) => c.id === openClassroomId) ?? null;
   if (openClassroom) {
     const grade = gradeLevelById.get(openClassroom.grade_level_id);
-    const openClassroomTeacherId = teacherByClassroomId.get(openClassroom.id);
-    const openClassroomTeacher = openClassroomTeacherId ? teacherById.get(openClassroomTeacherId) : null;
+    const openClassroomTeachers = (homeroomsByClassroomId.get(openClassroom.id) ?? []).flatMap((h) => teacherById.get(h.teacher_id) ?? []);
     return (
       <ClassroomRoster
         classroom={openClassroom}
         departmentId={departmentId}
         label={grade ? `${gradeShortLabel(grade.code)}/${openClassroom.name}` : openClassroom.name}
-        teacher={openClassroomTeacher ?? null}
+        gradeLabel={grade ? gradeShortLabel(grade.code) : undefined}
+        teachers={openClassroomTeachers}
+        classroomLabelsOf={(teacherId) =>
+          homeroomTeachers
+            .filter((h) => h.teacher_id === teacherId)
+            .flatMap((h) => {
+              const c = classrooms.find((x) => x.id === h.classroom_id);
+              const g = c && gradeLevelById.get(c.grade_level_id);
+              return c ? `${g ? gradeShortLabel(g.code) + "/" : ""}${c.name}` : [];
+            })
+        }
         onBack={() => setOpenClassroomId("")}
       />
     );
   }
+
+  const homeroomCell = (c: Classroom) => {
+    const homerooms = homeroomsByClassroomId.get(c.id) ?? [];
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 flex-col gap-1">
+          {homerooms.length === 0 && "—"}
+          {homerooms.map((h) => {
+            const t = teacherById.get(h.teacher_id);
+            if (!t) return null;
+            return (
+              <div key={h.id} className="flex items-center gap-2">
+                <Avatar name={t.name} src={t.avatar} className="h-6 w-6 text-[9px]" />
+                <span className="min-w-0 truncate">{t.name}</span>
+                {orgWide && (
+                  <button
+                    type="button"
+                    aria-label={`ลบ ${t.name}`}
+                    disabled={removeTeacher.isPending}
+                    className="shrink-0 text-muted-foreground transition-colors hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`ลบ ${t.name} ออกจากครูประจำชั้น?`)) removeTeacher.mutate(h.id);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {orgWide && (
+          <Button
+            size="icon"
+            variant="outline"
+            aria-label="เพิ่มครูประจำชั้น"
+            onClick={(e) => {
+              e.stopPropagation();
+              setHomeroomClassroomId(c.id);
+            }}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    );
+  };
+
+  /** Dept / grade / status selects: inline on desktop, inside the filter drawer on phones. */
+  const filterSelects = (cls: string, wrap?: (label: string, el: React.ReactElement) => React.ReactNode) => {
+    const w = wrap ?? ((_: string, el: React.ReactElement) => el);
+    return (
+      <>
+        {orgWide &&
+          w(
+            "แผนก",
+            <Select
+              className={cls}
+              value={pickedDept}
+              onChange={(e) => {
+                setPickedDept(e.target.value);
+                setGradeFilter("");
+              }}
+              aria-label="แผนก"
+              placeholder="เลือกแผนก"
+            >
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </Select>,
+          )}
+        {w(
+          "ระดับชั้น",
+          <Select
+            className={cls}
+            value={gradeFilter}
+            onChange={(e) => setGradeFilter(e.target.value)}
+            disabled={!departmentId}
+            aria-label="ระดับชั้น"
+            title={departmentId ? undefined : "เลือกแผนกก่อน"}
+          >
+            <option value="">ทุกระดับชั้น</option>
+            {gradeLevels.map((g) => (
+              <option key={g.id} value={g.id}>
+                {gradeShortLabel(g.code)}
+              </option>
+            ))}
+          </Select>,
+        )}
+        {w(
+          "สถานะ",
+          <Select
+            className={cls}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as "" | "active" | "inactive")}
+            aria-label="สถานะ"
+          >
+            <option value="">ทุกสถานะ</option>
+            <option value="active">ใช้งานอยู่</option>
+            <option value="inactive">ปิดใช้งาน</option>
+          </Select>,
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="page-fill page-flush min-h-0 shrink-0 pb-5">
@@ -124,59 +251,20 @@ export function Classrooms() {
             aria-label="ค้นหาห้องเรียน"
           />
         </div>
-        {orgWide && (
-          <Select
-            className="w-auto min-w-36"
-            value={pickedDept}
-            onChange={(e) => {
-              setPickedDept(e.target.value);
-              setGradeFilter("");
-            }}
-            aria-label="แผนก"
-            placeholder="เลือกแผนก"
-          >
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </Select>
-        )}
-        <Select
-          className="w-auto min-w-32"
-          value={gradeFilter}
-          onChange={(e) => setGradeFilter(e.target.value)}
-          disabled={!departmentId}
-          aria-label="ระดับชั้น"
-          title={departmentId ? undefined : "เลือกแผนกก่อน"}
-        >
-          <option value="">ทุกระดับชั้น</option>
-          {gradeLevels.map((g) => (
-            <option key={g.id} value={g.id}>
-              {gradeShortLabel(g.code)}
-            </option>
-          ))}
-        </Select>
-        <Select
-          className="w-auto min-w-28"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as "" | "active" | "inactive")}
-          aria-label="สถานะ"
-        >
-          <option value="">ทุกสถานะ</option>
-          <option value="active">ใช้งานอยู่</option>
-          <option value="inactive">ปิดใช้งาน</option>
-        </Select>
-        <Button
-          variant="outline"
-          disabled={!hasFilter}
-          onClick={() => {
-            setSearch("");
-            setGradeFilter("");
-            setStatusFilter("");
-          }}
-        >
+        <div className="hidden gap-2 lg:flex">{filterSelects("w-auto")}</div>
+        <Button variant="outline" className="hidden lg:inline-flex" disabled={!hasFilter} onClick={resetFilters}>
           รีเซ็ต
+        </Button>
+        <Button variant="outline" size="icon" className="relative shrink-0 lg:hidden" onClick={() => setFiltersOpen(true)} aria-label="ตัวกรอง">
+          <SlidersHorizontal className="h-3 w-3" />
+          {activeFilterCount > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] text-accent-foreground">
+              {activeFilterCount}
+            </span>
+          )}
+        </Button>
+        <Button variant="outline" size="icon" className="shrink-0 lg:hidden" onClick={() => setStatsOpen(true)} aria-label="สรุปห้องเรียน">
+          <BarChartIcon className="h-3 w-3" />
         </Button>
       </div>
 
@@ -242,7 +330,48 @@ export function Classrooms() {
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <ul className="space-y-2 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:hidden">
+            {pageRows.map((c) => {
+              const grade = gradeLevelById.get(c.grade_level_id);
+              const studentCount = studentCountByClassroomId.get(c.id) ?? 0;
+              return (
+                <li key={c.id}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setOpenClassroomId(c.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setOpenClassroomId(c.id);
+                      }
+                    }}
+                    className="rounded-xl bg-card p-3.5 shadow-card transition-colors active:bg-muted"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{grade ? `${gradeShortLabel(grade.code)}/${c.name}` : c.name}</p>
+                        <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                          {department && (
+                            <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${departmentTone(department.id)}`}>
+                              {department.name}
+                            </span>
+                          )}
+                          <span className="truncate text-xs text-muted-foreground">{studentCount} คน</span>
+                        </div>
+                      </div>
+                      <span className="mt-0.5 flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+                        <span className={c.is_active ? "size-1.5 rounded-full bg-success" : "size-1.5 rounded-full bg-muted-foreground"} />
+                        {c.is_active ? "ใช้งานอยู่" : "ปิดใช้งาน"}
+                      </span>
+                    </div>
+                    <div className="mt-2.5 border-t border-border pt-2.5 text-xs">{homeroomCell(c)}</div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
             <table className="w-full min-w-[32rem] text-xs">
               <thead className="bg-muted text-left text-xs text-muted-foreground">
                 <tr>
@@ -257,7 +386,6 @@ export function Classrooms() {
               <tbody>
                 {pageRows.map((c) => {
                   const grade = gradeLevelById.get(c.grade_level_id);
-                  const homerooms = homeroomsByClassroomId.get(c.id) ?? [];
                   const studentCount = studentCountByClassroomId.get(c.id) ?? 0;
                   return (
                     <tr
@@ -275,51 +403,14 @@ export function Classrooms() {
                       <td className="px-3 py-3 font-medium">
                         {grade ? `${gradeShortLabel(grade.code)}/${c.name}` : c.name}
                       </td>
-                      <td className="px-3 py-3">{department?.name ?? "—"}</td>
                       <td className="px-3 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex flex-1 flex-col gap-1">
-                            {homerooms.length === 0 && "—"}
-                            {homerooms.map((h) => {
-                              const t = teacherById.get(h.teacher_id);
-                              if (!t) return null;
-                              return (
-                                <div key={h.id} className="flex items-center gap-2">
-                                  <Avatar name={t.name} src={t.avatar} className="h-6 w-6 text-[9px]" />
-                                  <span className="min-w-0 truncate">{t.name}</span>
-                                  {orgWide && (
-                                    <button
-                                      type="button"
-                                      aria-label={`ลบ ${t.name}`}
-                                      disabled={removeTeacher.isPending}
-                                      className="shrink-0 text-muted-foreground transition-colors hover:text-destructive"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (confirm(`ลบ ${t.name} ออกจากครูประจำชั้น?`)) removeTeacher.mutate(h.id);
-                                      }}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                          {orgWide && (
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              aria-label="เพิ่มครูประจำชั้น"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setHomeroomClassroomId(c.id);
-                              }}
-                            >
-                              <Plus className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
+                        {department ? (
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${departmentTone(department.id)}`}>{department.name}</span>
+                        ) : (
+                          "—"
+                        )}
                       </td>
+                      <td className="px-3 py-3">{homeroomCell(c)}</td>
                       <td className="px-3 py-3">{studentCount}</td>
                       <td className="px-3 py-3">
                         <span
@@ -343,12 +434,47 @@ export function Classrooms() {
         </div>
       )}
 
-      <div className="mt-auto grid shrink-0 grid-cols-2 gap-2 lg:grid-cols-4">
+      <div className="mt-auto hidden shrink-0 grid-cols-4 gap-2 lg:grid">
         <StatCard tone="accent" icon={<BookIcon className="h-5 w-5" />} label="ทั้งหมด" value={scoped.length} unit="ห้องเรียน" />
         <StatCard tone="success" icon={<CheckmarkCircleIcon className="h-5 w-5" />} label="กำลังใช้งาน" value={activeCount} unit="ห้องเรียน" />
         <StatCard tone="warning" icon={<TimeIcon className="h-5 w-5" />} label="ปิดใช้งาน" value={scoped.length - activeCount} unit="ห้องเรียน" />
         <StatCard tone="muted" icon={<Users className="h-5 w-5" />} label="จำนวนนักเรียนรวม" value={totalStudents} unit="คน" />
       </div>
+
+      <Sheet open={statsOpen} onOpenChange={setStatsOpen} title="สรุปห้องเรียน" bottomOnPhone>
+        <div className="grid grid-cols-2 gap-2">
+          <StatCard tone="accent" icon={<BookIcon className="h-5 w-5" />} label="ทั้งหมด" value={scoped.length} unit="ห้องเรียน" />
+          <StatCard tone="success" icon={<CheckmarkCircleIcon className="h-5 w-5" />} label="กำลังใช้งาน" value={activeCount} unit="ห้องเรียน" />
+          <StatCard tone="warning" icon={<TimeIcon className="h-5 w-5" />} label="ปิดใช้งาน" value={scoped.length - activeCount} unit="ห้องเรียน" />
+          <StatCard tone="muted" icon={<Users className="h-5 w-5" />} label="จำนวนนักเรียนรวม" value={totalStudents} unit="คน" />
+        </div>
+      </Sheet>
+
+      <Modal
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        title="ตัวกรอง"
+        footer={
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              disabled={activeFilterCount === 0}
+              onClick={() => {
+                setGradeFilter("");
+                setStatusFilter("");
+              }}
+            >
+              ล้างตัวกรอง
+            </Button>
+            <Button className="flex-1" onClick={() => setFiltersOpen(false)}>
+              ดูผลลัพธ์
+            </Button>
+          </div>
+        }
+      >
+        <FormSection>{filterSelects("", (label, el) => <Field label={label}>{el}</Field>)}</FormSection>
+      </Modal>
 
       <HomeroomSheet
         open={!!homeroomClassroom}
@@ -404,13 +530,17 @@ function ClassroomRoster({
   classroom,
   departmentId,
   label,
-  teacher,
+  gradeLabel,
+  teachers,
+  classroomLabelsOf,
   onBack,
 }: {
   classroom: Classroom;
   departmentId: string;
   label: string;
-  teacher: { name: string; avatar: string | null } | null;
+  gradeLabel?: string;
+  teachers: { id: string; name: string; avatar: string | null }[];
+  classroomLabelsOf: (teacherId: string) => string[];
   onBack: () => void;
 }) {
   const { data: students = [], isLoading } = useStudents({
@@ -419,8 +549,8 @@ function ClassroomRoster({
     status: "studying",
     classroomId: classroom.id,
   });
-  const { page, setPage, pageCount, pageRows } = usePagination(students, [classroom.id]);
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
+  const [viewingTeacherId, setViewingTeacherId] = useState<string | null>(null);
 
   return (
     <div className="page-fill">
@@ -428,50 +558,30 @@ function ClassroomRoster({
         <Button size="sm" variant="ghost" onClick={onBack}>
           <ChevronForward className="h-3 w-3 rotate-180" /> {label}
         </Button>
-        {teacher && (
-          <div className="flex items-center gap-2">
-            <div className="text-right">
-              <p className="text-[10px] text-muted-foreground">ครูประจำชั้น</p>
-              <p className="text-xs font-medium">{teacher.name}</p>
-            </div>
-            <Avatar name={teacher.name} src={teacher.avatar} className="h-7 w-7 text-[9px]" />
+        {teachers.length > 0 && (
+          <div className="flex min-w-0 flex-col items-end gap-1">
+            <p className="text-[10px] text-muted-foreground">ครูประจำชั้น</p>
+            {teachers.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setViewingTeacherId(t.id)}
+                aria-label={`ดูข้อมูล ${t.name}`}
+                className="tappable flex min-w-0 items-center gap-2"
+              >
+                <p className="truncate text-xs font-medium">{t.name}</p>
+                <Avatar name={t.name} src={t.avatar} className="h-7 w-7 text-[9px]" />
+              </button>
+            ))}
           </div>
         )}
       </div>
 
       {isLoading ? (
-        <div role="status" aria-label="กำลังโหลด" className="overflow-x-auto rounded-lg border border-border bg-card">
-          <table className="w-full min-w-[20rem] text-xs">
-            <thead className="bg-muted text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
-                <th className="px-3 py-2 font-medium">คำนำหน้า</th>
-                <th className="px-3 py-2 font-medium">ชื่อ-สกุล</th>
-                <th className="px-3 py-2 font-medium">เบอร์โทรศัพท์</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[0, 1, 2, 3, 4].map((i) => (
-                <tr key={i} className="border-t border-border">
-                  <td className="px-3 py-3">
-                    <Skeleton className="h-3 w-16" />
-                  </td>
-                  <td className="px-3 py-3">
-                    <Skeleton className="h-3 w-10" />
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex items-center gap-2">
-                      <Skeleton className="h-6 w-6 shrink-0 rounded-full" />
-                      <Skeleton className="h-3 w-28" />
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <Skeleton className="h-3 w-20" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div role="status" aria-label="กำลังโหลด" className="space-y-2">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-xl" />
+          ))}
         </div>
       ) : students.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
@@ -479,46 +589,136 @@ function ClassroomRoster({
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="overflow-x-auto rounded-lg border border-border bg-card">
-            <table className="w-full min-w-[20rem] text-xs">
-              <thead className="bg-muted text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
-                  <th className="px-3 py-2 font-medium">คำนำหน้า</th>
-                  <th className="px-3 py-2 font-medium">ชื่อ-สกุล</th>
-                  <th className="px-3 py-2 font-medium">เบอร์โทรศัพท์</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((s) => (
-                  <tr
-                    key={s.id}
+          <ul className="space-y-2 lg:hidden">
+            {students.map((s) => {
+              const fullName = `${s.first_name} ${s.last_name}`;
+              const gender = studentGender(s.prefix);
+              return (
+                <li key={s.id}>
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setViewingStudent(s)}
-                    className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setViewingStudent(s);
+                      }
+                    }}
+                    className="rounded-xl bg-card p-3.5 shadow-card transition-colors active:bg-muted"
                   >
-                    <td className="px-3 py-3">{s.student_code}</td>
-                    <td className="px-3 py-3">{s.prefix ?? "—"}</td>
-                    <td className="px-3 py-3">
-                      <div className="flex items-center gap-2">
-                        <Avatar
-                          name={`${s.first_name} ${s.last_name}`}
-                          src={s.profile ? avatarUrl(s.profile) : null}
-                          className="h-6 w-6 text-[9px]"
-                        />
-                        {s.first_name} {s.last_name}
+                    <div className="flex items-start gap-3">
+                      <Avatar name={fullName} src={studentAvatarUrl(s) ?? (s.profile ? avatarUrl(s.profile) : null)} className="h-11 w-11 text-sm" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">{fullName}</p>
+                        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                          <span className="truncate text-xs text-muted-foreground">{s.student_code}</span>
+                          {gradeLabel && (
+                            <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${levelTone(gradeLabel)}`}>{gradeLabel}</span>
+                          )}
+                          {gender && (
+                            <span
+                              className={
+                                gender === "ชาย"
+                                  ? "inline-flex shrink-0 items-center rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300"
+                                  : "inline-flex shrink-0 items-center rounded-full bg-pink-500/15 px-2 py-0.5 text-[10px] font-medium text-pink-700 dark:text-pink-300"
+                              }
+                            >
+                              {gender}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </td>
-                    <td className="px-3 py-3">{s.phone ?? "—"}</td>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="table-panel hidden rounded-none border-t border-border shadow-none lg:flex">
+            <div className="table-panel-scroll scrollbar-hidden">
+              <table className="w-full text-[13px]">
+                <thead className="text-left text-xs">
+                  <tr>
+                    <th className="px-4 py-3">นักเรียน</th>
+                    <th className="px-4 py-3">ชั้น</th>
+                    <th className="px-4 py-3">เบอร์โทรศัพท์</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {students.map((s) => {
+                    const fullName = `${s.first_name} ${s.last_name}`;
+                    return (
+                      <tr key={s.id} onClick={() => setViewingStudent(s)} className="h-14 cursor-pointer border-t border-border first:border-t-0">
+                        <td className="px-4 py-0">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Avatar name={fullName} src={studentAvatarUrl(s) ?? (s.profile ? avatarUrl(s.profile) : null)} className="h-9 w-9 text-xs" />
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">
+                                {s.prefix && `${s.prefix} `}
+                                {fullName}
+                              </p>
+                              <p className="font-mono text-xs tabular-nums text-muted-foreground">{s.student_code}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-0">
+                          <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${levelTone(gradeLabel)}`}>{gradeLabel ?? "—"}</span>
+                        </td>
+                        <td className="px-4 py-0 text-muted-foreground">{s.phone ?? "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </div>
       )}
 
+      <TeacherSheet teacherId={viewingTeacherId} classrooms={viewingTeacherId ? classroomLabelsOf(viewingTeacherId) : []} onClose={() => setViewingTeacherId(null)} />
       <EditStudentSheet target={viewingStudent} onClose={() => setViewingStudent(null)} forceReadOnly />
     </div>
+  );
+}
+
+/** Homeroom teacher drawer — contact-level info only. */
+function TeacherSheet({ teacherId, classrooms, onClose }: { teacherId: string | null; classrooms: string[]; onClose: () => void }) {
+  const { data: t, isLoading } = useTeacherContact(teacherId);
+  const { data: departments = [] } = useDepartments();
+  const { data: areas = [] } = useLearningAreas();
+  const name = t ? `${t.prefix ?? ""}${t.first_name} ${t.last_name}` : "";
+  const rows: [string, React.ReactNode][] = t
+    ? [
+        ["รหัสครู", t.teacher_code ?? "—"],
+        ["แผนก", departments.find((d) => d.id === t.department_id)?.name ?? "—"],
+        ["กลุ่มสาระ", areas.find((a) => a.id === t.learning_area_id)?.name ?? "—"],
+        ["เบอร์โทรศัพท์", t.phone ? <a href={`tel:${t.phone}`} className="text-accent">{t.phone}</a> : "—"],
+        ["อีเมล", t.email ? <a href={`mailto:${t.email}`} className="break-all text-accent">{t.email}</a> : "—"],
+        ["ครูประจำชั้น", classrooms.length ? classrooms.join(", ") : "—"],
+      ]
+    : [];
+  return (
+    <Sheet open={teacherId !== null} onOpenChange={(o) => !o && onClose()} title="ครูประจำชั้น" bottomOnPhone closable>
+      {isLoading || !t ? (
+        <Skeleton className="h-40 w-full rounded-xl" />
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Avatar name={`${t.first_name} ${t.last_name}`} src={avatarUrl(t)} className="h-14 w-14 text-base" />
+            <p className="min-w-0 text-base font-semibold">{name}</p>
+          </div>
+          <dl className="divide-y divide-border rounded-xl bg-muted px-4 text-sm">
+            {rows.map(([k, v]) => (
+              <div key={k} className="flex items-start justify-between gap-4 py-3">
+                <dt className="shrink-0">{k}</dt>
+                <dd className="min-w-0 text-right text-muted-foreground">{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+    </Sheet>
   );
 }

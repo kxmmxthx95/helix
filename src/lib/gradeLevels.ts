@@ -36,3 +36,11 @@ export function levelTone(label: string | undefined): string {
   const n = Number(/(\d)/.exec(label ?? "")?.[1]);
   return n >= 1 ? LEVEL_TONES[(n - 1) % LEVEL_TONES.length]! : "bg-secondary text-muted-foreground";
 }
+
+/** Department badge tint — stable per department id, same palette as the level badges. */
+export function departmentTone(id: string | undefined): string {
+  if (!id) return "bg-secondary text-muted-foreground";
+  let h = 0;
+  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return LEVEL_TONES[h % LEVEL_TONES.length]!;
+}

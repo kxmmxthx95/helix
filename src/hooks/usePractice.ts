@@ -502,3 +502,34 @@ export function useSubmitPracticeAttempt() {
     onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_attempts"] }),
   });
 }
+
+/** Contact-level profile fields only (no national id / birth date / address / LINE) — for the homeroom teacher drawer. */
+export type TeacherContact = {
+  id: string;
+  prefix: string | null;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  teacher_code: string | null;
+  department_id: string | null;
+  learning_area_id: string | null;
+  avatar_path: string | null;
+  updated_at: string;
+};
+
+export function useTeacherContact(id: string | null) {
+  return useQuery({
+    queryKey: ["profiles", "teacher_contact", id],
+    enabled: !!id,
+    queryFn: async (): Promise<TeacherContact> => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, prefix, first_name, last_name, email, phone, teacher_code, department_id, learning_area_id, avatar_path, updated_at")
+        .eq("id", id!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
