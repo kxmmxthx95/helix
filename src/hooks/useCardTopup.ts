@@ -103,6 +103,15 @@ export function usePosStudentRecent(studentId: string | undefined) {
   });
 }
 
+/** Last 100 top-ups (cash + slip) of the student on screen, fetched only while the history popup is open. */
+export function usePosStudentTopups(studentId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ["card_transactions", "pos_topups", studentId],
+    enabled: !!studentId && enabled,
+    queryFn: () => rpc<PosStudentTx[]>(() => supabase.rpc("pos_student_topups", { p_student_id: studentId! })),
+  });
+}
+
 const useRefreshMoney = () => {
   const qc = useQueryClient();
   return () => {

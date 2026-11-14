@@ -21,7 +21,7 @@ import {
   productImageUrl,
   usePosMyToday,
   usePosProducts,
-  usePosStudentRecent,
+  usePosStudentTopups,
   usePosSale,
   usePosSaleItems,
   usePosTopupCash,
@@ -117,6 +117,9 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const minutesLeft = Math.max(1, Math.ceil((unlockedUntil - now) / 60000));
   const [todayOpen, setTodayOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  // Sale confirm popup: "tap the card" until a student with a card is on screen, then the student + amount to confirm.
+  const [payOpen, setPayOpen] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
   const [code, setCode] = useState("");
   // Sale on screen: scanned / tapped products (cart) or an on-screen keypad amount (keyed) — the cart wins when both exist.
@@ -147,7 +150,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
     return () => document.documentElement.classList.remove("pos-large");
   }, []);
 
-  const modalOpen = pinOpen || confirmOpen || todayOpen || codeOpen || testOpen;
+  const modalOpen = pinOpen || confirmOpen || todayOpen || codeOpen || testOpen || historyOpen;
   useEffect(() => {
     if (terminal && onSale && !modalOpen) capture.current?.focus();
   }, [terminal, onSale, modalOpen, student, done, looking]); // looking: a disabled input drops focus, so re-take it when the lookup ends (also after a failed one)
@@ -185,12 +188,19 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
     const c = raw.trim();
     if (!c) return;
     setLooking(true);
+    // A bound RFID / barcode card types its bare UID, so try the card first; otherwise it is a student code.
     try {
-      await lookup({ student_id: await posStudentByCode(c) });
-    } catch (e) {
-      setLooking(false);
-      toast(errMsg(e), "error");
+      await posLookup({ card_uid: c });
+    } catch {
+      try {
+        await lookup({ student_id: await posStudentByCode(c) });
+      } catch {
+        setLooking(false);
+        toast("ไม่พบบัตรหรือรหัสนักเรียนนี้", "error");
+      }
+      return;
     }
+    await lookup({ card_uid: c });
   }
 
   const price = cart.length ? cartTotal(cart) : parseAmount(keyed, SALE_MIN, SALE_MAX);
@@ -227,6 +237,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
       setEntry("");
       setCart([]);
       setKeyed("");
+      setPayOpen(false);
     } catch (e) {
       toast(errMsg(e), "error");
     }
@@ -435,7 +446,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         disabled={looking}
         onChange={(e) => setEntry(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Escape") return void (setStudent(null), setEntry(""));
+          if (e.key === "Escape") return void (setStudent(null), setEntry(""), setPayOpen(false));
           if (e.key !== "Enter") return;
           e.preventDefault();
           const raw = fromThaiLayout(entry.trim());
@@ -467,6 +478,10 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 ทำรายการต่อไป
               </Button>
             </div>
+          ) : student && mode === "sale" ? (
+            <div className="flex h-full min-h-0 w-full flex-col gap-4">
+              <ProductGrid products={products} loading={productsLoading} error={productsError} canManage={orgWide} category={category} onCategory={setCategory} onPick={(pr) => editCart(addToCart(cart, pr))} />
+            </div>
           ) : student ? (
             <div className="w-full max-w-xl space-y-6">
               <div className="flex items-center justify-center gap-5">
@@ -477,6 +492,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 />
                 <div className="min-w-0 text-left">
                   <p className="truncate font-heading text-4xl font-semibold">{student.name}</p>
+                  {student.department && <span className="mt-1 inline-block rounded-full bg-primary/10 px-3 py-0.5 text-base font-medium text-primary">{student.department}</span>}
                   <p className="text-xl text-muted-foreground">
                     {student.student_code}
                     {student.classroom ? ` · ${student.classroom}` : ""}
@@ -499,8 +515,10 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               )}
               {student.card_status === "frozen" && <p className="rounded-xl bg-destructive/10 px-4 py-3 text-xl font-semibold text-destructive">บัตรนี้ถูกระงับ — ขายไม่ได้</p>}
               {student.card_status === null && <p className="rounded-xl bg-warning/15 px-4 py-3 text-lg font-medium">นักเรียนยังไม่ได้ผูกบัตร — เติมเงินได้ แต่ขายไม่ได้</p>}
-              <RecentTx studentId={student.student_id} />
               <div className="flex justify-center gap-2">
+                <Button variant="outline" size="lg" className="h-14 px-8 text-lg" onClick={() => setHistoryOpen(true)}>
+                  ดูประวัติเติมเงิน
+                </Button>
                 <Button variant="outline" size="lg" className="h-14 px-8 text-lg font-bold text-destructive" onClick={() => (setStudent(null), setEntry(""))}>
                   ยกเลิก
                 </Button>
@@ -564,20 +582,12 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 </>
               )}
               {price !== null && price > SALE_MAX && <p className="text-base font-medium text-destructive">ยอดรวมเกิน {SALE_MAX} บาทต่อรายการ — ลดสินค้า</p>}
-              <Button size="lg" className="h-20 text-2xl" disabled={!canSell || !priceOk || over || paying || !online} onClick={() => void charge()}>
+              <Button size="lg" className="h-20 text-2xl" disabled={!priceOk || paying || !online} onClick={() => setPayOpen(true)}>
                 {paying ? <Spinner /> : price === null ? "ตัดเงิน" : `ยืนยันตัดเงิน ${formatBaht(price)} ฿`}
               </Button>
               {!paying && (
                 <p className="text-center text-base text-muted-foreground" aria-live="polite">
-                  {!online
-                    ? "ออฟไลน์ — รอเชื่อมต่ออินเทอร์เน็ต"
-                    : !priceOk
-                      ? "① เลือกสินค้า หรือกดยอดเงิน"
-                      : !student
-                        ? "② สแกนบัตรนักเรียน"
-                        : canSell && !over
-                          ? "③ กดปุ่มด้านบนเพื่อตัดเงิน"
-                          : ""}
+                  {!online ? "ออฟไลน์ — รอเชื่อมต่ออินเทอร์เน็ต" : !priceOk ? "① เลือกสินค้า หรือกดยอดเงิน" : "② กดปุ่มด้านบน แล้วแตะบัตรนักเรียน"}
                 </p>
               )}
             </>
@@ -585,6 +595,75 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         </section>
       </div>
 
+      {mode === "sale" && (payOpen || !!student) && (
+        <div role="dialog" aria-modal="true" aria-label="ตัดเงิน" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
+          <div className="max-h-full w-full max-w-2xl space-y-6 overflow-y-auto rounded-3xl bg-card p-8 text-center shadow-2xl">
+            {student ? (
+              <>
+                <div className="flex flex-col items-center gap-4">
+                  <Avatar
+                    name={student.name}
+                    src={studentAvatarUrl({ avatar_path: student.avatar_path, updated_at: student.avatar_updated_at })}
+                    className="size-40 text-5xl"
+                  />
+                  <div className="space-y-2">
+                    <p className="font-heading text-4xl font-semibold leading-snug">{student.name}</p>
+                    <p className="flex flex-wrap items-center justify-center gap-x-3 text-xl text-muted-foreground">
+                      {student.department && <span className="rounded-full bg-primary/10 px-3 py-1 text-lg font-medium text-primary">{student.department}</span>}
+                      <span>
+                        {student.student_code}
+                        {student.classroom ? ` · ${student.classroom}` : ""}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-muted px-6 py-4">
+                  <p className="text-xl text-muted-foreground">ยอดคงเหลือ</p>
+                  <p className="font-heading text-7xl font-semibold tabular-nums">{formatBaht(student.balance)} ฿</p>
+                  {student.daily_limit !== null && (
+                    <p className="mt-1 text-lg text-muted-foreground">
+                      วงเงินต่อวัน {formatBaht(student.daily_limit)} · ใช้ไปแล้ววันนี้ {formatBaht(student.spent_today)}
+                    </p>
+                  )}
+                </div>
+                {price !== null && (
+                  <div className="space-y-1">
+                    <p className="text-xl text-muted-foreground">ยอดที่จะตัด</p>
+                    <p className="font-heading text-6xl font-semibold tabular-nums text-destructive">{formatBaht(price)} ฿</p>
+                    {canSell && !over && <p className="text-xl text-muted-foreground">คงเหลือหลังตัด {formatBaht(student.balance - price)} ฿</p>}
+                  </div>
+                )}
+                {price !== null && over && (
+                  <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-xl font-semibold text-destructive">
+                    ยอดคงเหลือไม่พอหรือเกินวงเงินต่อวัน
+                  </p>
+                )}
+                {student.card_status === "frozen" && <p className="rounded-xl bg-destructive/10 px-4 py-3 text-xl font-semibold text-destructive">บัตรนี้ถูกระงับ — ขายไม่ได้</p>}
+                {student.card_status === null && <p className="rounded-xl bg-warning/15 px-4 py-3 text-lg font-medium">นักเรียนยังไม่ได้ผูกบัตร — ขายไม่ได้</p>}
+                {price !== null && student.card_status === "active" && !student.card_uid && (
+                  <p className="rounded-xl bg-warning/15 px-4 py-3 text-lg font-medium">แตะบัตร RFID ของนักเรียนเพื่อตัดเงิน</p>
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-4 py-10" role="status">
+                {looking ? <Spinner className="size-10" /> : <span className="size-6 rounded-full bg-amber-400 motion-safe:animate-pulse" aria-hidden />}
+                <p className="text-4xl font-semibold">แตะบัตรนักเรียน</p>
+                {price !== null && <p className="font-heading text-6xl font-semibold tabular-nums text-destructive">{formatBaht(price)} ฿</p>}
+              </div>
+            )}
+            <div className="flex gap-3">
+              <Button variant="outline" className="h-16 flex-1 text-xl font-bold text-destructive" onClick={() => (setPayOpen(false), setStudent(null), setEntry(""))}>
+                {price !== null ? "ยกเลิก" : "ปิด"}
+              </Button>
+              {price !== null && (
+                <Button className="h-16 flex-1 text-xl" disabled={!canSell || !priceOk || over || paying || !online} onClick={() => void charge()}>
+                  {paying ? <Spinner /> : "ยืนยัน"}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 
@@ -660,6 +739,9 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
       <Modal open={todayOpen} onOpenChange={setTodayOpen} title="รายการวันนี้" className="max-w-2xl" centered>
         <TodayPanel />
       </Modal>
+      <Modal open={historyOpen && !!student} onOpenChange={setHistoryOpen} title="ประวัติเติมเงิน" className="max-w-lg" centered>
+        {student && <TopupHistory studentId={student.student_id} />}
+      </Modal>
       <Modal open={codeOpen} onOpenChange={(o) => (setCodeOpen(o), !o && setCode(""))} title="ค้นหานักเรียน">
         <form
           className="space-y-3"
@@ -709,6 +791,8 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         open={confirmOpen && !!student && topupValue !== null}
         onOpenChange={(o) => !o && !topup.isPending && setConfirmOpen(false)}
         title="ยืนยันการเติมเงินสด"
+        className="max-w-2xl"
+        centered
         footer={
           <div className="flex gap-2">
             <Button type="button" variant="outline" className="h-16 flex-1 text-xl" disabled={topup.isPending} onClick={() => setConfirmOpen(false)}>
@@ -732,19 +816,32 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         }
       >
         {student && topupValue !== null && (
-          <dl className="space-y-4 text-lg">
-            <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">นักเรียน</dt>
-              <dd className="text-right font-semibold">{student.name}</dd>
+          <dl className="space-y-6 py-2 text-2xl">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <Avatar
+                name={student.name}
+                src={studentAvatarUrl({ avatar_path: student.avatar_path, updated_at: student.avatar_updated_at })}
+                className="size-32 text-4xl"
+              />
+              <div className="space-y-1">
+                <p className="font-heading text-3xl font-semibold">{student.name}</p>
+                <p className="flex flex-wrap items-center justify-center gap-x-3 text-lg text-muted-foreground">
+                  {student.department && <span className="rounded-full bg-primary/10 px-3 py-0.5 text-base font-medium text-primary">{student.department}</span>}
+                  <span>
+                    {student.student_code}
+                    {student.classroom ? ` · ${student.classroom}` : ""}
+                  </span>
+                </p>
+              </div>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">เติมเงินสด</dt>
-              <dd className="text-4xl font-bold tabular-nums">{formatBaht(topupValue)} ฿</dd>
+              <dd className="text-7xl font-bold tabular-nums text-success">{formatBaht(topupValue)} ฿</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">ยอดคงเหลือ</dt>
               <dd className="tabular-nums">
-                {formatBaht(student.balance)} → <span className="font-semibold">{formatBaht(student.balance + topupValue)} ฿</span>
+                {formatBaht(student.balance)} → <span className="font-semibold text-success">{formatBaht(student.balance + topupValue)} ฿</span>
               </dd>
             </div>
           </dl>
@@ -802,12 +899,19 @@ function ProductGrid({
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onPick(p)}
-            className="tappable flex min-h-24 flex-col gap-1 overflow-hidden rounded-2xl border border-border bg-background text-left transition-colors hover:bg-foreground/5 active:scale-[0.98] active:bg-foreground/10"
+            className="tappable flex flex-col overflow-hidden rounded-2xl border border-border bg-card text-left transition-colors hover:bg-foreground/5 active:scale-[0.98] active:bg-foreground/10"
           >
-            {productImageUrl(p) && <img src={productImageUrl(p)!} alt="" loading="lazy" className="aspect-[4/3] w-full object-cover" />}
-            <span className="flex flex-col gap-0.5 px-4 pb-3 pt-3">
+            <div className="aspect-[3/2] w-full bg-muted">
+              {productImageUrl(p) ? (
+                <img src={productImageUrl(p)!} alt="" loading="lazy" className="size-full object-cover" />
+              ) : (
+                <span className="flex size-full items-center justify-center text-base text-muted-foreground">ไม่มีรูป</span>
+              )}
+            </div>
+            <span className="flex flex-col gap-1 px-4 pb-4 pt-3">
               <span className="line-clamp-2 text-lg font-semibold leading-snug">{p.name}</span>
-              <span className="text-xl font-bold tabular-nums">{p.price} ฿</span>
+              <span className="text-2xl font-bold tabular-nums">{p.price} ฿</span>
+              <span className="truncate text-base text-muted-foreground">{categoryOf(p)}</span>
             </span>
           </button>
         ))}
@@ -1220,28 +1324,22 @@ function PinUnlockModal({ open, onClose, onUnlocked, forVoid = false }: { open: 
 
 /** The caller's own shift today, with void for their own rows. */
 /** The student's last 10 transactions on the POS card: time · type · amount (voided ones struck through). */
-function RecentTx({ studentId }: { studentId: string }) {
-  const { data = [], isLoading } = usePosStudentRecent(studentId);
-  if (isLoading) return <Spinner className="mx-auto size-5" />;
-  if (data.length === 0) return <p className="text-lg text-muted-foreground">ยังไม่มีรายการ</p>;
+function TopupHistory({ studentId }: { studentId: string }) {
+  const { data = [], isLoading } = usePosStudentTopups(studentId, true);
+  if (isLoading) return <Spinner className="mx-auto size-6" />;
+  if (data.length === 0) return <p className="py-6 text-center text-lg text-muted-foreground">ยังไม่มีประวัติเติมเงิน</p>;
   return (
-    <div className="mx-auto w-full max-w-md text-left">
-      <p className="pb-1 text-lg font-medium text-muted-foreground">รายการล่าสุด</p>
-      <ul className="max-h-48 divide-y divide-border overflow-y-auto rounded-xl border border-border bg-background px-3">
-        {data.map((t) => (
-          <li key={t.id} className={cn("flex items-center justify-between gap-2 py-2.5 text-base", t.voided_at && "text-muted-foreground line-through")}>
-            <span className="min-w-0 truncate">
-              {new Date(t.created_at).toLocaleString("th-TH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · {TX_TYPE_LABEL[t.type]}
-              {t.voided_at && " (ยกเลิก)"}
-            </span>
-            <span className={cn("shrink-0 font-semibold tabular-nums", !t.voided_at && t.amount > 0 && "text-success")}>
-              {t.amount > 0 ? "+" : ""}
-              {formatBaht(t.amount)} ฿
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <ul className="max-h-[60vh] divide-y divide-border overflow-y-auto">
+      {data.map((t) => (
+        <li key={t.id} className={cn("flex items-center justify-between gap-3 py-3 text-base", t.voided_at && "text-muted-foreground line-through")}>
+          <span className="min-w-0 truncate">
+            {new Date(t.created_at).toLocaleString("th-TH", { day: "numeric", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" })} · {TX_TYPE_LABEL[t.type]}
+            {t.voided_at && " (ยกเลิก)"}
+          </span>
+          <span className={cn("shrink-0 font-semibold tabular-nums", !t.voided_at && "text-success")}>+{formatBaht(t.amount)} ฿</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

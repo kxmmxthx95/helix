@@ -1397,6 +1397,7 @@ export type PosStudent = {
   avatar_path: string | null;
   avatar_updated_at: string;
   classroom: string | null;
+  department: string | null;
   balance: number;
   daily_limit: number | null;
   spent_today: number;
@@ -2094,6 +2095,10 @@ export type Database = {
         Returns: PosMyToday;
       };
       pos_student_recent: {
+        Args: { p_student_id: string };
+        Returns: PosStudentTx[];
+      };
+      pos_student_topups: {
         Args: { p_student_id: string };
         Returns: PosStudentTx[];
       };
