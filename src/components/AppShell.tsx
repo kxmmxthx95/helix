@@ -885,8 +885,14 @@ function AppShellInner() {
                     {section}
                     <ChevronDown className={cn("h-3 w-3 transition-transform", !open && "-rotate-90")} />
                   </button>}
-                  {open && (
-                    <div className="flex flex-col gap-0.5">
+                  <div
+                    className={cn(
+                      "grid transition-[grid-template-rows,opacity] duration-200 ease-ios motion-reduce:transition-none",
+                      open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                    )}
+                    inert={!open}
+                  >
+                    <div className="flex min-h-0 flex-col gap-0.5 overflow-hidden">
                       {items.map(({ to, label, icon: Icon }) => (
                         <NavLink
                           key={to}
@@ -900,7 +906,7 @@ function AppShellInner() {
                         </NavLink>
                       ))}
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             })}
