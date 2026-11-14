@@ -398,7 +398,7 @@ const TABS = [
   },
   {
     to: "/card-topup",
-    label: "บัตรเติมเงิน",
+    label: "จัดการ POS",
     icon: PricetagIcon,
     section: "การเงิน",
     managerOnly: false,
@@ -426,7 +426,7 @@ const SIDEBAR_KEY = "helix-sidebar-collapsed";
 const navDrawerLink = ({ isActive }: { isActive: boolean }) =>
   cn(
     "group font-ui tappable flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
-    isActive ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:bg-foreground/5",
+    isActive ? "bg-card text-foreground shadow-[inset_0_1px_3px_rgb(0_0_0/0.12)]" : "text-muted-foreground hover:bg-foreground/5",
   );
 
 /**
@@ -560,7 +560,7 @@ function AppShellInner() {
     cn(
       "tappable flex h-10 items-center justify-center rounded-lg transition-colors",
       collapsed ? "w-10" : "flex-1",
-      active ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+      active ? "bg-card text-foreground shadow-[inset_0_1px_3px_rgb(0_0_0/0.12)]" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
     );
 
   const themeButton = (
@@ -682,12 +682,12 @@ function AppShellInner() {
                         "group font-ui tappable flex items-center rounded-lg text-[13px] font-semibold transition-colors",
                         collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-2.5 py-2",
                         isActive
-                          ? "bg-card text-foreground shadow-card"
+                          ? "bg-card text-foreground shadow-[inset_0_1px_3px_rgb(0_0_0/0.12)]"
                           : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
                       )
                     }
                   >
-                    <Icon className="h-4 w-4 shrink-0 group-aria-[current=page]:text-accent" />
+                    <Icon className="h-4 w-4 shrink-0" />
                     {!collapsed && <span className="truncate">{label}</span>}
                   </NavLink>
                 ))}

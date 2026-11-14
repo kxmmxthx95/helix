@@ -4,8 +4,9 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { FiSidebar } from "react-icons/fi";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { AlertTriangle, LockIcon, BarChartIcon, BarcodeIcon, CartIcon, CheckmarkCircleIcon, CoinIcon, DesktopIcon, LogOut, Moon, Monitor, Search, Sun } from "@/components/icons";
+import { AlertTriangle, HomeIcon, LockIcon, BarChartIcon, BarcodeIcon, CartIcon, CheckmarkCircleIcon, CoinIcon, DesktopIcon, LogOut, Moon, Monitor, Search, Sun } from "@/components/icons";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { useTheme } from "@/components/ThemeProvider";
@@ -30,6 +31,7 @@ import {
   useTerminals,
 } from "@/hooks/useCardTopup";
 import { avatarUrl, studentAvatarUrl } from "@/hooks/useAvatar";
+import { isCashierOnly } from "@/lib/roles";
 import { useRoleSubtitle } from "@/hooks/useProfiles";
 import { addToCart, cartTotal, categoryOf, isProductCode, setQty, type CartLine } from "@/lib/posCart";
 import { parseAmount, SALE_MAX, SALE_MIN, TOPUP_MAX, TOPUP_MIN, TX_TYPE_LABEL } from "@/lib/cardTopup";
@@ -76,6 +78,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const toast = useToast();
   const online = useOnline();
   const { profile, signOut } = useAuth();
+  const navigate = useNavigate();
   const { data: terminals = [] } = useTerminals();
   const [terminalId, setTerminalId] = useState(readTerminal);
   // org-wide only: the other card-top-up tabs live in a sidebar (collapsible like the portal's; a drawer below lg).
@@ -355,6 +358,12 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               </div>
           </nav>
           <div className="mt-auto flex flex-col gap-2 border-t border-border/60 p-3">
+            {profile && !isCashierOnly(profile.roles) && (
+              <button type="button" className="tappable flex min-h-12 items-center gap-3 rounded-xl border border-border bg-card px-4 py-2 text-left text-base font-semibold" onClick={() => navigate("/")}>
+                <HomeIcon className="h-6 w-6 shrink-0" />
+                <span className="truncate">กลับเมนูหลัก</span>
+              </button>
+            )}
             {terminal && (
               <button type="button" className="tappable min-h-12 rounded-xl border border-border bg-card px-4 py-2 text-left text-base font-semibold" onClick={() => (setTerminalId(""), setDrawer(false))}>
                 {terminal.name} · เปลี่ยนเครื่อง
@@ -625,7 +634,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 online ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive",
               )}
             >
-              <span className={cn("size-3 rounded-full", online ? "bg-success" : "bg-destructive motion-safe:animate-pulse")} aria-hidden />
+              <span className={cn("size-3 rounded-full motion-safe:animate-pulse", online ? "bg-success" : "bg-destructive")} aria-hidden />
               {online ? "ออนไลน์" : "ออฟไลน์"}
             </span>
             {onSale && terminal && (
