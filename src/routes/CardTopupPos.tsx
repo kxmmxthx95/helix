@@ -123,6 +123,10 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   // Sale confirm popup: "tap the card" until a student with a card is on screen, then the student + amount to confirm.
   const [payOpen, setPayOpen] = useState(false);
+  // Big sale on a student who set a PIN: the server answers "pin_required" / "bad" / "locked" instead of charging.
+  type PinGate = { status: "pin_required" | "bad" | "locked"; attemptsLeft?: number; until?: string };
+  const [pinGate, setPinGate] = useState<PinGate | null>(null);
+  const [pinDigits, setPinDigits] = useState("");
   const [testOpen, setTestOpen] = useState(false);
   const [rfidTestOpen, setRfidTestOpen] = useState(false);
   const [code, setCode] = useState("");
@@ -227,15 +231,25 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
     editCart(addToCart(cart, p));
   }
 
-  async function charge() {
+  useEffect(() => {
+    if (!student) (setPinGate(null), setPinDigits(""));
+  }, [student]);
+
+  async function charge(pin?: string) {
     if (!student?.card_uid || !canSell || !priceOk || over) return;
     const card_uid = student.card_uid;
-    const common = { card_uid, terminal_id: terminal?.id ?? null, client_tx_id: saleKey.current };
+    const common = { card_uid, terminal_id: terminal?.id ?? null, client_tx_id: saleKey.current, pin };
     try {
       const r = cart.length
         ? await saleItems.mutateAsync({ ...common, items: cart.map((l) => ({ product_id: l.product.id, qty: l.qty })) })
         : await sale.mutateAsync({ ...common, amount: price! });
+      if (!r.ok) {
+        // Nothing was charged; the same sale key stays valid for the retry with the PIN.
+        setPinDigits("");
+        return setPinGate({ status: r.status, attemptsLeft: "attempts_left" in r ? r.attempts_left : undefined, until: "locked_until" in r ? r.locked_until : undefined });
+      }
       saleKey.current = crypto.randomUUID();
+      setPinGate(null);
       setDone({ kind: "sale", amount: r.amount, balance: r.balance });
       setStudent(null);
       setEntry("");
@@ -245,6 +259,17 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
     } catch (e) {
       toast(errMsg(e), "error");
     }
+  }
+
+  function pinPress(k: (typeof KEYS)[number]) {
+    if (paying || pinGate?.status === "locked") return;
+    tick(k === "C" || k === "⌫" ? 700 : 1000);
+    if (k === "C") return setPinDigits("");
+    if (k === "⌫") return setPinDigits((p) => p.slice(0, -1));
+    if (pinDigits.length >= 4) return;
+    const next = pinDigits + k;
+    setPinDigits(next);
+    if (next.length === 4) void charge(next);
   }
 
   const topupValue = parseAmount(topupAmount, TOPUP_MIN, TOPUP_MAX);
@@ -470,6 +495,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
           // Typed digits with a student on screen set the amount; the cashier then confirms with ตัดเงิน.
           if (student && mode === "topup" && /^\d{1,4}$/.test(raw)) return void setTopupAmount(raw);
           if (student && mode === "sale" && !cart.length && /^\d{1,3}$/.test(raw)) return void setKeyed(raw);
+          if (pinGate && pinGate.status !== "locked" && /^\d{4}$/.test(raw)) return void charge(raw);
           if (isProductCode(raw)) return void (mode === "sale" ? addByCode(raw) : toast("สแกนสินค้าได้ที่แท็บ POS", "error"));
           else if (raw.startsWith("qr_")) void lookup({ card_uid: raw });
           else if (raw) void lookupCode(raw);
@@ -679,11 +705,50 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 {price !== null && <p className="font-heading text-6xl font-semibold tabular-nums text-destructive">{formatBaht(price)} ฿</p>}
               </div>
             )}
+            {student && pinGate && (
+              <div className="space-y-4 rounded-2xl border border-border bg-background p-5">
+                {pinGate.status === "locked" ? (
+                  <p role="alert" className="text-xl font-semibold text-destructive">
+                    PIN ถูกล็อกชั่วคราว
+                    {pinGate.until ? ` — ลองใหม่หลัง ${new Date(pinGate.until).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.` : ""}
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-2xl font-semibold">ให้นักเรียนกด PIN 4 หลัก</p>
+                    {pinGate.status === "bad" && (
+                      <p role="alert" className="text-lg font-semibold text-destructive">
+                        PIN ไม่ถูกต้อง{pinGate.attemptsLeft !== undefined ? ` — เหลืออีก ${pinGate.attemptsLeft} ครั้ง` : ""}
+                      </p>
+                    )}
+                    <div className="flex justify-center gap-3" role="status" aria-label={`ใส่แล้ว ${pinDigits.length} จาก 4 หลัก`}>
+                      {[0, 1, 2, 3].map((i) => (
+                        <span key={i} className={cn("size-5 rounded-full border-2 border-foreground", i < pinDigits.length && "bg-foreground")} />
+                      ))}
+                    </div>
+                    <div className="mx-auto grid max-w-xs grid-cols-3 gap-2">
+                      {KEYS.map((k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          aria-label={k === "⌫" ? "ลบ" : k === "C" ? "ล้าง" : k}
+                          disabled={paying}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => pinPress(k)}
+                          className="tappable h-16 rounded-2xl border border-border bg-card text-2xl font-semibold tabular-nums transition-colors hover:bg-foreground/5 active:bg-foreground/15"
+                        >
+                          {k}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             <div className="flex gap-3">
               <Button variant="outline" className="h-16 flex-1 text-xl font-bold text-destructive" onClick={() => (setPayOpen(false), setStudent(null), setEntry(""))}>
                 {price !== null ? "ยกเลิก" : "ปิด"}
               </Button>
-              {price !== null && (
+              {price !== null && !pinGate && (
                 <Button className="h-16 flex-1 text-xl" disabled={!canSell || !priceOk || over || paying || !online} onClick={() => void charge()}>
                   {paying ? <Spinner /> : "ยืนยัน"}
                 </Button>

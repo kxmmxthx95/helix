@@ -9,9 +9,11 @@ import { useToast } from "@/components/Toast";
 import { Avatar, Button, Card, EmptyState, Field, Input, Select, Skeleton } from "@/components/ui";
 import { studentAvatarUrl } from "@/hooks/useAvatar";
 import {
+  useCardPinStatus,
   useCardTransactions,
   useMyCardStudents,
   usePortalSummary,
+  useSetCardPin,
   useSetDailyLimit,
   useSetFrozen,
   useSlipRequests,
@@ -58,6 +60,8 @@ function ChildCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
   const { data: slips = [] } = useSlipRequests();
   const setFrozen = useSetFrozen();
   const [limitOpen, setLimitOpen] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
+  const { data: pinSt } = useCardPinStatus(kid.id);
   const canTopup = useCanTopup(kid);
   const [topupOpen, setTopupOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -76,6 +80,13 @@ function ChildCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
         </p>
       )}
     </div>
+  );
+
+  // Student and parent both set it: a cloned card alone cannot make a big purchase once a PIN exists.
+  const pinButton = (
+    <Button variant="outline" onClick={() => setPinOpen(true)}>
+      {pinSt?.has_pin ? "เปลี่ยน PIN บัตร" : "ตั้ง PIN บัตร"}
+    </Button>
   );
 
   const manageButtons = (
@@ -149,6 +160,9 @@ function ChildCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
             {slipList}
           </Disclosure>
         )}
+        <Disclosure icon={LockIcon} title="PIN บัตร" subtitle={pinSt?.has_pin ? "ตั้งแล้ว" : "ยังไม่ได้ตั้ง"}>
+          <div className="flex flex-wrap gap-2">{pinButton}</div>
+        </Disclosure>
         {canAct && (
           <Disclosure icon={ShieldIcon} title="วงเงินและสถานะบัตร">
             <div className="flex flex-wrap gap-2">{manageButtons}</div>
@@ -190,8 +204,9 @@ function ChildCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
         </div>
         {balance}
         <StudentQrCard studentId={kid.id} studentName={fullName(kid)} />
-        {(canTopup || canAct) && (
+        {(
           <div className="flex flex-wrap gap-2">
+            {pinButton}
             {canTopup && (
               <Button onClick={goTopup} disabled={!TOPUP_OPEN}>
                 {TOPUP_OPEN ? "เติมเงิน (โอนพร้อมเพย์)" : "เติมเงิน (ยังไม่เปิดใช้งาน)"}
@@ -218,6 +233,7 @@ function ChildCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
           {history}
         </Sheet>
       </SheetStyleContext.Provider>
+      <PinModal open={pinOpen} kid={kid} hasPin={!!pinSt?.has_pin} threshold={pinSt?.pin_threshold ?? null} onClose={() => setPinOpen(false)} />
       {canAct && <LimitModal open={limitOpen} kid={kid} current={sum?.daily_limit ?? null} onClose={() => setLimitOpen(false)} />}
     </>
   );
@@ -258,6 +274,52 @@ function Disclosure({
       </summary>
       <div className="px-4 pb-4">{children}</div>
     </details>
+  );
+}
+
+function PinModal({ open, kid, hasPin, threshold, onClose }: { open: boolean; kid: PortalStudent; hasPin: boolean; threshold: number | null; onClose: () => void }) {
+  const toast = useToast();
+  const setPin = useSetCardPin();
+  const [pin, setPinText] = useState("");
+  const [again, setAgain] = useState("");
+  const valid = /^\d{4}$/.test(pin) && pin === again;
+  const digits = (v: string) => v.replace(/\D/g, "").slice(0, 4);
+
+  async function save() {
+    try {
+      await setPin.mutateAsync({ student_id: kid.id, pin });
+      toast(hasPin ? "เปลี่ยน PIN แล้ว" : "ตั้ง PIN แล้ว");
+      setPinText("");
+      setAgain("");
+      onClose();
+    } catch (e) {
+      toast(errMsg(e), "error");
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      title={hasPin ? "เปลี่ยน PIN บัตร" : "ตั้ง PIN บัตร"}
+      description={threshold === null ? "ตัวเลข 4 หลัก ใช้ยืนยันเมื่อซื้อยอดสูง" : `ตัวเลข 4 หลัก ใช้ยืนยันเมื่อซื้อตั้งแต่ ${formatBaht(threshold)} บาท ขึ้นไป`}
+      footer={
+        <Button type="button" className="w-full" disabled={!valid || setPin.isPending} onClick={() => void save()}>
+          บันทึก PIN
+        </Button>
+      }
+    >
+      <div className="space-y-3">
+        <Field label="PIN ใหม่">
+          <Input type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={(e) => setPinText(digits(e.target.value))} />
+        </Field>
+        <Field label="ยืนยัน PIN อีกครั้ง">
+          <Input type="password" inputMode="numeric" autoComplete="off" value={again} onChange={(e) => setAgain(digits(e.target.value))} />
+        </Field>
+        {again.length === 4 && pin !== again && <p className="text-sm text-destructive">PIN ไม่ตรงกัน</p>}
+        <p className="text-xs text-muted-foreground">ลืม PIN ให้ติดต่อโรงเรียนเพื่อรีเซ็ต แล้วตั้งใหม่ได้ที่หน้านี้</p>
+      </div>
+    </Modal>
   );
 }
 

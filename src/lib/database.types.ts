@@ -1495,6 +1495,13 @@ export type CardSaleRow = {
   items: { name: string; qty: number; price: number }[];
 };
 
+/** pos_sale / pos_sale_items. When a student PIN is required the sale is NOT made and ok is false (a wrong PIN is a result so the attempt counter commits). */
+export type PosSaleResult =
+  | { ok: true; tx_id: string; amount: number; balance: number }
+  | { ok: false; status: "pin_required" }
+  | { ok: false; status: "bad"; attempts_left: number }
+  | { ok: false; status: "locked"; locked_until: string };
+
 export type PosMyToday = {
   sales_count: number;
   sales_total: number;
@@ -1991,12 +1998,32 @@ export type Database = {
         Returns: PosStudent;
       };
       pos_sale: {
-        Args: { p_card_uid: string; p_amount: number; p_terminal_id: string | null; p_client_tx_id: string | null };
-        Returns: { ok: true; tx_id: string; amount: number; balance: number };
+        Args: { p_card_uid: string; p_amount: number; p_terminal_id: string | null; p_client_tx_id: string | null; p_pin: string | null };
+        Returns: PosSaleResult;
       };
       pos_sale_items: {
-        Args: { p_card_uid: string; p_items: { product_id: string; qty: number }[]; p_terminal_id: string | null; p_client_tx_id: string | null };
-        Returns: { ok: true; tx_id: string; amount: number; balance: number };
+        Args: { p_card_uid: string; p_items: { product_id: string; qty: number }[]; p_terminal_id: string | null; p_client_tx_id: string | null; p_pin: string | null };
+        Returns: PosSaleResult;
+      };
+      card_settings_get: {
+        Args: Record<string, never>;
+        Returns: { pin_threshold: number };
+      };
+      card_settings_set: {
+        Args: { p_pin_threshold: number };
+        Returns: void;
+      };
+      card_pin_status: {
+        Args: { p_student_id: string };
+        Returns: { has_pin: boolean; pin_threshold: number };
+      };
+      card_set_pin: {
+        Args: { p_student_id: string; p_pin: string };
+        Returns: void;
+      };
+      card_reset_pin: {
+        Args: { p_student_id: string };
+        Returns: void;
       };
       pos_topup_cash: {
         Args: { p_card_uid: string | null; p_student_id: string | null; p_amount: number; p_terminal_id: string | null; p_client_tx_id: string | null };

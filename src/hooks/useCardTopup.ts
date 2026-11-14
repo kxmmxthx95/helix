@@ -15,6 +15,7 @@ import type {
   Student,
   StudentQr,
   CardSaleRow,
+  PosSaleResult,
   CardTopupRow,
   CardHistoryRow,
   CardKind,
@@ -125,9 +126,9 @@ const useRefreshMoney = () => {
 export function usePosSale() {
   const refresh = useRefreshMoney();
   return useMutation({
-    mutationFn: (a: { card_uid: string; amount: number; terminal_id: string | null; client_tx_id: string }) =>
-      rpc<{ tx_id: string; amount: number; balance: number }>(() =>
-        supabase.rpc("pos_sale", { p_card_uid: a.card_uid, p_amount: a.amount, p_terminal_id: a.terminal_id, p_client_tx_id: a.client_tx_id }),
+    mutationFn: (a: { card_uid: string; amount: number; terminal_id: string | null; client_tx_id: string; pin?: string }) =>
+      rpc<PosSaleResult>(() =>
+        supabase.rpc("pos_sale", { p_card_uid: a.card_uid, p_amount: a.amount, p_terminal_id: a.terminal_id, p_client_tx_id: a.client_tx_id, p_pin: a.pin ?? null }),
       ),
     onSettled: refresh,
   });
@@ -137,9 +138,9 @@ export function usePosSale() {
 export function usePosSaleItems() {
   const refresh = useRefreshMoney();
   return useMutation({
-    mutationFn: (a: { card_uid: string; items: { product_id: string; qty: number }[]; terminal_id: string | null; client_tx_id: string }) =>
-      rpc<{ tx_id: string; amount: number; balance: number }>(() =>
-        supabase.rpc("pos_sale_items", { p_card_uid: a.card_uid, p_items: a.items, p_terminal_id: a.terminal_id, p_client_tx_id: a.client_tx_id }),
+    mutationFn: (a: { card_uid: string; items: { product_id: string; qty: number }[]; terminal_id: string | null; client_tx_id: string; pin?: string }) =>
+      rpc<PosSaleResult>(() =>
+        supabase.rpc("pos_sale_items", { p_card_uid: a.card_uid, p_items: a.items, p_terminal_id: a.terminal_id, p_client_tx_id: a.client_tx_id, p_pin: a.pin ?? null }),
       ),
     onSettled: refresh,
   });
@@ -455,6 +456,49 @@ export function usePortalSummary(studentId: string | null) {
     queryKey: ["card_transactions", "summary", studentId],
     enabled: !!studentId,
     queryFn: () => rpc<CardPortalSummary>(() => supabase.rpc("card_portal_summary", { p_student_id: studentId! })),
+  });
+}
+
+/** Student PIN for big sales: whether one is set + the threshold. Student / guardian / org-wide. */
+export function useCardPinStatus(studentId: string | null) {
+  return useQuery({
+    queryKey: ["card_pin_status", studentId],
+    enabled: !!studentId,
+    queryFn: () => rpc<{ has_pin: boolean; pin_threshold: number }>(() => supabase.rpc("card_pin_status", { p_student_id: studentId! })),
+  });
+}
+
+/** The student themselves or a guardian sets / changes the 4-digit PIN. */
+export function useSetCardPin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (a: { student_id: string; pin: string }) => rpc<void>(() => supabase.rpc("card_set_pin", { p_student_id: a.student_id, p_pin: a.pin })),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["card_pin_status"] }),
+  });
+}
+
+/** Org-wide: clear a student's PIN (forgotten). */
+export function useResetCardPin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (studentId: string) => rpc<void>(() => supabase.rpc("card_reset_pin", { p_student_id: studentId })),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["card_pin_status"] }),
+  });
+}
+
+/** Amount (baht) from which a sale needs the student's PIN. */
+export function useCardSettings() {
+  return useQuery({
+    queryKey: ["card_settings"],
+    queryFn: () => rpc<{ pin_threshold: number }>(() => supabase.rpc("card_settings_get")),
+  });
+}
+
+export function useSetPinThreshold() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: number) => rpc<void>(() => supabase.rpc("card_settings_set", { p_pin_threshold: v })),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["card_settings"] }),
   });
 }
 

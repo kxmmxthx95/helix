@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { BarcodeIcon, DesktopIcon, Search } from "@/components/icons";
 import { Button, Field, Input, Spinner, Switch } from "@/components/ui";
 import {
+  useCardSettings,
   useCashiers,
+  useResetCardPin,
   useResetPin,
   useSaveTerminal,
+  useSetPinThreshold,
+  useStudentSearch,
   useTerminals,
 } from "@/hooks/useCardTopup";
 import type { PosTerminal } from "@/lib/database.types";
@@ -191,6 +195,8 @@ export function TerminalsTab({ onTestScanner, onTestRfid }: { onTestScanner?: ()
         </ul>
       </div>
 
+      <StudentPinAdmin />
+
       <Modal
         open={!!form}
         onOpenChange={(o) => !o && setForm(null)}
@@ -215,6 +221,75 @@ export function TerminalsTab({ onTestScanner, onTestRfid }: { onTestScanner?: ()
           </form>
         )}
       </Modal>
+    </div>
+  );
+}
+
+/** PIN of the student for big sales: the amount it starts at, and a reset for a forgotten PIN (staff never see or set a PIN). */
+function StudentPinAdmin() {
+  const toast = useToast();
+  const { data: settings } = useCardSettings();
+  const setThreshold = useSetPinThreshold();
+  const resetPin = useResetCardPin();
+  const [text, setText] = useState("");
+  useEffect(() => {
+    if (settings) setText(String(settings.pin_threshold));
+  }, [settings]);
+  const value = Number(text);
+  const valid = Number.isInteger(value) && value >= 1 && value <= 500;
+  const [term, setTerm] = useState("");
+  const { data: hits = [] } = useStudentSearch(term);
+
+  return (
+    <div className="space-y-4">
+      <h2 className="font-ui text-2xl font-semibold">PIN นักเรียน (ยอดสูง)</h2>
+      <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
+        <p className="text-lg text-muted-foreground">ซื้อตั้งแต่ยอดนี้ขึ้นไป ต้องกด PIN ของนักเรียน (เฉพาะนักเรียนที่ตั้ง PIN แล้ว)</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Input
+            inputMode="numeric"
+            className="h-14 w-36 text-lg"
+            aria-label="ยอดที่ต้องใช้ PIN (บาท)"
+            value={text}
+            onChange={(e) => setText(e.target.value.replace(/\D/g, "").slice(0, 3))}
+          />
+          <span className="text-lg">บาท</span>
+          <Button
+            className="h-14 px-6 text-lg"
+            disabled={!valid || setThreshold.isPending || value === settings?.pin_threshold}
+            onClick={() => setThreshold.mutateAsync(value).then(() => toast("บันทึกแล้ว"), (e) => toast(errMsg(e), "error"))}
+          >
+            บันทึก
+          </Button>
+          {!valid && text !== "" && <span className="text-base text-destructive">ใส่จำนวนเต็ม 1–500</span>}
+        </div>
+      </div>
+
+      <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
+        <p className="text-lg font-semibold">รีเซ็ต PIN นักเรียน</p>
+        <p className="text-base text-muted-foreground">ใช้เมื่อนักเรียนลืม PIN หรือ PIN ถูกล็อก — ล้าง PIN แล้วให้นักเรียนหรือผู้ปกครองตั้งใหม่ในพอร์ทัล</p>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <Input type="search" className="h-14 !pl-12 text-lg" placeholder="ค้นหาชื่อหรือรหัสนักเรียน" aria-label="ค้นหานักเรียน" autoComplete="off" value={term} onChange={(e) => setTerm(e.target.value)} />
+        </div>
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {hits.map((h) => (
+            <li key={h.id} className="flex items-center justify-between gap-3 rounded-xl border border-border p-3 text-lg">
+              <span className="min-w-0 truncate">
+                <span className="font-semibold">{`${h.prefix ?? ""}${h.first_name} ${h.last_name}`}</span> <span className="text-muted-foreground">{h.student_code}</span>
+              </span>
+              <Button
+                variant="outline"
+                className="h-12 shrink-0 px-4 text-base"
+                disabled={resetPin.isPending}
+                onClick={() => resetPin.mutateAsync(h.id).then(() => toast(`รีเซ็ต PIN ของ ${h.first_name} แล้ว`), (e) => toast(errMsg(e), "error"))}
+              >
+                รีเซ็ต PIN
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
