@@ -825,7 +825,7 @@ function AppShellInner() {
                 {pageTitle}
               </p>
             )}
-            {mobileHeaderEnd ? <div className="ml-auto shrink-0">{mobileHeaderEnd}</div> : null}
+            {mobileHeaderEnd ? <div className="ml-auto shrink-0">{mobileHeaderEnd}</div> : location.pathname === "/" ? <div className="ml-auto shrink-0">{updateButton}</div> : null}
           </div>
         </header>
 
@@ -847,7 +847,7 @@ function AppShellInner() {
               <ChevronBack className="h-3 w-3" />
             </Button>
           }
-          footerClassName="py-2"
+          footerClassName="py-4"
           footer={
             <div className="flex items-center gap-2">
               {avatarButton("h-9 w-9 text-xs")}
