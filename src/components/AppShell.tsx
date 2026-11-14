@@ -439,7 +439,14 @@ const SIDEBAR_KEY = "helix-sidebar-collapsed";
 const navDrawerLink = ({ isActive }: { isActive: boolean }) =>
   cn(
     "group font-ui tappable flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
-    isActive ? "bg-card text-foreground shadow-[inset_0_1px_3px_rgb(0_0_0/0.12)]" : "text-muted-foreground hover:bg-foreground/5",
+    isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-foreground/5",
+  );
+
+/** Bare top-level link (no group): looks like a section header, no icon. */
+const navDrawerTopLink = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    "tappable flex items-center rounded-lg px-3 py-2 text-[15px] font-semibold transition-colors",
+    isActive ? "bg-muted text-foreground" : "text-foreground hover:bg-foreground/5",
   );
 
 /**
@@ -805,6 +812,7 @@ function AppShellInner() {
             <Button
               variant="ghost"
               size="icon"
+              className="rounded-full bg-muted text-foreground"
               onClick={() => setNavOpen(false)}
               aria-label="หุบเมนู"
               title="หุบเมนู"
@@ -843,13 +851,7 @@ function AppShellInner() {
                   {section && <button
                     type="button"
                     aria-expanded={open}
-                    onClick={() =>
-                      setOpenSections((prev) => {
-                        const next = new Set(prev);
-                        if (!next.delete(section)) next.add(section);
-                        return next;
-                      })
-                    }
+                    onClick={() => setOpenSections(open ? new Set() : new Set([section]))}
                     className="tappable flex w-full items-center justify-between px-3 py-2 text-[15px] font-semibold text-foreground"
                   >
                     {section}
@@ -863,9 +865,9 @@ function AppShellInner() {
                           to={to}
                           end={to === "/"}
                           onClick={() => setNavOpen(false)}
-                          className={navDrawerLink}
+                          className={section ? navDrawerLink : navDrawerTopLink}
                         >
-                          <Icon className="h-[18px] w-[18px] shrink-0" />
+                          {section && <Icon className="h-[18px] w-[18px] shrink-0" />}
                           <span className="truncate">{label}</span>
                         </NavLink>
                       ))}

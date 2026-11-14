@@ -657,7 +657,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         {!onSale ? adminView : !terminal ? picker : saleBody}
       </div>
 
-      <Modal open={todayOpen} onOpenChange={setTodayOpen} title="รายการวันนี้" className="max-w-2xl">
+      <Modal open={todayOpen} onOpenChange={setTodayOpen} title="รายการวันนี้" className="max-w-2xl" centered>
         <TodayPanel />
       </Modal>
       <Modal open={codeOpen} onOpenChange={(o) => (setCodeOpen(o), !o && setCode(""))} title="ค้นหานักเรียน">

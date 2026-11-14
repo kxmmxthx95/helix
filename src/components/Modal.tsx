@@ -1,11 +1,13 @@
 import { useEffect, useRef } from "react";
 import { X } from "@/components/icons";
+import { Sheet, usePhone } from "@/components/Sheet";
 import { cn } from "@/lib/utils";
 
 /**
  * Centered pop-up for short forms (a Sheet is the side drawer for long lists). Native <dialog>:
  * top layer, focus trap and focus return come from the browser. Controlled — Esc and a click on
  * the backdrop only call onOpenChange(false), so the parent decides whether it may close.
+ * Phones/tablets (< lg) get a bottom sheet instead, unless `centered` (wide, table-like content).
  */
 export function Modal({
   open,
@@ -15,6 +17,7 @@ export function Modal({
   children,
   footer,
   className,
+  centered = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -24,15 +27,26 @@ export function Modal({
   /** Actions below the body (cancel / save, etc.). */
   footer?: React.ReactNode;
   className?: string;
+  /** Keep the centered pop-up on phones too. */
+  centered?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const phone = usePhone();
+  const asSheet = phone && !centered;
 
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
+    if (open && !asSheet && !dialog.open) dialog.showModal();
+    if ((!open || asSheet) && dialog.open) dialog.close();
+  }, [open, asSheet]);
+
+  if (asSheet)
+    return (
+      <Sheet open={open} onOpenChange={onOpenChange} title={title} description={description} footer={footer} bottomOnPhone closable>
+        {children}
+      </Sheet>
+    );
 
   return (
     <dialog

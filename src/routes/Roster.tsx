@@ -1066,7 +1066,7 @@ export function EditStudentSheet({
                   />
                 </Field>
 
-                <div className="flex items-center justify-between gap-4 text-sm leading-5">
+                <div className="form-row flex min-h-7 items-center justify-between gap-4 text-sm leading-5">
                   <span>อายุ</span>
                   <span className="text-muted-foreground">
                     {(() => {
@@ -1602,6 +1602,7 @@ function CreateStudentLoginSheet({
   return (
     <Sheet
       open={student !== null}
+      bottomOnPhone
       onOpenChange={(open) => !open && close()}
       title="สร้างบัญชีเข้าใช้"
       description={student ? `${student.first_name} ${student.last_name}` : undefined}
@@ -1724,6 +1725,7 @@ function BulkCreateLoginsSheet({
   return (
     <Sheet
       open={open}
+      bottomOnPhone
       onOpenChange={(next) => {
         if (!next) {
           reset();
