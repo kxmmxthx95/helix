@@ -920,6 +920,12 @@ export function EditStudentSheet({
     return () => URL.revokeObjectURL(url);
   }, [avatar]);
 
+  // Every open (or switch to another student) starts on the first tab, whatever way the last one was closed.
+  const targetKey = target === null ? null : target === "new" ? "new" : target.id;
+  useEffect(() => {
+    setTab("general");
+  }, [targetKey]);
+
   const isNew = target === "new";
   // Teachers can open a row to view it (mayView in the parent) but can't
   // write — RLS blocks it server-side regardless, this just keeps the form
