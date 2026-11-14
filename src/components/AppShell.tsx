@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { FiSidebar } from "react-icons/fi";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -37,7 +37,7 @@ import {
   Users,
   WatchIcon,
 } from "@/components/icons";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate, useOutlet } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet, SheetStyleContext } from "@/components/Sheet";
 import { MobileHeaderProvider, useMobileHeaderSlot } from "@/components/MobileHeaderSlot";
@@ -440,6 +440,17 @@ const navDrawerTopLink = ({ isActive }: { isActive: boolean }) =>
     isActive ? "bg-muted text-foreground" : "text-foreground hover:bg-foreground/5",
   );
 
+const pathDepth = (p: string) => p.split("/").filter(Boolean).length;
+
+/** iOS-style navigation transition (phones only): 1 = push, -1 = pop, 0 = crossfade. */
+const IOS_EASE = [0.32, 0.72, 0, 1] as const;
+const pageVariants = {
+  enter: (d: number) => (d === 1 ? { x: "100%" } : d === -1 ? { x: "-30%", opacity: 0.6 } : { opacity: 0 }),
+  center: (d: number) => ({ x: 0, opacity: 1, zIndex: d === -1 ? 1 : 2 }),
+  exit: (d: number) =>
+    d === 1 ? { x: "-30%", opacity: 0.6, zIndex: 1 } : d === -1 ? { x: "100%", zIndex: 2 } : { opacity: 0 },
+};
+
 /**
  * Adaptive shell:
  * - phone / tablet (< lg): top header with hamburger -> left-side nav drawer, shared px-3
@@ -465,6 +476,29 @@ function AppShellInner() {
   const location = useLocation();
   const navigate = useNavigate();
   const toast = useToast();
+  const outlet = useOutlet();
+  const reduceMotion = useReducedMotion();
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 1023px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const on = () => setIsMobile(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  // Navigation direction, derived once per pathname change. Drawer navigation crossfades instead of sliding.
+  const drawerNav = useRef(false);
+  const prevPath = useRef(location.pathname);
+  const navDir = useRef<-1 | 0 | 1>(0);
+  if (prevPath.current !== location.pathname) {
+    const d = pathDepth(location.pathname) - pathDepth(prevPath.current);
+    navDir.current = drawerNav.current || reduceMotion || d === 0 ? 0 : d > 0 ? 1 : -1;
+    drawerNav.current = false;
+    prevPath.current = location.pathname;
+  }
+  const closeNav = () => {
+    drawerNav.current = true;
+    setNavOpen(false);
+  };
   const uploadAvatar = useUploadAvatar();
   const avatarFileRef = useRef<HTMLInputElement>(null);
   const avatarSrc = profile ? avatarUrl(profile) : null;
@@ -601,6 +635,7 @@ function AppShellInner() {
       variant="ghost"
       size="icon"
       onClick={() => {
+        drawerNav.current = true;
         setNavOpen(false);
         navigate("/settings");
       }}
@@ -854,6 +889,7 @@ function AppShellInner() {
               <button
                 type="button"
                 onClick={() => {
+                  drawerNav.current = true;
                   setNavOpen(false);
                   navigate("/profile");
                 }}
@@ -898,7 +934,7 @@ function AppShellInner() {
                           key={to}
                           to={to}
                           end={to === "/"}
-                          onClick={() => setNavOpen(false)}
+                          onClick={closeNav}
                           className={section ? navDrawerLink : navDrawerTopLink}
                         >
                           {section && <Icon className="h-[18px] w-[18px] shrink-0" />}
@@ -937,8 +973,8 @@ function AppShellInner() {
           </div>
         )}
 
-        <main className="scrollbar-hidden flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
-          <div className="mx-auto flex min-h-full w-full max-w-screen-2xl flex-1 flex-col px-shell pb-[max(3rem,env(safe-area-inset-bottom))]">
+        <main className="scrollbar-hidden flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain overflow-x-hidden">
+          <div className="relative mx-auto flex min-h-full w-full max-w-screen-2xl flex-1 flex-col px-shell pb-[max(3rem,env(safe-area-inset-bottom))]">
             <header
               className={cn(
                 "sticky top-0 z-20 hidden h-12 shrink-0 items-center bg-background lg:flex",
@@ -951,15 +987,32 @@ function AppShellInner() {
                 </p>
               )}
             </header>
-            <motion.div
-              key={location.pathname}
-              className="flex min-h-0 flex-1 flex-col pt-4"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-            >
-              <Outlet />
-            </motion.div>
+            {isMobile ? (
+              <AnimatePresence initial={false} mode="popLayout" custom={navDir.current}>
+                <motion.div
+                  key={location.pathname}
+                  custom={navDir.current}
+                  variants={pageVariants}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={navDir.current === 0 ? { duration: 0.18, ease: "easeOut" } : { duration: 0.38, ease: IOS_EASE }}
+                  className="relative flex min-h-0 flex-1 flex-col bg-background pt-4"
+                >
+                  {outlet}
+                </motion.div>
+              </AnimatePresence>
+            ) : (
+              <motion.div
+                key={location.pathname}
+                className="flex min-h-0 flex-1 flex-col pt-4"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+              >
+                {outlet}
+              </motion.div>
+            )}
           </div>
         </main>
       </div>
