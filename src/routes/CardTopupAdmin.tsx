@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
-import { DesktopIcon, Search } from "@/components/icons";
+import { BarcodeIcon, DesktopIcon, Search } from "@/components/icons";
 import { Button, Field, Input, Spinner, Switch } from "@/components/ui";
 import {
   useCashiers,
@@ -26,7 +26,7 @@ function thisDeviceTerminal(): string {
 type Form = { id?: string; name: string; active: boolean };
 
 /** เครื่องขาย — terminals (add / rename / on-off) and cashier PIN resets. */
-export function TerminalsTab() {
+export function TerminalsTab({ onTestScanner, onTestRfid }: { onTestScanner?: () => void; onTestRfid?: () => void } = {}) {
   const toast = useToast();
   const { data: terminals = [], isLoading } = useTerminals();
   const { data: cashiers = [] } = useCashiers();
@@ -99,6 +99,18 @@ export function TerminalsTab() {
           <Button className="h-14 px-6 text-lg" onClick={() => setForm({ name: "", active: true })}>
             เพิ่มเครื่องขาย
           </Button>
+          {onTestRfid && (
+            <Button variant="outline" className="h-14 px-5 text-lg" onClick={onTestRfid}>
+              <BarcodeIcon className="mr-2 h-5 w-5" />
+              RFID
+            </Button>
+          )}
+          {onTestScanner && (
+            <Button variant="outline" className="h-14 px-5 text-lg" onClick={onTestScanner}>
+              <BarcodeIcon className="mr-2 h-5 w-5" />
+              บาร์โค้ด
+            </Button>
+          )}
         </div>
 
         {/* Filter row */}

@@ -63,7 +63,7 @@ const VIEWS = [
   { key: "void", label: "ยกเลิกรายการ", icon: AlertTriangle },
   { key: "report", label: "รายงาน", icon: BarChartIcon },
   { key: "products", label: "สินค้า", icon: BarcodeIcon },
-  { key: "terminals", label: "เครื่องขาย", icon: DesktopIcon },
+  { key: "terminals", label: "อุปกรณ์", icon: DesktopIcon },
 ] as const;
 type View = (typeof VIEWS)[number]["key"];
 /** Cashiers get these two in the sidebar; the rest are org-wide only. */
@@ -123,6 +123,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   // Sale confirm popup: "tap the card" until a student with a card is on screen, then the student + amount to confirm.
   const [payOpen, setPayOpen] = useState(false);
   const [testOpen, setTestOpen] = useState(false);
+  const [rfidTestOpen, setRfidTestOpen] = useState(false);
   const [code, setCode] = useState("");
   // Sale on screen: scanned / tapped products (cart) or an on-screen keypad amount (keyed) — the cart wins when both exist.
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -152,7 +153,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
     return () => document.documentElement.classList.remove("pos-large");
   }, []);
 
-  const modalOpen = pinOpen || confirmOpen || todayOpen || codeOpen || testOpen || historyOpen;
+  const modalOpen = pinOpen || confirmOpen || todayOpen || codeOpen || testOpen || rfidTestOpen || historyOpen;
   useEffect(() => {
     if (terminal && onSale && !modalOpen) capture.current?.focus();
   }, [terminal, onSale, modalOpen, student, done, looking]); // looking: a disabled input drops focus, so re-take it when the lookup ends (also after a failed one)
@@ -374,10 +375,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                       {key === "topup" && isUnlocked && <span className={cn("ml-auto shrink-0 text-base font-semibold tabular-nums", minutesLeft <= 5 ? "font-semibold text-destructive motion-safe:animate-pulse" : "text-muted-foreground")}>เหลือ {minutesLeft} นาที</span>}
                     </button>
                   ))}
-                  <button type="button" className={itemClass()} onClick={() => (setTestOpen(true), setDrawer(false))}>
-                    <BarcodeIcon className="h-6 w-6 shrink-0" />
-                    <span className="truncate">ทดสอบเครื่องอ่านบาร์โค้ด</span>
-                  </button>
                 </div>
               </div>
           </nav>
@@ -430,7 +427,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
       {view === "void" && <VoidTopupTab unlocked={isUnlocked} onNeedPin={() => (setPinFor("void"), setPinOpen(true))} />}
       {view === "report" && <ReportTab />}
       {view === "products" && <ProductsTab />}
-      {view === "terminals" && <TerminalsTab />}
+      {view === "terminals" && <TerminalsTab onTestScanner={() => setTestOpen(true)} onTestRfid={() => setRfidTestOpen(true)} />}
     </div>
   );
 
@@ -705,10 +702,10 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
       <div className="absolute inset-0 z-0 bg-shell" aria-hidden />
       {sidebar}
       <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-        <header className="flex h-[5rem] shrink-0 items-center gap-3 border-b border-border bg-card px-4 pt-safe">
+        <header className="relative flex h-[5rem] shrink-0 items-center gap-3 border-b border-border bg-card px-4 pt-safe">
           {toggleButton}
           {onSale ? (
-            <div role="tablist" aria-label="งานหน้าเคาน์เตอร์" className="flex min-w-0 gap-1 rounded-2xl bg-muted p-1">
+            <div role="tablist" aria-label="งานหน้าเคาน์เตอร์" className="flex min-w-0 gap-1 rounded-2xl bg-muted p-1 lg:absolute lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2">
               {VIEWS.filter((v) => isCounterView(v.key)).map(({ key, label, icon: Icon }) => (
                 <button
                   key={key}
@@ -732,7 +729,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               ))}
             </div>
           ) : (
-            <p className="font-heading truncate text-2xl font-semibold">{VIEWS.find((v) => v.key === view)?.label}</p>
+            <p className="font-heading truncate text-2xl font-semibold lg:absolute lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2">{VIEWS.find((v) => v.key === view)?.label}</p>
           )}
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <span
@@ -803,6 +800,9 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
             }}
           />
         )}
+      </Modal>
+      <Modal open={rfidTestOpen} onOpenChange={setRfidTestOpen} title="ทดสอบเครื่องอ่านบัตร RFID">
+        <RfidTest />
       </Modal>
       <Modal open={testOpen} onOpenChange={setTestOpen} title="ทดสอบเครื่องอ่านบาร์โค้ด">
         <ScannerTest />
@@ -1019,6 +1019,110 @@ function StudentHits({ term, onPick }: { term: string; onPick: (id: string) => v
 }
 
 /** Shows what the reader typed and how fast; nothing is looked up or charged. A scanner "types" a whole code in well under 50 ms per key. */
+/** Tap a card on the RFID reader: shows what it typed, how it decodes, and which student (if any) the UID is bound to. Read-only. */
+function RfidTest() {
+  type Result =
+    | { kind: "ok"; raw: string; uid: string; perKey: number; student: string | null | undefined }
+    | { kind: "slow"; raw: string; perKey: number }
+    | { kind: "noEnter"; raw: string };
+  const [result, setResult] = useState<Result | null>(null);
+  const [value, setValue] = useState("");
+  const [focused, setFocused] = useState(true);
+  const first = useRef(0);
+  const input = useRef<HTMLInputElement>(null);
+  const noEnter = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(noEnter.current), []);
+
+  async function finish(raw: string) {
+    window.clearTimeout(noEnter.current);
+    const perKey = (performance.now() - first.current) / raw.length;
+    setValue("");
+    if (perKey >= 50) return setResult({ kind: "slow", raw, perKey });
+    const uid = fromThaiLayout(raw.trim());
+    setResult({ kind: "ok", raw, uid, perKey, student: undefined });
+    let student: string | null = null;
+    try {
+      student = (await posLookup({ card_uid: uid })).name;
+    } catch {
+      /* not bound (or no permission): shown as "not bound" */
+    }
+    setResult((r) => (r && r.kind === "ok" && r.raw === raw ? { ...r, student } : r));
+  }
+
+  return (
+    <div className="space-y-4" onClick={() => input.current?.focus()}>
+      <input
+        ref={input}
+        autoFocus
+        autoComplete="off"
+        className="sr-only"
+        aria-label="ช่องรับสัญญาณเครื่องอ่านบัตร RFID"
+        value={value}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onChange={(e) => {
+          if (!value) first.current = performance.now();
+          const next = e.target.value;
+          setValue(next);
+          window.clearTimeout(noEnter.current);
+          if (next) noEnter.current = window.setTimeout(() => (setResult({ kind: "noEnter", raw: next }), setValue("")), 1500);
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" || !value) return;
+          e.preventDefault();
+          void finish(value);
+        }}
+      />
+
+      <div
+        role="status"
+        aria-live="polite"
+        className={cn("space-y-1 rounded-2xl border-2 p-5", !result ? "border-warning/50 bg-warning/10" : result.kind === "ok" ? "border-success/50 bg-success/10" : "border-destructive/40 bg-destructive/10")}
+      >
+        {!result ? (
+          <>
+            <p className="text-2xl font-bold">{focused ? "พร้อมแล้ว — แตะบัตร RFID ที่เครื่องอ่านได้เลย" : "แตะที่หน้าต่างนี้ก่อน แล้วค่อยแตะบัตร"}</p>
+            <p className="text-lg text-muted-foreground">ระบบจะไม่ตัดเงิน เป็นการทดสอบเท่านั้น</p>
+          </>
+        ) : result.kind === "ok" ? (
+          <>
+            <p className="text-2xl font-bold text-success">อ่านบัตรได้</p>
+            <p className="text-lg">
+              รหัสบัตร <span className="font-mono text-xl font-bold">{result.uid}</span> · เร็ว {result.perKey.toFixed(0)} ms/ตัว
+            </p>
+            <p className="text-lg">
+              {result.student === undefined ? "กำลังตรวจว่าผูกกับนักเรียนหรือยัง…" : result.student ? <>ผูกกับ <span className="font-semibold">{result.student}</span></> : "ยังไม่ได้ผูกบัตรนี้กับนักเรียน"}
+            </p>
+            {result.raw !== result.uid && <p className="text-base text-muted-foreground">แป้นพิมพ์เป็นภาษาไทย (ได้ "{result.raw}") — ระบบแปลงให้อัตโนมัติ แต่ควรสลับเป็นภาษาอังกฤษ</p>}
+          </>
+        ) : (
+          <>
+            <p className="text-2xl font-bold text-destructive">{result.kind === "noEnter" ? "อ่านได้ แต่เครื่องไม่ส่ง Enter" : "สัญญาณช้าเหมือนพิมพ์มือ"}</p>
+            <p className="text-lg">
+              {result.kind === "noEnter" ? "ตั้งค่าเครื่องอ่านให้ส่ง Enter (CR) ต่อท้าย ตามคู่มือของเครื่อง" : "ตรวจสาย USB หรือการเชื่อมต่อของเครื่องอ่าน"}
+            </p>
+            <p className="break-all font-mono text-base text-muted-foreground">ได้รับ: {result.raw}</p>
+          </>
+        )}
+      </div>
+
+      {result && (
+        <Button
+          variant="outline"
+          className="h-14 w-full text-lg"
+          onClick={(e) => {
+            e.stopPropagation();
+            setResult(null);
+            input.current?.focus();
+          }}
+        >
+          ทดสอบอีกครั้ง
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function ScannerTest() {
   type Result =
     | { kind: "ok"; text: string; perKey: number }
