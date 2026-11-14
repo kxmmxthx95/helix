@@ -6,32 +6,44 @@ import { studentAvatarUrl } from "@/hooks/useAvatar";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useStudentQr, type PortalStudent } from "@/hooks/useCardTopup";
 import { useDepartments } from "@/hooks/useProfiles";
-import { schoolLogoUrl, useSchoolSettings } from "@/hooks/useSettings";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { cn } from "@/lib/utils";
 
+const GRADIENT = "linear-gradient(135deg,#ff7aa8,#ff2d55 60%,#c026d3)";
 const FACE = "absolute inset-0 overflow-hidden rounded-3xl shadow-xl";
 
+/** Credit-card style EMV chip, drawn in CSS: gold plate with contact grooves. */
+function Chip() {
+  return (
+    <div aria-hidden className="my-auto h-9 w-12 self-end overflow-hidden rounded-md border border-amber-700/40 shadow-sm" style={{ backgroundImage: "linear-gradient(135deg,#fde68a,#d6a537 50%,#f5d57a)" }}>
+      <div className="relative h-full w-full">
+        <i className="absolute inset-x-0 top-1/3 border-t border-amber-800/40" />
+        <i className="absolute inset-x-0 top-2/3 border-t border-amber-800/40" />
+        <i className="absolute inset-y-0 left-1/3 border-l border-amber-800/40" />
+        <i className="absolute inset-y-0 left-2/3 border-l border-amber-800/40" />
+        <i className="absolute inset-[30%_33%] rounded-sm border border-amber-800/40" />
+      </div>
+    </div>
+  );
+}
+
 /**
- * Phone-only top-up card: tap to flip. Front = student details + payment barcode,
- * back = the school's PromptPay QR only.
+ * Phone-only top-up card: tap to flip. Front = student details, back = the payment barcode.
  */
 export function TopupFlipCard({ kid }: { kid: PortalStudent }) {
   const reduce = useReducedMotion();
   const [flipped, setFlipped] = useState(false);
   const { data: qr } = useStudentQr(kid.id);
   const frozen = qr?.status === "frozen";
-  const barcode = useBarcodeImage(qr && !frozen ? qr.token : null, 6);
+  const barcode = useBarcodeImage(qr && !frozen ? qr.token : null, 0);
   const { data: departments = [] } = useDepartments();
   const { data: grades = [] } = useGradeLevels(kid.department_id);
-  const { data: settings } = useSchoolSettings();
-  const promptpay = settings ? schoolLogoUrl({ logo_path: settings.promptpay_qr_path, updated_at: settings.updated_at }) : null;
   const dept = departments.find((d) => d.id === kid.department_id)?.name;
   const grade = grades.find((g) => g.id === kid.grade_level_id);
   const toggle = () => setFlipped((f) => !f);
 
   const front = (
-    <div className={cn(FACE, "flex flex-col justify-between gap-3 p-4 text-white")} style={{ backgroundImage: "linear-gradient(135deg,#ff7aa8,#ff2d55 60%,#c026d3)", backfaceVisibility: "hidden" }} aria-hidden={flipped}>
+    <div className={cn(FACE, "flex flex-col gap-3 p-4 text-white")} style={{ backgroundImage: GRADIENT, backfaceVisibility: "hidden" }} aria-hidden={flipped}>
       <div className="flex items-center gap-3">
         <Avatar name={`${kid.first_name} ${kid.last_name}`} src={studentAvatarUrl(kid)} className="size-12 shrink-0 text-base ring-2 ring-white/70" />
         <div className="min-w-0">
@@ -43,9 +55,19 @@ export function TopupFlipCard({ kid }: { kid: PortalStudent }) {
           </p>
         </div>
       </div>
-      <div className="rounded-xl bg-white px-1 py-1.5">
+      <Chip />
+      <img src="/logo.webp" alt="Helix" className="h-6 w-auto self-start invert" />
+    </div>
+  );
+
+  const back = (
+    <div className={cn(FACE, "flex items-center justify-center p-4")} style={{ backgroundImage: GRADIENT, transform: reduce ? undefined : "rotateY(180deg)", backfaceVisibility: "hidden" }} aria-hidden={!flipped}>
+      <div className="w-full rounded-xl bg-white px-3 py-3">
         {barcode ? (
-          <img src={barcode} alt={`บาร์โค้ดชำระเงินของ ${kid.first_name}`} className="mx-auto h-16 w-full object-contain" />
+          <>
+            <img src={barcode} alt={`บาร์โค้ดชำระเงินของ ${kid.first_name}`} className="mx-auto h-28 w-full object-contain" />
+            <p className="mt-1.5 break-all text-center font-mono text-xs tracking-[0.2em] text-neutral-700">{qr?.token}</p>
+          </>
         ) : (
           <p className="flex h-16 items-center justify-center text-center text-xs text-neutral-500">
             {!qr ? "ยังไม่มีบาร์โค้ด — ติดต่อโรงเรียน" : frozen ? (qr.frozen_by === "school" ? "บาร์โค้ดถูกระงับโดยโรงเรียน" : "บาร์โค้ดถูกระงับ") : "…"}
@@ -55,22 +77,12 @@ export function TopupFlipCard({ kid }: { kid: PortalStudent }) {
     </div>
   );
 
-  const back = (
-    <div className={cn(FACE, "flex items-center justify-center bg-white p-3")} style={{ transform: reduce ? undefined : "rotateY(180deg)", backfaceVisibility: "hidden" }} aria-hidden={!flipped}>
-      {promptpay ? (
-        <img src={promptpay} alt="QR พร้อมเพย์ของโรงเรียน" className="h-full max-w-full object-contain" />
-      ) : (
-        <p className="text-center text-xs text-neutral-500">โรงเรียนยังไม่ได้ตั้งค่าพร้อมเพย์</p>
-      )}
-    </div>
-  );
-
   return (
     <div className="mx-auto w-full max-w-sm" style={{ perspective: 1200 }}>
       <motion.div
         role="button"
         tabIndex={0}
-        aria-label={flipped ? "บัตรเติมเงิน ด้านหลัง (QR พร้อมเพย์) แตะเพื่อพลิกกลับ" : "บัตรเติมเงิน ด้านหน้า แตะเพื่อดู QR พร้อมเพย์"}
+        aria-label={flipped ? "บัตรเติมเงิน ด้านหลัง (บาร์โค้ด) แตะเพื่อพลิกกลับ" : "บัตรเติมเงิน ด้านหน้า แตะเพื่อดูบาร์โค้ด"}
         onClick={toggle}
         onKeyDown={(e) => {
           if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {

@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronForward, DocumentTextIcon, FileUp, CoinIcon, LockIcon, ShieldIcon } from "@/components/icons";
 import { Modal } from "@/components/Modal";
-import { Sheet, SheetStyleContext } from "@/components/Sheet";
+import { tick } from "@/lib/sound";
+import { Sheet } from "@/components/Sheet";
 import { TopupFlipCard } from "@/components/TopupFlipCard";
 import { StudentQrCard } from "@/components/StudentQrCard";
 import { useToast } from "@/components/Toast";
@@ -12,6 +13,8 @@ import {
   useCardPinStatus,
   useCardTransactions,
   useMyCardStudents,
+  useRfidStatus,
+  useSetRfidFrozen,
   usePortalSummary,
   useSetCardPin,
   useSetDailyLimit,
@@ -160,9 +163,18 @@ function ChildCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
             {slipList}
           </Disclosure>
         )}
-        <Disclosure icon={LockIcon} title="PIN บัตร" subtitle={pinSt?.has_pin ? "ตั้งแล้ว" : "ยังไม่ได้ตั้ง"}>
-          <div className="flex flex-wrap gap-2">{pinButton}</div>
-        </Disclosure>
+        <button type="button" onClick={() => setPinOpen(true)} className="flex w-full items-center gap-3 rounded-2xl bg-card p-4 text-left shadow-card active:scale-[0.99]">
+          <span className="relative flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
+            <LockIcon className="h-4 w-4" />
+            {pinSt && !pinSt.has_pin && <span aria-label="ยังไม่ได้ตั้ง PIN" className="absolute -right-1 -top-1 size-3 rounded-full bg-destructive ring-2 ring-card" />}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[15px] font-semibold">PIN บัตร</span>
+            <span className="block truncate text-xs text-muted-foreground">{pinSt?.has_pin ? "ตั้งแล้ว · แตะเพื่อเปลี่ยน" : "ยังไม่ได้ตั้ง · แตะเพื่อตั้ง"}</span>
+          </span>
+          <ChevronForward className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+        <RfidCard kid={kid} canAct={canAct} />
         {canAct && (
           <Disclosure icon={ShieldIcon} title="วงเงินและสถานะบัตร">
             <div className="flex flex-wrap gap-2">{manageButtons}</div>
@@ -227,12 +239,33 @@ function ChildCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
         </div>
       </Card>
 
-      {/* The student shell makes Sheets bottom cards on phones; this one is a side drawer. */}
-      <SheetStyleContext.Provider value="drawer">
-        <Sheet open={historyOpen} onOpenChange={setHistoryOpen} title="ประวัติรายการ" closable>
-          {history}
-        </Sheet>
-      </SheetStyleContext.Provider>
+      <Sheet open={historyOpen} onOpenChange={setHistoryOpen} title="ประวัติรายการ" closable bottomOnPhone bodyClassName="px-0 pt-1">
+        <ul className="divide-y divide-border/60">
+          {txs.map((t) => {
+            const d = new Date(t.created_at);
+            const plus = t.amount > 0;
+            return (
+              <li key={t.id} className="flex items-center gap-3 px-4 py-3">
+                <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-semibold", t.voided_at ? "bg-muted text-muted-foreground" : plus ? "bg-emerald-500/15 text-emerald-600" : "bg-rose-500/15 text-rose-600")}>
+                  {plus ? "+" : "−"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className={cn("truncate text-[15px] font-semibold", t.voided_at && "text-muted-foreground line-through")}>{TX_TYPE_LABEL[t.type]}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {d.toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })}
+                    {t.voided_at && <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">ยกเลิกแล้ว</span>}
+                  </p>
+                </div>
+                <span className={cn("shrink-0 text-[15px] font-semibold tabular-nums", t.voided_at ? "text-muted-foreground line-through" : plus ? "text-emerald-600" : "text-foreground")}>
+                  {plus ? "+" : "−"}
+                  {formatBaht(Math.abs(t.amount))}
+                </span>
+              </li>
+            );
+          })}
+          {txs.length === 0 && <li className="px-4 py-10 text-center text-sm text-muted-foreground">ยังไม่มีรายการ</li>}
+        </ul>
+      </Sheet>
       <PinModal open={pinOpen} kid={kid} hasPin={!!pinSt?.has_pin} threshold={pinSt?.pin_threshold ?? null} onClose={() => setPinOpen(false)} />
       {canAct && <LimitModal open={limitOpen} kid={kid} current={sum?.daily_limit ?? null} onClose={() => setLimitOpen(false)} />}
     </>
@@ -277,47 +310,147 @@ function Disclosure({
   );
 }
 
+const PAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"];
+
+/** Lost RFID card: freeze just the RFID card (phone barcode keeps working). Hidden when no RFID card is bound. */
+function RfidCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
+  const toast = useToast();
+  const { data: rfid } = useRfidStatus(kid.id);
+  const setFrozen = useSetRfidFrozen();
+  const [confirm, setConfirm] = useState(false);
+  if (!rfid) return null;
+  const frozen = rfid.status === "frozen";
+  const bySchool = frozen && rfid.frozen_by === "school";
+  const tappable = !frozen || (canAct && !bySchool);
+  const subtitle = !frozen ? "แตะเพื่อระงับ (บัตรหาย)" : bySchool ? "ระงับโดยโรงเรียน — ติดต่อฝ่ายการเงิน" : canAct ? "ระงับอยู่ · แตะเพื่อปลดระงับ" : "ระงับอยู่ · ให้ผู้ปกครองปลดระงับ";
+
+  function run(frozenNext: boolean) {
+    setFrozen.mutate(
+      { student_id: kid.id, frozen: frozenNext },
+      { onSuccess: () => (setConfirm(false), toast(frozenNext ? "ระงับบัตร RFID แล้ว" : "ปลดระงับบัตร RFID แล้ว")), onError: (e) => toast(errMsg(e), "error") },
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={!tappable || setFrozen.isPending}
+        onClick={() => (frozen ? run(false) : setConfirm(true))}
+        className="flex w-full items-center gap-3 rounded-2xl bg-card p-4 text-left shadow-card active:scale-[0.99] disabled:active:scale-100"
+      >
+        <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", frozen ? "bg-destructive/10 text-destructive" : "bg-accent-soft text-accent")}>
+          <ShieldIcon className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-semibold">บัตร RFID · ลงท้าย {rfid.last4}</span>
+          <span className={cn("block truncate text-xs", frozen ? "text-destructive" : "text-muted-foreground")}>{subtitle}</span>
+        </span>
+        {tappable && <ChevronForward className="h-4 w-4 shrink-0 text-muted-foreground" />}
+      </button>
+      <Modal
+        open={confirm}
+        centered
+        onOpenChange={setConfirm}
+        title="ระงับบัตร RFID?"
+        description={`บัตรที่ลงท้าย ${rfid.last4} จะใช้ซื้อของไม่ได้ทันที บาร์โค้ดในมือถือยังใช้ได้ตามปกติ`}
+        footer={
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={() => setConfirm(false)}>
+              ยกเลิก
+            </Button>
+            <Button type="button" variant="destructive" className="flex-1 bg-destructive text-white hover:bg-destructive/90" disabled={setFrozen.isPending} onClick={() => run(true)}>
+              ระงับบัตร
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">ปลดระงับได้โดยผู้ปกครองหรือโรงเรียนเท่านั้น</p>
+      </Modal>
+    </>
+  );
+}
+
+/** Centered pop-up with an on-screen keypad: enter the 4-digit PIN, then enter it again; saves when both match. */
 function PinModal({ open, kid, hasPin, threshold, onClose }: { open: boolean; kid: PortalStudent; hasPin: boolean; threshold: number | null; onClose: () => void }) {
   const toast = useToast();
   const setPin = useSetCardPin();
-  const [pin, setPinText] = useState("");
-  const [again, setAgain] = useState("");
-  const valid = /^\d{4}$/.test(pin) && pin === again;
-  const digits = (v: string) => v.replace(/\D/g, "").slice(0, 4);
+  const [first, setFirst] = useState<string | null>(null); // null = step 1 (new PIN), set = step 2 (confirm)
+  const [digits, setDigits] = useState("");
+  const [mismatch, setMismatch] = useState(false);
 
-  async function save() {
+  function reset() {
+    setFirst(null);
+    setDigits("");
+    setMismatch(false);
+  }
+
+  async function save(pin: string) {
     try {
       await setPin.mutateAsync({ student_id: kid.id, pin });
       toast(hasPin ? "เปลี่ยน PIN แล้ว" : "ตั้ง PIN แล้ว");
-      setPinText("");
-      setAgain("");
+      reset();
       onClose();
     } catch (e) {
       toast(errMsg(e), "error");
+      reset();
+    }
+  }
+
+  function press(k: string) {
+    if (setPin.isPending) return;
+    tick(k === "C" || k === "⌫" ? 700 : 1000);
+    if (k === "C") return setDigits("");
+    if (k === "⌫") return setDigits((d) => d.slice(0, -1));
+    if (digits.length >= 4) return;
+    const next = digits + k;
+    setDigits(next);
+    if (next.length < 4) return;
+    if (first === null) {
+      setMismatch(false);
+      setTimeout(() => (setFirst(next), setDigits("")), 150);
+    } else if (next === first) {
+      void save(next);
+    } else {
+      setTimeout(() => (reset(), setMismatch(true)), 250);
     }
   }
 
   return (
     <Modal
       open={open}
-      onOpenChange={(o) => !o && onClose()}
+      centered
+      onOpenChange={(o) => {
+        if (!o) (reset(), onClose());
+      }}
       title={hasPin ? "เปลี่ยน PIN บัตร" : "ตั้ง PIN บัตร"}
-      description={threshold === null ? "ตัวเลข 4 หลัก ใช้ยืนยันเมื่อซื้อยอดสูง" : `ตัวเลข 4 หลัก ใช้ยืนยันเมื่อซื้อตั้งแต่ ${formatBaht(threshold)} บาท ขึ้นไป`}
-      footer={
-        <Button type="button" className="w-full" disabled={!valid || setPin.isPending} onClick={() => void save()}>
-          บันทึก PIN
-        </Button>
-      }
     >
-      <div className="space-y-3">
-        <Field label="PIN ใหม่">
-          <Input type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={(e) => setPinText(digits(e.target.value))} />
-        </Field>
-        <Field label="ยืนยัน PIN อีกครั้ง">
-          <Input type="password" inputMode="numeric" autoComplete="off" value={again} onChange={(e) => setAgain(digits(e.target.value))} />
-        </Field>
-        {again.length === 4 && pin !== again && <p className="text-sm text-destructive">PIN ไม่ตรงกัน</p>}
-        <p className="text-xs text-muted-foreground">ลืม PIN ให้ติดต่อโรงเรียนเพื่อรีเซ็ต แล้วตั้งใหม่ได้ที่หน้านี้</p>
+      <div className="flex flex-col items-center gap-4">
+        <p className={cn("text-sm font-medium", mismatch ? "text-destructive" : "text-muted-foreground")}>
+          {mismatch ? "PIN ไม่ตรงกัน เริ่มใหม่อีกครั้ง" : first === null ? "ตั้ง PIN ใหม่" : "ยืนยัน PIN อีกครั้ง"}
+        </p>
+        <div className="flex gap-3" aria-label={`ใส่แล้ว ${digits.length} จาก 4 หลัก`}>
+          {[0, 1, 2, 3].map((i) => (
+            <span key={i} className={cn("size-3.5 rounded-full border-2 border-primary transition-colors", i < digits.length && "bg-primary")} />
+          ))}
+        </div>
+        <div className="grid w-full max-w-[16rem] grid-cols-3 gap-2">
+          {PAD_KEYS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => press(k)}
+              disabled={setPin.isPending}
+              className="tappable h-14 rounded-2xl bg-muted text-xl font-semibold active:scale-95 disabled:opacity-50"
+            >
+              {k}
+            </button>
+          ))}
+        </div>
+        <p className="text-center text-sm text-destructive">
+          {threshold === null ? "ตัวเลข 4 หลัก ใช้ยืนยันเมื่อซื้อยอดสูง" : `ตัวเลข 4 หลัก ใช้ยืนยันเมื่อซื้อตั้งแต่ ${formatBaht(threshold)} บาท ขึ้นไป`}
+        </p>
+        <p className="text-center text-xs text-muted-foreground">ลืม PIN ให้ติดต่อโรงเรียนเพื่อรีเซ็ต แล้วตั้งใหม่ได้ที่หน้านี้</p>
       </div>
     </Modal>
   );

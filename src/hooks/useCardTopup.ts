@@ -459,6 +459,25 @@ export function usePortalSummary(studentId: string | null) {
   });
 }
 
+/** The student's live RFID card (null = none bound). Student / guardian / org-wide. */
+export function useRfidStatus(studentId: string | null) {
+  return useQuery({
+    queryKey: ["card_rfid_status", studentId],
+    enabled: !!studentId,
+    queryFn: () => rpc<{ status: "active" | "frozen"; frozen_by: "parent" | "school" | null; last4: string } | null>(() => supabase.rpc("card_rfid_status", { p_student_id: studentId! })),
+  });
+}
+
+/** Freeze (lost card) / unfreeze only the RFID card; the phone barcode is untouched. */
+export function useSetRfidFrozen() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (a: { student_id: string; frozen: boolean }) =>
+      rpc<void>(() => supabase.rpc("card_set_rfid_frozen", { p_student_id: a.student_id, p_frozen: a.frozen })),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["card_rfid_status"] }),
+  });
+}
+
 /** Student PIN for big sales: whether one is set + the threshold. Student / guardian / org-wide. */
 export function useCardPinStatus(studentId: string | null) {
   return useQuery({

@@ -2013,6 +2013,14 @@ export type Database = {
         Args: { p_pin_threshold: number };
         Returns: void;
       };
+      card_rfid_status: {
+        Args: { p_student_id: string };
+        Returns: { status: "active" | "frozen"; frozen_by: "parent" | "school" | null; last4: string } | null;
+      };
+      card_set_rfid_frozen: {
+        Args: { p_student_id: string; p_frozen: boolean };
+        Returns: undefined;
+      };
       card_pin_status: {
         Args: { p_student_id: string };
         Returns: { has_pin: boolean; pin_threshold: number };
