@@ -28,8 +28,12 @@ import { HomeroomSheet } from "@/routes/StatusManagement";
 
 /** อ่านอย่างเดียว — org-wide list ของทุกห้องเรียนในแผนก, ตรงข้ามกับ ClassroomPanel ใน StatusManagement.tsx ที่จัดการทีละระดับชั้นและมี CRUD. */
 export function Classrooms() {
-  const { profile: me } = useAuth();
-  if (!me) return null;
+  const { profile } = useAuth();
+  // Guard in a wrapper: an early return above the hooks breaks hook order when the profile reloads.
+  return profile ? <ClassroomsList me={profile} /> : null;
+}
+
+function ClassroomsList({ me }: { me: NonNullable<ReturnType<typeof useAuth>["profile"]> }) {
 
   const orgWide = isOrgWide(me.roles);
   const isHomeroomTeacherOnly = !orgWide && !isDeptHead(me.roles);
