@@ -28,6 +28,7 @@ import {
   PersonAddIcon,
   PricetagIcon,
   RibbonIcon,
+  RefreshIcon,
   SettingsIcon,
   ShieldIcon,
   Sun,
@@ -42,6 +43,7 @@ import { Sheet, SheetStyleContext } from "@/components/Sheet";
 import { MobileHeaderProvider, useMobileHeaderSlot } from "@/components/MobileHeaderSlot";
 import { useTheme } from "@/components/ThemeProvider";
 import { useToast } from "@/components/Toast";
+import { applyUpdate, checkForUpdate, pendingOps } from "@/lib/swUpdate";
 import { Avatar, Button, Select } from "@/components/ui";
 import { avatarUrl, useUploadAvatar } from "@/hooks/useAvatar";
 import { useOutboxSync } from "@/hooks/useOutboxSync";
@@ -610,6 +612,30 @@ function AppShellInner() {
     </Button>
   );
 
+  const [updating, setUpdating] = useState(false);
+  const updateApp = async () => {
+    if (updating) return;
+    setUpdating(true);
+    try {
+      const r = await checkForUpdate();
+      if (r === "unsupported") return toast("ไม่รองรับการอัปเดตในโหมดนี้", "error");
+      if (r === "latest") return toast("เป็นเวอร์ชันล่าสุดแล้ว");
+      const n = await pendingOps();
+      if (n > 0 && !confirm(`มี ${n} รายการยังไม่ได้ซิงก์ อัปเดตตอนนี้ต่อไหม?`)) return;
+      toast("กำลังอัปเดต…");
+      await applyUpdate();
+    } catch {
+      toast("ตรวจสอบการอัปเดตไม่สำเร็จ", "error");
+    } finally {
+      setUpdating(false);
+    }
+  };
+  const updateButton = (
+    <Button variant="ghost" size="icon" onClick={updateApp} disabled={updating} aria-label="อัปเดตแอป" title="อัปเดตแอป" className="text-muted-foreground">
+      <RefreshIcon className={cn("h-3.5 w-3.5", updating && "animate-spin")} />
+    </Button>
+  );
+
   const signOutButton = (
     <Button variant="ghost" size="icon" onClick={signOut} aria-label="ออกจากระบบ" className="text-muted-foreground">
       <LogOut className="h-3.5 w-3.5" />
@@ -761,6 +787,16 @@ function AppShellInner() {
             </button>
             <button
               type="button"
+              onClick={updateApp}
+              disabled={updating}
+              title="อัปเดตแอป"
+              aria-label="อัปเดตแอป"
+              className={footerIconClass()}
+            >
+              <RefreshIcon className={cn("h-4 w-4", updating && "animate-spin")} />
+            </button>
+            <button
+              type="button"
               onClick={signOut}
               title="ออกจากระบบ"
               aria-label="ออกจากระบบ"
@@ -829,6 +865,7 @@ function AppShellInner() {
               <div className="flex shrink-0 items-center">
                 {settingsButton}
                 {themeButton}
+                {updateButton}
                 {signOutButton}
               </div>
             </div>

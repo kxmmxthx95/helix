@@ -16,3 +16,28 @@ export async function applyIfIdle(reg: ServiceWorkerRegistration, hiddenMs: numb
   const pending = await idbStore.all().then((o) => o.length, () => 0);
   if (shouldReload(hiddenMs, pending)) apply();
 }
+
+export type UpdateCheck = "unsupported" | "latest" | "ready";
+
+/** Manual check: look for a new service worker and wait until it is installed (waiting). */
+export async function checkForUpdate(): Promise<UpdateCheck> {
+  const reg = await navigator.serviceWorker?.getRegistration();
+  if (!reg) return "unsupported";
+  await reg.update();
+  const installing = reg.installing;
+  if (installing && !reg.waiting) {
+    await new Promise<void>((done) => {
+      installing.addEventListener("statechange", () => (installing.state === "installed" || installing.state === "redundant") && done());
+    });
+  }
+  return reg.waiting ? "ready" : "latest";
+}
+
+/** Activate the waiting worker (vite-plugin-pwa "prompt" mode listens for SKIP_WAITING) and reload once it controls. */
+export async function applyUpdate() {
+  const reg = await navigator.serviceWorker.getRegistration();
+  navigator.serviceWorker.addEventListener("controllerchange", () => location.reload(), { once: true });
+  reg?.waiting?.postMessage({ type: "SKIP_WAITING" });
+}
+
+export const pendingOps = () => idbStore.all().then((o) => o.length, () => 0);

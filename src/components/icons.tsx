@@ -80,6 +80,7 @@ import CopyOutline from "react-ionicons/lib/CopyOutline";
 import QrCodeOutline from "react-ionicons/lib/QrCodeOutline";
 import BarcodeOutline from "react-ionicons/lib/BarcodeOutline";
 import CardOutline from "react-ionicons/lib/CardOutline";
+import RefreshOutline from "react-ionicons/lib/RefreshOutline";
 import ShieldOutline from "react-ionicons/lib/ShieldOutline";
 import Sunny from "react-ionicons/lib/Sunny";
 import AirplaneOutline from "react-ionicons/lib/AirplaneOutline";
@@ -199,6 +200,7 @@ export const ShieldIcon = wrap(ShieldOutline);
 export const QrIcon = wrap(QrCodeOutline);
 export const BarcodeIcon = wrap(BarcodeOutline);
 export const CardIcon = wrap(CardOutline);
+export const RefreshIcon = wrap(RefreshOutline);
 export const NotificationIcon = wrap(NotificationsOutline);
 
 /** No ionicons bold/underline glyph exists — plain monoline SVGs matching the wrap()'d icons' size contract instead. */
