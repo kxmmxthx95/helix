@@ -38,6 +38,7 @@ jobs:
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client-17 age rclone
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH" # the Ubuntu wrapper in /usr/bin picks v16
           echo "DATE=$(TZ=Asia/Bangkok date +%F)" >> "$GITHUB_ENV"
 
       - name: Keep-alive (any API request counts as activity)
