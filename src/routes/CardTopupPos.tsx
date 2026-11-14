@@ -37,6 +37,7 @@ import { addToCart, cartTotal, categoryOf, isProductCode, setQty, type CartLine 
 import { parseAmount, SALE_MAX, SALE_MIN, TOPUP_MAX, TOPUP_MIN, TX_TYPE_LABEL } from "@/lib/cardTopup";
 import { profileFullName, type PosProduct, type PosStudent } from "@/lib/database.types";
 import { formatBaht } from "@/lib/tuition";
+import { tick } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 import { TerminalsTab } from "@/routes/CardTopupAdmin";
 import { ProductsTab } from "@/routes/CardTopupProducts";
@@ -301,6 +302,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   }
 
   function press(k: (typeof KEYS)[number]) {
+    tick(k === "C" || k === "⌫" ? 700 : 1000);
     if (mode === "topup") {
       topupKey.current = crypto.randomUUID();
       return setTopupAmount((p) => (k === "C" ? "" : k === "⌫" ? p.slice(0, -1) : /^\d{0,3}$/.test(p) ? p + k : p));
@@ -1340,6 +1342,7 @@ function PinUnlockModal({ open, onClose, onUnlocked, forVoid = false }: { open: 
 
   function press(k: (typeof KEYS)[number]) {
     if (busy || locked) return;
+    tick(k === "C" || k === "⌫" ? 700 : 1000);
     setError(null);
     if (k === "C") return setPinText("");
     if (k === "⌫") return setPinText((p) => p.slice(0, -1));
