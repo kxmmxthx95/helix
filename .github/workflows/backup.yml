@@ -1,0 +1,95 @@
+# Nightly backup of the Supabase project (free plan has no backups, and pauses after 7 idle days).
+# Setup + restore steps: docs/BACKUP.md
+name: backup
+
+on:
+  schedule:
+    - cron: "17 19 * * *" # 02:17 Asia/Bangkok
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency: backup
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      RCLONE_CONFIG_R2_TYPE: s3
+      RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
+      RCLONE_CONFIG_SB_TYPE: s3
+      RCLONE_CONFIG_SB_PROVIDER: Other
+      RCLONE_CONFIG_SB_ACCESS_KEY_ID: ${{ secrets.SB_S3_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_SB_SECRET_ACCESS_KEY: ${{ secrets.SB_S3_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_SB_ENDPOINT: ${{ secrets.SUPABASE_URL }}/storage/v1/s3
+      RCLONE_CONFIG_SB_REGION: ap-southeast-1
+      BUCKET: ${{ secrets.R2_BUCKET }}
+    steps:
+      - name: Tools (pg_dump 17 to match the server, age, rclone)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17 age rclone
+          echo "DATE=$(TZ=Asia/Bangkok date +%F)" >> "$GITHUB_ENV"
+
+      - name: Keep-alive (any API request counts as activity)
+        run: |
+          curl -fsS -o /dev/null "${{ secrets.SUPABASE_URL }}/rest/v1/school_settings?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}"
+
+      - name: Dump database (public + auth + storage metadata)
+        run: |
+          pg_dump "${{ secrets.SUPABASE_DB_URL }}" -Fc --no-owner --no-privileges -n public -n auth -n storage -f db.dump
+          # Integrity: the archive must be readable and not tiny.
+          pg_restore -l db.dump > /dev/null
+          test "$(stat -c %s db.dump)" -gt 100000
+          age -r "${{ secrets.AGE_PUBLIC_KEY }}" -o "db-$DATE.dump.age" db.dump
+          rm db.dump
+
+      - name: Upload dump + rotate (daily 14d, weekly 8w, monthly 12m)
+        run: |
+          rclone copyto "db-$DATE.dump.age" "r2:$BUCKET/db/daily/db-$DATE.dump.age"
+          [ "$(date -d "$DATE" +%u)" = 7 ] && rclone copyto "db-$DATE.dump.age" "r2:$BUCKET/db/weekly/db-$DATE.dump.age"
+          [ "$(date -d "$DATE" +%d)" = 01 ] && rclone copyto "db-$DATE.dump.age" "r2:$BUCKET/db/monthly/db-$DATE.dump.age"
+          rclone delete "r2:$BUCKET/db/daily" --min-age 14d
+          rclone delete "r2:$BUCKET/db/weekly" --min-age 56d
+          rclone delete "r2:$BUCKET/db/monthly" --min-age 365d
+          true
+
+      - name: Sync Storage buckets (deleted/overwritten files kept 30 days)
+        run: |
+          rclone sync sb: "r2:$BUCKET/storage" --backup-dir "r2:$BUCKET/storage-old/$DATE" --transfers 8
+          rclone delete "r2:$BUCKET/storage-old" --min-age 30d
+          rclone rmdirs "r2:$BUCKET/storage-old" --leave-root
+
+      - name: Usage check (free plan 500 MB db / 1 GB storage; warn at 80%)
+        run: |
+          db=$(psql "${{ secrets.SUPABASE_DB_URL }}" -Atc "select pg_database_size(current_database())")
+          st=$(psql "${{ secrets.SUPABASE_DB_URL }}" -Atc "select coalesce(sum((metadata->>'size')::bigint),0) from storage.objects")
+          echo "db=$((db/1048576)) MB storage=$((st/1048576)) MB"
+          msg=""
+          [ "$db" -gt $((400*1048576)) ] && msg="ฐานข้อมูล $((db/1048576)) MB เกิน 80% ของ 500 MB (แพลนฟรี) — ตัดสินใจ archive หรืออัปเกรด Pro"
+          [ "$st" -gt $((800*1048576)) ] && msg="$msg Storage $((st/1048576)) MB เกิน 80% ของ 1 GB (แพลนฟรี)"
+          echo "WARN=$msg" >> "$GITHUB_ENV"
+
+      - name: LINE warning (near the free-plan limit)
+        if: env.WARN != ''
+        run: |
+          curl -fsS -X POST https://api.line.me/v2/bot/message/push \
+            -H "Authorization: Bearer ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" -H "Content-Type: application/json" \
+            -d "$(jq -nc --arg to "${{ secrets.LINE_USER_ID }}" --arg t "Helix: $WARN" '{to:$to,messages:[{type:"text",text:$t}]}')"
+
+      - name: LINE alert (backup failed)
+        if: failure()
+        run: |
+          curl -fsS -X POST https://api.line.me/v2/bot/message/push \
+            -H "Authorization: Bearer ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" -H "Content-Type: application/json" \
+            -d "$(jq -nc --arg to "${{ secrets.LINE_USER_ID }}" --arg t "Helix: สำรองข้อมูลคืนนี้ล้มเหลว ดู ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" '{to:$to,messages:[{type:"text",text:$t}]}')"
