@@ -380,6 +380,9 @@ export type StaffAttendanceStatusRow = {
   status: AttendanceStatus | null;
   clock_in_time: string | null;
   clock_out_time: string | null;
+  /** true = ผู้จัดการแก้สถานะเอง (migration 0154) */
+  overridden: boolean;
+  override_reason: string | null;
 };
 
 // --------------------------------------------------------------- duty roster
@@ -1961,6 +1964,14 @@ export type Database = {
       staff_attendance_status: {
         Args: { p_start: string; p_end: string };
         Returns: StaffAttendanceStatusRow[];
+      };
+      set_staff_attendance_override: {
+        Args: { p_profile_id: string; p_date: string; p_status: AttendanceStatus; p_reason: string };
+        Returns: void;
+      };
+      clear_staff_attendance_override: {
+        Args: { p_profile_id: string; p_date: string };
+        Returns: void;
       };
       pos_lookup: {
         Args: { p_card_uid: string | null; p_student_id: string | null };

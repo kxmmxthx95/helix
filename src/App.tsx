@@ -26,7 +26,6 @@ import { CurriculumMap } from "@/routes/CurriculumMap";
 import { MyCurriculum } from "@/routes/MyCurriculum";
 import { StudyMap } from "@/routes/StudyMap";
 import { Employees } from "@/routes/Employees";
-import { StaffAttendance } from "@/routes/StaffAttendance";
 import { Enrollment } from "@/routes/Enrollment";
 import { Roster } from "@/routes/Roster";
 import { Settings } from "@/routes/Settings";
@@ -130,7 +129,7 @@ function Gate() {
         <Route path="student-cards" element={<StudentCards />} />
         <Route path="duty-roster" element={<DutyRoster />} />
         <Route path="employees" element={<Employees />} />
-        <Route path="staff-attendance" element={<StaffAttendance />} />
+        <Route path="staff-attendance" element={<Navigate to="/time-tracking?tab=report" replace />} />
         <Route path="status" element={<StatusManagement />} />
         <Route path="settings" element={<Settings />} />
         <Route path="line-notifications" element={<LineNotifications />} />

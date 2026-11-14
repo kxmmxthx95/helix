@@ -364,17 +364,6 @@ const TABS = [
     teacherOrManagerOnly: true,
   },
   {
-    to: "/staff-attendance",
-    label: "รายงานการมาทำงาน",
-    icon: BarChartIcon,
-    section: "บุคลากร",
-    managerOnly: false,
-    orgWideOnly: false,
-    deptManagerOnly: true,
-    academicManagerOnly: false,
-    teacherOrManagerOnly: false,
-  },
-  {
     to: "/duty-roster",
     label: "เวรประจำวัน",
     icon: ShieldIcon,
@@ -546,8 +535,10 @@ function AppShellInner() {
       (!profile || !isCashierOnly(profile.roles) || t.to === "/card-topup") &&
       (!t.hideFromStudent || !profile || !profile.roles.includes("student")) &&
       // /time-tracking is further gated by the school-wide per-role toggle (migration 0032).
+      // (managers keep it for the "รายงานการมาทำงาน" tab even when their role's clock is off).
       (t.to !== "/time-tracking" ||
-        (profile && profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r)))),
+        (profile &&
+          (canManage(profile.roles) || profile.roles.some((r) => schoolSettings?.time_tracking_roles.includes(r))))),
   );
 
   const tabSections: { section: string; items: typeof tabs }[] = [];
