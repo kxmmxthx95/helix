@@ -49,6 +49,7 @@ import { useRoleSubtitle } from "@/hooks/useProfiles";
 import { useSchoolSettings } from "@/hooks/useSettings";
 import { profileFullName } from "@/lib/database.types";
 import {
+  canIssueBarcode,
   canManage,
   canManageAcademic,
   canManageUsers,
@@ -409,6 +410,18 @@ const TABS = [
     cardTopupOnly: true,
   },
   {
+    to: "/student-cards",
+    label: "บัตรเติมเงิน",
+    icon: PricetagIcon,
+    section: "การเงิน",
+    managerOnly: false,
+    orgWideOnly: false,
+    deptManagerOnly: false,
+    academicManagerOnly: false,
+    teacherOrManagerOnly: false,
+    cardIssueOnly: true,
+  },
+  {
     to: "/line-notifications",
     label: "แจ้งเตือนไลน์",
     icon: NotificationIcon,
@@ -520,6 +533,7 @@ function AppShellInner() {
             profile.roles.includes("student") ||
             profile.roles.includes("parent")))) &&
       (!t.orgWideOrParentOnly || (profile && (isOrgWide(profile.roles) || profile.roles.includes("parent")))) &&
+      (!t.cardIssueOnly || (profile && canIssueBarcode(profile.roles))) &&
       (!t.cardTopupOnly || (profile && (isOrgWide(profile.roles) || profile.roles.includes("cashier") || profile.roles.includes("parent")))) &&
       // A cashier-only account sees nothing but the POS screen.
       (!profile || !isCashierOnly(profile.roles) || t.to === "/card-topup") &&

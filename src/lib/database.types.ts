@@ -1424,6 +1424,13 @@ export type CardSlipRequest = {
   updated_at: string;
 };
 
+/** student_cards.kind (migration 0152): qr = token the system issues; barcode / rfid = a physical card scanned in. */
+export type CardKind = "qr" | "barcode" | "rfid";
+/** card_live_cards() — never carries the full card_uid, only its last 4 characters. */
+export type LiveCard = { id: string; student_id: string; kind: CardKind; status: StudentCardStatus; frozen_by: "parent" | "school" | null; last4: string; created_at: string };
+/** card_history() — derived from audit_logs. */
+export type CardHistoryRow = { at: string; actor: string | null; action: "bind" | "revoke" | "lock" | "unlock"; kind: CardKind; last4: string };
+
 /** card_my_qr() — the live QR token (migration 0117); null when the student has none. */
 export type StudentQr = { token: string; status: StudentCardStatus; frozen_by: "parent" | "school" | null };
 
@@ -1988,8 +1995,24 @@ export type Database = {
         Returns: { ok: true; tx_id: string; balance: number };
       };
       card_bind: {
-        Args: { p_student_id: string; p_card_uid: string };
+        Args: { p_student_id: string; p_card_uid: string; p_kind: "barcode" | "rfid" };
         Returns: void;
+      };
+      card_revoke: {
+        Args: { p_card_id: string };
+        Returns: void;
+      };
+      card_set_locked: {
+        Args: { p_card_id: string; p_locked: boolean };
+        Returns: void;
+      };
+      card_live_cards: {
+        Args: Record<string, never>;
+        Returns: LiveCard[];
+      };
+      card_history: {
+        Args: { p_student_id: string };
+        Returns: CardHistoryRow[];
       };
       pos_student_by_code: {
         Args: { p_code: string };

@@ -9,7 +9,6 @@ import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Avatar, AvatarCard, BuddhistDateSelect, Card, EmptyState, Field, FormSection, Input, Select, SheetFormContext, Skeleton, Spinner, Switch } from "@/components/ui";
 import { avatarUrl, studentAvatarUrl } from "@/hooks/useAvatar";
-import { useIssueQr, useIssueQrBulk, useLiveCardStatus } from "@/hooks/useCardTopup";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useClassrooms } from "@/hooks/useStatusManagement";
 import { useDepartments, useInviteUsers, type InviteOutcome, type UserInvite } from "@/hooks/useProfiles";
@@ -242,30 +241,6 @@ function AccountCell({ row, compact }: { row: StudentListItem; compact?: boolean
   );
 }
 
-function BarcodeCell({ status, pending, onIssue }: { status?: string; pending: boolean; onIssue: () => void }) {
-  if (!status)
-    return (
-      <Button
-        variant="tinted"
-        size="sm"
-        disabled={pending}
-        onClick={(e) => {
-          e.stopPropagation();
-          onIssue();
-        }}
-      >
-        สร้างบาร์โค้ด
-      </Button>
-    );
-  const frozen = status === "frozen";
-  return (
-    <span className={cn("inline-flex items-center gap-1 text-xs font-medium", frozen ? "text-warning" : "text-success")}>
-      <CheckmarkCircleIcon className="size-3.5" />
-      {frozen ? "สร้างแล้ว (ระงับ)" : "สร้างแล้ว"}
-    </span>
-  );
-}
-
 export function pickAddress(v: AddressFields): AddressFields {
   return Object.fromEntries(ADDRESS_KEYS.map((k) => [k, v[k]])) as AddressFields;
 }
@@ -409,18 +384,6 @@ export function Roster() {
   // through to see it. mayView opens the row read-only for them.
   const mayView = mayEdit || (me?.roles.includes("teacher") ?? false);
   const mayManageUsers = me ? canManageUsers(me.roles) : false;
-  const mayIssueBarcode = me ? canIssueBarcode(me.roles) : false;
-  const { data: cardStatus } = useLiveCardStatus();
-  const issueBarcode = useIssueQr();
-  const issueBarcodeBulk = useIssueQrBulk();
-  const [barcodeBulkOpen, setBarcodeBulkOpen] = useState(false);
-  const missingBarcode = (rows ?? []).filter((r) => !cardStatus?.has(r.id));
-  const toast = useToast();
-  const issue = (id: string) =>
-    issueBarcode.mutate(id, {
-      onSuccess: () => toast("สร้างบาร์โค้ดสำเร็จ"),
-      onError: (e) => toast(e instanceof Error ? e.message : "สร้างบาร์โค้ดไม่สำเร็จ", "error"),
-    });
   const deleteStudent = useDeleteStudent();
   const removeStudent = (row: Student) => {
     if (
@@ -475,11 +438,6 @@ export function Roster() {
             </span>
           )}
         </Button>
-        {mayIssueBarcode && (
-          <Button variant="outline" size="icon" className="shrink-0" onClick={() => setBarcodeBulkOpen(true)} aria-label="สร้างบาร์โค้ดทุกคน">
-            <BarcodeIcon className="h-3 w-3" />
-          </Button>
-        )}
         {mayManageUsers && (
           <Button
             variant="outline"
@@ -646,12 +604,9 @@ export function Roster() {
                       </div>
                     </div>
                   </div>
-                  {(mayManageUsers || mayIssueBarcode) && (
+                  {mayManageUsers && (
                     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2.5">
-                      {mayIssueBarcode && (
-                        <BarcodeCell status={cardStatus?.get(row.id)} pending={issueBarcode.isPending} onIssue={() => issue(row.id)} />
-                      )}
-                      {!mayManageUsers ? null : row.profile_id ? (
+                      {row.profile_id ? (
                         <AccountCell row={row} compact />
                       ) : (
                         <Button
@@ -684,7 +639,6 @@ export function Roster() {
                     <th className="px-4 py-3">ชั้น</th>
                     <th className="px-4 py-3">สถานะ</th>
                     {mayManageUsers && <th className="px-4 py-3">บัญชี</th>}
-                    {mayIssueBarcode && <th className="px-4 py-3">บาร์โค้ด</th>}
                     {mayEdit && <th className="w-14 px-4 py-3" />}
                   </tr>
                 </thead>
@@ -760,11 +714,6 @@ export function Roster() {
                             )}
                           </td>
                         )}
-                        {mayIssueBarcode && (
-                          <td className="px-4 py-0">
-                            <BarcodeCell status={cardStatus?.get(row.id)} pending={issueBarcode.isPending} onIssue={() => issue(row.id)} />
-                          </td>
-                        )}
                         {mayEdit && (
                           <td className="px-4 py-0 text-right">
                             <Button
@@ -793,12 +742,11 @@ export function Roster() {
       )}
 
       {hasSearch && rows && (
-        <div className={`sticky bottom-0 z-10 mt-auto grid shrink-0 grid-cols-2 gap-2 bg-background pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 ${mayIssueBarcode ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
+        <div className={`sticky bottom-0 z-10 mt-auto grid shrink-0 grid-cols-2 gap-2 bg-background pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 lg:grid-cols-4`}>
           <StatCard tone="accent" icon={<UsersIcon className="h-5 w-5" />} label="ทั้งหมด" value={rows.length} unit="คน" />
           <StatCard tone="success" icon={<CheckmarkCircleIcon className="h-5 w-5" />} label="กำลังศึกษา" value={rows.filter((r) => r.status === "studying").length} unit="คน" />
           <StatCard tone="muted" icon={<ProfileIcon className="h-5 w-5" />} label="มีบัญชีแล้ว" value={rows.filter((r) => r.profile_id).length} unit="คน" />
           <StatCard tone="warning" icon={<KeyIcon className="h-5 w-5" />} label="ยังไม่มีบัญชี" value={rows.filter((r) => !r.profile_id).length} unit="คน" />
-          {mayIssueBarcode && <StatCard tone="accent" icon={<BarcodeIcon className="h-5 w-5" />} label="มีบาร์โค้ดแล้ว" value={rows.length - missingBarcode.length} unit="คน" />}
         </div>
       )}
 
@@ -885,41 +833,6 @@ export function Roster() {
             </Select>
           </Field>
         </FormSection>
-      </Modal>
-
-      <Modal
-        open={barcodeBulkOpen}
-        onOpenChange={setBarcodeBulkOpen}
-        title="สร้างบาร์โค้ดทุกคน"
-        description="ตามรายชื่อที่กรองอยู่ในหน้านี้"
-        footer={
-          <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setBarcodeBulkOpen(false)}>
-              ยกเลิก
-            </Button>
-            <Button
-              className="flex-1"
-              disabled={missingBarcode.length === 0 || issueBarcodeBulk.isPending}
-              onClick={() =>
-                issueBarcodeBulk.mutate(
-                  missingBarcode.map((r) => r.id),
-                  {
-                    onSuccess: (n) => (toast(`สร้างบาร์โค้ด ${n} คน`), setBarcodeBulkOpen(false)),
-                    onError: (e) => toast(e instanceof Error ? e.message : "สร้างบาร์โค้ดไม่สำเร็จ", "error"),
-                  },
-                )
-              }
-            >
-              {issueBarcodeBulk.isPending ? <Spinner /> : `สร้าง ${missingBarcode.length} คน`}
-            </Button>
-          </div>
-        }
-      >
-        <p className="text-sm text-muted-foreground">
-          {missingBarcode.length > 0
-            ? `จะสร้างบาร์โค้ดให้ ${missingBarcode.length} คนที่ยังไม่มี คนที่มีอยู่แล้วจะไม่ถูกเปลี่ยน`
-            : "ทุกคนในรายการนี้มีบาร์โค้ดแล้ว"}
-        </p>
       </Modal>
 
       <EditStudentSheet target={editing} onClose={() => setEditing(null)} />

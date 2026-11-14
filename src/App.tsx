@@ -42,6 +42,7 @@ import { canUsePos, isCashierOnly } from "@/lib/roles";
 import { PosLogin, POS_DENIED_KEY } from "@/routes/PosLogin";
 import { CardTopup } from "@/routes/CardTopup";
 import { CardTopupForm } from "@/routes/CardTopupForm";
+import { StudentCards } from "@/routes/StudentCards";
 import { Tuition } from "@/routes/Tuition";
 import { Leave } from "@/routes/Leave";
 import { LineNotifications } from "@/routes/LineNotifications";
@@ -126,6 +127,7 @@ function Gate() {
         <Route path="tuition" element={<Tuition />} />
         <Route path="card-topup" element={<CardTopup />} />
         <Route path="card-topup/:studentId" element={<CardTopupForm />} />
+        <Route path="student-cards" element={<StudentCards />} />
         <Route path="duty-roster" element={<DutyRoster />} />
         <Route path="employees" element={<Employees />} />
         <Route path="staff-attendance" element={<StaffAttendance />} />

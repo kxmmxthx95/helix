@@ -15,6 +15,9 @@ import type {
   Student,
   StudentQr,
   CardTopupRow,
+  CardHistoryRow,
+  CardKind,
+  LiveCard,
 } from "@/lib/database.types";
 import { compressImage } from "@/lib/image";
 import { supabase } from "@/lib/supabase";
@@ -350,6 +353,45 @@ export function useIssueQr() {
     onSettled: refresh,
   });
 }
+
+// ------------------------------------------- บัตรเติมเงิน page: bind / revoke / lock (0152)
+
+/** Live cards of every student the caller may manage, grouped by student. */
+export function useLiveCards() {
+  return useQuery({
+    queryKey: ["student_cards", "live_cards"],
+    queryFn: async () => {
+      const rows = await rpc<LiveCard[]>(() => supabase.rpc("card_live_cards"));
+      const byStudent = new Map<string, LiveCard[]>();
+      for (const c of rows) byStudent.set(c.student_id, [...(byStudent.get(c.student_id) ?? []), c]);
+      return byStudent;
+    },
+  });
+}
+
+export function useCardHistory(studentId: string | null) {
+  return useQuery({
+    queryKey: ["student_cards", "history", studentId],
+    enabled: !!studentId,
+    queryFn: () => rpc<CardHistoryRow[]>(() => supabase.rpc("card_history", { p_student_id: studentId! })),
+  });
+}
+
+function useCardMutation<A>(run: (a: A) => PromiseLike<{ data: unknown; error: { message: string } | null }>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (a: A) => rpc<void>(() => run(a)),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["student_cards"] }),
+  });
+}
+
+export const useBindCard = () =>
+  useCardMutation((a: { student_id: string; card_uid: string; kind: Exclude<CardKind, "qr"> }) =>
+    supabase.rpc("card_bind", { p_student_id: a.student_id, p_card_uid: a.card_uid, p_kind: a.kind }),
+  );
+export const useRevokeCard = () => useCardMutation((id: string) => supabase.rpc("card_revoke", { p_card_id: id }));
+export const useLockCard = () =>
+  useCardMutation((a: { id: string; locked: boolean }) => supabase.rpc("card_set_locked", { p_card_id: a.id, p_locked: a.locked }));
 
 // ------------------------------------------- parent / student portal (0108)
 
