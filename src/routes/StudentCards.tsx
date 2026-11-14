@@ -273,10 +273,11 @@ function StudentCardsPanel({ student, cards }: { student: StudentListItem; cards
 
       <section className="flex flex-col gap-2">
         <h3 className="text-[13px] font-semibold">ผูกบัตร RFID</h3>
-        <form onSubmit={(e) => (e.preventDefault(), submit())} className="flex gap-2">
-          <Input ref={input} value={code} onChange={(e) => setCode(e.target.value)} placeholder="สแกนหรือพิมพ์เลขบัตร แล้วกด Enter" autoFocus autoComplete="off" />
-          <Button type="submit" disabled={!code.trim() || bind.isPending}>ผูก</Button>
-        </form>
+        <div className="flex gap-2">
+          {/* The reader types the UID then Enter; Enter must not bind — only the ผูก button does. */}
+          <Input ref={input} value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.preventDefault()} placeholder="แตะบัตรหรือพิมพ์เลขบัตร แล้วกดปุ่มผูก" autoFocus autoComplete="off" />
+          <Button type="button" onClick={submit} disabled={!code.trim() || bind.isPending}>ผูก</Button>
+        </div>
         {cards.some((c) => c.kind === kind) && <p className="text-xs text-muted-foreground">มี{KIND_LABEL[kind]}อยู่แล้ว — ผูกใหม่จะแทนที่ใบเดิม</p>}
       </section>
 
