@@ -105,13 +105,14 @@ export function PlanCard({
       className={cn(
         "relative flex w-full flex-col rounded-lg px-2 py-1.5 text-left leading-snug transition-opacity",
         roomy && "min-h-[4.25rem] justify-center rounded-xl px-3 py-2",
-        filled ? gradient : "border border-dashed border-border text-muted-foreground",
-        !readOnly && !filled && "hover:bg-muted/60",
+        filled ? gradient : "border border-dashed border-destructive/50 text-destructive",
+        !readOnly && !filled && "hover:bg-destructive/5",
         !readOnly && filled && "hover:opacity-90",
       )}
     >
       <span className="text-[10px] tabular-nums opacity-70">
-        คาบ {ordinal} {time}
+        คาบ {ordinal}
+        {time && <span className="block">{time}</span>}
       </span>
       <span className={cn("line-clamp-2 pr-4 text-xs", filled && "font-semibold")}>{topic?.title ?? (taught ? "สอนแล้ว" : "ว่าง")}</span>
       {taught &&

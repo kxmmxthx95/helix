@@ -107,13 +107,14 @@ function MyTeachingPlan() {
             })}
       </div>
 
-      <div className="table-panel hidden md:flex">
+      <div className="table-panel hidden rounded-none border-t border-border shadow-none md:flex">
         <div className="table-panel-scroll scrollbar-hidden">
           <table className="w-full text-[13px]">
             <thead className="text-left text-xs">
               <tr>
                 <th className="px-4 py-3">วิชา</th>
-                <th className="px-4 py-3">ชั้น · ห้อง</th>
+                <th className="px-4 py-3">ชั้น</th>
+                <th className="px-4 py-3">ห้อง</th>
                 <th className="px-4 py-3 text-center">ความคืบหน้า</th>
                 <th className="px-4 py-3">สถานะ</th>
                 <th className="w-10 px-4 py-3" />
@@ -123,7 +124,7 @@ function MyTeachingPlan() {
               {isLoading
                 ? [0, 1, 2].map((i) => (
                     <tr key={i} role="status" aria-label="กำลังโหลด" className="h-14 border-t border-border first:border-t-0">
-                      {["w-40", "w-24", "w-48", "w-32"].map((w, j) => (
+                      {["w-40", "w-24", "w-12", "w-48", "w-32"].map((w, j) => (
                         <td key={j} className="px-4 py-0">
                           <Skeleton className={`h-3 ${w}`} />
                         </td>
@@ -150,8 +151,11 @@ function MyTeachingPlan() {
                             <p className="font-mono text-xs tabular-nums text-muted-foreground">{l.code}</p>
                           </Link>
                         </td>
-                        <td className="px-4 py-0 text-muted-foreground">{l.where}</td>
-                        <td className="px-4 py-0">{p && <PlanProgress stats={p.stats} className="mx-auto max-w-60" />}</td>
+                        <td className="px-4 py-0">
+                          <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">{l.grade}</span>
+                        </td>
+                        <td className="px-4 py-0 text-muted-foreground">{l.room}</td>
+                        <td className="px-4 py-0">{p && <PlanProgress stats={p.stats} className="mx-auto w-40 flex-col gap-1.5 [&>div]:w-full [&>div]:flex-none" />}</td>
                         <td className="px-4 py-0 text-xs text-muted-foreground">{nextText(p)}</td>
                         <td className="px-4 py-0 text-muted-foreground">
                           <ChevronForward className="h-3 w-3" />

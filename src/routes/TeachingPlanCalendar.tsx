@@ -1,14 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useId, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { ChevronBack, ChevronForward } from "@/components/icons";
+import { CheckmarkCircleIcon, ChevronBack, ChevronForward, Search } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { PlanMonthGrid } from "@/components/PlanMonthGrid";
 import { PlanWeekGrid } from "@/components/PlanWeekGrid";
-import { PlanProgress, useAssignmentLabel } from "@/components/TeachingPlanParts";
+import { useAssignmentLabel } from "@/components/TeachingPlanParts";
 import { useToast } from "@/components/Toast";
-import { Button, EmptyState, Spinner } from "@/components/ui";
+import { Button, EmptyState, Input, Select, Spinner } from "@/components/ui";
 import { useAcademicEvents, useAllAcademicTerms } from "@/hooks/useAcademicTerms";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
@@ -140,17 +140,32 @@ export function TeachingPlanCalendar() {
 
   return (
     <div className="page-fill">
-      <div className="shrink-0 space-y-2">
-        <Link to="/teaching-plan?tab=mine" className="inline-flex items-center gap-1 text-xs text-accent">
-          <ChevronBack className="h-3 w-3" /> ทุกวิชา
-        </Link>
+      <div data-slot="plan-banner" className="shrink-0 space-y-1">
+        <div className="flex items-center gap-1">
+          <Link
+            to="/teaching-plan?tab=mine"
+            aria-label="กลับ"
+            className="-ml-3 inline-flex size-11 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+          >
+            <ChevronBack className="h-4 w-4" />
+          </Link>
+          <h2 className="min-w-0 truncate text-xl font-semibold leading-snug">{info.name}</h2>
+        </div>
         <div>
-          <p className="text-xs text-muted-foreground">
-            {info.code}
-            {info.learningArea && ` · ${info.learningArea}`} · {info.where}
-          </p>
-          <h2 className="text-lg font-semibold leading-snug">{info.name}</h2>
-          <PlanProgress stats={stats} className="mt-1" />
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
+            {(
+              [
+                [info.code, `font-mono tabular-nums ${styling.outline(assignment.subject_id)}`],
+                [info.grade, "border-accent/60 text-accent"],
+                [`ห้อง ${info.room}`, "border-warning/60 text-warning"],
+                [`${stats.total} คาบ`, "border-border text-muted-foreground"],
+              ] as const
+            ).map(([t, tone]) => (
+              <span key={t} className={cn("inline-flex h-6 items-center rounded-full border bg-card px-2.5 text-xs font-medium", tone)}>
+                {t}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -180,20 +195,15 @@ export function TeachingPlanCalendar() {
                   ? new Date(`${first}T00:00:00Z`).toLocaleDateString("th-TH", { month: "long", year: "numeric", timeZone: "UTC" })
                   : `${fmt(week)} – ${fmt(addDays(week, 5))}`}
               </span>
-              <div className="ml-auto flex gap-1 rounded-xl bg-fill p-1 max-sm:hidden" role="radiogroup" aria-label="มุมมอง">
-                {(["week", "month"] as const).map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    role="radio"
-                    aria-checked={view === v}
-                    onClick={() => setView(v)}
-                    className={cn("h-7 rounded-lg px-3 text-xs font-medium transition-colors", view === v ? "bg-card shadow-sm" : "text-muted-foreground")}
-                  >
-                    {v === "week" ? "สัปดาห์" : "เดือน"}
-                  </button>
-                ))}
-              </div>
+              <Select
+                className="ml-auto w-auto max-sm:hidden"
+                value={view}
+                onChange={(e) => setView(e.target.value as "week" | "month")}
+                aria-label="มุมมอง"
+              >
+                <option value="week">สัปดาห์</option>
+                <option value="month">เดือน</option>
+              </Select>
               {!readOnly && (
                 <Button size="sm" className="max-sm:ml-auto" onClick={() => setTopicsOpen(true)}>
                   หัวข้อ
@@ -242,27 +252,29 @@ export function TeachingPlanCalendar() {
       )}
 
       <Sheet open={topicsOpen} onOpenChange={setTopicsOpen} title="หัวข้อ" description="เลือกหัวข้อ แล้วแตะช่องในปฏิทินเพื่อวาง" closable>
-        <div className="space-y-1.5">
-          {topics.length === 0 && <p className="text-sm text-muted-foreground">ยังไม่มีผังการเรียนของวิชานี้ (ชื่อวิชาต้องขึ้นต้นด้วยชื่อวิชาในผังการเรียน) และระดับชั้นนี้</p>}
-          <LessonCards topics={topics}>
-            {(t) => {
-              const n = countOf(t.id);
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => {
-                    setArmed(t);
-                    setTopicsOpen(false);
-                  }}
-                  className={cn("block w-full rounded-md border bg-card px-3 py-2 text-left text-sm hover:bg-muted/60", n === 0 ? "border-warning/50" : "border-border")}
-                >
-                  <p className="font-medium leading-snug">{t.title}</p>
-                  <p className={cn("text-xs", n === 0 ? "text-warning" : "text-muted-foreground")}>{n === 0 ? "ยังไม่ได้วาง" : `${n} คาบ`}</p>
-                </button>
-              );
+        <div className="space-y-3">
+          {armed && (
+            <div className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5", styling.gradient(assignment.subject_id, assignment.classroom_id))}>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] opacity-70">หัวข้อที่เลือกไว้</p>
+                <p className="truncate text-sm font-semibold">{armed.title}</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setArmed(null)}>
+                ยกเลิก
+              </Button>
+            </div>
+          )}
+          <TopicPicker
+            topics={topics}
+            countOf={countOf}
+            tone={styling.gradient(assignment.subject_id, assignment.classroom_id)}
+            selectedId={armed?.id}
+            emptyText="ยังไม่มีผังการเรียนของวิชานี้ (ชื่อวิชาต้องขึ้นต้นด้วยชื่อวิชาในผังการเรียน) และระดับชั้นนี้"
+            onPick={(t) => {
+              setArmed(t);
+              setTopicsOpen(false);
             }}
-          </LessonCards>
+          />
         </div>
       </Sheet>
 
@@ -273,6 +285,8 @@ export function TeachingPlanCalendar() {
           cell={picked}
           slot={slotAt(picked)}
           topics={topics}
+          countOf={countOf}
+          tone={styling.gradient(assignment.subject_id, assignment.classroom_id)}
           onClose={() => setPicked(null)}
         />
       )}
@@ -285,12 +299,17 @@ function SlotSheet({
   cell,
   slot,
   topics,
+  countOf,
+  tone,
   onClose,
 }: {
   assignmentId: string;
   cell: SlotCell;
   slot: TeachingPlanSlot | undefined;
   topics: PlanTopicItem[];
+  countOf: (topicId: string) => number;
+  /** Subject area gradient (same as the calendar cards). */
+  tone: string;
   onClose: () => void;
 }) {
   const toast = useToast();
@@ -299,6 +318,7 @@ function SlotSheet({
   const key = { teaching_assignment_id: assignmentId, slot_date: cell.date, period_no: cell.periodNo };
   const fail = (e: unknown) => toast(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ", "error");
   const busy = place.isPending || clear.isPending;
+  const current = topics.find((t) => t.id === slot?.topic_id);
 
   return (
     <Sheet
@@ -308,34 +328,93 @@ function SlotSheet({
       bottomOnPhone
       closable
     >
-      <div className="space-y-4">
-        <div className="space-y-1.5">
-          <p className="text-xs font-medium text-muted-foreground">เลือกหัวข้อ</p>
-          {topics.length === 0 && <p className="text-sm text-muted-foreground">ยังไม่มีผังการเรียนของวิชานี้ในระดับชั้นนี้</p>}
-          <LessonCards topics={topics} openId={slot?.topic_id}>
-            {(t) => (
+      <div className="space-y-3">
+        {slot && (
+          <div className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5", tone)}>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] opacity-70">หัวข้อที่วางไว้</p>
+              <p className="truncate text-sm font-semibold">{current?.title ?? "สอนแล้ว"}</p>
+            </div>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => clear.mutate(slot.id, { onSuccess: onClose, onError: fail })}>
+              ลบ
+            </Button>
+          </div>
+        )}
+
+        <TopicPicker
+          topics={topics}
+          countOf={countOf}
+          tone={tone}
+          selectedId={slot?.topic_id}
+          disabled={busy}
+          emptyText="ยังไม่มีผังการเรียนของวิชานี้ในระดับชั้นนี้"
+          onPick={(t) => place.mutate({ ...key, topic_id: t.id }, { onSuccess: onClose, onError: fail })}
+        />
+      </div>
+    </Sheet>
+  );
+}
+
+// Search + lesson accordion + topic rows; shared by the "หัวข้อ" drawer and the per-cell sheet.
+function TopicPicker({
+  topics,
+  countOf,
+  tone,
+  selectedId,
+  disabled,
+  emptyText,
+  onPick,
+}: {
+  topics: PlanTopicItem[];
+  countOf: (topicId: string) => number;
+  tone: string;
+  selectedId?: string | null;
+  disabled?: boolean;
+  emptyText: string;
+  onPick: (t: PlanTopicItem) => void;
+}) {
+  const [q, setQ] = useState("");
+  const needle = q.trim().toLowerCase();
+  const shown = needle ? topics.filter((t) => `${t.title} ${t.lessonName}`.toLowerCase().includes(needle)) : topics;
+  if (topics.length === 0) return <p className="text-sm text-muted-foreground">{emptyText}</p>;
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหาหัวข้อ" aria-label="ค้นหาหัวข้อ" className="pl-9" />
+      </div>
+      {shown.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">ไม่พบหัวข้อ</p>}
+      <div className="space-y-1.5">
+        <LessonCards topics={shown} openId={selectedId} forceOpen={!!needle} countOf={countOf}>
+          {(t) => {
+            const on = selectedId === t.id;
+            const n = countOf(t.id);
+            return (
               <button
                 key={t.id}
                 type="button"
-                disabled={busy}
-                onClick={() => place.mutate({ ...key, topic_id: t.id }, { onSuccess: onClose, onError: fail })}
+                disabled={disabled}
+                aria-pressed={on}
+                onClick={() => onPick(t)}
                 className={cn(
-                  "block w-full rounded-md border px-3 py-2 text-left text-sm hover:bg-muted/60",
-                  slot?.topic_id === t.id ? "border-foreground/40 ring-1 ring-foreground/20" : "border-border",
+                  "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors active:bg-muted",
+                  on ? cn(tone, "font-semibold") : "hover:bg-muted/60",
                 )}
               >
-                {t.title}
+                <span className="min-w-0 flex-1 leading-snug">{t.title}</span>
+                {on ? (
+                  <CheckmarkCircleIcon className="h-5 w-5 shrink-0" aria-label="เลือกอยู่" />
+                ) : (
+                  <span className={cn("shrink-0 text-xs tabular-nums", n === 0 ? "text-warning" : "text-muted-foreground")}>
+                    {n === 0 ? "ยังไม่วาง" : `วางแล้ว ${n} คาบ`}
+                  </span>
+                )}
               </button>
-            )}
-          </LessonCards>
-          {slot && (
-            <Button variant="outline" disabled={busy} onClick={() => clear.mutate(slot.id, { onSuccess: onClose, onError: fail })}>
-              ล้างช่องนี้
-            </Button>
-          )}
-        </div>
+            );
+          }}
+        </LessonCards>
       </div>
-    </Sheet>
+    </div>
   );
 }
 
@@ -343,26 +422,36 @@ function SlotSheet({
 function LessonCards({
   topics,
   openId,
+  forceOpen,
+  countOf,
   children,
 }: {
   topics: PlanTopicItem[];
   openId?: string | null;
+  forceOpen?: boolean;
+  countOf?: (topicId: string) => number;
   children: (t: PlanTopicItem) => ReactNode;
 }) {
+  const group = useId(); // same `name` = native exclusive accordion: opening a lesson closes the others
   return (
     <>
-      {groupByLesson(topics).map(([lesson, items]) => (
-        <details key={lesson} open={items.some((t) => t.id === openId)} className="group rounded-lg border border-border bg-card">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
-            <span className="text-sm font-semibold leading-snug">{lesson}</span>
-            <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-              {items.length} หัวข้อ
-              <ChevronForward className="h-3 w-3 transition-transform group-open:rotate-90" />
-            </span>
-          </summary>
-          <div className="space-y-1.5 px-2 pb-2">{items.map(children)}</div>
-        </details>
-      ))}
+      {groupByLesson(topics).map(([lesson, items]) => {
+        const placed = countOf ? items.filter((t) => countOf(t.id) > 0).length : null;
+        return (
+          <details key={lesson} name={forceOpen ? undefined : group} open={forceOpen || items.some((t) => t.id === openId)} className="group rounded-xl border border-border bg-card">
+            <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
+              <span className="text-base font-semibold leading-snug">{lesson}</span>
+              <span className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
+                <span className={cn("tabular-nums", placed === items.length && "text-success")}>
+                  {placed === null ? `${items.length} หัวข้อ` : `วางแล้ว ${placed}/${items.length}`}
+                </span>
+                <ChevronForward className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+              </span>
+            </summary>
+            <div className="space-y-0.5 px-1.5 pb-1.5">{items.map(children)}</div>
+          </details>
+        );
+      })}
     </>
   );
 }

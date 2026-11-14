@@ -525,6 +525,8 @@ export type TimetableStyling = {
   color: (subjectId: string, classroomId: string) => string;
   /** Same hue and shade as `color`, as a gradient — for the timetable grid cards. */
   gradient: (subjectId: string, classroomId: string) => string;
+  /** Coloured border + text of the subject's area hue (white-card chip). */
+  outline: (subjectId: string) => string;
   typeLabel: (subjectId: string) => string;
   /** Pill classes for the subject-type badge. */
   typeBadge: (subjectId: string) => string;
@@ -547,6 +549,7 @@ export function useTimetableStyling(
         colors.shade(byId.get(subjectId)?.learning_area_id, classrooms.find((c) => c.id === classroomId)?.grade_level_id),
       gradient: (subjectId, classroomId) =>
         colors.gradient(byId.get(subjectId)?.learning_area_id, classrooms.find((c) => c.id === classroomId)?.grade_level_id),
+      outline: (subjectId) => colors.outline(byId.get(subjectId)?.learning_area_id),
       typeLabel: (subjectId) => {
         const t = byId.get(subjectId)?.subject_type;
         return t ? SUBJECT_TYPE_LABEL[t] : "";

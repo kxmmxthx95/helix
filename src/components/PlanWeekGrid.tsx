@@ -33,7 +33,8 @@ export function PlanWeekGrid(p: Props) {
   const periodAt = new Map(p.periods.map((x) => [`${x.day_of_week}-${x.period_no}`, x]));
   const dateOf = (day: number) => addDays(p.week, day - 1);
   const [picked, setPicked] = useState<number | null>(null);
-  const listDay = picked ?? days.find((d) => dateOf(d) === p.today) ?? days[0] ?? 1;
+  const live = new Set(p.cells.map((c) => days.find((d) => dateOf(d) === c.date)).filter((d): d is number => d != null));
+  const listDay = picked ?? days.find((d) => live.has(d) && dateOf(d) === p.today) ?? days.find((d) => live.has(d)) ?? days[0] ?? 1;
 
   const cell = (day: number, no: number) => p.cells.find((c) => c.date === dateOf(day) && c.periodNo === no);
   const card = (c: SlotCell, day: number) => {
@@ -63,9 +64,10 @@ export function PlanWeekGrid(p: Props) {
               type="button"
               role="tab"
               aria-selected={d === listDay}
+              disabled={!live.has(d)}
               onClick={() => setPicked(d)}
               className={cn(
-                "h-9 shrink-0 rounded-full px-4 text-[13px] font-medium transition-colors",
+                "h-9 shrink-0 rounded-full px-4 text-[13px] font-medium transition-colors disabled:opacity-40",
                 d === listDay ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
               )}
             >
@@ -114,7 +116,10 @@ export function PlanWeekGrid(p: Props) {
             <tr className="h-12">
               <th className="w-28 px-2 py-3 text-center font-medium">คาบ / เวลา</th>
               {days.map((d) => (
-                <th key={d} className={cn("border-l border-border px-2 py-3 text-center font-medium", dateOf(d) === p.today && "text-accent")}>
+                <th
+                  key={d}
+                  className={cn("border-l border-border px-2 py-3 text-center font-medium", dateOf(d) === p.today && "text-accent", !live.has(d) && "opacity-40")}
+                >
                   <span className="block">{DAY[d]}</span>
                   <span className="block font-normal tabular-nums">{fmt(dateOf(d))}</span>
                   {p.closed(dateOf(d)) && <span className="block truncate font-normal text-warning">{p.closed(dateOf(d))}</span>}
@@ -164,7 +169,7 @@ export function PlanWeekGrid(p: Props) {
                     const c = cell(d, no);
                     return (
                       <td key={d} className="border-l border-border p-1">
-                        {c ? card(c, d) : <div className={cn("min-h-[4.25rem] rounded-lg", p.closed(dateOf(d)) ? "bg-muted/60" : "bg-muted/20")} />}
+                        {c ? card(c, d) : <div aria-disabled="true" className={cn("min-h-[4.25rem] rounded-lg bg-muted/60", !live.has(d) && "opacity-60")} />}
                       </td>
                     );
                   })}

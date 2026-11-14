@@ -48,6 +48,8 @@ export function useAssignmentLabel(departmentId: string | null) {
       code: s?.code ?? "—",
       learningArea: learningAreas.find((x) => x.id === s?.learning_area_id)?.name ?? "",
       name: s?.name_th ?? "—",
+      grade: g?.name ?? "—",
+      room: c?.name ?? "—",
       where: [g?.name, c?.name].filter(Boolean).join(" · ") || "—",
     };
   };

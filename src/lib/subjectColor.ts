@@ -188,4 +188,17 @@ const SHADE_HEX: Record<AreaHue, [string, string, string]> = {
 export const subjectHex = (hue: AreaHue, step: GradeStep = 1) => SHADE_HEX[hue][step];
 export const subjectShade = (hue: AreaHue, step: GradeStep = 1) => SHADES[hue][step];
 export const subjectGradient = (hue: AreaHue, step: GradeStep = 1) => GRADIENTS[hue][step];
+/** Outline chip: coloured border + text on a white card. */
+const OUTLINES: Record<AreaHue, string> = {
+  rose: "border-rose-400 text-rose-700 dark:text-rose-300",
+  blue: "border-blue-400 text-blue-700 dark:text-blue-300",
+  emerald: "border-emerald-400 text-emerald-700 dark:text-emerald-300",
+  amber: "border-amber-400 text-amber-700 dark:text-amber-300",
+  orange: "border-orange-400 text-orange-700 dark:text-orange-300",
+  violet: "border-violet-400 text-violet-700 dark:text-violet-300",
+  cyan: "border-cyan-400 text-cyan-700 dark:text-cyan-300",
+  pink: "border-pink-400 text-pink-700 dark:text-pink-300",
+  slate: "border-slate-400 text-slate-700 dark:text-slate-300",
+};
+export const subjectOutline = (hue: AreaHue) => OUTLINES[hue];
 export const areaDot = (hue: AreaHue) => DOTS[hue];
