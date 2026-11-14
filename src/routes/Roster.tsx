@@ -966,13 +966,13 @@ export function EditStudentSheet({
     if (invalid.length) {
       setAttempted(true);
       setTab("general");
-      toast(`กรอกข้อมูลให้ถูกต้อง (${invalid.length} ช่อง)`, "error");
+      toast(`บันทึกไม่ได้: ${Object.values(errors).slice(0, 3).join(" · ")}${invalid.length > 3 ? ` (+${invalid.length - 3})` : ""}`, "error");
       return;
     }
     const problem = guardianProblem(currentGuardians, currentSource);
     if (problem) {
       setTab("guardian");
-      toast(problem, "error");
+      toast(`บันทึกไม่ได้ — ${problem}`, "error");
       return;
     }
     // Guardians are only rewritten once edited, so a slow-loading list can never be mistaken for "cleared".
@@ -987,9 +987,9 @@ export function EditStudentSheet({
         if (guardiansEdited) await saveGuardians(id, guardianDrafts, guardianRows, source);
         await extra?.afterSave?.(draftToSave);
         toast("บันทึกข้อมูลนักเรียนสำเร็จ");
+        close();
       })
-      .catch((err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"));
-    close();
+      .catch((err) => toast(`บันทึกไม่ได้: ${err instanceof Error ? err.message : "ไม่ทราบสาเหตุ"}`, "error"));
   }
 
   const title = extra?.title ?? (isNew ? "เพิ่มนักเรียน" : readOnly ? "ข้อมูลนักเรียน" : "แก้ไขข้อมูลนักเรียน");
@@ -1005,7 +1005,7 @@ export function EditStudentSheet({
         {readOnly ? "ปิด" : "ยกเลิก"}
       </Button>
       {!readOnly && (
-        <Button type="submit" form="edit-student" className="flex-1">
+        <Button type="submit" form="edit-student" className="flex-1" disabled={save.isPending}>
           บันทึก
         </Button>
       )}
