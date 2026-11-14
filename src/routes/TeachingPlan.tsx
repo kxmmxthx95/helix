@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronForward } from "@/components/icons";
 import { PlanProgress, useAssignmentLabel } from "@/components/TeachingPlanParts";
@@ -46,10 +46,20 @@ export function TeachingPlan() {
 
 function MyTeachingPlan() {
   const { profile: me } = useAuth();
+  const navigate = useNavigate();
   const departmentId = me?.department_id ?? null;
   const { data: assignments = [], isLoading } = useMyTeachingAssignments(me?.id ?? null);
   const label = useAssignmentLabel(departmentId);
   const { progress } = useAssignmentProgress(assignments, departmentId);
+
+  const nextText = (p: ReturnType<typeof progress.get>) =>
+    !p || p.stats.total === 0
+      ? "ยังไม่มีคาบสอนในภาคเรียนนี้"
+      : p.next
+        ? `คาบถัดไป: ${new Date(`${p.next.slot_date}T00:00:00Z`).toLocaleDateString("th-TH", { day: "numeric", month: "short", timeZone: "UTC" })} คาบ ${p.next.period_no}`
+        : p.stats.planned === 0
+          ? "ยังไม่ได้วางหัวข้อ"
+          : "ไม่มีคาบที่วางแผนไว้ข้างหน้า";
 
   if (!me) return null;
   if (!isLoading && assignments.length === 0) {
@@ -64,7 +74,7 @@ function MyTeachingPlan() {
 
   return (
     <div className="page-fill">
-      <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto md:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto md:hidden">
         {isLoading
           ? [0, 1, 2].map((i) => (
               <Card key={i} role="status" aria-label="กำลังโหลด" className="space-y-2 p-3">
@@ -91,18 +101,67 @@ function MyTeachingPlan() {
                   </div>
                   <p className="mt-1.5 text-sm font-semibold leading-snug">{l.name}</p>
                   {p && <PlanProgress stats={p.stats} className="mt-2" />}
-                  <p className="mt-1.5 truncate text-xs text-muted-foreground">
-                    {!p || p.stats.total === 0
-                      ? "ยังไม่มีคาบสอนในภาคเรียนนี้"
-                      : p.next
-                        ? `คาบถัดไป: ${new Date(`${p.next.slot_date}T00:00:00Z`).toLocaleDateString("th-TH", { day: "numeric", month: "short", timeZone: "UTC" })} คาบ ${p.next.period_no}`
-                        : p.stats.planned === 0
-                          ? "ยังไม่ได้วางหัวข้อ"
-                          : "ไม่มีคาบที่วางแผนไว้ข้างหน้า"}
-                  </p>
+                  <p className="mt-1.5 truncate text-xs text-muted-foreground">{nextText(p)}</p>
                 </Link>
               );
             })}
+      </div>
+
+      <div className="table-panel hidden md:flex">
+        <div className="table-panel-scroll scrollbar-hidden">
+          <table className="w-full text-[13px]">
+            <thead className="text-left text-xs">
+              <tr>
+                <th className="px-4 py-3">วิชา</th>
+                <th className="px-4 py-3">ชั้น · ห้อง</th>
+                <th className="px-4 py-3 text-center">ความคืบหน้า</th>
+                <th className="px-4 py-3">สถานะ</th>
+                <th className="w-10 px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading
+                ? [0, 1, 2].map((i) => (
+                    <tr key={i} role="status" aria-label="กำลังโหลด" className="h-14 border-t border-border first:border-t-0">
+                      {["w-40", "w-24", "w-48", "w-32"].map((w, j) => (
+                        <td key={j} className="px-4 py-0">
+                          <Skeleton className={`h-3 ${w}`} />
+                        </td>
+                      ))}
+                      <td />
+                    </tr>
+                  ))
+                : assignments.map((a) => {
+                    const l = label(a);
+                    const p = progress.get(a.id);
+                    return (
+                      <tr
+                        key={a.id}
+                        onClick={() => navigate(`/teaching-plan/${a.id}`)}
+                        className="h-14 cursor-pointer border-t border-border first:border-t-0"
+                      >
+                        <td className="px-4 py-0">
+                          <Link
+                            to={`/teaching-plan/${a.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="block min-w-0"
+                          >
+                            <p className="truncate text-sm font-medium">{l.name}</p>
+                            <p className="font-mono text-xs tabular-nums text-muted-foreground">{l.code}</p>
+                          </Link>
+                        </td>
+                        <td className="px-4 py-0 text-muted-foreground">{l.where}</td>
+                        <td className="px-4 py-0">{p && <PlanProgress stats={p.stats} className="mx-auto max-w-60" />}</td>
+                        <td className="px-4 py-0 text-xs text-muted-foreground">{nextText(p)}</td>
+                        <td className="px-4 py-0 text-muted-foreground">
+                          <ChevronForward className="h-3 w-3" />
+                        </td>
+                      </tr>
+                    );
+                  })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

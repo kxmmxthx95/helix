@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronForward, Users } from "@/components/icons";
@@ -90,15 +90,6 @@ export function TeachingPlanOverview() {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <div className="rounded-2xl border border-border bg-card px-4 py-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={cn("text-2xl font-semibold tabular-nums", tone)}>{value}</p>
-    </div>
-  );
-}
-
 function OverviewBoard({
   departmentId,
   academicYear,
@@ -138,18 +129,6 @@ function OverviewBoard({
   }
 
   const rows = assignments;
-  const all = useMemo(() => {
-    const ps = [...progress.values()].map((p) => p.stats);
-    const total = ps.reduce((n, p) => n + p.total, 0);
-    const completed = ps.reduce((n, p) => n + p.completed, 0);
-    return {
-      total,
-      completed,
-      offPlan: ps.reduce((n, p) => n + p.offPlan, 0),
-      noPlan: ps.filter((p) => p.planned === 0).length,
-      pct: total ? Math.round((completed / total) * 100) : 0,
-    };
-  }, [progress]);
 
   if (!isLoading && rows.length === 0) {
     return (
@@ -161,13 +140,6 @@ function OverviewBoard({
 
   return (
     <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <Stat label="ความคืบหน้ารวม" value={`${all.pct}%`} />
-        <Stat label="คาบที่สอนแล้ว" value={`${all.completed}/${all.total}`} />
-        <Stat label="สอนไม่ตามแผน" value={String(all.offPlan)} tone={all.offPlan ? "text-warning" : undefined} />
-        <Stat label="วิชาที่ยังไม่วางหัวข้อ" value={String(all.noPlan)} tone={all.noPlan ? "text-warning" : undefined} />
-      </div>
-
       <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
         {isLoading
           ? [0, 1, 2, 3].map((i) => (
