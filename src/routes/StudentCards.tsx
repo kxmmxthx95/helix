@@ -1,10 +1,10 @@
 import { useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { BarcodeIcon, CheckmarkCircleIcon, KeyIcon, Search } from "@/components/icons";
+import { BarcodeIcon, CardIcon, Search, TimeIcon, SlidersHorizontal } from "@/components/icons";
 import { Modal } from "@/components/Modal";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Avatar, Button, Card, EmptyState, Input, Select, Skeleton, Spinner } from "@/components/ui";
+import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { avatarUrl, studentAvatarUrl } from "@/hooks/useAvatar";
 import { useBindCard, useIssueQr, useIssueQrBulk, useCardHistory, useLiveCards, useLockCard, useRevokeCard } from "@/hooks/useCardTopup";
 import { useAllGradeLevels } from "@/hooks/useCurriculumStructure";
@@ -14,6 +14,7 @@ import { useStudents, type StudentListItem } from "@/hooks/useStudents";
 import type { CardHistoryRow, CardKind, LiveCard } from "@/lib/database.types";
 import { canIssueBarcode, isOrgWide } from "@/lib/roles";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
+import { fromThaiLayout } from "@/lib/scanText";
 import { cn } from "@/lib/utils";
 
 // บัตรเติมเงิน — bind a physical barcode / RFID card to a student (migration 0152).
@@ -27,6 +28,8 @@ const KINDS: { kind: CardKind; label: string; bindable: boolean }[] = [
 const KIND_LABEL = Object.fromEntries(KINDS.map((k) => [k.kind, k.label])) as Record<CardKind, string>;
 const ACTION_LABEL: Record<CardHistoryRow["action"], string> = { bind: "ผูกบัตร", revoke: "ยกเลิกบัตร", lock: "ล็อกบัตร", unlock: "ปลดล็อกบัตร" };
 
+const ACTION_DOT: Record<CardHistoryRow["action"], string> = { bind: "bg-success", revoke: "bg-destructive", lock: "bg-warning", unlock: "bg-accent" };
+
 const cardState = (c: LiveCard) => (c.status === "active" ? "ใช้งานได้" : c.frozen_by === "school" ? "ล็อกโดยโรงเรียน" : "ผู้ปกครองระงับ");
 const fmt = (iso: string) => new Date(iso).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" });
 const fullName = (s: StudentListItem) => `${s.prefix ?? ""}${s.first_name} ${s.last_name}`;
@@ -37,6 +40,8 @@ export function StudentCards() {
   const [deptPick, setDeptPick] = useState("");
   const [gradeLevelId, setGradeLevelId] = useState("");
   const [classroomId, setClassroomId] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilters = [deptPick, gradeLevelId, classroomId].filter(Boolean).length;
   const [picked, setPicked] = useState<StudentListItem | null>(null);
   const open = setPicked;
 
@@ -66,13 +71,15 @@ export function StudentCards() {
   const gradeName = new Map(grades.map((g) => [g.id, gradeShortLabel(g.code)]));
   const avatar = (s: StudentListItem) => studentAvatarUrl(s) ?? (s.profile ? avatarUrl(s.profile) : null);
   const chips = (id: string) => (
-    <div className="flex flex-wrap gap-1">
-      {(cards?.get(id) ?? []).map((c) => (
-        <span key={c.id} className={cn("inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium", c.status === "active" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive")}>
-          {KIND_LABEL[c.kind]}
-        </span>
-      ))}
-      {!cards?.get(id)?.length && <span className="text-xs text-muted-foreground">ยังไม่มีบัตร</span>}
+    <div className="flex gap-1.5">
+      {([["qr", BarcodeIcon, "บาร์โค้ดชำระเงิน", "bg-warning/10 text-warning"], ["rfid", CardIcon, "RFID", "bg-destructive/10 text-destructive"]] as const).map(([kind, Icon, label, frozen]) => {
+        const c = cards?.get(id)?.find((x) => x.kind === kind);
+        return (
+          <span key={kind} title={c ? `${label} · ${cardState(c)}` : `${label} · ยังไม่มี`} className={cn("inline-flex size-8 items-center justify-center rounded-lg", !c ? "bg-muted text-muted-foreground" : c.status === "active" ? "bg-success/10 text-success" : frozen)}>
+            <Icon className="size-4" aria-label={c ? `${label} · ${cardState(c)}` : `${label} · ยังไม่มี`} />
+          </span>
+        );
+      })}
     </div>
   );
   const levelChip = (s: StudentListItem) => {
@@ -87,21 +94,48 @@ export function StudentCards() {
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ค้นหาชื่อหรือรหัสนักเรียน" className="pl-9" type="search" />
         </div>
-        {!scoped && (
-          <Select value={deptPick} onChange={(e) => (setDeptPick(e.target.value), setGradeLevelId(""), setClassroomId(""))} placeholder="ทุกแผนก" className="w-40">
-            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </Select>
-        )}
-        <Select value={gradeLevelId} onChange={(e) => (setGradeLevelId(e.target.value), setClassroomId(""))} placeholder="ทุกระดับชั้น" className="w-36">
-          {shown.map((g) => <option key={g.id} value={g.id}>{gradeShortLabel(g.code)}</option>)}
-        </Select>
-        <Select value={classroomId} onChange={(e) => setClassroomId(e.target.value)} placeholder="ทุกห้อง" className="w-32" disabled={!gradeLevelId}>
-          {classrooms.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </Select>
+        <Button variant="outline" size="icon" className="relative shrink-0" onClick={() => setFiltersOpen(true)} aria-label="ตัวกรอง">
+          <SlidersHorizontal className="h-3 w-3" />
+          {activeFilters > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[10px] text-accent-foreground">{activeFilters}</span>
+          )}
+        </Button>
         <Button variant="outline" size="icon" className="shrink-0" onClick={() => setBulkOpen(true)} disabled={!students?.length} aria-label="สร้างบาร์โค้ดทุกคน">
           <BarcodeIcon className="h-3 w-3" />
         </Button>
       </div>
+
+      <Modal
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        title="ตัวกรอง"
+        footer={
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" disabled={!activeFilters} onClick={() => (setDeptPick(""), setGradeLevelId(""), setClassroomId(""))}>ล้างตัวกรอง</Button>
+            <Button className="flex-1" onClick={() => setFiltersOpen(false)}>ดูผลลัพธ์</Button>
+          </div>
+        }
+      >
+        <FormSection>
+          {!scoped && (
+            <Field label="แผนก">
+              <Select value={deptPick} onChange={(e) => (setDeptPick(e.target.value), setGradeLevelId(""), setClassroomId(""))} placeholder="ทุกแผนก">
+                {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </Select>
+            </Field>
+          )}
+          <Field label="ระดับชั้น">
+            <Select value={gradeLevelId} onChange={(e) => (setGradeLevelId(e.target.value), setClassroomId(""))} placeholder="ทุกระดับชั้น">
+              {shown.map((g) => <option key={g.id} value={g.id}>{gradeShortLabel(g.code)}</option>)}
+            </Select>
+          </Field>
+          <Field label="ห้อง">
+            <Select value={classroomId} onChange={(e) => setClassroomId(e.target.value)} placeholder="ทุกห้อง" disabled={!gradeLevelId}>
+              {classrooms.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </Field>
+        </FormSection>
+      </Modal>
 
       {!searched && <EmptyState title="ค้นหานักเรียน" description="พิมพ์ชื่อหรือรหัสนักเรียน หรือเลือกตัวกรองเพื่อแสดงรายชื่อ" />}
       {searched && isLoading && <Skeleton className="h-40 w-full" />}
@@ -137,7 +171,6 @@ export function StudentCards() {
                     <th className="px-4 py-3">นักเรียน</th>
                     <th className="px-4 py-3">แผนก</th>
                     <th className="px-4 py-3">ชั้น</th>
-                    <th className="px-4 py-3">บัตร</th>
                     <th className="px-4 py-3">บาร์โค้ด</th>
                     <th className="px-4 py-3">RFID</th>
                   </tr>
@@ -156,14 +189,12 @@ export function StudentCards() {
                       </td>
                       <td className="px-4 py-0 text-muted-foreground">{deptName.get(s.department_id) ?? "—"}</td>
                       <td className="px-4 py-0">{levelChip(s)}</td>
-                      <td className="px-4 py-0">{chips(s.id)}</td>
                       <td className="px-4 py-0">
                         {(() => {
                           const qr = cards?.get(s.id)?.find((c) => c.kind === "qr");
                           return qr ? (
-                            <span className={cn("inline-flex items-center gap-1 text-xs font-medium", qr.status === "active" ? "text-success" : "text-warning")}>
-                              <CheckmarkCircleIcon className="size-3.5" />
-                              {qr.status === "active" ? "สร้างแล้ว" : "สร้างแล้ว (ระงับ)"}
+                            <span title={qr.status === "active" ? "สร้างแล้ว" : "สร้างแล้ว (ระงับ)"} className={cn("inline-flex h-8 w-8 items-center justify-center rounded-lg", qr.status === "active" ? "bg-success/10 text-success" : "bg-warning/10 text-warning")}>
+                              <BarcodeIcon className="size-4" aria-label={qr.status === "active" ? "สร้างแล้ว" : "สร้างแล้ว (ระงับ)"} />
                             </span>
                           ) : (
                             <Button variant="tinted" size="sm" disabled={issueQr.isPending} onClick={(e) => (e.stopPropagation(), issue(s.id))}>
@@ -176,11 +207,12 @@ export function StudentCards() {
                         {(() => {
                           const rfid = cards?.get(s.id)?.find((c) => c.kind === "rfid");
                           return rfid ? (
-                            <span className={cn("text-xs font-medium", rfid.status === "active" ? "text-success" : "text-destructive")}>…{rfid.last4} · {cardState(rfid)}</span>
+                            <span title={`…${rfid.last4} · ${cardState(rfid)}`} className={cn("inline-flex h-8 w-8 items-center justify-center rounded-lg", rfid.status === "active" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive")}>
+                              <CardIcon className="h-4 w-4" aria-label={`RFID …${rfid.last4} · ${cardState(rfid)}`} />
+                            </span>
                           ) : (
-                            <Button variant="tinted" size="sm" onClick={(e) => (e.stopPropagation(), open(s))}>
-                              <KeyIcon className="h-3 w-3" />
-                              ผูกบัตร RFID
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg bg-muted text-muted-foreground" onClick={(e) => (e.stopPropagation(), open(s))} aria-label="ผูกบัตร RFID" title="ผูกบัตร RFID">
+                              <CardIcon className="h-4 w-4" />
                             </Button>
                           );
                         })()}
@@ -236,6 +268,7 @@ function StudentCardsPanel({ student, cards }: { student: StudentListItem; cards
   const lock = useLockCard();
   const { data: history } = useCardHistory(student.id);
   const kind = "rfid" as const;
+  const [tab, setTab] = useState<"cards" | "history">("cards");
   const [code, setCode] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const done = (msg: string) => ({ onSuccess: () => toast(msg), onError: (e: unknown) => toast(e instanceof Error ? e.message : "ไม่สำเร็จ", "error") });
@@ -250,46 +283,96 @@ function StudentCardsPanel({ student, cards }: { student: StudentListItem; cards
   };
   const ask = (msg: string, run: () => void) => confirm(msg) && run();
 
+  const h3 = "font-heading mb-2 px-0.5 text-[15px] font-semibold leading-tight";
+  const hasRfid = cards.some((c) => c.kind === kind);
+
   return (
     <div className="flex flex-col gap-5">
-      <section className="flex flex-col gap-2">
-        <h3 className="text-[13px] font-semibold">บัตรที่ใช้งานอยู่</h3>
-        {cards.length === 0 && <p className="text-sm text-muted-foreground">ยังไม่มีบัตร</p>}
-        {cards.map((c) => (
-          <div key={c.id} className="flex items-center gap-2 rounded-xl bg-card p-3 shadow-card">
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-semibold">{KIND_LABEL[c.kind]} <span className="font-normal text-muted-foreground">…{c.last4}</span></p>
-              <p className={cn("text-xs", c.status === "active" ? "text-success" : "text-destructive")}>{cardState(c)}</p>
-            </div>
-            {c.status === "frozen" ? (
-              <Button size="sm" variant="outline" onClick={() => lock.mutate({ id: c.id, locked: false }, done("ปลดล็อกแล้ว"))}>ปลดล็อก</Button>
-            ) : (
-              <Button size="sm" variant="outline" onClick={() => lock.mutate({ id: c.id, locked: true }, done("ล็อกบัตรแล้ว"))}>ล็อก</Button>
+      <div role="tablist" aria-label="ข้อมูลบัตร" className="flex border-b border-border">
+        {([["cards", "บัตร", CardIcon], ["history", "ประวัติ", TimeIcon]] as const).map(([key, label, Icon]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setTab(key)}
+            className={cn(
+              "tappable -mb-px flex min-h-10 flex-1 items-center justify-center gap-1.5 border-b-2 px-3 text-[13px] font-semibold transition-colors",
+              tab === key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
             )}
-            <Button size="sm" variant="destructive" onClick={() => ask(`ยกเลิกบัตร ${KIND_LABEL[c.kind]} …${c.last4}? บัตรนี้จะใช้จ่ายไม่ได้อีก`, () => revoke.mutate(c.id, done("ยกเลิกบัตรแล้ว")))}>ยกเลิก</Button>
-          </div>
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            {label}
+          </button>
         ))}
+      </div>
+
+      {tab === "cards" && (
+        <>
+      <section>
+        <h3 className={h3}>บัตรที่ใช้งานอยู่</h3>
+        {cards.length === 0 ? (
+          <p className="rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground">ยังไม่มีบัตร</p>
+        ) : (
+          <ul className="divide-y divide-border overflow-hidden rounded-xl bg-muted">
+            {cards.map((c) => {
+              const Icon = c.kind === "rfid" ? CardIcon : BarcodeIcon;
+              const ok = c.status === "active";
+              return (
+                <li key={c.id} className="flex items-center gap-3 px-4 py-3">
+                  <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg", ok ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive")}>
+                    <Icon className="size-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{KIND_LABEL[c.kind]} <span className="font-normal text-muted-foreground">…{c.last4}</span></p>
+                    <p className={cn("flex items-center gap-1.5 text-xs", ok ? "text-success" : "text-destructive")}>
+                      <span className="size-1.5 rounded-full bg-current" />
+                      {cardState(c)}
+                    </p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => lock.mutate({ id: c.id, locked: ok }, done(ok ? "ล็อกบัตรแล้ว" : "ปลดล็อกแล้ว"))}>{ok ? "ล็อก" : "ปลดล็อก"}</Button>
+                  <Button size="sm" variant="destructive" onClick={() => ask(`ยกเลิกบัตร ${KIND_LABEL[c.kind]} …${c.last4}? บัตรนี้จะใช้จ่ายไม่ได้อีก`, () => revoke.mutate(c.id, done("ยกเลิกบัตรแล้ว")))}>ยกเลิก</Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-[13px] font-semibold">ผูกบัตร RFID</h3>
+      <section>
+        <h3 className={h3}>ผูกบัตร RFID</h3>
         <div className="flex gap-2">
           {/* The reader types the UID then Enter; Enter must not bind — only the ผูก button does. */}
-          <Input ref={input} value={code} onChange={(e) => setCode(e.target.value)} onKeyDown={(e) => e.key === "Enter" && e.preventDefault()} placeholder="แตะบัตรหรือพิมพ์เลขบัตร แล้วกดปุ่มผูก" autoFocus autoComplete="off" />
+          <Input ref={input} value={code} onChange={(e) => setCode(fromThaiLayout(e.target.value))} onKeyDown={(e) => e.key === "Enter" && e.preventDefault()} placeholder="แตะบัตรหรือพิมพ์เลขบัตร" autoFocus autoComplete="off" />
           <Button type="button" onClick={submit} disabled={!code.trim() || bind.isPending}>ผูก</Button>
         </div>
-        {cards.some((c) => c.kind === kind) && <p className="text-xs text-muted-foreground">มี{KIND_LABEL[kind]}อยู่แล้ว — ผูกใหม่จะแทนที่ใบเดิม</p>}
+        <p className="mt-2 px-0.5 text-xs text-muted-foreground">
+          {hasRfid ? `มี${KIND_LABEL[kind]}อยู่แล้ว — ผูกใหม่จะแทนที่ใบเดิม` : "แตะบัตรที่เครื่องอ่าน แล้วกดปุ่มผูก"}
+        </p>
       </section>
+        </>
+      )}
 
-      <section className="flex flex-col gap-2">
-        <h3 className="text-[13px] font-semibold">ประวัติ</h3>
-        {history?.length === 0 && <p className="text-sm text-muted-foreground">ยังไม่มีประวัติ</p>}
-        {history?.map((h, i) => (
-          <p key={i} className="text-xs text-muted-foreground">
-            {fmt(h.at)} · <span className="text-foreground">{ACTION_LABEL[h.action]}</span> {KIND_LABEL[h.kind]} …{h.last4} · {h.actor ?? "ระบบ"}
-          </p>
-        ))}
+      {tab === "history" && (
+      <section>
+        {history?.length === 0 ? (
+          <p className="rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground">ยังไม่มีประวัติ</p>
+        ) : (
+          <ul className="divide-y divide-border overflow-hidden rounded-xl bg-muted">
+            {history?.map((h, i) => (
+              <li key={i} className="flex items-start gap-3 px-4 py-2.5">
+                <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", ACTION_DOT[h.action])} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px]"><span className="font-medium">{ACTION_LABEL[h.action]}</span> {KIND_LABEL[h.kind]} <span className="text-muted-foreground">…{h.last4}</span></p>
+                  <p className="text-xs text-muted-foreground">{h.actor ?? "ระบบ"}</p>
+                </div>
+                <time className="shrink-0 text-xs tabular-nums text-muted-foreground">{fmt(h.at)}</time>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
+      )}
     </div>
   );
 }
