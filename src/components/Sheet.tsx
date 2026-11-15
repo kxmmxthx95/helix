@@ -96,9 +96,9 @@ export function Sheet({
         >
           {ios && <div aria-hidden className="mx-auto mt-1.5 h-[5px] w-9 shrink-0 rounded-full bg-muted-foreground/40" />}
           <div className={cn("shrink-0 px-4", ios ? "pb-2 pt-2" : "border-b border-border py-3", headerClassName)}>
-            <div className="flex min-w-0 items-center gap-3">
+            <div className={cn("flex min-w-0 items-center gap-3", ios && "relative")}>
               {icon && <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent", iconClassName)}>{icon}</div>}
-              <Drawer.Title className="font-heading min-w-0 flex-1 truncate text-[17px] font-semibold leading-6 tracking-[-0.01em]">{title}</Drawer.Title>
+              <Drawer.Title className={cn("font-heading min-w-0 flex-1 truncate text-[17px] font-semibold leading-6 tracking-[-0.01em]", ios && "px-10 text-center")}>{title}</Drawer.Title>
               {resizable && (
                 <Button
                   size="icon"
@@ -110,7 +110,7 @@ export function Sheet({
                 </Button>
               )}
               {headerEnd}
-              {closable && <CloseButton onClick={() => onOpenChange(false)} />}
+              {closable && (ios ? <div className="absolute right-0 top-1/2 -translate-y-1/2"><CloseButton onClick={() => onOpenChange(false)} /></div> : <CloseButton onClick={() => onOpenChange(false)} />)}
             </div>
             {/* Description is kept for screen readers only; the header shows just the title. */}
             <Drawer.Description className="sr-only">{description ?? title}</Drawer.Description>
