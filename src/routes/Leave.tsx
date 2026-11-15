@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, EmptyState, Select, Skeleton } from "@/components/ui";
-import { NewLeaveSheet } from "@/routes/NewLeaveSheet";
+import { Avatar, Button, EmptyState, Input, Select, Skeleton } from "@/components/ui";
+import { avatarUrl } from "@/hooks/useAvatar";
+import { CheckmarkCircleIcon, Search, TimeIcon, X } from "@/components/icons";
 import { CoverSheet, type CoverLeave } from "@/routes/CoverSheet";
 import { useProfiles } from "@/hooks/useProfiles";
 import {
@@ -17,7 +18,6 @@ import { canManage } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
-const currentYear = () => new Date().getFullYear();
 
 export const LEAVE_STATUS_LABEL: Record<LeaveStatus, string> = {
   pending: "รออนุมัติ",
@@ -33,31 +33,72 @@ export const LEAVE_STATUS_STYLE: Record<LeaveStatus, string> = {
   cancelled: "bg-muted text-muted-foreground",
 };
 
+const LEAVE_STATUS_ICON = { pending: TimeIcon, approved: CheckmarkCircleIcon, rejected: X, cancelled: X };
+
+/** Status as an icon (label in title/aria-label for hover and screen readers). */
+function LeaveStatusIcon({ status }: { status: LeaveStatus }) {
+  const Icon = LEAVE_STATUS_ICON[status];
+  return (
+    <span
+      role="img"
+      aria-label={LEAVE_STATUS_LABEL[status]}
+      title={LEAVE_STATUS_LABEL[status]}
+      className={cn("inline-flex h-7 w-7 items-center justify-center", LEAVE_STATUS_STYLE[status].replace(/bg-\S+\s*/, ""))}
+    >
+      <Icon className="h-4 w-4" />
+    </span>
+  );
+}
+
 type LeaveView = "mine" | "approvals";
 
 export function Leave() {
   const { profile } = useAuth();
-  const [view, setView] = useState<LeaveView>("mine");
-  const [newLeaveOpen, setNewLeaveOpen] = useState(false);
+  const [chosenView, setView] = useState<LeaveView | null>(null);
+  const [search, setSearch] = useState("");
   const [approvalStatus, setApprovalStatus] = useState<LeaveStatus | "">("pending");
   if (!profile) return null;
   const mayApprove = canManage(profile.roles);
+  const view = chosenView ?? (mayApprove ? "approvals" : "mine");
 
   return (
     <div className="page-fill">
-      <div className="toolbar">
-        <Select className="min-w-0 flex-1 sm:w-48 sm:flex-none" value={view} onChange={(e) => setView(e.target.value as LeaveView)}>
-          <option value="mine">คำขอลาของฉัน</option>
-          {mayApprove && <option value="approvals">คำขอลา</option>}
-        </Select>
-        {view === "mine" && (
-          <Button size="sm" variant="outline" className="ml-auto shrink-0" onClick={() => setNewLeaveOpen(true)}>
-            + ลาใหม่
-          </Button>
-        )}
-        {view === "approvals" && (
+      <div className="flex w-full border-b border-border" role="tablist">
+        {(
+          [
+            ...(mayApprove ? [["approvals", "รายการ"]] : []),
+            ["mine", "ประวัติการลา"],
+          ] as [LeaveView, string][]
+        ).map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            aria-selected={view === k}
+            onClick={() => setView(k)}
+            className={cn(
+              "-mb-px inline-flex h-9 min-w-0 flex-1 items-center justify-center border-b-2 px-3 text-sm font-medium transition-colors",
+              view === k ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {view === "approvals" && (
+        <div className="toolbar">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหาชื่อผู้ขอ"
+              className="pl-9"
+              type="search"
+            />
+          </div>
           <Select
-            className="ml-auto w-36 shrink-0 sm:w-40"
+            className="w-36 shrink-0 sm:w-40"
             value={approvalStatus}
             onChange={(e) => setApprovalStatus(e.target.value as LeaveStatus | "")}
             aria-label="สถานะคำขอ"
@@ -69,69 +110,22 @@ export function Leave() {
               </option>
             ))}
           </Select>
-        )}
-      </div>
+        </div>
+      )}
 
       {view === "mine" && (
         <>
-          <QuotaSection profileId={profile.id} />
-          <MyRequestsSection profileId={profile.id} open={newLeaveOpen} onOpenChange={setNewLeaveOpen} />
+          <MyRequestsSection profileId={profile.id} />
         </>
       )}
       {view === "approvals" && mayApprove && (
-        <ApprovalsSection approverId={profile.id} status={approvalStatus} />
+        <ApprovalsSection approverId={profile.id} status={approvalStatus} search={search} />
       )}
     </div>
   );
 }
 
-function QuotaSection({ profileId }: { profileId: string }) {
-  const { data: types = [] } = useLeaveTypes();
-  const { data: requests = [] } = useMyLeaveRequests(profileId);
-  const year = currentYear();
-
-  const usedByType = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const r of requests) {
-      if (r.status !== "pending" && r.status !== "approved") continue;
-      if (!r.start_date.startsWith(String(year))) continue;
-      map.set(r.leave_type_id, (map.get(r.leave_type_id) ?? 0) + r.days);
-    }
-    return map;
-  }, [requests, year]);
-
-  if (types.length === 0) return null;
-
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">โควตาลาปี {year}</p>
-      <ul className="divide-y divide-border rounded-lg border border-border px-3 text-sm">
-        {types.map((t) => {
-          const used = usedByType.get(t.id) ?? 0;
-          const over = t.max_days_per_year !== null && used > t.max_days_per_year;
-          return (
-            <li key={t.id} className="flex items-center justify-between py-1.5">
-              <span>{t.name}</span>
-              <span className={cn(over && "font-medium text-destructive")}>
-                {t.max_days_per_year !== null ? `${used} / ${t.max_days_per_year} วัน` : `${used} วัน (ไม่จำกัด)`}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-function MyRequestsSection({
-  profileId,
-  open,
-  onOpenChange,
-}: {
-  profileId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
+function MyRequestsSection({ profileId }: { profileId: string }) {
   const { data: types = [] } = useLeaveTypes();
   const { data: requests = [], isLoading } = useMyLeaveRequests(profileId);
   const cancel = useCancelLeaveRequest();
@@ -148,6 +142,7 @@ function MyRequestsSection({
               <tr>
                 <th className="px-3 py-2 font-medium">ประเภท</th>
                 <th className="px-3 py-2 font-medium">วันที่</th>
+                <th className="px-3 py-2 font-medium">จำนวนวัน</th>
                 <th className="px-3 py-2 font-medium">เหตุผล</th>
                 <th className="px-3 py-2 font-medium">สถานะ</th>
                 <th className="px-3 py-2 font-medium" />
@@ -161,6 +156,9 @@ function MyRequestsSection({
                   </td>
                   <td className="px-3 py-2">
                     <Skeleton className="h-3 w-32" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Skeleton className="h-3 w-12" />
                   </td>
                   <td className="px-3 py-2">
                     <Skeleton className="h-3 w-24" />
@@ -177,19 +175,21 @@ function MyRequestsSection({
       )}
       {!isLoading && requests.length === 0 && (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ยังไม่มีคำขอลา" description="กด + ลาใหม่เพื่อส่งคำขอลา" />
+          <EmptyState title="ยังไม่มีคำขอลา" />
         </div>
       )}
       {requests.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
-          <table className="w-full min-w-[36rem] text-xs">
-            <thead className="bg-muted text-left text-xs text-muted-foreground">
+<div className="table-panel rounded-none border-t border-border shadow-none">
+          <div className="table-panel-scroll scrollbar-hidden">
+          <table className="w-full min-w-[36rem] text-[13px]">
+            <thead className="text-left text-xs">
               <tr>
-                <th className="px-3 py-2 font-medium">ประเภท</th>
-                <th className="px-3 py-2 font-medium">วันที่</th>
-                <th className="px-3 py-2 font-medium">เหตุผล</th>
-                <th className="px-3 py-2 font-medium">สถานะ</th>
-                <th className="px-3 py-2 font-medium" />
+                <th className="px-4 py-3">ประเภท</th>
+                <th className="px-4 py-3">วันที่</th>
+                <th className="px-4 py-3">จำนวนวัน</th>
+                <th className="px-4 py-3">เหตุผล</th>
+                <th className="px-4 py-3">สถานะ</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
@@ -197,21 +197,20 @@ function MyRequestsSection({
                 const cancellable =
                   (r.status === "pending" || r.status === "approved") && r.start_date > todayIso();
                 return (
-                  <tr key={r.id} className="border-t border-border align-top">
-                    <td className="px-3 py-2 font-medium">{typeName(r.leave_type_id)}</td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {r.start_date} – {r.end_date} ({r.days} วัน)
+                  <tr key={r.id} className="h-14 border-t border-border first:border-t-0">
+                    <td className="px-4 py-3">{typeName(r.leave_type_id)}</td>
+                    <td className="px-4 py-2 text-muted-foreground">
+                      {r.start_date} – {r.end_date}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">{r.reason}</td>
-                    <td className="px-3 py-2">
-                      <span className={cn("rounded-full px-2 py-0.5 text-xs", LEAVE_STATUS_STYLE[r.status])}>
-                        {LEAVE_STATUS_LABEL[r.status]}
-                      </span>
+                    <td className="px-4 py-2 text-muted-foreground">{r.days} วัน</td>
+                    <td className="px-4 py-2 text-muted-foreground">{r.reason}</td>
+                    <td className="px-4 py-2">
+                      <LeaveStatusIcon status={r.status} />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-2">
                       <div className="flex gap-2">
                         {(r.status === "pending" || r.status === "approved") && r.end_date >= todayIso() && (
-                          <Button size="sm" variant="outline" onClick={() => setCoverFor(r)}>
+                          <Button size="sm" onClick={() => setCoverFor(r)}>
                             มอบงานแทน
                           </Button>
                         )}
@@ -232,10 +231,10 @@ function MyRequestsSection({
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
-      <NewLeaveSheet profileId={profileId} open={open} onOpenChange={onOpenChange} />
       {coverFor && (
         <CoverSheet leave={coverFor} actorId={profileId} open onOpenChange={(o) => !o && setCoverFor(null)} />
       )}
@@ -243,13 +242,20 @@ function MyRequestsSection({
   );
 }
 
-function ApprovalsSection({ approverId, status }: { approverId: string; status: LeaveStatus | "" }) {
-  const { data: requests = [], isLoading } = useLeaveApprovals(status);
+function ApprovalsSection({ approverId, status, search }: { approverId: string; status: LeaveStatus | ""; search: string }) {
+  const { data: all = [], isLoading } = useLeaveApprovals(status);
   const { data: types = [] } = useLeaveTypes();
   const { data: profiles = [] } = useProfiles({ search: "", departmentId: "", role: "", active: "" });
   const setStatus = useSetLeaveStatus();
   const [coverFor, setCoverFor] = useState<CoverLeave | null>(null);
-  const nameById = new Map(profiles.map((p) => [p.id, profileFullName(p)]));
+  const profileById = new Map(profiles.map((p) => [p.id, p]));
+  const q = search.trim().toLowerCase();
+  const requests = q
+    ? all.filter((r) => {
+        const p = profileById.get(r.profile_id);
+        return !!p && profileFullName(p).toLowerCase().includes(q);
+      })
+    : all;
   const typeName = (id: string) => types.find((t) => t.id === id)?.name ?? "—";
 
   async function openAttachment(path: string) {
@@ -271,6 +277,7 @@ function ApprovalsSection({ approverId, status }: { approverId: string; status: 
                 <th className="px-3 py-2 font-medium">ผู้ขอ</th>
                 <th className="px-3 py-2 font-medium">ประเภท</th>
                 <th className="px-3 py-2 font-medium">วันที่</th>
+                <th className="px-3 py-2 font-medium">จำนวนวัน</th>
                 <th className="px-3 py-2 font-medium">เหตุผล</th>
                 <th className="px-3 py-2 font-medium">ไฟล์แนบ</th>
                 <th className="px-3 py-2 font-medium">สถานะ</th>
@@ -288,6 +295,9 @@ function ApprovalsSection({ approverId, status }: { approverId: string; status: 
                   </td>
                   <td className="px-3 py-2">
                     <Skeleton className="h-3 w-32" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <Skeleton className="h-3 w-12" />
                   </td>
                   <td className="px-3 py-2">
                     <Skeleton className="h-3 w-24" />
@@ -309,29 +319,43 @@ function ApprovalsSection({ approverId, status }: { approverId: string; status: 
         </div>
       )}
       {requests.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[48rem] text-xs">
-            <thead className="bg-muted text-left text-xs text-muted-foreground">
+<div className="table-panel rounded-none border-t border-border shadow-none">
+          <div className="table-panel-scroll scrollbar-hidden">
+          <table className="w-full min-w-[48rem] text-[13px]">
+            <thead className="text-left text-xs">
               <tr>
-                <th className="px-3 py-2 font-medium">ผู้ขอ</th>
-                <th className="px-3 py-2 font-medium">ประเภท</th>
-                <th className="px-3 py-2 font-medium">วันที่</th>
-                <th className="px-3 py-2 font-medium">เหตุผล</th>
-                <th className="px-3 py-2 font-medium">ไฟล์แนบ</th>
-                <th className="px-3 py-2 font-medium">สถานะ</th>
-                <th className="px-3 py-2 font-medium" />
+                <th className="px-4 py-3">ผู้ขอ</th>
+                <th className="px-4 py-3">ประเภท</th>
+                <th className="px-4 py-3">วันที่</th>
+                <th className="px-4 py-3">จำนวนวัน</th>
+                <th className="px-4 py-3">เหตุผล</th>
+                <th className="px-4 py-3">ไฟล์แนบ</th>
+                <th className="px-4 py-3">สถานะ</th>
+                <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {requests.map((r) => (
-                <tr key={r.id} className="border-t border-border align-top">
-                  <td className="px-3 py-2 font-medium">{nameById.get(r.profile_id) ?? "—"}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{typeName(r.leave_type_id)}</td>
-                  <td className="px-3 py-2 text-muted-foreground">
-                    {r.start_date} – {r.end_date} ({r.days} วัน)
+                <tr key={r.id} className="h-14 border-t border-border first:border-t-0">
+                  <td className="px-4 py-3">
+                    {(() => {
+                      const p = profileById.get(r.profile_id);
+                      const name = p ? profileFullName(p) : "—";
+                      return (
+                        <div className="flex min-w-0 items-center gap-3">
+                          <Avatar name={name} src={p ? avatarUrl(p) : null} className="h-9 w-9 text-xs" />
+                          <span className="whitespace-nowrap text-sm font-medium">{name}</span>
+                        </div>
+                      );
+                    })()}
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground">{r.reason}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2 text-muted-foreground">{typeName(r.leave_type_id)}</td>
+                  <td className="px-4 py-2 text-muted-foreground">
+                    {r.start_date} – {r.end_date}
+                  </td>
+                  <td className="px-4 py-2 text-muted-foreground">{r.days} วัน</td>
+                  <td className="px-4 py-2 text-muted-foreground">{r.reason}</td>
+                  <td className="px-4 py-2">
                     {r.attachment_path && (
                       <button
                         type="button"
@@ -342,14 +366,12 @@ function ApprovalsSection({ approverId, status }: { approverId: string; status: 
                       </button>
                     )}
                   </td>
-                  <td className="px-3 py-2">
-                    <span className={cn("rounded-full px-2 py-0.5 text-xs", LEAVE_STATUS_STYLE[r.status])}>
-                      {LEAVE_STATUS_LABEL[r.status]}
-                    </span>
+                  <td className="px-4 py-2">
+                    <LeaveStatusIcon status={r.status} />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-2">
                     {(r.status === "pending" || r.status === "approved") && r.end_date >= todayIso() && (
-                      <Button size="sm" variant="outline" className="mb-1" onClick={() => setCoverFor(r)}>
+                      <Button size="sm" className="mb-1" onClick={() => setCoverFor(r)}>
                         มอบงานแทน
                       </Button>
                     )}
@@ -377,6 +399,7 @@ function ApprovalsSection({ approverId, status }: { approverId: string; status: 
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
       {coverFor && (
