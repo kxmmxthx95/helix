@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ScheduleEntry, TeachingAssignment } from "@/lib/database.types";
+import type { Room, ScheduleEntry, TeachingAssignment } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
 // ------------------------------------------------------------- schedule_entries
@@ -90,7 +90,9 @@ export function useDepartmentSchedule(
   });
 }
 
-export type ScheduleEntryDraft = Pick<ScheduleEntry, "teaching_assignment_id" | "day_of_week" | "period_no">;
+export type ScheduleEntryDraft = Pick<ScheduleEntry, "teaching_assignment_id" | "day_of_week" | "period_no"> & {
+  room_id?: string | null;
+};
 
 export function useCreateScheduleEntry() {
   const qc = useQueryClient();
@@ -123,5 +125,51 @@ export function useDeleteScheduleEntry() {
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["schedule_entries"] }),
+  });
+}
+
+/** Set or clear the physical room of a placed entry. The DB trigger rejects a double-booked room. */
+export function useSetEntryRoom() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, room_id }: { id: string; room_id: string | null }) => {
+      const { error } = await supabase.from("schedule_entries").update({ room_id }).eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["schedule_entries"] }),
+  });
+}
+
+// ----------------------------------------------------------------------- rooms
+// Per-department physical rooms (migration 0161). Retired rooms stay listed
+// so old entries still show a name; pickers filter on is_active themselves.
+
+export function useRooms(departmentId: string | null) {
+  return useQuery({
+    queryKey: ["rooms", departmentId],
+    enabled: !!departmentId,
+    queryFn: async (): Promise<Room[]> => {
+      const { data, error } = await supabase
+        .from("rooms")
+        .select("*")
+        .eq("department_id", departmentId!)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useSaveRoom() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (r: { id?: string; department_id: string; name: string; is_active?: boolean }) => {
+      const { id, ...fields } = r;
+      const { error } = id
+        ? await supabase.from("rooms").update(fields).eq("id", id)
+        : await supabase.from("rooms").insert(fields);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["rooms"] }),
   });
 }

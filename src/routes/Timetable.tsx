@@ -8,6 +8,7 @@ import {
   ChevronBack,
   ChevronForward,
   CheckmarkCircleIcon,
+  BuildingIcon,
   DownloadIcon,
   GraduationCap,
   InfoIcon,
@@ -24,6 +25,7 @@ import {
   X,
 } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
+import { TimetableCard } from "@/components/TimetableCard";
 import { useToast } from "@/components/Toast";
 import { Button, EmptyState, Field, Input, Select, Skeleton, Spinner, Switch, Avatar } from "@/components/ui";
 import { useActiveAcademicYear, useCurrentTerm } from "@/hooks/useAcademicTerms";
@@ -49,6 +51,9 @@ import {
   fetchDepartmentSchedule,
   useDepartmentSchedule,
   useMoveScheduleEntry,
+  useRooms,
+  useSaveRoom,
+  useSetEntryRoom,
   useTeacherSchedule,
   type ScheduleEntryRow,
 } from "@/hooks/useSchedule";
@@ -58,12 +63,13 @@ import { hhmm, mergePeriods, teachingOrdinal } from "@/lib/periods";
 import {
   profileFullName,
   type Classroom,
+  type Room,
   type GradeLevel,
   type PeriodDefinition,
   type PeriodType,
   type TeachingAssignment,
 } from "@/lib/database.types";
-import { gradeShortLabel } from "@/lib/gradeLevels";
+import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { SUBJECT_TYPE_BADGE, SUBJECT_TYPE_LABEL } from "@/lib/subjectColor";
 import { canManage, isOrgWide, isSelfScoped } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -91,6 +97,7 @@ export function Timetable() {
   const [pickedDept, setPickedDept] = useState("");
   const [view, setView] = useState<View | "">("");
   const [periodSettingsOpen, setPeriodSettingsOpen] = useState(false);
+  const [roomsOpen, setRoomsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
   const departmentId = orgWide ? pickedDept : (me?.department_id ?? "");
@@ -223,6 +230,13 @@ export function Timetable() {
             ตั้งค่าคาบเวลา
           </Button>
         )}
+
+        {departmentId && mayEdit && (
+          <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={() => setRoomsOpen(true)}>
+            <BuildingIcon className="h-3.5 w-3.5" />
+            จัดการห้อง
+          </Button>
+        )}
       </div>
 
       {departmentId && view && (
@@ -237,6 +251,8 @@ export function Timetable() {
           teachers={teachers}
         />
       )}
+
+      {departmentId && mayEdit && <RoomsSheet open={roomsOpen} onOpenChange={setRoomsOpen} departmentId={departmentId} />}
 
       {departmentId && (
         <PeriodSettingsSheet
@@ -1076,6 +1092,13 @@ function TimetableGrid({
 }) {
   const del = useDeleteScheduleEntry();
   const move = useMoveScheduleEntry();
+  const setRoom = useSetEntryRoom();
+  const { data: venues = [] } = useRooms(scope.departmentId);
+  const venueName = (id: string | null) => (id ? venues.find((v) => v.id === id)?.name : undefined);
+  const gradePill = (classroomId: string) => {
+    const label = roomLabel(classroomId);
+    return { label, className: levelTone(label) };
+  };
   const toast = useToast();
   const [drag, setDrag] = useState<{ id: string; day: number; periodNo: number } | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
@@ -1108,12 +1131,22 @@ function TimetableGrid({
     day: number,
     periodNo: number,
     selfEntryId?: string,
+    room?: string | null,
   ): Promise<string> {
     const raw = err instanceof Error ? err.message : "";
     const where = `${DAY_LABEL[day] ?? day} คาบ ${displayNo(periodNo)}`;
     if (/not teaching/.test(raw)) return `${where} เป็นช่วงพัก ไม่ใช่คาบเรียน`;
     if (/locked\/archived/.test(raw)) return "ภาคเรียนนี้ถูกล็อกหรือเก็บถาวรแล้ว แก้ตารางไม่ได้";
     if (/no period_definitions/.test(raw)) return `ยังไม่ได้ตั้งค่าเวลาของ ${where}`;
+    if (/room conflict/.test(raw)) {
+      const all = await fetchDepartmentSchedule(scope.departmentId, scope.academicYear, scope.term).catch(() => []);
+      const mine = selfEntryId ? entries.find((x) => x.id === selfEntryId) : undefined;
+      const roomId = room ?? mine?.room_id ?? null;
+      const lines = all
+        .filter((e) => e.id !== selfEntryId && e.room_id === roomId && e.day_of_week === day && e.period_no === periodNo)
+        .map((e) => `• ${subjectLabel(e.teaching_assignment.subject_id)} ${subjectName(e.teaching_assignment.subject_id)} · ${roomLabel(e.teaching_assignment.classroom_id)}`);
+      return `ห้อง ${venueName(roomId) ?? ""} ถูกใช้แล้ว — ${where}${lines.length ? `\n${lines.join("\n")}` : ""}`;
+    }
     if (!/schedule conflict/.test(raw)) return raw || "ไม่สำเร็จ";
 
     const all = await fetchDepartmentSchedule(scope.departmentId, scope.academicYear, scope.term).catch(() => []);
@@ -1253,13 +1286,20 @@ function TimetableGrid({
                       cell.map((e) => {
                         const sid = e.teaching_assignment.subject_id;
                         return (
-                          <div key={e.id} className={cn("rounded-xl px-3 py-2 leading-snug", styling.gradient(sid, e.teaching_assignment.classroom_id))}>
-                            <p className="text-xs opacity-70">{subjectLabel(sid)}</p>
-                            <p className="truncate text-[15px] font-semibold">{subjectName(sid)}</p>
-                            <p className="text-[11px] opacity-70">
-                              {mode === "classroom" ? teacherLabel(e.teaching_assignment.teacher_id) : roomLabel(e.teaching_assignment.classroom_id)}
-                            </p>
-                          </div>
+                          <TimetableCard
+                            key={e.id}
+                            tone={styling.color(sid, e.teaching_assignment.classroom_id)}
+                            code={subjectLabel(sid)}
+                            name={subjectName(sid)}
+                            grade={gradePill(e.teaching_assignment.classroom_id)}
+                            who={mode === "classroom" ? teacherLabel(e.teaching_assignment.teacher_id) : undefined}
+                            badge={{ className: styling.typeBadge(sid), title: styling.typeLabel(sid) }}
+                            footer={
+                              venueName(e.room_id) && (
+                                <p className="truncate text-xs text-muted-foreground">ห้อง {venueName(e.room_id)}</p>
+                              )
+                            }
+                          />
                         );
                       })
                     )}
@@ -1363,7 +1403,7 @@ function TimetableGrid({
                         {cellEntries.map((e) => {
                           const subjectId = e.teaching_assignment.subject_id;
                           return (
-                            <div
+                            <TimetableCard
                               key={e.id}
                               draggable={mayEdit}
                               onDragStart={(ev) => {
@@ -1375,49 +1415,63 @@ function TimetableGrid({
                                 setDrag(null);
                                 setOverKey(null);
                               }}
-                              className={cn(
-                                "relative flex flex-1 flex-col justify-center gap-0.5 rounded-lg px-2.5 py-2 leading-snug",
-                                mayEdit && "cursor-grab transition-shadow hover:shadow-md active:cursor-grabbing",
-                                drag?.id === e.id && "opacity-40",
-                                styling.gradient(subjectId, e.teaching_assignment.classroom_id),
-                              )}
-                            >
-                              <span
-                                title={styling.typeLabel(subjectId)}
-                                className={cn(
-                                  "absolute top-3 h-2 w-2 rounded-full ring-2 ring-white/60",
-                                  mayEdit ? "right-8" : "right-3",
-                                  styling.typeBadge(subjectId),
-                                )}
-                              />
-                              <p className="pr-5 text-sm font-semibold">{subjectLabel(subjectId)}</p>
-                              <p title={subjectName(subjectId)} className="truncate">
-                                {subjectName(subjectId)}
-                              </p>
-                              {(() => {
-                                const text =
-                                  mode === "classroom"
-                                    ? teacherLabel(e.teaching_assignment.teacher_id)
-                                    : roomLabel(e.teaching_assignment.classroom_id);
-                                return (
-                                  <p title={text} className="truncate text-[11px] opacity-70">
-                                    {text}
-                                  </p>
-                                );
-                              })()}
-                              {mayEdit && (
-                                <button
-                                  type="button"
-                                  aria-label="ลบคาบนี้"
-                                  onClick={() => {
-                                    if (confirm(`ลบคาบนี้ออกจากตาราง?`)) del.mutate(e.id);
-                                  }}
-                                  className="absolute right-1 top-1 rounded-md p-1.5 opacity-60 transition-colors hover:bg-black/10 hover:text-destructive hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-current"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              )}
-                            </div>
+                              dragging={drag?.id === e.id}
+                              className={cn(mayEdit && "cursor-grab transition-shadow hover:shadow-md active:cursor-grabbing")}
+                              tone={styling.color(subjectId, e.teaching_assignment.classroom_id)}
+                              code={subjectLabel(subjectId)}
+                              name={subjectName(subjectId)}
+                              grade={gradePill(e.teaching_assignment.classroom_id)}
+                              who={mode === "classroom" ? teacherLabel(e.teaching_assignment.teacher_id) : undefined}
+                              badge={{ className: styling.typeBadge(subjectId), title: styling.typeLabel(subjectId) }}
+                              action={
+                                mayEdit && (
+                                  <button
+                                    type="button"
+                                    aria-label="ลบคาบนี้"
+                                    onClick={() => {
+                                      if (confirm(`ลบคาบนี้ออกจากตาราง?`)) del.mutate(e.id);
+                                    }}
+                                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-current"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                )
+                              }
+                              footer={
+                                mayEdit ? (
+                                  <Select
+                                    aria-label="ห้องเรียน"
+                                    value={e.room_id ?? ""}
+                                    onChange={(ev) => {
+                                      const room_id = ev.target.value || null;
+                                      setRoom.mutate(
+                                        { id: e.id, room_id },
+                                        {
+                                          onError: (err) =>
+                                            void explainFailure(err, e.teaching_assignment, day, periodNo, e.id, room_id).then((msg) =>
+                                              toast(`ตั้งห้องไม่ได้ — ${msg}`, "error", { durationMs: 8000 }),
+                                            ),
+                                        },
+                                      );
+                                    }}
+                                    className={cn("h-7 text-xs md:text-xs", !e.room_id && "text-muted-foreground")}
+                                  >
+                                    <option value="">ไม่ระบุห้อง</option>
+                                    {venues
+                                      .filter((v) => v.is_active || v.id === e.room_id)
+                                      .map((v) => (
+                                        <option key={v.id} value={v.id}>
+                                          ห้อง {v.name}
+                                        </option>
+                                      ))}
+                                  </Select>
+                                ) : (
+                                  venueName(e.room_id) && (
+                                    <p className="truncate text-xs text-muted-foreground">ห้อง {venueName(e.room_id)}</p>
+                                  )
+                                )
+                              }
+                            />
                           );
                         })}
                         {(ghostAt.get(cellKey) ?? []).map((g) => (
@@ -1468,6 +1522,7 @@ function TimetableGrid({
         subjectLabel={subjectLabel}
         teacherLabel={teacherLabel}
         roomLabel={roomLabel}
+        venues={venues}
         onClose={() => setPlacing(null)}
       />
     </div>
@@ -1495,6 +1550,7 @@ function PlaceSheet({
   subjectName,
   teacherLabel,
   roomLabel,
+  venues,
   styling,
   explainFailure,
   onClose,
@@ -1511,12 +1567,15 @@ function PlaceSheet({
   subjectName: (id: string) => string;
   teacherLabel: (id: string | null) => string;
   roomLabel: (id: string) => string;
+  venues: Room[];
   styling: TimetableStyling;
   explainFailure: (
     err: unknown,
     a: Pick<TeachingAssignment, "teacher_id" | "classroom_id" | "group_id">,
     day: number,
     periodNo: number,
+    selfEntryId?: string,
+    room?: string | null,
   ) => Promise<string>;
   onClose: () => void;
 }) {
@@ -1527,9 +1586,11 @@ function PlaceSheet({
   const [sort, setSort] = useState<"code" | "left">("code");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [placing, setPlacing] = useState(false);
+  const [roomId, setRoomId] = useState("");
 
   useEffect(() => {
     if (!open) return;
+    setRoomId("");
     setSearch("");
     setFilter("all");
     setSelected(new Set());
@@ -1564,14 +1625,14 @@ function PlaceSheet({
     setPlacing(true);
     const ids = [...selected];
     const results = await Promise.allSettled(
-      ids.map((id) => create.mutateAsync({ teaching_assignment_id: id, day_of_week: day, period_no: periodNo })),
+      ids.map((id) => create.mutateAsync({ teaching_assignment_id: id, day_of_week: day, period_no: periodNo, room_id: roomId || null })),
     );
     setPlacing(false);
     const failed = await Promise.all(
       results.flatMap((r, i) => {
         if (r.status !== "rejected") return [];
         const assignment = candidates.find((x) => x.id === ids[i])!;
-        return [explainFailure(r.reason, assignment, day, periodNo).then((msg) => `${subjectLabel(assignment.subject_id)}: ${msg}`)];
+        return [explainFailure(r.reason, assignment, day, periodNo, undefined, roomId || null).then((msg) => `${subjectLabel(assignment.subject_id)}: ${msg}`)];
       }),
     );
     if (failed.length === 0) {
@@ -1650,6 +1711,14 @@ function PlaceSheet({
               </button>
             ))}
         </div>
+        <Select className="w-full" value={roomId} onChange={(e) => setRoomId(e.target.value)} aria-label="ห้องเรียน">
+          <option value="">ไม่ระบุห้อง</option>
+          {venues.filter((v) => v.is_active).map((v) => (
+            <option key={v.id} value={v.id}>
+              ห้อง {v.name}
+            </option>
+          ))}
+        </Select>
         <div>
           <Select
             className="w-full"
@@ -1720,6 +1789,75 @@ function PlaceSheet({
                 : "ไม่พบวิชาที่ตรงเงื่อนไข"}
             </li>
           )}
+        </ul>
+      </div>
+    </Sheet>
+  );
+}
+
+function RoomsSheet({ open, onOpenChange, departmentId }: { open: boolean; onOpenChange: (o: boolean) => void; departmentId: string }) {
+  const { data: rooms = [] } = useRooms(departmentId);
+  const save = useSaveRoom();
+  const toast = useToast();
+  const [name, setName] = useState("");
+  const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
+
+  const run = (r: Parameters<typeof save.mutate>[0], done?: () => void) =>
+    save.mutate(r, {
+      onSuccess: done,
+      onError: (err) => toast(/duplicate key/.test(err.message) ? "มีห้องชื่อนี้แล้ว" : err.message, "error"),
+    });
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange} title="จัดการห้อง" description="ห้องที่ใช้เรียนจริง เช่น 305, ห้องแล็บวิทย์">
+      <div className="space-y-3">
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const n = name.trim();
+            if (n) run({ department_id: departmentId, name: n }, () => setName(""));
+          }}
+        >
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ชื่อห้องใหม่" aria-label="ชื่อห้องใหม่" />
+          <Button type="submit" disabled={!name.trim() || save.isPending}>
+            <Plus className="h-3.5 w-3.5" />
+            เพิ่ม
+          </Button>
+        </form>
+        <ul className="space-y-2">
+          {rooms.map((r) => (
+            <li key={r.id} className="flex items-center gap-2 rounded-xl border border-border p-2">
+              {editing?.id === r.id ? (
+                <Input
+                  autoFocus
+                  value={editing.name}
+                  onChange={(e) => setEditing({ id: r.id, name: e.target.value })}
+                  onBlur={() => {
+                    const n = editing.name.trim();
+                    setEditing(null);
+                    if (n && n !== r.name) run({ id: r.id, department_id: departmentId, name: n });
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+                  aria-label="ชื่อห้อง"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEditing({ id: r.id, name: r.name })}
+                  className={cn("min-w-0 flex-1 truncate text-left text-sm", !r.is_active && "text-muted-foreground line-through")}
+                >
+                  {r.name}
+                </button>
+              )}
+              <Switch
+                checked={r.is_active}
+                onChange={(v) => run({ id: r.id, department_id: departmentId, name: r.name, is_active: v })}
+                label={`เปิดใช้ห้อง ${r.name}`}
+              />
+            </li>
+          ))}
+          {rooms.length === 0 && <li className="py-8 text-center text-sm text-muted-foreground">ยังไม่มีห้อง</li>}
         </ul>
       </div>
     </Sheet>

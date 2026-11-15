@@ -1159,6 +1159,17 @@ export type ScheduleEntry = {
   teaching_assignment_id: string;
   day_of_week: number;
   period_no: number;
+  /** Physical room (rooms, migration 0161); null = not assigned. */
+  room_id: string | null;
+  created_at: string;
+};
+
+/** Physical room a schedule entry is held in (ห้อง 305) — not a student group (Classroom). Migration 0161. */
+export type Room = {
+  id: string;
+  department_id: string;
+  name: string;
+  is_active: boolean;
   created_at: string;
 };
 
@@ -1747,7 +1758,8 @@ export type Database = {
         InsertOf<TeachingPlanSlot, "topic_id" | "completed_at" | "completed_on_plan" | "note">
       >;
       period_definitions: Table<PeriodDefinition, InsertOf<PeriodDefinition, never>>;
-      schedule_entries: Table<ScheduleEntry, InsertOf<ScheduleEntry, never>>;
+      schedule_entries: Table<ScheduleEntry, InsertOf<ScheduleEntry, "room_id">>;
+      rooms: Table<Room, InsertOf<Room, "is_active">>;
       time_clock_records: Table<
         TimeClockRecord,
         InsertOf<

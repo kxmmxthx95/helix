@@ -9,7 +9,7 @@ import { avatarUrl } from "@/hooks/useAvatar";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
-import { useClassroomSchedule, useDepartmentSchedule } from "@/hooks/useSchedule";
+import { useClassroomSchedule, useDepartmentSchedule, useRooms } from "@/hooks/useSchedule";
 import { useSchoolSettings } from "@/hooks/useSettings";
 import type { ProfileRow } from "@/hooks/useProfiles";
 import { profileFullName, type Classroom, type PeriodDefinition } from "@/lib/database.types";
@@ -98,6 +98,9 @@ function ExportBody({
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const { data: venues = [] } = useRooms(departmentId || null);
+  const venueName = (id: string | null) => (id ? venues.find((v) => v.id === id)?.name : undefined);
 
   const roomLabel = (c: Classroom) => {
     const code = gradeLevels.find((g) => g.id === c.grade_level_id)?.code;
@@ -225,7 +228,9 @@ function ExportBody({
           periodNo: e.period_no,
           code: s?.code ?? "—",
           name: s?.name_th ?? "",
-          extra: isRoom ? teacherName(a.teacher_id) : c ? roomLabel(c) : "—",
+          extra: [isRoom ? teacherName(a.teacher_id) : c ? roomLabel(c) : "—", venueName(e.room_id) && `ห้อง ${venueName(e.room_id)}`]
+            .filter(Boolean)
+            .join(" · "),
           fill: s ? colors.hex(s.learning_area_id, c?.grade_level_id) : null,
         };
       }),

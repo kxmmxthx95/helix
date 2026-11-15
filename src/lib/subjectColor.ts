@@ -138,11 +138,11 @@ export const SUBJECT_TYPE_LABEL: Record<SubjectType, string> = {
   activity: "กิจกรรม",
 };
 
-/** Solid pills so they stand out from the pastel area hue behind them; colours chosen to avoid the area hues. */
+/** Solid pills (white text) for the subject-type badge: basic blue, additional orange, activity grey. */
 export const SUBJECT_TYPE_BADGE: Record<SubjectType, string> = {
-  basic: "bg-slate-700 text-white dark:bg-slate-500",
-  additional: "bg-indigo-600 text-white dark:bg-indigo-500",
-  activity: "bg-lime-600 text-white dark:bg-lime-600",
+  basic: "bg-blue-600 text-white dark:bg-blue-500",
+  additional: "bg-orange-700 text-white dark:bg-orange-600",
+  activity: "bg-slate-600 text-white dark:bg-slate-500",
 };
 
 export function areaHue(areaId: string | null | undefined, areaById: Map<string, LearningArea>): AreaHue {
