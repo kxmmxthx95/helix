@@ -24,6 +24,7 @@ import {
   useSetStudentLeaveStatus,
   type PendingStudentLeaveRequest,
 } from "@/hooks/useStudentLeave";
+import { leaveAttachmentUrl } from "@/hooks/useLeave";
 import type { AttendanceRecord, AttendanceStatus } from "@/lib/database.types";
 import { avatarUrl } from "@/hooks/useAvatar";
 import type { StudentListItem } from "@/hooks/useStudents";
@@ -412,6 +413,11 @@ function LeaveRequestsPanel({ approverId }: { approverId: string }) {
             <p className="text-xs text-muted-foreground">
               {r.start_date} – {r.end_date} ({r.days} วัน) · {r.reason}
             </p>
+            {r.attachment_path && (
+              <button type="button" className="text-xs text-accent underline" onClick={() => leaveAttachmentUrl(r.attachment_path!).then((u) => window.open(u, "_blank")).catch(() => {})}>
+                ดูไฟล์แนบ
+              </button>
+            )}
             <div className="flex gap-2">
               <Button
                 size="sm"

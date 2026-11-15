@@ -174,6 +174,8 @@ export type StudentLeaveRequest = {
   /** Generated column (end_date - start_date + 1) — read-only. */
   days: number;
   reason: string;
+  leave_type_id: string | null;
+  attachment_path: string | null;
   status: StudentLeaveStatus;
   approved_by: string | null;
   approved_at: string | null;

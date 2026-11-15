@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { StudentLeaveRequest } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
+import { uploadLeaveAttachment } from "@/hooks/useLeave";
 
 // ------------------------------------------------------- student_leave_requests
 // Separate domain from leave_requests (staff) — see migration 0035. A parent
@@ -79,13 +80,18 @@ export function useRequestStudentLeave() {
       startDate: string;
       endDate: string;
       reason: string;
+      leaveTypeId: string;
+      file: File | null;
     }) => {
+      const attachmentPath = params.file ? await uploadLeaveAttachment(params.submittedBy, params.file) : null;
       const { error } = await supabase.from("student_leave_requests").insert({
         student_id: params.studentId,
         submitted_by: params.submittedBy,
         start_date: params.startDate,
         end_date: params.endDate,
         reason: params.reason,
+        leave_type_id: params.leaveTypeId,
+        attachment_path: attachmentPath,
       });
       if (error) throw error;
     },

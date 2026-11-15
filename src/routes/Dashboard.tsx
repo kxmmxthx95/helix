@@ -23,6 +23,7 @@ import {
   useHiddenOverviewSubjects,
   useSetHiddenOverviewSubjects,
 } from "@/hooks/useDeptClassroomOverview";
+import { useLeaveTypes } from "@/hooks/useLeave";
 import { useClockIn, useClockOut, useMyTimeClock } from "@/hooks/useTimeClock";
 import {
   useCancelStudentLeaveRequest,
@@ -1330,30 +1331,39 @@ export function StudentLeaveSection({ student, submittedBy, showName = true }: {
   const request = useRequestStudentLeave();
   const cancel = useCancelStudentLeaveRequest();
   const [tab, setTab] = useState<"form" | "history">("form");
+  const { data: types = [] } = useLeaveTypes();
+  const [leaveTypeId, setLeaveTypeId] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [attempted, setAttempted] = useState(false);
   const days = startDate && endDate ? dayCount(startDate, endDate) : 0;
+  const selectedType = types.find((t) => t.id === leaveTypeId);
+  const needsAttachment =
+    !!selectedType?.requires_attachment_after_days && days > selectedType.requires_attachment_after_days && !file;
   const err = (bad: boolean, msg: string) => (attempted && bad ? msg : undefined);
 
   function reset() {
+    setLeaveTypeId("");
     setStartDate("");
     setEndDate("");
     setReason("");
+    setFile(null);
     setAttempted(false);
   }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    const invalid = [!startDate, !endDate || (!!startDate && endDate < startDate), !reason.trim()].filter(Boolean).length;
+    const invalid = [!leaveTypeId, !startDate, !endDate || (!!startDate && endDate < startDate), !reason.trim(), needsAttachment].filter(Boolean).length;
     if (invalid) {
       setAttempted(true);
       toast(`กรอกข้อมูลให้ถูกต้อง (${invalid} ช่อง)`, "error");
       return;
     }
     request.mutate(
-      { studentId: student.id, submittedBy, startDate, endDate, reason: reason.trim() },
+      { studentId: student.id, submittedBy, leaveTypeId, startDate, endDate, reason: reason.trim(), file },
       {
         onSuccess: () => {
           toast("ส่งคำขอลาสำเร็จ");
@@ -1376,7 +1386,7 @@ export function StudentLeaveSection({ student, submittedBy, showName = true }: {
       <div className="flex w-full gap-0 border-b border-border" role="tablist">
         {(
           [
-            ["form", "ฟอร์มขอลา"],
+            ["form", "คำร้อง"],
             ["history", "ประวัติการลา"],
           ] as const
         ).map(([k, label]) => (
@@ -1399,6 +1409,15 @@ export function StudentLeaveSection({ student, submittedBy, showName = true }: {
       {tab === "form" && (
         <form className="space-y-4" onSubmit={submit} noValidate>
           <FormSection>
+            <Field label="ประเภทการลา" required error={err(!leaveTypeId, "เลือกประเภทการลา")}>
+              <Select value={leaveTypeId} onChange={(e) => setLeaveTypeId(e.target.value)} placeholder="เลือกประเภท">
+                {types.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
             <Field label="วันเริ่ม" required error={err(!startDate, "เลือกวันเริ่ม")}>
               <Input type="date" value={startDate} min={todayIso()} onChange={(e) => setStartDate(e.target.value)} />
             </Field>
@@ -1414,10 +1433,30 @@ export function StudentLeaveSection({ student, submittedBy, showName = true }: {
             <Field label="เหตุผล" required error={err(!reason.trim(), "กรอกเหตุผล")}>
               <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="เช่น ลาป่วย มีไข้" />
             </Field>
+            <div className="flex min-h-[3.25rem] items-center justify-between gap-4 text-sm leading-5">
+              <span>
+                ไฟล์แนบ
+                {selectedType?.requires_attachment_after_days ? <span className="text-destructive" aria-hidden> *</span> : null}
+              </span>
+              <input ref={fileRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              <button type="button" onClick={() => fileRef.current?.click()} className="min-w-0 truncate text-muted-foreground hover:text-foreground">
+                {file ? file.name : "เลือกไฟล์"}
+              </button>
+            </div>
           </FormSection>
-          <Button type="submit" className="w-full" disabled={request.isPending}>
-            {request.isPending ? <Spinner className="h-3 w-3" /> : "ส่งคำขอ"}
-          </Button>
+          {selectedType?.requires_attachment_after_days ? (
+            <p className={cn("px-1 text-xs", attempted && needsAttachment ? "text-destructive" : "text-muted-foreground")}>
+              ลาต่อเนื่องเกิน {selectedType.requires_attachment_after_days} วัน ต้องแนบเอกสารประกอบ
+            </p>
+          ) : null}
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={reset}>
+              ยกเลิก
+            </Button>
+            <Button type="submit" className="flex-1" disabled={request.isPending}>
+              {request.isPending ? <Spinner className="h-3 w-3" /> : "ส่งคำขอ"}
+            </Button>
+          </div>
         </form>
       )}
 
@@ -1443,7 +1482,7 @@ export function StudentLeaveSection({ student, submittedBy, showName = true }: {
                 <li key={r.id} className="space-y-1 py-2">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-muted-foreground">
-                      {leaveDate(r.start_date)} – {leaveDate(r.end_date)} ({r.days} วัน)
+                      {types.find((t) => t.id === r.leave_type_id)?.name ?? "ลา"} · {leaveDate(r.start_date)} – {leaveDate(r.end_date)} ({r.days} วัน)
                     </span>
                     <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs", LEAVE_STATUS_STYLE[r.status])}>
                       {LEAVE_STATUS_LABEL[r.status]}

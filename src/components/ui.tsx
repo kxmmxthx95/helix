@@ -293,7 +293,7 @@ export function Field({
             className={cn(
               "min-w-0 flex-1",
               valueStart ? "flex items-center justify-end gap-2 [&_select]:w-auto [&_select]:[field-sizing:content]" : "block",
-              "[&_input]:h-7 [&_input]:border-transparent [&_input]:bg-transparent [&_input]:px-0 [&_input]:text-right [&_input]:shadow-none [&_input]:hover:border-transparent",
+              "[&_input]:text-sm [&_select]:text-sm [&_input]:h-7 [&_input]:border-transparent [&_input]:bg-transparent [&_input]:px-0 [&_input]:text-right [&_input]:shadow-none [&_input]:hover:border-transparent",
               "[&_input:focus-visible]:border-transparent [&_input:focus-visible]:ring-0",
               // Values read lighter than their labels (iOS settings rows); focus and open dropdown stay full strength.
               "[&_input]:text-muted-foreground [&_select]:text-muted-foreground [&_input:focus]:text-foreground [&_option]:text-foreground",

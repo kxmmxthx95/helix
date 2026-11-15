@@ -829,6 +829,11 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
                     {l.end_date !== l.start_date && ` – ${leaveDate(l.end_date)}`} · {l.days} วัน
                   </p>
                   {l.reason && <p className="mt-3 text-sm leading-6">{l.reason}</p>}
+                  {l.attachment_path && (
+                    <button type="button" className="mt-2 text-sm text-accent underline" onClick={() => leaveAttachmentUrl(l.attachment_path!).then((u) => window.open(u, "_blank")).catch(() => {})}>
+                      ดูไฟล์แนบ
+                    </button>
+                  )}
                   <p className="mt-3 text-xs text-muted-foreground">ยื่นเมื่อ {leaveSubmittedAt(l.created_at)}</p>
                   <div className="mt-4 flex gap-2">
                     {(["approved", "rejected"] as const).map((st) => (

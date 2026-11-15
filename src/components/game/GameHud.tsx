@@ -22,7 +22,7 @@ import {
   PricetagIcon,
   RibbonIcon,
 } from "@/components/icons";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, usePhone } from "@/components/Sheet";
 import { Avatar } from "@/components/ui";
 import { useActiveTerm } from "@/hooks/useAcademicTerms";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions, type MyAssignment } from "@/hooks/useAssignments";
@@ -56,7 +56,7 @@ type Panel = "attendance" | "behavior" | "leave" | "bag" | "subjects" | "timetab
 const PANEL_TITLE: Record<Panel, string> = {
   attendance: "เช็คชื่อเข้าแถว",
   behavior: "พฤติกรรม",
-  leave: "ลา",
+  leave: "ใบลา",
   bag: "กระเป๋า",
   subjects: "วิชาของฉัน",
   timetable: "ตารางเรียน",
@@ -148,6 +148,7 @@ function IconSquare({ icon: I, color, className, glyph = "h-7 w-7" }: { icon: Ic
 
 /** Student home: gradient hero (next due work), stat cards, icon menu, due-work and subject carousels. */
 export function GameHud() {
+  const phone = usePhone();
   const { profile, myStudent } = useAuth();
   const navigate = useNavigate();
   const reduce = useReducedMotion();
@@ -229,7 +230,7 @@ export function GameHud() {
     { label: "แบบฝึกหัด", icon: BookIcon, color: "linear-gradient(160deg,#6ee08a,#34c759)", onClick: () => navigate("/practice") },
     { label: "ปฏิทิน", icon: CalendarIcon, color: "linear-gradient(160deg,#ff8aa8,#ff2d55)", onClick: () => navigate("/academic-events") },
     { label: "เอกสาร", icon: LibraryIcon, color: "linear-gradient(160deg,#9aa0ff,#5856d6)", onClick: () => navigate("/documents") },
-    { label: "ลา", icon: AirplaneIcon, color: "linear-gradient(160deg,#6dd5e6,#32ade6)", onClick: () => setPanel("leave") },
+    { label: "ใบลา", icon: AirplaneIcon, color: "linear-gradient(160deg,#6dd5e6,#32ade6)", onClick: () => setPanel("leave") },
     { label: "เช็คชื่อเข้าแถว", icon: CheckmarkCircleIcon, color: "linear-gradient(160deg,#5de0b8,#30b0a0)", onClick: () => setPanel("attendance") },
     { label: "พฤติกรรม", icon: RibbonIcon, color: "linear-gradient(160deg,#ffd45e,#ffcc00)", onClick: () => setPanel("behavior") },
     { label: "บัตรเติมเงิน", icon: PricetagIcon, color: "linear-gradient(160deg,#d58bff,#af52de)", onClick: () => navigate("/card-topup") },
@@ -411,7 +412,8 @@ export function GameHud() {
         open={panel !== null}
         onOpenChange={(o) => !o && setPanel(null)}
         title={panel ? PANEL_TITLE[panel] : ""}
-        closable
+        closable={!phone}
+        bottomOnPhone
         wide={panel === "timetable" ? "full" : false}
         bodyClassName="[&_.page-fill]:min-h-0 [&_.page-fill]:pb-0"
       >

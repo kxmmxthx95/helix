@@ -105,6 +105,15 @@ export function usePendingStaffLeave(approverId: string, enabled: boolean) {
 
 const LEAVE_BUCKET = "leave-attachments";
 
+/** Uploads to the private bucket under `${ownerId}/...` (folder = auth.uid(), what the storage policies check). */
+export async function uploadLeaveAttachment(ownerId: string, file: File): Promise<string> {
+  const ext = file.name.includes(".") ? file.name.split(".").pop() : null;
+  const path = `${ownerId}/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
+  const { error } = await supabase.storage.from(LEAVE_BUCKET).upload(path, file);
+  if (error) throw error;
+  return path;
+}
+
 export function useRequestLeave() {
   const qc = useQueryClient();
   return useMutation({
@@ -116,15 +125,7 @@ export function useRequestLeave() {
       reason: string;
       file: File | null;
     }) => {
-      let attachmentPath: string | null = null;
-      if (params.file) {
-        const ext = params.file.name.includes(".") ? params.file.name.split(".").pop() : null;
-        attachmentPath = `${params.profileId}/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
-        const { error: upErr } = await supabase.storage
-          .from(LEAVE_BUCKET)
-          .upload(attachmentPath, params.file);
-        if (upErr) throw upErr;
-      }
+      const attachmentPath = params.file ? await uploadLeaveAttachment(params.profileId, params.file) : null;
       const { error } = await supabase.from("leave_requests").insert({
         profile_id: params.profileId,
         leave_type_id: params.leaveTypeId,
