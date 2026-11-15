@@ -13,9 +13,7 @@ import { useDepartmentTeachingAssignments } from "@/hooks/useTeachingLoad";
 import { useAssignmentProgress } from "@/hooks/useTeachingPlanSlots";
 import { profileFullName, type TeachingAssignment } from "@/lib/database.types";
 import { canManageAcademic, isOrgWide } from "@/lib/roles";
-import { cn } from "@/lib/utils";
 
-const TERM_LABEL: Record<number, string> = { 1: "ภาคเรียน 1", 2: "ภาคเรียน 2" };
 
 export function TeachingPlanOverview() {
   const { profile: me } = useAuth();
@@ -26,8 +24,7 @@ export function TeachingPlanOverview() {
 
   const departmentId = orgWide ? pickedDept : (me?.department_id ?? "");
   const { data: currentTerm } = useCurrentTerm(departmentId || null);
-  const [pickedTerm, setTerm] = useState<1 | 2 | null>(null);
-  const term = pickedTerm ?? currentTerm?.term ?? 1;
+  const term = currentTerm?.term ?? 1;
   const department = departments.find((d) => d.id === departmentId);
   const splitsByTerm = department?.code === "SEC";
   const { data: activeYear } = useActiveAcademicYear(departmentId || null);
@@ -54,28 +51,6 @@ export function TeachingPlanOverview() {
               </option>
             ))}
           </Select>
-        )}
-
-        {splitsByTerm && (
-          <div className="flex w-full shrink-0 gap-0 border-b border-border" role="tablist">
-            {([1, 2] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                aria-selected={term === t}
-                onClick={() => setTerm(t)}
-                className={cn(
-                  "inline-flex h-8 min-w-0 flex-1 items-center justify-center border-b-2 px-3 text-xs font-medium transition-colors -mb-px",
-                  term === t
-                    ? "border-foreground text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {TERM_LABEL[t]}
-              </button>
-            ))}
-          </div>
         )}
       </div>
 

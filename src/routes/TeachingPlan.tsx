@@ -19,7 +19,7 @@ export function TeachingPlan() {
   const [params, setParams] = useSearchParams();
   if (!me) return null;
   if (!canManageAcademic(me.roles)) return <MyTeachingPlan />;
-  const tab = params.get("tab") === "mine" ? "mine" : "overview";
+  const tab = params.get("tab") === "overview" ? "overview" : "mine";
   return (
     <div className="page-fill">
       <div className="flex shrink-0 gap-0 border-b border-border" role="tablist">
