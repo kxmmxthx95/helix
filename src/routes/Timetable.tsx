@@ -1296,7 +1296,7 @@ function TimetableGrid({
                             badge={{ className: styling.typeBadge(sid), title: styling.typeLabel(sid) }}
                             footer={
                               venueName(e.room_id) && (
-                                <p className="truncate text-xs text-muted-foreground">ห้อง {venueName(e.room_id)}</p>
+                                <p className="truncate text-xs text-muted-foreground">{venueName(e.room_id)}</p>
                               )
                             }
                           />
@@ -1461,13 +1461,13 @@ function TimetableGrid({
                                       .filter((v) => v.is_active || v.id === e.room_id)
                                       .map((v) => (
                                         <option key={v.id} value={v.id}>
-                                          ห้อง {v.name}
+                                          {v.name}
                                         </option>
                                       ))}
                                   </Select>
                                 ) : (
                                   venueName(e.room_id) && (
-                                    <p className="truncate text-xs text-muted-foreground">ห้อง {venueName(e.room_id)}</p>
+                                    <p className="truncate text-xs text-muted-foreground">{venueName(e.room_id)}</p>
                                   )
                                 )
                               }
@@ -1715,7 +1715,7 @@ function PlaceSheet({
           <option value="">ไม่ระบุห้อง</option>
           {venues.filter((v) => v.is_active).map((v) => (
             <option key={v.id} value={v.id}>
-              ห้อง {v.name}
+              {v.name}
             </option>
           ))}
         </Select>
@@ -1800,6 +1800,7 @@ function RoomsSheet({ open, onOpenChange, departmentId }: { open: boolean; onOpe
   const save = useSaveRoom();
   const toast = useToast();
   const [name, setName] = useState("");
+  const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
 
   const run = (r: Parameters<typeof save.mutate>[0], done?: () => void) =>
@@ -1808,9 +1809,17 @@ function RoomsSheet({ open, onOpenChange, departmentId }: { open: boolean; onOpe
       onError: (err) => toast(/duplicate key/.test(err.message) ? "มีห้องชื่อนี้แล้ว" : err.message, "error"),
     });
 
+  const sorted = useMemo(() => [...rooms].sort((a, b) => a.name.localeCompare(b.name, "th", { numeric: true })), [rooms]);
+  const shown = sorted.filter((r) => r.name.toLowerCase().includes(search.trim().toLowerCase()));
+  const activeCount = rooms.filter((r) => r.is_active).length;
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} title="จัดการห้อง" description="ห้องที่ใช้เรียนจริง เช่น 305, ห้องแล็บวิทย์">
-      <div className="space-y-3">
+    <Sheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="จัดการห้อง"
+      description="ห้องที่ใช้เรียนจริง เช่น 305, ห้องแล็บวิทย์ ปิดห้องที่เลิกใช้แล้วได้โดยไม่กระทบคาบเดิม"
+      footer={
         <form
           className="flex gap-2"
           onSubmit={(e) => {
@@ -1819,18 +1828,38 @@ function RoomsSheet({ open, onOpenChange, departmentId }: { open: boolean; onOpe
             if (n) run({ department_id: departmentId, name: n }, () => setName(""));
           }}
         >
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ชื่อห้องใหม่" aria-label="ชื่อห้องใหม่" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ชื่อห้องใหม่ เช่น PB-306" aria-label="ชื่อห้องใหม่" />
           <Button type="submit" disabled={!name.trim() || save.isPending}>
             <Plus className="h-3.5 w-3.5" />
-            เพิ่ม
+            เพิ่มห้อง
           </Button>
         </form>
-        <ul className="space-y-2">
-          {rooms.map((r) => (
-            <li key={r.id} className="flex items-center gap-2 rounded-xl border border-border p-2">
+      }
+    >
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input type="search" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ค้นหาห้อง..." aria-label="ค้นหาห้อง" />
+          </div>
+          <p className="shrink-0 rounded-full bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+            ใช้งาน {activeCount}/{rooms.length}
+          </p>
+        </div>
+
+        <ul className="grid grid-cols-2 gap-2">
+          {shown.map((r) => (
+            <li
+              key={r.id}
+              className={cn(
+                "flex items-center gap-2 rounded-xl border p-2.5 pl-3 transition-colors",
+                r.is_active ? "border-border bg-card" : "border-transparent bg-muted/50",
+              )}
+            >
               {editing?.id === r.id ? (
                 <Input
                   autoFocus
+                  className="h-8"
                   value={editing.name}
                   onChange={(e) => setEditing({ id: r.id, name: e.target.value })}
                   onBlur={() => {
@@ -1844,21 +1873,26 @@ function RoomsSheet({ open, onOpenChange, departmentId }: { open: boolean; onOpe
               ) : (
                 <button
                   type="button"
+                  title="กดเพื่อเปลี่ยนชื่อ"
                   onClick={() => setEditing({ id: r.id, name: r.name })}
-                  className={cn("min-w-0 flex-1 truncate text-left text-sm", !r.is_active && "text-muted-foreground line-through")}
+                  className="min-w-0 flex-1 text-left leading-tight"
                 >
-                  {r.name}
+                  <span className={cn("block truncate text-sm font-medium", !r.is_active && "text-muted-foreground")}>{r.name}</span>
+                  <span className="block text-[11px] text-muted-foreground">{r.is_active ? "ใช้งาน" : "ปิดใช้งาน"}</span>
                 </button>
               )}
               <Switch
+                size="xs"
                 checked={r.is_active}
                 onChange={(v) => run({ id: r.id, department_id: departmentId, name: r.name, is_active: v })}
                 label={`เปิดใช้ห้อง ${r.name}`}
               />
             </li>
           ))}
-          {rooms.length === 0 && <li className="py-8 text-center text-sm text-muted-foreground">ยังไม่มีห้อง</li>}
         </ul>
+        {shown.length === 0 && (
+          <p className="py-8 text-center text-sm text-muted-foreground">{rooms.length === 0 ? "ยังไม่มีห้อง — เพิ่มห้องแรกด้านล่าง" : "ไม่พบห้องที่ค้นหา"}</p>
+        )}
       </div>
     </Sheet>
   );
