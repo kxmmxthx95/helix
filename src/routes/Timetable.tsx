@@ -42,7 +42,7 @@ import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments, useProfiles, type ProfileRow } from "@/hooks/useProfiles";
-import { useClassroomsByDepartment, useCurrentClassroomEnrollmentsByDepartment } from "@/hooks/useStatusManagement";
+import { useClassroomsByDepartment, useCurrentClassroomEnrollmentsByDepartment, useHomeroomTeachersByDepartment } from "@/hooks/useStatusManagement";
 import { useDepartmentTeachingAssignments } from "@/hooks/useTeachingLoad";
 import {
   useClassroomSchedule,
@@ -343,6 +343,12 @@ function ClassroomWorkspace({
     return map;
   }, [enrollments]);
 
+  // ครูประจำชั้น per room, shown in the list with their profile photo.
+  const { data: homerooms = [] } = useHomeroomTeachersByDepartment(departmentId, academicYear);
+  const { data: homeroomProfiles = [] } = useProfilesByIds([...new Set(homerooms.map((h) => h.teacher_id))]);
+  const homeroomOf = (classroomId: string) =>
+    homerooms.filter((h) => h.classroom_id === classroomId).flatMap((h) => homeroomProfiles.find((p) => p.id === h.teacher_id) ?? []);
+
   const room = sorted.find((c) => c.id === pickedId) ?? sorted[0];
   const { data: roomEntries = [] } = useClassroomSchedule(room?.id ?? null, academicYear, term);
   const { data: defaultPeriods = [] } = useDepartmentPeriods(departmentId);
@@ -371,9 +377,19 @@ function ClassroomWorkspace({
         items={sorted.map((c) => ({
           id: c.id,
           name: label(c),
-          subtitle: `นักเรียน ${studentCount.get(c.id) ?? 0} คน`,
+          subtitle: homeroomOf(c.id).map((t) => `${t.first_name} ${t.last_name}`).join(", ") || "ยังไม่มีครูประจำชั้น",
           subjects: new Set(assignments.filter((a) => a.classroom_id === c.id).map((a) => a.subject_id)).size,
-          search: label(c),
+          search: `${label(c)} ${homeroomOf(c.id).map((t) => `${t.first_name} ${t.last_name}`).join(" ")}`,
+          avatar: (
+            <Avatar
+              name={(() => {
+                const t = homeroomOf(c.id)[0];
+                return t ? `${t.first_name} ${t.last_name}` : "?";
+              })()}
+              src={homeroomOf(c.id)[0] ? avatarUrl(homeroomOf(c.id)[0]!) : undefined}
+              className="h-11 w-11 text-xs ring-2 ring-sky-200 dark:ring-sky-500/40"
+            />
+          ),
         }))}
       />
 
@@ -398,7 +414,7 @@ function ClassroomWorkspace({
             <StatChip
               icon={TimeIcon}
               tint="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20"
-              value={`${roomEntries.length}/${countTeachingSlots(mergePeriods(defaultPeriods, gradePeriods))}`}
+              value={`${countPlacedSlots(roomEntries)}/${countTeachingSlots(mergePeriods(defaultPeriods, gradePeriods))}`}
               label="คาบที่จัดแล้ว"
             />
             <StatChip
@@ -585,7 +601,7 @@ type PickerItem = {
   name: string;
   /** Shown instead of `name` as two lines (e.g. first name / last name); `name` still drives search and sort. */
   nameLines?: [string, string];
-  subtitle: string;
+  subtitle?: string;
   /** Subjects taught / scheduled — shown as the pill and used for the second sort. */
   subjects: number;
   search: string;
@@ -670,7 +686,7 @@ function PickerList({
                 ) : (
                   <p className="truncate text-sm font-medium text-foreground">{i.name}</p>
                 )}
-                <p className="truncate text-xs text-muted-foreground">{i.subtitle}</p>
+                {i.subtitle && <p className="truncate text-xs text-muted-foreground">{i.subtitle}</p>}
               </div>
             </button>
           </li>
@@ -823,7 +839,7 @@ function TeacherWorkspace({
     {
       icon: TimeIcon,
       tint: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20",
-      value: `${entries.length}/${countTeachingSlots(deptPeriods)}`,
+      value: `${countPlacedSlots(entries)}/${countTeachingSlots(deptPeriods)}`,
       label: "คาบที่จัดแล้ว",
     },
     { icon: GraduationCap, tint: "bg-violet-100 text-violet-600 dark:bg-violet-500/20", value: gradeRange, label: "ระดับที่สอน" },
@@ -1054,6 +1070,10 @@ function BackHeader({ label, onBack }: { label: string; onBack: () => void }) {
     </div>
   );
 }
+
+/** Entries sharing a day+period (co-teaching, เรียนรวม) fill one slot, so they count once. */
+const countPlacedSlots = (entries: { day_of_week: number; period_no: number }[]) =>
+  new Set(entries.map((e) => `${e.day_of_week}-${e.period_no}`)).size;
 
 const countTeachingSlots = (periods: PeriodDefinition[]) => periods.filter((p) => p.period_type === "teaching").length;
 
