@@ -109,6 +109,8 @@ function ClassroomsList({ me }: { me: NonNullable<ReturnType<typeof useAuth>["pr
 
   const [openClassroomId, setOpenClassroomId] = useState("");
   const [homeroomClassroomId, setHomeroomClassroomId] = useState("");
+  const [preview, setPreview] = useState<{ label: string; students: Student[] } | null>(null);
+  const previewFrame = useRef<HTMLIFrameElement>(null);
   const homeroomClassroom = classrooms.find((c) => c.id === homeroomClassroomId) ?? null;
   const openClassroom = classrooms.find((c) => c.id === openClassroomId) ?? null;
   if (openClassroom) {
@@ -135,8 +137,6 @@ function ClassroomsList({ me }: { me: NonNullable<ReturnType<typeof useAuth>["pr
     );
   }
 
-  const [preview, setPreview] = useState<{ label: string; students: Student[] } | null>(null);
-  const previewFrame = useRef<HTMLIFrameElement>(null);
   const openRosterPreview = async (c: Classroom) => {
     const grade = gradeLevelById.get(c.grade_level_id);
     const label = grade ? `${gradeShortLabel(grade.code)}/${c.name}` : c.name;
