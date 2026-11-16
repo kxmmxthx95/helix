@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, computeSlots, isoDow, weekStart } from "./planSlots";
+import { addDays, computeSlots, eventApplies, isoDow, periodReplaced, weekStart } from "./planSlots";
 
 describe("planSlots", () => {
   it("computes ISO weekday and week start", () => {
@@ -19,5 +19,33 @@ describe("planSlots", () => {
       "2026-11-16#3",
       "2026-11-18#2",
     ]);
+  });
+  const morning = { start_date: "2026-11-09", end_date: "2026-11-09", students_attend: true, replaces_classes: true, start_time: "08:30:00", end_time: "12:00:00" };
+  it("replaces only periods overlapping the event window", () => {
+    expect(periodReplaced("2026-11-09", { start_time: "09:00", end_time: "09:50" }, [morning])).toBe(true);
+    expect(periodReplaced("2026-11-09", { start_time: "11:30", end_time: "12:20" }, [morning])).toBe(true); // partial overlap
+    expect(periodReplaced("2026-11-09", { start_time: "12:00", end_time: "12:50" }, [morning])).toBe(false); // touching only
+    expect(periodReplaced("2026-11-09", { start_time: "13:00", end_time: "13:50" }, [morning])).toBe(false);
+    expect(periodReplaced("2026-11-10", { start_time: "09:00", end_time: "09:50" }, [morning])).toBe(false);
+  });
+  it("replaces every period without a window or when closed all day; ignores non-replacing events", () => {
+    const p = { start_time: "13:00", end_time: "13:50" };
+    expect(periodReplaced("2026-11-09", p, [{ ...morning, start_time: null, end_time: null }])).toBe(true);
+    expect(periodReplaced("2026-11-09", p, [{ ...morning, students_attend: false }])).toBe(true);
+    expect(periodReplaced("2026-11-09", p, [{ ...morning, replaces_classes: false }])).toBe(false);
+  });
+  it("computeSlots drops only the replaced periods of a half-day activity", () => {
+    const entries = [
+      { day_of_week: 1, period_no: 2, start_time: "09:00", end_time: "09:50" },
+      { day_of_week: 1, period_no: 6, start_time: "13:00", end_time: "13:50" },
+    ];
+    const slots = computeSlots({ start: "2026-11-09", end: "2026-11-09" }, entries, [morning]);
+    expect(slots.map((s) => s.periodNo)).toEqual([6]);
+  });
+  it("scopes events by department and grade", () => {
+    expect(eventApplies({ departmentIds: [] }, "d1", "g1")).toBe(true);
+    expect(eventApplies({ departmentIds: ["d2"] }, "d1", "g1")).toBe(false);
+    expect(eventApplies({ departmentIds: ["d1"], gradeLevelIds: ["g2"] }, "d1", "g1")).toBe(false);
+    expect(eventApplies({ departmentIds: ["d1"], gradeLevelIds: ["g1"] }, "d1", "g1")).toBe(true);
   });
 });

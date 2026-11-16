@@ -26,6 +26,19 @@ export function useDepartmentPeriods(departmentId: string | null) {
   });
 }
 
+/** Department default rows plus every grade override — for callers that resolve times per grade (see periodTimes). */
+export function useAllDepartmentPeriods(departmentId: string | null) {
+  return useQuery({
+    queryKey: ["period_definitions", departmentId, "all"],
+    enabled: !!departmentId,
+    queryFn: async (): Promise<PeriodDefinition[]> => {
+      const { data, error } = await supabase.from("period_definitions").select("*").eq("department_id", departmentId!);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function usePeriodsForGrade(departmentId: string | null, gradeLevelId: string | null) {
   return useQuery({
     queryKey: ["period_definitions", departmentId, gradeLevelId],

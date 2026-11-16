@@ -139,7 +139,7 @@ export function useSetAcademicTermStatus() {
 // ------------------------------------------------------------- academic_events
 // Read is open to everyone signed in — no department filter needed on read.
 
-export type AcademicEventRow = AcademicEvent & { departmentIds: string[] };
+export type AcademicEventRow = AcademicEvent & { departmentIds: string[]; gradeLevelIds: string[] };
 
 export function useAcademicEvents() {
   return useQuery({
@@ -147,13 +147,17 @@ export function useAcademicEvents() {
     queryFn: async (): Promise<AcademicEventRow[]> => {
       const { data, error } = await supabase
         .from("academic_events")
-        .select("*, academic_event_departments(department_id)")
+        .select("*, academic_event_departments(department_id), academic_event_grade_levels(grade_level_id)")
         .order("start_date");
       if (error) throw error;
-      return (data as unknown as (AcademicEvent & { academic_event_departments: { department_id: string }[] })[]).map(
+      return (data as unknown as (AcademicEvent & {
+        academic_event_departments: { department_id: string }[];
+        academic_event_grade_levels: { grade_level_id: string }[];
+      })[]).map(
         (row) => ({
           ...row,
           departmentIds: row.academic_event_departments.map((d) => d.department_id),
+          gradeLevelIds: row.academic_event_grade_levels.map((g) => g.grade_level_id),
         }),
       );
     },
@@ -162,18 +166,19 @@ export function useAcademicEvents() {
 
 export type AcademicEventDraft = Pick<
   AcademicEvent,
-  "name" | "event_type" | "start_date" | "end_date" | "students_attend" | "staff_attend" | "description" | "show_in_schedule" | "notify_users"
+  "name" | "event_type" | "start_date" | "end_date" | "students_attend" | "staff_attend" | "description" | "show_in_schedule" | "notify_users" | "replaces_classes" | "start_time" | "end_time"
 >;
 
-/** Saves the event row, then replaces its department links with exactly departmentIds (empty = whole school). */
+/** Saves the event row, then replaces its department and grade-level links with exactly departmentIds / gradeLevelIds (empty = whole school / every grade). */
 export function useSaveAcademicEvent() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
       id,
       departmentIds,
+      gradeLevelIds,
       ...draft
-    }: AcademicEventDraft & { id?: string; departmentIds: string[] }) => {
+    }: AcademicEventDraft & { id?: string; departmentIds: string[]; gradeLevelIds: string[] }) => {
       const eventId = id
         ? await supabase
             .from("academic_events")
@@ -204,6 +209,15 @@ export function useSaveAcademicEvent() {
           .from("academic_event_departments")
           .insert(departmentIds.map((department_id) => ({ event_id: eventId, department_id })));
         if (insError) throw insError;
+      }
+
+      const { error: delGradeError } = await supabase.from("academic_event_grade_levels").delete().eq("event_id", eventId);
+      if (delGradeError) throw delGradeError;
+      if (gradeLevelIds.length > 0) {
+        const { error: insGradeError } = await supabase
+          .from("academic_event_grade_levels")
+          .insert(gradeLevelIds.map((grade_level_id) => ({ event_id: eventId, grade_level_id })));
+        if (insGradeError) throw insGradeError;
       }
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["academic_events"] }),

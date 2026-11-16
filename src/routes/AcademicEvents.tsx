@@ -16,11 +16,15 @@ import {
   type AcademicEventRow,
 } from "@/hooks/useAcademicTerms";
 import { useAttendanceRange } from "@/hooks/useAttendance";
+import { useAllGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useStudentByProfile } from "@/hooks/useStudents";
 import type { AcademicEventType } from "@/lib/database.types";
 import { canManage, isOrgWide, isSelfScoped } from "@/lib/roles";
+import { gradeShortLabel } from "@/lib/gradeLevels";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 
 const EVENT_TYPE_LABEL: Record<AcademicEventType, string> = {
   holiday: "วันหยุด",
@@ -190,10 +194,14 @@ export function AcademicEvents() {
           description: null,
           show_in_schedule: false,
           notify_users: false,
+          replaces_classes: false,
+          start_time: null,
+          end_time: null,
           external_ref: null,
           created_at: "",
           updated_at: "",
           departmentIds: [],
+          gradeLevelIds: [],
           isTerm: true,
         });
       }
@@ -718,8 +726,9 @@ function EventSheet({
   const { data: departments = [] } = useDepartments();
   const toast = useToast();
   const save = useSaveAcademicEvent();
+  const { data: allGrades = [] } = useAllGradeLevels();
 
-  const blank = (): AcademicEventDraft & { departmentIds: string[] } => ({
+  const blank = (): AcademicEventDraft & { departmentIds: string[]; gradeLevelIds: string[] } => ({
     name: "",
     event_type: "holiday",
     start_date: initialDate ?? "",
@@ -728,6 +737,10 @@ function EventSheet({
     description: null,
     show_in_schedule: true,
     notify_users: false,
+    replaces_classes: false,
+    start_time: null,
+    end_time: null,
+    gradeLevelIds: [],
     // A dept_head's event is always scoped to their own department — the
     // "whole school" (empty) option is org-wide only, so it's never offered here.
     departmentIds: orgWide ? [] : myDepartmentId ? [myDepartmentId] : [],
@@ -749,6 +762,10 @@ function EventSheet({
             description: event.description,
             show_in_schedule: event.show_in_schedule,
             notify_users: event.notify_users,
+            replaces_classes: event.replaces_classes,
+            start_time: event.start_time,
+            end_time: event.end_time,
+            gradeLevelIds: event.gradeLevelIds,
             departmentIds: event.departmentIds,
           }
         : blank(),
@@ -767,11 +784,42 @@ function EventSheet({
     }));
   }
 
+  function toggleGrade(id: string, checked: boolean) {
+    setDraft((d) => ({
+      ...d,
+      gradeLevelIds: checked ? [...d.gradeLevelIds, id] : d.gradeLevelIds.filter((x) => x !== id),
+    }));
+  }
+
+  // Grades offered = those of the chosen departments (none chosen = the whole school's).
+  const gradeChoices = allGrades.filter((g) => draft.departmentIds.length === 0 || draft.departmentIds.includes(g.department_id));
+  const blocksPeriods = !draft.students_attend || draft.replaces_classes;
+  const { data: affected = 0 } = useQuery({
+    queryKey: ["period_attendance_records", "count_in_range", draft.start_date, draft.end_date],
+    enabled: open && blocksPeriods && !!draft.start_date && !!draft.end_date && draft.end_date >= draft.start_date,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("period_attendance_records")
+        .select("id", { count: "exact", head: true })
+        .gte("date", draft.start_date)
+        .lte("date", draft.end_date);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!draft.name.trim() || !draft.start_date || !draft.end_date) return;
+    if (invalid) return;
     save.mutate(
-      { id: event?.id, ...draft },
+      {
+        id: event?.id,
+        ...draft,
+        // The window only means something while the event replaces classes; grade links only within chosen departments' grades.
+        start_time: draft.replaces_classes && draft.students_attend ? draft.start_time : null,
+        end_time: draft.replaces_classes && draft.students_attend ? draft.end_time : null,
+        gradeLevelIds: draft.gradeLevelIds.filter((id) => gradeChoices.some((g) => g.id === id)),
+      },
       {
         onSuccess: () => {
           toast(mode === "create" ? "เพิ่ม Event สำเร็จ" : "บันทึกสำเร็จ");
@@ -781,7 +829,12 @@ function EventSheet({
     );
   }
 
-  const invalid = !draft.name.trim() || !draft.start_date || !draft.end_date;
+  const windowed = draft.replaces_classes && draft.students_attend;
+  const invalid =
+    !draft.name.trim() ||
+    !draft.start_date ||
+    !draft.end_date ||
+    (windowed && (!!draft.start_time !== !!draft.end_time || (!!draft.start_time && draft.end_time! <= draft.start_time)));
 
   return (
     <Sheet
@@ -880,7 +933,56 @@ function EventSheet({
               <Switch size="sm" checked={draft[k]} onChange={(on) => setDraft({ ...draft, [k]: on })} label={label} />
             </div>
           ))}
+          {draft.students_attend && (
+            <div className="flex items-center justify-between gap-4 text-sm leading-5">
+              <span>แทนคาบเรียน (นักเรียนมา แต่ไม่มีเรียนในช่วงนี้)</span>
+              <Switch
+                size="sm"
+                checked={draft.replaces_classes}
+                onChange={(on) => setDraft({ ...draft, replaces_classes: on })}
+                label="แทนคาบเรียน"
+              />
+            </div>
+          )}
         </FormSection>
+
+        {windowed && (
+          <FormSection title="ช่วงเวลาที่แทนคาบ (ว่าง = ทั้งวัน)">
+            <Field label="เวลาเริ่ม">
+              <Input
+                type="time"
+                value={draft.start_time?.slice(0, 5) ?? ""}
+                onChange={(e) => setDraft({ ...draft, start_time: e.target.value || null })}
+              />
+            </Field>
+            <Field label="เวลาสิ้นสุด">
+              <Input
+                type="time"
+                value={draft.end_time?.slice(0, 5) ?? ""}
+                min={draft.start_time?.slice(0, 5) || undefined}
+                onChange={(e) => setDraft({ ...draft, end_time: e.target.value || null })}
+              />
+            </Field>
+            <p className="text-xs text-muted-foreground">คาบที่เวลาทับกับช่วงนี้ (แม้บางส่วน) จะไม่มีเรียนและไม่ต้องเช็คชื่อ</p>
+          </FormSection>
+        )}
+
+        {blocksPeriods && gradeChoices.length > 0 && (
+          <FormSection title="ระดับชั้นที่เกี่ยวข้อง (ไม่เลือก = ทุกระดับชั้น)">
+            {gradeChoices.map((g) => (
+              <div key={g.id} className="flex items-center justify-between gap-4 text-sm leading-5">
+                <span>{gradeShortLabel(g.code)}</span>
+                <Switch size="sm" checked={draft.gradeLevelIds.includes(g.id)} onChange={(on) => toggleGrade(g.id, on)} label={g.code} />
+              </div>
+            ))}
+          </FormSection>
+        )}
+
+        {blocksPeriods && affected > 0 && (
+          <p className="rounded-xl bg-warning/15 px-3 py-2 text-xs text-warning">
+            ช่วงวันที่นี้มีเช็คชื่อรายคาบอยู่แล้ว {affected} รายการ ข้อมูลเดิมจะไม่ถูกลบ แต่เช็คชื่อใหม่ในคาบที่ถูกแทนจะบันทึกไม่ได้
+          </p>
+        )}
       </form>
     </Sheet>
   );

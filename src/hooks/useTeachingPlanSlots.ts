@@ -2,7 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useAcademicEvents, useAllAcademicTerms } from "@/hooks/useAcademicTerms";
 import type { ScheduleEntry, TeachingAssignment, TeachingPlanSlot } from "@/lib/database.types";
-import { computeSlots, termRange } from "@/lib/planSlots";
+import { computeSlots, eventApplies, termRange } from "@/lib/planSlots";
+import { withTimes } from "@/lib/periods";
+import { useAllDepartmentPeriods } from "@/hooks/usePeriodDefinitions";
+import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import { supabase } from "@/lib/supabase";
 
 // แผนการสอนแบบปฏิทิน — see migration 0142. The slot grid itself is computed
@@ -192,20 +195,26 @@ export function useAssignmentProgress(assignments: TeachingAssignment[], departm
   const { data: entries = [] } = useScheduleEntriesForAssignments(ids);
   const { data: terms = [] } = useAllAcademicTerms();
   const { data: events = [] } = useAcademicEvents();
+  const { data: periods = [] } = useAllDepartmentPeriods(departmentId);
+  const { data: classrooms = [] } = useClassroomsByDepartment(departmentId);
   const progress = useMemo(() => {
-    const deptEvents = events.filter((e) => e.departmentIds.length === 0 || (departmentId && e.departmentIds.includes(departmentId)));
     const today = new Date().toISOString().slice(0, 10);
     return new Map(
       assignments.map((a) => {
         const range = termRange(terms, a, departmentId);
+        const gradeId = classrooms.find((c) => c.id === a.classroom_id)?.grade_level_id ?? null;
         const total = range
-          ? computeSlots(range, entries.filter((e) => e.teaching_assignment_id === a.id), deptEvents).length
+          ? computeSlots(
+              range,
+              withTimes(entries.filter((e) => e.teaching_assignment_id === a.id), periods, gradeId),
+              events.filter((e) => eventApplies(e, departmentId, gradeId)),
+            ).length
           : 0;
         const mine = slots.filter((s) => s.teaching_assignment_id === a.id);
         const next = mine.find((s) => s.topic_ids.length > 0 && !s.completed_at && s.slot_date >= today);
         return [a.id, { stats: slotStats(mine, total), next }] as const;
       }),
     );
-  }, [assignments, departmentId, terms, events, entries, slots]);
+  }, [assignments, departmentId, terms, events, entries, slots, periods, classrooms]);
   return { progress, isLoading };
 }

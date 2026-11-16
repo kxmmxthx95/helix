@@ -1568,10 +1568,20 @@ export type AcademicEvent = {
   show_in_schedule: boolean;
   /** Flag only — no delivery job reads it yet. See migration 0085. */
   notify_users: boolean;
+  /** Students attend but the periods overlapping start_time..end_time (or all periods when no window) are replaced by the event. See migration 0166. */
+  replaces_classes: boolean;
+  start_time: string | null;
+  end_time: string | null;
   /** Dedupe key for API-synced rows, e.g. "iapp:2026-01-01" — null for manually created events. See migration 0045. */
   external_ref: string | null;
   created_at: string;
   updated_at: string;
+};
+
+/** Which grade levels an academic_event applies to — no rows = every grade of its departments. */
+export type AcademicEventGradeLevel = {
+  event_id: string;
+  grade_level_id: string;
 };
 
 /** Which departments an academic_event applies to — no rows for an event = whole school. */
@@ -1806,9 +1816,18 @@ export type Database = {
         AcademicEvent,
         InsertOf<
           AcademicEvent,
-          "students_attend" | "staff_attend" | "external_ref" | "description" | "show_in_schedule" | "notify_users"
+          | "students_attend"
+          | "staff_attend"
+          | "external_ref"
+          | "description"
+          | "show_in_schedule"
+          | "notify_users"
+          | "replaces_classes"
+          | "start_time"
+          | "end_time"
         >
       >;
+      academic_event_grade_levels: Table<AcademicEventGradeLevel, AcademicEventGradeLevel>;
       academic_event_departments: Table<AcademicEventDepartment, AcademicEventDepartment>;
       student_contacts: Table<
         StudentContact,

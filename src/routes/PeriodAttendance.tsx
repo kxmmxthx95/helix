@@ -4,7 +4,10 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ChevronBack } from "@/components/icons";
 import { Button, Card, EmptyState, Input, Skeleton, Spinner } from "@/components/ui";
 import { useToast } from "@/components/Toast";
-import { useActiveAcademicYear, useActiveTerm } from "@/hooks/useAcademicTerms";
+import { useAcademicEvents, useActiveAcademicYear, useActiveTerm } from "@/hooks/useAcademicTerms";
+import { useAllDepartmentPeriods } from "@/hooks/usePeriodDefinitions";
+import { periodTimes } from "@/lib/periods";
+import { eventApplies, periodReplaced } from "@/lib/planSlots";
 import { useClassroomRoster, summarizeAttendance } from "@/hooks/useAttendance";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
@@ -143,7 +146,16 @@ function PeriodCheckInPanel({
     return code ? gradeShortLabel(code) : "—";
   };
 
-  const openEntry = todaysEntries.find((e) => e.id === openEntryId) ?? null;
+  // Periods replaced by an activity / closure on this date: shown read-only, never checked in (also enforced by DB trigger, 0166).
+  const { data: events = [] } = useAcademicEvents();
+  const { data: allPeriods = [] } = useAllDepartmentPeriods(departmentId || null);
+  const replacedBy = (e: ScheduleEntryRow) => {
+    const grade = classroomOf(e.teaching_assignment.classroom_id)?.grade_level_id ?? null;
+    const times = periodTimes(allPeriods, grade, e.day_of_week, e.period_no);
+    return events.find((ev) => eventApplies(ev, departmentId, grade) && periodReplaced(date, times ?? {}, [ev]))?.name ?? null;
+  };
+
+  const openEntry = todaysEntries.find((e) => e.id === openEntryId && !replacedBy(e)) ?? null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -239,11 +251,12 @@ function PeriodCheckInPanel({
                 {todaysEntries.map((e) => {
                   const subject = subjects.find((s) => s.id === e.teaching_assignment.subject_id);
                   const classroom = classroomOf(e.teaching_assignment.classroom_id);
+                  const activity = replacedBy(e);
                   return (
                     <tr
                       key={e.id}
-                      onClick={() => setOpenEntryId(e.id)}
-                      className="cursor-pointer border-t border-border hover:bg-muted/50"
+                      onClick={activity ? undefined : () => setOpenEntryId(e.id)}
+                      className={cn("border-t border-border", activity ? "text-muted-foreground" : "cursor-pointer hover:bg-muted/50")}
                     >
                       <td className="px-3 py-2 text-muted-foreground">{e.period_no}</td>
                       <td className="truncate px-3 py-2">{subject?.code ?? "—"}</td>
@@ -253,12 +266,17 @@ function PeriodCheckInPanel({
                       <td className="truncate px-3 py-2">{classroom?.name ?? "—"}</td>
                       <td className="px-3 py-2 text-center">
                         <span
+                          title={activity ?? undefined}
                           className={cn(
-                            "inline-flex rounded-full px-2 py-0.5 text-xs",
-                            takenSet.has(e.id) ? "bg-success/15 text-success" : "bg-muted text-muted-foreground",
+                            "inline-flex max-w-full truncate rounded-full px-2 py-0.5 text-xs",
+                            activity
+                              ? "bg-accent-soft text-accent"
+                              : takenSet.has(e.id)
+                                ? "bg-success/15 text-success"
+                                : "bg-muted text-muted-foreground",
                           )}
                         >
-                          {takenSet.has(e.id) ? "เช็คแล้ว" : "ยังไม่เช็ค"}
+                          {activity ? `กิจกรรม: ${activity}` : takenSet.has(e.id) ? "เช็คแล้ว" : "ยังไม่เช็ค"}
                         </span>
                       </td>
                     </tr>

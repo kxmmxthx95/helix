@@ -28,8 +28,8 @@ import {
   useTeachingPlanSlots,
 } from "@/hooks/useTeachingPlanSlots";
 import type { TeachingAssignment } from "@/lib/database.types";
-import { mergePeriods } from "@/lib/periods";
-import { addDays, computeSlots, type SlotCell, termRange, weekStart } from "@/lib/planSlots";
+import { mergePeriods, withTimes } from "@/lib/periods";
+import { addDays, computeSlots, eventApplies, type SlotCell, termRange, weekStart } from "@/lib/planSlots";
 import { supabase } from "@/lib/supabase";
 import { useTimetableStyling } from "@/routes/Timetable";
 import { cn } from "@/lib/utils";
@@ -94,6 +94,7 @@ export function TeachingPlanCalendar() {
   const ids = useMemo(() => (assignmentId ? [assignmentId] : []), [assignmentId]);
   const { data: slots = [] } = useTeachingPlanSlots(ids);
   const place = usePlaceTopic();
+  const clearSlot = useClearSlot();
   const [view, setView] = useState<"week" | "month">("week");
   const [anchor, setAnchor] = useState(today); // any date in the shown week/month
   const [picked, setPicked] = useState<SlotCell | null>(null);
@@ -102,10 +103,18 @@ export function TeachingPlanCalendar() {
 
   const range = assignment ? termRange(terms, assignment, departmentId) : null;
   const deptEvents = useMemo(
-    () => events.filter((e) => e.departmentIds.length === 0 || (departmentId && e.departmentIds.includes(departmentId))),
-    [events, departmentId],
+    () => events.filter((e) => eventApplies(e, departmentId, found?.gradeLevelId ?? null)),
+    [events, departmentId, found?.gradeLevelId],
   );
-  const cells = useMemo(() => (range ? computeSlots(range, entries, deptEvents) : []), [range, entries, deptEvents]);
+  const cells = useMemo(
+    () => (range ? computeSlots(range, withTimes(entries, periods, found?.gradeLevelId ?? null), deptEvents) : []),
+    [range, entries, periods, deptEvents, found?.gradeLevelId],
+  );
+  // Topics placed on a period that is no longer a lesson (a later holiday / replacing activity) — kept, but flagged for re-placing.
+  const orphans = useMemo(() => {
+    const live = new Set(cells.map((c) => `${c.date}#${c.periodNo}`));
+    return slots.filter((s) => s.topic_ids.length > 0 && !s.completed_at && !live.has(`${s.slot_date}#${s.period_no}`));
+  }, [slots, cells]);
 
   if (isLoading) {
     return (
@@ -228,6 +237,22 @@ export function TeachingPlanCalendar() {
                 </Button>
               )}
             </div>
+
+            {!readOnly && orphans.length > 0 && (
+              <div className="space-y-1.5 rounded-xl bg-warning/15 px-3 py-2 text-xs text-warning">
+                <p className="font-medium">มี {orphans.length} คาบที่วางหัวข้อไว้ แต่ตอนนี้ไม่มีเรียน (ถูกกิจกรรม/วันหยุดแทน) — ล้างช่องแล้ววางใหม่</p>
+                {orphans.map((o) => (
+                  <div key={o.id} className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate">
+                      {fmt(o.slot_date)} คาบ {o.period_no}
+                    </span>
+                    <Button size="sm" variant="outline" disabled={clearSlot.isPending} onClick={() => clearSlot.mutate(o.id)}>
+                      ล้างช่อง
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {view === "week" ? (
               <PlanWeekGrid

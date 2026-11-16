@@ -5,8 +5,41 @@ import type { AcademicTerm, TeachingAssignment } from "@/lib/database.types";
 // are YYYY-MM-DD strings handled in UTC so the user's timezone never shifts a day.
 
 export type SlotCell = { date: string; dayOfWeek: number; periodNo: number };
-type Entry = { day_of_week: number; period_no: number };
-type Event = { start_date: string; end_date: string; students_attend: boolean };
+type Entry = { day_of_week: number; period_no: number; start_time?: string; end_time?: string };
+export type PlanEvent = {
+  start_date: string;
+  end_date: string;
+  students_attend: boolean;
+  replaces_classes?: boolean;
+  start_time?: string | null;
+  end_time?: string | null;
+};
+type Event = PlanEvent;
+type Scoped = { departmentIds: string[]; gradeLevelIds?: string[] };
+
+/** Does the event apply to this department/grade? No links = everyone (mirrors period_replaced_by_event in 0166). */
+export function eventApplies(e: Scoped, departmentId: string | null, gradeLevelId: string | null) {
+  return (
+    (e.departmentIds.length === 0 || (!!departmentId && e.departmentIds.includes(departmentId))) &&
+    (!e.gradeLevelIds?.length || (!!gradeLevelId && e.gradeLevelIds.includes(gradeLevelId)))
+  );
+}
+
+/**
+ * Is this period replaced by an event on `date`? Same rule as the SQL function
+ * period_replaced_by_event (0166): closed-all-day events replace every period;
+ * replaces_classes events replace every period (no window) or those whose time
+ * overlaps the window. Times are "HH:MM" or "HH:MM:SS" — compared as strings.
+ */
+export function periodReplaced(date: string, period: { start_time?: string; end_time?: string }, events: Event[]) {
+  return events.some((e) => {
+    if (e.start_date > date || date > e.end_date) return false;
+    if (!e.students_attend) return true;
+    if (!e.replaces_classes) return false;
+    if (!e.start_time || !e.end_time || !period.start_time || !period.end_time) return true;
+    return period.start_time.slice(0, 5) < e.end_time.slice(0, 5) && e.start_time.slice(0, 5) < period.end_time.slice(0, 5);
+  });
+}
 
 const DAY_MS = 86_400_000;
 
@@ -27,9 +60,8 @@ export function weekStart(date: string): string {
 export function computeSlots(range: { start: string; end: string }, entries: Entry[], events: Event[]): SlotCell[] {
   const out: SlotCell[] = [];
   for (let d = range.start; d <= range.end; d = addDays(d, 1)) {
-    if (events.some((e) => !e.students_attend && e.start_date <= d && d <= e.end_date)) continue;
     const dow = isoDow(d);
-    for (const e of entries) if (e.day_of_week === dow) out.push({ date: d, dayOfWeek: dow, periodNo: e.period_no });
+    for (const e of entries) if (e.day_of_week === dow && !periodReplaced(d, e, events)) out.push({ date: d, dayOfWeek: dow, periodNo: e.period_no });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date) || a.periodNo - b.periodNo);
 }
