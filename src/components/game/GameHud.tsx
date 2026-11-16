@@ -22,7 +22,7 @@ import {
   PricetagIcon,
   RibbonIcon,
 } from "@/components/icons";
-import { Sheet, usePhone } from "@/components/Sheet";
+import { Sheet } from "@/components/Sheet";
 import { Avatar } from "@/components/ui";
 import { useActiveTerm } from "@/hooks/useAcademicTerms";
 import { assignmentStatus, useMyAssignments, useMyItemScores, useMySubmissions, type MyAssignment } from "@/hooks/useAssignments";
@@ -148,7 +148,6 @@ function IconSquare({ icon: I, color, className, glyph = "h-7 w-7" }: { icon: Ic
 
 /** Student home: gradient hero (next due work), stat cards, icon menu, due-work and subject carousels. */
 export function GameHud() {
-  const phone = usePhone();
   const { profile, myStudent } = useAuth();
   const navigate = useNavigate();
   const reduce = useReducedMotion();
@@ -412,7 +411,7 @@ export function GameHud() {
         open={panel !== null}
         onOpenChange={(o) => !o && setPanel(null)}
         title={panel ? PANEL_TITLE[panel] : ""}
-        closable={!phone}
+        closable
         bottomOnPhone
         wide={panel === "timetable" ? "full" : false}
         bodyClassName="[&_.page-fill]:min-h-0 [&_.page-fill]:pb-0"

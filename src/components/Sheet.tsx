@@ -57,7 +57,7 @@ export function Sheet({
   icon?: React.ReactNode;
   /** Overrides the icon tile's look (e.g. a bare back button: "bg-transparent text-foreground"). */
   iconClassName?: string;
-  /** Shows an X button at the end of the header row. */
+  /** Shows an X button at the end of the header row (never on the phone bottom sheet — dismiss by dragging down or tapping the backdrop). */
   closable?: boolean;
   children: React.ReactNode;
   /** Sticky actions below the scroll body (cancel / save, etc.). */
@@ -110,7 +110,7 @@ export function Sheet({
                 </Button>
               )}
               {headerEnd}
-              {closable && (ios ? <div className="absolute right-0 top-1/2 -translate-y-1/2"><CloseButton onClick={() => onOpenChange(false)} /></div> : <CloseButton onClick={() => onOpenChange(false)} />)}
+              {closable && !ios && <CloseButton onClick={() => onOpenChange(false)} />}
             </div>
             {/* Description is kept for screen readers only; the header shows just the title. */}
             <Drawer.Description className="sr-only">{description ?? title}</Drawer.Description>
