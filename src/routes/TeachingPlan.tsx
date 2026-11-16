@@ -61,7 +61,8 @@ function MyTeachingPlan() {
           ? "ยังไม่ได้วางหัวข้อ"
           : "ไม่มีคาบที่วางแผนไว้ข้างหน้า";
 
-  const canMerge = assignments.length > 1;
+  const canMerge = (a: (typeof assignments)[number]) =>
+    assignments.some((b) => b.id !== a.id && b.subject_id === a.subject_id);
 
   if (!me) return null;
   if (!isLoading && assignments.length === 0) {
@@ -105,7 +106,7 @@ function MyTeachingPlan() {
                   {p && <PlanProgress stats={p.stats} className="mt-2" />}
                   <p className="mt-1.5 truncate text-xs text-muted-foreground">{nextText(p)}</p>
                 </Link>
-                {canMerge && (
+                {canMerge(a) && (
                   <Link
                     to={`/teaching-plan/${a.id}?merge=1`}
                     className="absolute bottom-2.5 right-3 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium"
@@ -171,7 +172,7 @@ function MyTeachingPlan() {
                         <td className="px-4 py-0 text-xs text-muted-foreground">{nextText(p)}</td>
                         <td className="px-4 py-0 text-muted-foreground">
                           <div className="flex items-center justify-end gap-3">
-                            {canMerge && (
+                            {canMerge(a) && (
                               <Link
                                 to={`/teaching-plan/${a.id}?merge=1`}
                                 onClick={(e) => e.stopPropagation()}

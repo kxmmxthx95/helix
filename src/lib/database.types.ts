@@ -672,6 +672,8 @@ export type TeachingAssignment = {
   // schedule_entries conflict trigger they're not a real conflict. See
   // migration 0019.
   group_id: string | null;
+  // รวมแผน: same non-null value = linked plans that mirror topic placement (migration 0169).
+  plan_group_id: string | null;
   // Per-assignment override of curriculum_subjects/department_settings
   // score_collect_pct/score_exam_pct — null = fall back to those. See
   // migration 0030.
@@ -1746,7 +1748,7 @@ export type Database = {
         TeachingAssignment,
         InsertOf<
           TeachingAssignment,
-          "term" | "group_id" | "score_collect_pct" | "score_exam_pct" | "split_exam_items"
+          "term" | "group_id" | "plan_group_id" | "score_collect_pct" | "score_exam_pct" | "split_exam_items"
         >
       >;
       score_items: Table<
@@ -1959,9 +1961,9 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
-      copy_plan_to_group: {
-        Args: { p_source: string; p_targets: string[] };
-        Returns: { target_id: string; copied: number; skipped: number }[];
+      set_plan_link: {
+        Args: { p_assignment: string; p_mates: string[] };
+        Returns: { copied: number; skipped: number }[];
       };
       attendance_duties: {
         Args: { p_profile: string; p_date: string };

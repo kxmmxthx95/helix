@@ -134,16 +134,19 @@ export function useRemoveTopic() {
   });
 }
 
-/** รวมแผน: copies the source's topics to group mates (SQL copy_plan_to_group, 0167). */
-export function useCopyPlanToGroup() {
+/** รวมแผน: links the source with exactly these mates (SQL set_plan_link, 0169). */
+export function useSetPlanLink() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (v: { source: string; targets: string[] }) => {
-      const { data, error } = await supabase.rpc("copy_plan_to_group", { p_source: v.source, p_targets: v.targets });
+    mutationFn: async (v: { source: string; mates: string[] }) => {
+      const { data, error } = await supabase.rpc("set_plan_link", { p_assignment: v.source, p_mates: v.mates });
       if (error) throw error;
       return data;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["teaching_plan_slots"] }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["teaching_plan_slots"] });
+      void qc.invalidateQueries({ queryKey: ["teaching_assignments"] });
+    },
   });
 }
 

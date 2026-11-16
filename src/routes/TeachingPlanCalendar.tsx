@@ -22,7 +22,7 @@ import {
   useAssignmentScheduleEntries,
   type PlanSlot,
   useClearSlot,
-  useCopyPlanToGroup,
+  useSetPlanLink,
   usePlaceTopic,
   useRemoveTopic,
   usePlanTopics,
@@ -31,7 +31,7 @@ import {
 } from "@/hooks/useTeachingPlanSlots";
 import type { TeachingAssignment } from "@/lib/database.types";
 import { mergePeriods, withTimes } from "@/lib/periods";
-import { addDays, computeSlots, copyPreview, eventApplies, type SlotCell, termRange, weekStart } from "@/lib/planSlots";
+import { addDays, computeSlots, eventApplies, type SlotCell, termRange, weekStart } from "@/lib/planSlots";
 import { supabase } from "@/lib/supabase";
 import { useTimetableStyling } from "@/routes/Timetable";
 import { cn } from "@/lib/utils";
@@ -133,7 +133,7 @@ export function TeachingPlanCalendar() {
   }
 
   const info = label(assignment);
-  const mates = myAssignments.filter((a) => a.id !== assignment.id);
+  const mates = myAssignments.filter((a) => a.id !== assignment.id && a.subject_id === assignment.subject_id);
   const readOnly = assignment.teacher_id !== me.id;
   const room = classrooms.find((c) => c.id === assignment.classroom_id);
   const gradeCode = gradeLevels.find((g) => g.id === room?.grade_level_id)?.code;
@@ -335,11 +335,7 @@ export function TeachingPlanCalendar() {
       {mergeOpen && (
         <MergePlanSheet
           source={assignment}
-          sourceSlots={slots}
           mates={mates}
-          departmentId={departmentId}
-          subjects={subjects}
-          classrooms={classrooms}
           label={label}
           onClose={() => setMergeOpen(false)}
         />
@@ -361,90 +357,31 @@ export function TeachingPlanCalendar() {
   );
 }
 
-type MateProps = {
-  mate: TeachingAssignment;
-  sourceSlots: PlanSlot[];
-  departmentId: string | null;
-  subjects: { id: string; name_th: string }[];
-  classrooms: { id: string; grade_level_id: string }[];
-  label: ReturnType<typeof useAssignmentLabel>;
-  checked: boolean;
-  onToggle: (on: boolean) => void;
-};
-
-// One group mate: preview (same rules as the SQL copy) and a checkbox, disabled when nothing would be copied.
-function MateRow({ mate, sourceSlots, departmentId, subjects, classrooms, label, checked, onToggle }: MateProps) {
-  const gradeId = classrooms.find((c) => c.id === mate.classroom_id)?.grade_level_id ?? null;
-  const subjectName = subjects.find((x) => x.id === mate.subject_id)?.name_th ?? null;
-  const { data: topics = [], isLoading: l1 } = usePlanTopics(departmentId, gradeId, subjectName);
-  const { data: slots = [], isLoading: l2 } = useTeachingPlanSlots([mate.id]);
-  const { data: entries = [], isLoading: l3 } = useAssignmentScheduleEntries(mate.id);
-  const info = label(mate);
-  const preview = useMemo(
-    () => copyPreview(sourceSlots, slots, entries, new Set(topics.map((t) => t.id))),
-    [sourceSlots, slots, entries, topics],
-  );
-  const loading = l1 || l2 || l3;
-  const none = !loading && preview.copied === 0;
-  return (
-    <label className={cn("flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5", none && "opacity-60")}>
-      <input
-        type="checkbox"
-        className="size-4"
-        checked={checked && !none}
-        disabled={loading || none}
-        onChange={(e) => onToggle(e.target.checked)}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">
-          {info.name} · {info.grade}/{info.room}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {loading
-            ? "กำลังตรวจ…"
-            : none
-              ? preview.skipped > 0
-                ? "คัดลอกไม่ได้ (ผังการเรียนไม่ตรง / คาบไม่ตรง / มีหัวข้อแล้ว)"
-                : "ต้นทางยังไม่มีหัวข้อ"
-              : `คัดลอกได้ ${preview.copied} หัวข้อ · ข้าม ${preview.skipped}`}
-        </p>
-      </div>
-    </label>
-  );
-}
-
+// รวมแผน: tick the other rooms of this subject to link with. Linked rooms mirror each other's
+// topic placement (migration 0169); un-ticking a linked room unlinks it (its topics stay).
 function MergePlanSheet({
   source,
-  sourceSlots,
   mates,
-  departmentId,
-  subjects,
-  classrooms,
   label,
   onClose,
 }: {
   source: TeachingAssignment;
-  sourceSlots: PlanSlot[];
   mates: TeachingAssignment[];
-  departmentId: string | null;
-  subjects: { id: string; name_th: string }[];
-  classrooms: { id: string; grade_level_id: string }[];
   label: ReturnType<typeof useAssignmentLabel>;
   onClose: () => void;
 }) {
   const toast = useToast();
-  const copy = useCopyPlanToGroup();
-  const [off, setOff] = useState<Set<string>>(() => new Set(mates.map((m) => m.id)));
-  const targets = mates.filter((m) => !off.has(m.id)).map((m) => m.id);
-  const mine = sourceSlots.filter((s) => s.teaching_assignment_id === source.id);
+  const link = useSetPlanLink();
+  const [on, setOn] = useState<Set<string>>(
+    () => new Set(mates.filter((m) => source.plan_group_id && m.plan_group_id === source.plan_group_id).map((m) => m.id)),
+  );
 
   function run() {
-    copy.mutate(
-      { source: source.id, targets },
+    link.mutate(
+      { source: source.id, mates: [...on] },
       {
-        onSuccess: (rows) => {
-          const sum = (k: "copied" | "skipped") => rows.reduce((n, r) => n + r[k], 0);
-          toast(`รวมแผนแล้ว: คัดลอก ${sum("copied")} หัวข้อ · ข้าม ${sum("skipped")}`);
+        onSuccess: ([r]) => {
+          toast(on.size === 0 ? "เลิกรวมแผนแล้ว" : `รวมแผนแล้ว${r && r.copied > 0 ? `: คัดลอก ${r.copied} หัวข้อ` : ""}`);
           onClose();
         },
         onError: (e) => toast(e instanceof Error ? e.message : "รวมแผนไม่สำเร็จ", "error"),
@@ -457,7 +394,7 @@ function MergePlanSheet({
       open
       onOpenChange={(o) => !o && onClose()}
       title="รวมแผน"
-      description="คัดลอกหัวข้อของวิชานี้ไปยังวิชาที่เลือก (ไม่ทับคาบที่มีหัวข้ออยู่แล้ว ไม่คัดลอกสถานะสอนแล้ว)"
+      description="ห้องที่ติ๊กจะใช้แผนเดียวกัน: วางหรือลบหัวข้อห้องไหน ห้องอื่นตามในคาบเดียวกัน (วัน+คาบตรงกัน) ไม่แตะคาบที่สอนแล้ว"
       bottomOnPhone
       closable
       footer={
@@ -465,33 +402,36 @@ function MergePlanSheet({
           <Button type="button" variant="outline" className="ml-auto" onClick={onClose}>
             ยกเลิก
           </Button>
-          <Button type="button" disabled={targets.length === 0 || copy.isPending} onClick={run}>
-            {copy.isPending ? <Spinner className="h-3 w-3" /> : "รวมแผน"}
+          <Button type="button" disabled={link.isPending} onClick={run}>
+            {link.isPending ? <Spinner className="h-3 w-3" /> : "บันทึก"}
           </Button>
         </div>
       }
     >
       <div className="space-y-2">
-        {mates.map((m) => (
-          <MateRow
-            key={m.id}
-            mate={m}
-            sourceSlots={mine}
-            departmentId={departmentId}
-            subjects={subjects}
-            classrooms={classrooms}
-            label={label}
-            checked={!off.has(m.id)}
-            onToggle={(on) =>
-              setOff((o) => {
-                const n = new Set(o);
-                if (on) n.delete(m.id);
-                else n.add(m.id);
-                return n;
-              })
-            }
-          />
-        ))}
+        {mates.map((m) => {
+          const info = label(m);
+          return (
+            <label key={m.id} className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5">
+              <input
+                type="checkbox"
+                className="size-4"
+                checked={on.has(m.id)}
+                onChange={(e) =>
+                  setOn((o) => {
+                    const n = new Set(o);
+                    if (e.target.checked) n.add(m.id);
+                    else n.delete(m.id);
+                    return n;
+                  })
+                }
+              />
+              <p className="min-w-0 flex-1 truncate text-sm font-medium">
+                {info.name} · {info.grade}/{info.room}
+              </p>
+            </label>
+          );
+        })}
       </div>
     </Sheet>
   );

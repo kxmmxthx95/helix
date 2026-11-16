@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, computeSlots, copyPreview, eventApplies, isoDow, periodReplaced, weekStart } from "./planSlots";
+import { addDays, computeSlots, eventApplies, isoDow, periodReplaced, weekStart } from "./planSlots";
 
 describe("planSlots", () => {
   it("computes ISO weekday and week start", () => {
@@ -47,18 +47,5 @@ describe("planSlots", () => {
     expect(eventApplies({ departmentIds: ["d2"] }, "d1", "g1")).toBe(false);
     expect(eventApplies({ departmentIds: ["d1"], gradeLevelIds: ["g2"] }, "d1", "g1")).toBe(false);
     expect(eventApplies({ departmentIds: ["d1"], gradeLevelIds: ["g1"] }, "d1", "g1")).toBe(true);
-  });
-  it("previews the group plan copy with the SQL skip rules", () => {
-    const src = [
-      { slot_date: "2026-11-09", period_no: 2, topic_ids: ["a", "b"] }, // Mon: target free, b invalid
-      { slot_date: "2026-11-10", period_no: 2, topic_ids: ["a"] }, // Tue: target has no such period
-      { slot_date: "2026-11-16", period_no: 2, topic_ids: ["a"] }, // Mon: target already planned
-      { slot_date: "2026-11-23", period_no: 2, topic_ids: ["a"] }, // Mon: target taught
-    ];
-    const tgt = [
-      { slot_date: "2026-11-16", period_no: 2, topic_ids: ["x"] },
-      { slot_date: "2026-11-23", period_no: 2, topic_ids: [], completed_at: "2026-11-23T00:00:00Z" },
-    ];
-    expect(copyPreview(src, tgt, [{ day_of_week: 1, period_no: 2 }], new Set(["a"]))).toEqual({ copied: 1, skipped: 4 });
   });
 });
