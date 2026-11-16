@@ -480,6 +480,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
     <>
       <input
         ref={capture}
+        inputMode="none" // scanner/RFID capture only: keep the tablet soft keyboard closed
         className="sr-only"
         aria-label="สแกนบัตรนักเรียน สินค้า หรือพิมพ์ยอดเงิน"
         autoComplete="off"
@@ -1122,6 +1123,7 @@ function RfidTest() {
         ref={input}
         autoFocus
         autoComplete="off"
+        inputMode="none" // scanner/RFID capture only: keep the tablet soft keyboard closed
         className="sr-only"
         aria-label="ช่องรับสัญญาณเครื่องอ่านบัตร RFID"
         value={value}
@@ -1231,6 +1233,7 @@ function ScannerTest() {
         ref={input}
         autoFocus
         autoComplete="off"
+        inputMode="none" // scanner/RFID capture only: keep the tablet soft keyboard closed
         className="sr-only"
         aria-label="ช่องรับสัญญาณเครื่องอ่านบาร์โค้ด"
         value={value}
