@@ -43,7 +43,7 @@ import {
 } from "@/hooks/usePlan";
 import { useDepartments } from "@/hooks/useProfiles";
 import type { GradeLevel } from "@/lib/database.types";
-import { gradeShortLabel } from "@/lib/gradeLevels";
+import { gradeBadgeClass, gradeShortLabel } from "@/lib/gradeLevels";
 import { canManageAcademic, isOrgWide } from "@/lib/roles";
 import { downloadPlanLessonPdf } from "@/lib/planLessonPdf";
 import { PLAN_HUES, PLAN_ICONS, planIconFor, planTileClass } from "@/lib/planStyle";
@@ -250,33 +250,40 @@ function SubjectList({
           description={subjects.length === 0 ? (mayEdit ? "กดปุ่ม + เพื่อเพิ่มวิชาแรก" : "ยังไม่มีวิชาในผัง") : "ลองเปลี่ยนคำค้นหา"}
         />
       ) : view === "list" ? (
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
-          <table className="w-full min-w-[32rem] text-xs">
-            <thead className="bg-muted text-left text-xs text-muted-foreground">
+        <div className="table-panel rounded-none border-t border-border shadow-none">
+          <div className="table-panel-scroll scrollbar-hidden">
+          <table className="w-full min-w-[32rem] text-[13px]">
+            <thead className="text-left text-xs">
               <tr>
-                <th className="px-3 py-2 font-medium">วิชา</th>
-                <th className="px-3 py-2 font-medium">ระดับชั้น</th>
-                <th className="px-3 py-2 text-right font-medium">บท</th>
-                <th className="px-3 py-2 text-right font-medium">หัวข้อ</th>
-                <th className="w-10 px-3 py-2" />
+                <th className="px-4 py-3">วิชา</th>
+                <th className="px-4 py-3">ระดับชั้น</th>
+                <th className="px-4 py-3 text-right">บท</th>
+                <th className="px-4 py-3 text-right">หัวข้อ</th>
+                <th className="w-10 px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {shown.map((s) => (
-                <tr key={s.id} onClick={() => onOpen(s.id)} className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted">
-                  <td className="max-w-xs truncate px-3 py-3">{s.name}</td>
-                  <td className="px-3 py-3">
+                <tr key={s.id} onClick={() => onOpen(s.id)} className="h-14 cursor-pointer border-t border-border first:border-t-0 active:bg-muted">
+                  <td className="max-w-xs px-4 py-2">
+                    <span className="flex items-center gap-3">
+                      <SubjectTile subject={s} size="sm" />
+                      <span className="truncate">{s.name}</span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">
                     <GradeBadges grades={gradeOf(s)} />
                   </td>
-                  <td className="px-3 py-3 text-right">{s.lessonCount}</td>
-                  <td className="px-3 py-3 text-right">{s.topicCount}</td>
-                  <td className="px-3 py-3 text-muted-foreground">
+                  <td className="px-4 py-2 text-right">{s.lessonCount}</td>
+                  <td className="px-4 py-2 text-right">{s.topicCount}</td>
+                  <td className="px-4 py-2 text-muted-foreground">
                     <ChevronForward className="h-3 w-3" />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -315,7 +322,7 @@ function GradeBadges({ grades }: { grades: GradeLevel[] }) {
   return (
     <span className="flex flex-wrap gap-1">
       {grades.slice(0, 4).map((g) => (
-        <span key={g.id} className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">
+        <span key={g.id} className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", gradeBadgeClass(g.code))}>
           {gradeShortLabel(g.code)}
         </span>
       ))}
@@ -1534,11 +1541,12 @@ function SubjectTagPicker({
   );
 }
 
-function SubjectTile({ subject }: { subject: { color: string | null; icon: string | null } }) {
+function SubjectTile({ subject, size = "md" }: { subject: { color: string | null; icon: string | null }; size?: "sm" | "md" }) {
   const Icon = planIconFor(subject.icon);
+  const sm = size === "sm";
   return (
-    <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", planTileClass(subject.color))}>
-      <Icon className="h-6 w-6" />
+    <div className={cn("flex shrink-0 items-center justify-center", sm ? "h-8 w-8 rounded-lg" : "h-12 w-12 rounded-xl", planTileClass(subject.color))}>
+      <Icon className={sm ? "h-4 w-4" : "h-6 w-6"} />
     </div>
   );
 }

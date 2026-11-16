@@ -6,6 +6,20 @@ export function gradeShortLabel(code: string) {
   return prefix ? `${prefix}${m[2]}` : code;
 }
 
+const GRADE_BADGE = [
+  "bg-rose-100 text-rose-800 dark:bg-rose-500/20 dark:text-rose-200",
+  "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200",
+  "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200",
+  "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200",
+  "bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-200",
+  "bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-200",
+];
+/** Badge colour by grade number (ม.1 → ม.6 each get their own hue). */
+export function gradeBadgeClass(code: string) {
+  const n = Number(/\d+/.exec(code)?.[0]);
+  return n >= 1 ? GRADE_BADGE[(n - 1) % GRADE_BADGE.length] : "bg-muted";
+}
+
 /**
  * Grades in one curriculum path: from the cohort entry point up to (but not
  * including) the next entry point — ม.1→ม.3, ม.4→ม.6, ป.1→ป.3, ป.4→ป.6.
