@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useId, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { usePlanSubjects } from "@/hooks/usePlan";
 import { useAuth } from "@/auth/AuthProvider";
 import { CheckmarkCircleIcon, ChevronBack, ChevronForward, Search } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
@@ -86,6 +87,7 @@ export function TeachingPlanCalendar() {
   });
   const { data: classrooms = [] } = useClassroomsByDepartment(departmentId);
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
+  const { data: planSubjects = [] } = usePlanSubjects(departmentId);
   const styling = useTimetableStyling(subjects, classrooms, gradeLevels);
   const subjectName = subjects.find((x) => x.id === assignment?.subject_id)?.name_th ?? null;
   const { data: topics = [] } = usePlanTopics(departmentId, found?.gradeLevelId ?? null, subjectName);
@@ -133,7 +135,16 @@ export function TeachingPlanCalendar() {
   }
 
   const info = label(assignment);
-  const mates = myAssignments.filter((a) => a.id !== assignment.id && a.subject_id === assignment.subject_id);
+  // Link candidates: same grade and a shared ผังการเรียน subject (name prefix, like the DB trigger).
+  const planIds = (subjectId: string) => {
+    const n = subjects.find((x) => x.id === subjectId)?.name_th.trim() ?? "";
+    return planSubjects.filter((p) => n.startsWith(p.name.trim())).map((p) => p.id);
+  };
+  const gradeOf = (a: TeachingAssignment) => classrooms.find((c) => c.id === a.classroom_id)?.grade_level_id;
+  const mine = planIds(assignment.subject_id);
+  const mates = myAssignments.filter(
+    (a) => a.id !== assignment.id && gradeOf(a) === gradeOf(assignment) && planIds(a.subject_id).some((id) => mine.includes(id)),
+  );
   const readOnly = assignment.teacher_id !== me.id;
   const room = classrooms.find((c) => c.id === assignment.classroom_id);
   const gradeCode = gradeLevels.find((g) => g.id === room?.grade_level_id)?.code;
@@ -237,13 +248,13 @@ export function TeachingPlanCalendar() {
                 <option value="week">สัปดาห์</option>
                 <option value="month">เดือน</option>
               </Select>
-              {!readOnly && mates.length > 0 && (
+              {!readOnly && (
                 <Button size="sm" variant="outline" className="max-sm:ml-auto" onClick={() => setMergeOpen(true)}>
                   รวมแผน
                 </Button>
               )}
               {!readOnly && (
-                <Button size="sm" className={cn(mates.length === 0 && "max-sm:ml-auto")} onClick={() => setTopicsOpen(true)}>
+                <Button size="sm" onClick={() => setTopicsOpen(true)}>
                   หัวข้อ
                 </Button>
               )}
@@ -409,6 +420,11 @@ function MergePlanSheet({
       }
     >
       <div className="space-y-2">
+        {mates.length === 0 && (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            ไม่มีวิชาอื่นให้รวม (รวมได้เฉพาะวิชาที่คุณสอน ชั้นเดียวกัน และใช้ผังการเรียนเดียวกัน เช่น คณิตพื้นฐาน + คณิตเพิ่มเติม)
+          </p>
+        )}
         {mates.map((m) => {
           const info = label(m);
           return (

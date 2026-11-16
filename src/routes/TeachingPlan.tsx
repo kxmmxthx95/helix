@@ -61,8 +61,17 @@ function MyTeachingPlan() {
           ? "ยังไม่ได้วางหัวข้อ"
           : "ไม่มีคาบที่วางแผนไว้ข้างหน้า";
 
-  const canMerge = (a: (typeof assignments)[number]) =>
-    assignments.some((b) => b.id !== a.id && b.subject_id === a.subject_id);
+  const statusBadge = (p: ReturnType<typeof progress.get>) => {
+    const tone =
+      !p || p.stats.total === 0
+        ? "bg-fill text-muted-foreground"
+        : p.next
+          ? "bg-success/10 text-success"
+          : p.stats.planned === 0
+            ? "bg-destructive/10 text-destructive"
+            : "bg-warning/10 text-warning";
+    return <span className={`inline-flex h-6 items-center rounded-full px-2.5 text-xs font-medium ${tone}`}>{nextText(p)}</span>;
+  };
 
   if (!me) return null;
   if (!isLoading && assignments.length === 0) {
@@ -104,16 +113,14 @@ function MyTeachingPlan() {
                   </div>
                   <p className="mt-1.5 text-sm font-semibold leading-snug">{l.name}</p>
                   {p && <PlanProgress stats={p.stats} className="mt-2" />}
-                  <p className="mt-1.5 truncate text-xs text-muted-foreground">{nextText(p)}</p>
+                  <div className="mt-1.5">{statusBadge(p)}</div>
                 </Link>
-                {canMerge(a) && (
-                  <Link
-                    to={`/teaching-plan/${a.id}?merge=1`}
-                    className="absolute bottom-2.5 right-3 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium"
-                  >
-                    รวมแผน
-                  </Link>
-                )}
+                <Link
+                  to={`/teaching-plan/${a.id}?merge=1`}
+                  className="absolute bottom-2.5 right-3 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium"
+                >
+                  รวมแผน
+                </Link>
                 </div>
               );
             })}
@@ -169,20 +176,18 @@ function MyTeachingPlan() {
                         </td>
                         <td className="px-4 py-0 text-muted-foreground">{l.room}</td>
                         <td className="px-4 py-0">{p && <PlanProgress stats={p.stats} className="mx-auto w-40 flex-col gap-1.5 [&>div]:w-full [&>div]:flex-none" />}</td>
-                        <td className="px-4 py-0 text-xs text-muted-foreground">{nextText(p)}</td>
+                        <td className="px-4 py-0">{statusBadge(p)}</td>
                         <td className="px-4 py-0 text-muted-foreground">
                           <div className="flex items-center justify-end gap-3">
-                            {canMerge(a) && (
-                              <Link
-                                to={`/teaching-plan/${a.id}?merge=1`}
-                                onClick={(e) => e.stopPropagation()}
-                                aria-label="รวมแผน"
-                                title="รวมแผน"
-                                className="inline-flex size-8 items-center justify-center rounded-full hover:bg-muted"
-                              >
-                                <CopyIcon className="h-4 w-4" />
-                              </Link>
-                            )}
+                            <Link
+                              to={`/teaching-plan/${a.id}?merge=1`}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label="รวมแผน"
+                              title="รวมแผน"
+                              className="inline-flex size-8 items-center justify-center rounded-full hover:bg-muted"
+                            >
+                              <CopyIcon className="h-4 w-4" />
+                            </Link>
                             <ChevronForward className="h-3 w-3" />
                           </div>
                         </td>
