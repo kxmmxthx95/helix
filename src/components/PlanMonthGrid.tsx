@@ -120,6 +120,11 @@ export function PlanCard({
             {look.code}
           </span>
           <span className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-semibold", look.grade.className)}>{look.grade.label}</span>
+          {topics.length > 0 && (
+            <span className="ml-auto rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+              {topics.length}
+            </span>
+          )}
         </span>
       )}
       {topics.length > 0 ? (
