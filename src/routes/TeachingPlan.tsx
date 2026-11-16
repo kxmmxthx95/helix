@@ -61,6 +61,9 @@ function MyTeachingPlan() {
           ? "ยังไม่ได้วางหัวข้อ"
           : "ไม่มีคาบที่วางแผนไว้ข้างหน้า";
 
+  const hasMates = (a: (typeof assignments)[number]) =>
+    !!a.group_id && assignments.some((b) => b.id !== a.id && b.group_id === a.group_id);
+
   if (!me) return null;
   if (!isLoading && assignments.length === 0) {
     return (
@@ -87,8 +90,8 @@ function MyTeachingPlan() {
               const l = label(a);
               const p = progress.get(a.id);
               return (
+                <div key={a.id} className="relative">
                 <Link
-                  key={a.id}
                   to={`/teaching-plan/${a.id}`}
                   className="block rounded-2xl border border-border bg-card p-3 transition-colors hover:bg-muted/60"
                 >
@@ -103,6 +106,15 @@ function MyTeachingPlan() {
                   {p && <PlanProgress stats={p.stats} className="mt-2" />}
                   <p className="mt-1.5 truncate text-xs text-muted-foreground">{nextText(p)}</p>
                 </Link>
+                {hasMates(a) && (
+                  <Link
+                    to={`/teaching-plan/${a.id}?merge=1`}
+                    className="absolute bottom-2.5 right-3 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium"
+                  >
+                    รวมแผน
+                  </Link>
+                )}
+                </div>
               );
             })}
       </div>
@@ -117,7 +129,7 @@ function MyTeachingPlan() {
                 <th className="px-4 py-3">ห้อง</th>
                 <th className="px-4 py-3 text-center">ความคืบหน้า</th>
                 <th className="px-4 py-3">สถานะ</th>
-                <th className="w-10 px-4 py-3" />
+                <th className="w-32 px-4 py-3" />
               </tr>
             </thead>
             <tbody>
@@ -158,7 +170,18 @@ function MyTeachingPlan() {
                         <td className="px-4 py-0">{p && <PlanProgress stats={p.stats} className="mx-auto w-40 flex-col gap-1.5 [&>div]:w-full [&>div]:flex-none" />}</td>
                         <td className="px-4 py-0 text-xs text-muted-foreground">{nextText(p)}</td>
                         <td className="px-4 py-0 text-muted-foreground">
-                          <ChevronForward className="h-3 w-3" />
+                          <div className="flex items-center justify-end gap-3">
+                            {hasMates(a) && (
+                              <Link
+                                to={`/teaching-plan/${a.id}?merge=1`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"
+                              >
+                                รวมแผน
+                              </Link>
+                            )}
+                            <ChevronForward className="h-3 w-3" />
+                          </div>
                         </td>
                       </tr>
                     );

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useId, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { CheckmarkCircleIcon, ChevronBack, ChevronForward, Search } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
@@ -101,7 +101,8 @@ export function TeachingPlanCalendar() {
   const [anchor, setAnchor] = useState(today); // any date in the shown week/month
   const [picked, setPicked] = useState<SlotCell | null>(null);
   const [topicsOpen, setTopicsOpen] = useState(false);
-  const [mergeOpen, setMergeOpen] = useState(false);
+  const [search] = useSearchParams();
+  const [mergeOpen, setMergeOpen] = useState(search.get("merge") === "1");
   const { data: myAssignments = [] } = useMyTeachingAssignments(me?.id ?? null);
   const [armed, setArmed] = useState<PlanTopicItem | null>(null); // topic chosen in the drawer, placed on the next tapped cell
 
@@ -173,7 +174,7 @@ export function TeachingPlanCalendar() {
   }
 
   return (
-    <div className="page-fill gap-3">
+    <div className="page-fill gap-4">
       <div data-slot="plan-banner" className="shrink-0">
         <div className="flex items-center gap-1">
           <Link
@@ -213,7 +214,7 @@ export function TeachingPlanCalendar() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="min-h-0 min-w-0 flex-1 space-y-2 overflow-y-auto">
+          <div className="min-h-0 min-w-0 flex-1 space-y-3 overflow-y-auto">
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" aria-label="ก่อนหน้า" onClick={() => step(-1)}>
                 <ChevronBack className="h-3 w-3" />
@@ -658,13 +659,15 @@ function LessonCards({
         return (
           <details key={lesson} name={forceOpen ? undefined : group} open={forceOpen || items.some((t) => openIds?.includes(t.id))} className="group rounded-xl border border-border bg-card">
             <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
-              <span className="min-w-0 flex-1 text-[15px] font-semibold leading-snug">{lesson}</span>
-              <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold leading-snug">{lesson}</span>
                 {placed !== null && (
-                  <span aria-hidden className="h-1 w-10 overflow-hidden rounded-full bg-secondary">
+                  <span aria-hidden className="mt-1.5 block h-1 overflow-hidden rounded-full bg-secondary">
                     <span className="block h-full rounded-full bg-success" style={{ width: `${(placed / items.length) * 100}%` }} />
                   </span>
                 )}
+              </span>
+              <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
                 <span className={cn("tabular-nums", placed === items.length && "text-success")}>
                   {placed === null ? `${items.length} หัวข้อ` : `${placed}/${items.length}`}
                 </span>
