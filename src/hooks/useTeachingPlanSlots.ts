@@ -134,6 +134,19 @@ export function useRemoveTopic() {
   });
 }
 
+/** รวมแผน: copies the source's topics to group mates (SQL copy_plan_to_group, 0167). */
+export function useCopyPlanToGroup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { source: string; targets: string[] }) => {
+      const { data, error } = await supabase.rpc("copy_plan_to_group", { p_source: v.source, p_targets: v.targets });
+      if (error) throw error;
+      return data;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["teaching_plan_slots"] }),
+  });
+}
+
 /** Clears the whole period (its topics go with it). */
 export function useClearSlot() {
   return useSlotMutation((id: string) => supabase.from("teaching_plan_slots").delete().eq("id", id));

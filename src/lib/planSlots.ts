@@ -82,3 +82,33 @@ export function termRange(terms: AcademicTerm[], a: TeachingAssignment, departme
     end: rows.map((t) => t.end_date as string).sort().reverse()[0] as string,
   };
 }
+
+type CopySlot = { slot_date: string; period_no: number; topic_ids: string[]; completed_at?: string | null };
+
+/**
+ * What "รวมแผน" would copy from a source plan into one target — the same skip rules as the
+ * SQL function copy_plan_to_group (0167): no such period in the target's schedule, target slot
+ * taught or already holding topics, or a topic outside the target's ผังการเรียน (`validTopicIds`).
+ */
+export function copyPreview(
+  source: CopySlot[],
+  target: CopySlot[],
+  targetEntries: Entry[],
+  validTopicIds: Set<string>,
+) {
+  let copied = 0;
+  let skipped = 0;
+  for (const s of source) {
+    if (s.topic_ids.length === 0) continue;
+    const t = target.find((x) => x.slot_date === s.slot_date && x.period_no === s.period_no);
+    const hasPeriod = targetEntries.some((e) => e.day_of_week === isoDow(s.slot_date) && e.period_no === s.period_no);
+    if (!hasPeriod || t?.completed_at || (t && t.topic_ids.length > 0)) {
+      skipped += s.topic_ids.length;
+      continue;
+    }
+    const ok = s.topic_ids.filter((id) => validTopicIds.has(id)).length;
+    copied += ok;
+    skipped += s.topic_ids.length - ok;
+  }
+  return { copied, skipped };
+}

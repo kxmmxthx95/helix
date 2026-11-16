@@ -1959,6 +1959,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      copy_plan_to_group: {
+        Args: { p_source: string; p_targets: string[] };
+        Returns: { target_id: string; copied: number; skipped: number }[];
+      };
       attendance_duties: {
         Args: { p_profile: string; p_date: string };
         Returns: { classroom_id: string | null; schedule_entry_id: string | null; label: string; period_no: number | null }[];
