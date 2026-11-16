@@ -5,7 +5,7 @@ import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { ChevronBack, Plus, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Skeleton, Switch } from "@/components/ui";
+import { Button, Card, EmptyState, Field, FormSection, Input, Skeleton, Switch } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
 import { useClassroomsByIds, useExamQuestions, useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
 import {
@@ -159,6 +159,15 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
   );
 }
 
+function SwitchRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="flex min-h-[3.25rem] items-center justify-between gap-4 text-sm leading-5">
+      <span>{label}</span>
+      <Switch size="sm" label={label} checked={checked} onChange={onChange} />
+    </div>
+  );
+}
+
 function CreateSessionSheet({
   open,
   onOpenChange,
@@ -271,72 +280,37 @@ function CreateSessionSheet({
             }}
           />
         </Field>
-        <Field label="ชื่อการสอบ" required>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น สอบกลางภาค" />
-        </Field>
-        <label className="flex items-center gap-2 text-xs">
-          <input
-            type="checkbox"
-            checked={noSchedule}
-            onChange={(e) => setNoSchedule(e.target.checked)}
-          />
-          ไม่กำหนดวันและเวลาเปิด-ปิดสอบ
-        </label>
-        {!noSchedule && (
-          <>
-            <Field label="เปิดสอบ" required>
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  type="date"
-                  value={opensAt.slice(0, 10)}
-                  onChange={(e) => setOpensAt(e.target.value ? `${e.target.value}T${opensAt.slice(11) || "00:00"}` : "")}
-                />
-                <Input
-                  type="time"
-                  value={opensAt.slice(11)}
-                  onChange={(e) => setOpensAt(`${opensAt.slice(0, 10)}T${e.target.value}`)}
-                  disabled={!opensAt.slice(0, 10)}
-                />
-              </div>
-            </Field>
-            <Field label="ปิดสอบ" required>
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  type="date"
-                  value={closesAt.slice(0, 10)}
-                  onChange={(e) => setClosesAt(e.target.value ? `${e.target.value}T${closesAt.slice(11) || "00:00"}` : "")}
-                />
-                <Input
-                  type="time"
-                  value={closesAt.slice(11)}
-                  onChange={(e) => setClosesAt(`${closesAt.slice(0, 10)}T${e.target.value}`)}
-                  disabled={!closesAt.slice(0, 10)}
-                />
-              </div>
-            </Field>
-          </>
-        )}
-        <Field label="เวลาทำ (นาที, ไม่บังคับ)">
-          <Input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="ไม่จำกัด" />
-        </Field>
-        <Field label="จำนวนครั้งที่สอบได้">
-          <Input type="number" min="1" value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)} />
-        </Field>
+        <FormSection>
+          <Field label="ชื่อการสอบ" required>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น สอบกลางภาค" />
+          </Field>
+          <SwitchRow label="ไม่กำหนดวันและเวลาเปิด-ปิดสอบ" checked={noSchedule} onChange={setNoSchedule} />
+          {!noSchedule && (
+            <>
+              <Field label="เปิดสอบ" required>
+                <Input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} />
+              </Field>
+              <Field label="ปิดสอบ" required>
+                <Input type="datetime-local" value={closesAt} min={opensAt} onChange={(e) => setClosesAt(e.target.value)} />
+              </Field>
+            </>
+          )}
+        </FormSection>
 
-        <div className="space-y-2 rounded-lg border border-border p-2.5">
-          <label className="flex items-center justify-between text-xs">
-            สุ่มลำดับข้อ
-            <Switch checked={shuffleQuestions} onChange={setShuffleQuestions} />
-          </label>
-          <label className="flex items-center justify-between text-xs">
-            สุ่มลำดับตัวเลือก
-            <Switch checked={shuffleChoices} onChange={setShuffleChoices} />
-          </label>
-          <label className="flex items-center justify-between text-xs">
-            บันทึกคะแนนเข้าสมุดคะแนน
-            <Switch checked={syncGradebook} onChange={setSyncGradebook} />
-          </label>
-        </div>
+        <FormSection>
+          <Field label="เวลาทำ (นาที)">
+            <Input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="ไม่จำกัด" />
+          </Field>
+          <Field label="จำนวนครั้งที่สอบได้">
+            <Input type="number" min="1" value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)} />
+          </Field>
+        </FormSection>
+
+        <FormSection>
+          <SwitchRow label="สุ่มลำดับข้อ" checked={shuffleQuestions} onChange={setShuffleQuestions} />
+          <SwitchRow label="สุ่มลำดับตัวเลือก" checked={shuffleChoices} onChange={setShuffleChoices} />
+          <SwitchRow label="บันทึกคะแนนเข้าสมุดคะแนน" checked={syncGradebook} onChange={setSyncGradebook} />
+        </FormSection>
 
         {subjectId && (
           <Field label="ห้องที่เปิดสอบ" required>
