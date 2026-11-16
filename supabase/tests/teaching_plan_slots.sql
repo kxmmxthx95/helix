@@ -18,8 +18,12 @@ begin
     limit 1;
   d := date '2030-01-07' + (dow - 1); -- a Monday + (dow-1)
 
-  insert into teaching_plan_slots (teaching_assignment_id, slot_date, period_no, topic_id)
-    values (a, d, per, t) returning id into s;
+  insert into teaching_plan_slots (teaching_assignment_id, slot_date, period_no)
+    values (a, d, per) returning id into s;
+  insert into teaching_plan_slot_topics (slot_id, topic_id) values (s, t);
+  -- a second topic in the same period is allowed
+  insert into teaching_plan_slot_topics (slot_id, topic_id, position)
+    select s, pt2.id, 1 from plan_topics pt2 where pt2.lesson_id = (select lesson_id from plan_topics where id = t) and pt2.id <> t limit 1;
 
   begin
     insert into teaching_plan_slots (teaching_assignment_id, slot_date, period_no) values (a, d + 1, per);
@@ -29,7 +33,7 @@ begin
   end;
 
   begin
-    update teaching_plan_slots set topic_id = (select id from plan_topics where id <> t limit 1) where id = s;
+    insert into teaching_plan_slot_topics (slot_id, topic_id) select s, id from plan_topics where id not in (select id from plan_topics where lesson_id in (select lesson_id from plan_topics where id = t)) limit 1;
     raise exception 'foreign-subject topic accepted';
   exception when raise_exception then
     if sqlerrm like 'foreign%' then raise; end if;

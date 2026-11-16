@@ -1201,13 +1201,15 @@ export type TeachingPlanSlot = {
   teaching_assignment_id: string;
   slot_date: string; // YYYY-MM-DD
   period_no: number;
-  topic_id: string | null;
   completed_at: string | null;
   completed_on_plan: boolean | null;
   note: string | null;
   created_at: string;
   updated_at: string;
 };
+
+/** A ผังการเรียน topic placed in a slot (0164) — a period can hold several. */
+export type TeachingPlanSlotTopic = { slot_id: string; topic_id: string; position: number };
 
 // ---------------------------------------------------------------- attendance
 // เช็คชื่อเข้าโรงเรียน — homeroom, once per student per day. See
@@ -1757,8 +1759,9 @@ export type Database = {
       >;
       teaching_plan_slots: Table<
         TeachingPlanSlot,
-        InsertOf<TeachingPlanSlot, "topic_id" | "completed_at" | "completed_on_plan" | "note">
+        InsertOf<TeachingPlanSlot, "completed_at" | "completed_on_plan" | "note">
       >;
+      teaching_plan_slot_topics: Table<TeachingPlanSlotTopic, InsertOf<TeachingPlanSlotTopic, "position">>;
       period_definitions: Table<PeriodDefinition, InsertOf<PeriodDefinition, never>>;
       schedule_entries: Table<ScheduleEntry, InsertOf<ScheduleEntry, "room_id">>;
       rooms: Table<Room, InsertOf<Room, "is_active">>;

@@ -1,7 +1,6 @@
 import { AlertTriangle, CheckmarkCircleIcon } from "@/components/icons";
-import type { PlanTopicItem } from "@/hooks/useTeachingPlanSlots";
-import type { PeriodDefinition, TeachingPlanSlot } from "@/lib/database.types";
-import { hhmm, teachingOrdinal } from "@/lib/periods";
+import type { PlanSlot, PlanTopicItem } from "@/hooks/useTeachingPlanSlots";
+import type { PeriodDefinition } from "@/lib/database.types";
 import { addDays, type SlotCell, weekStart } from "@/lib/planSlots";
 import { cn } from "@/lib/utils";
 
@@ -13,10 +12,10 @@ type Props = {
   cells: SlotCell[];
   /** Holiday/closure name for a date, or null. */
   closed: (date: string) => string | null;
-  slotAt: (c: { date: string; periodNo: number }) => TeachingPlanSlot | undefined;
+  slotAt: (c: { date: string; periodNo: number }) => PlanSlot | undefined;
   topics: PlanTopicItem[];
-  /** Subject card gradient classes — same as the timetable. */
-  gradient: string;
+  /** Timetable-card look of this subject: stripe colour, code, classroom pill, subject-type pill. */
+  look: PlanLook;
   today: string;
   readOnly: boolean;
   onOpen: (c: SlotCell) => void;
@@ -26,7 +25,6 @@ type Props = {
 export function PlanMonthGrid(p: Props) {
   const first = `${p.month}-01`;
   const weeks = Array.from({ length: 6 }, (_, w) => addDays(weekStart(first), w * 7)).filter((ws) => ws.slice(0, 7) <= p.month);
-  const periodAt = new Map(p.periods.map((x) => [`${x.day_of_week}-${x.period_no}`, x]));
 
   return (
     <div className="overflow-x-auto rounded-xl border border-border bg-card">
@@ -52,15 +50,12 @@ export function PlanMonthGrid(p: Props) {
                 </p>
                 {inMonth && event && <p className="rounded-lg bg-muted px-1.5 py-1 text-muted-foreground">{event}</p>}
                 {dayCells.map((c) => {
-                  const pd = periodAt.get(`${i + 1}-${c.periodNo}`);
                   return (
                     <PlanCard
                       key={c.periodNo}
-                      ordinal={teachingOrdinal(p.periods, i + 1, c.periodNo)}
-                      time={pd ? `${hhmm(pd.start_time)}–${hhmm(pd.end_time)}` : ""}
                       slot={p.slotAt(c)}
-                      topic={p.topics.find((t) => t.id === p.slotAt(c)?.topic_id)}
-                      gradient={p.gradient}
+                      topics={placedTopics(p.topics, p.slotAt(c))}
+                      look={p.look}
                       readOnly={p.readOnly}
                       onOpen={() => p.onOpen(c)}
                     />
@@ -75,46 +70,67 @@ export function PlanMonthGrid(p: Props) {
   );
 }
 
+/** Topics of a slot, in placement order. */
+export function placedTopics(topics: PlanTopicItem[], slot: PlanSlot | undefined): PlanTopicItem[] {
+  return (slot?.topic_ids ?? []).flatMap((id) => topics.find((t) => t.id === id) ?? []);
+}
+
+export type PlanLook = {
+  tone: string;
+  code: string;
+  grade: { label: string; className: string };
+  badge: { className: string; title: string };
+};
+
 /** Timetable-style period card; `roomy` = week grid size, default = compact for month cells. */
 export function PlanCard({
-  ordinal,
-  time,
   slot,
-  topic,
-  gradient,
+  topics,
+  look,
   readOnly,
   onOpen,
   roomy = false,
 }: {
-  ordinal: number;
-  time: string;
-  slot: TeachingPlanSlot | undefined;
-  topic: PlanTopicItem | undefined;
-  gradient: string;
+  slot: PlanSlot | undefined;
+  topics: PlanTopicItem[];
+  look: PlanLook;
   readOnly: boolean;
   onOpen: () => void;
   roomy?: boolean;
 }) {
   const taught = slot?.completed_at != null;
-  const filled = !!topic || taught;
+  const filled = topics.length > 0 || taught;
   return (
     <button
       type="button"
       disabled={readOnly}
       onClick={onOpen}
       className={cn(
-        "relative flex w-full flex-col rounded-lg px-2 py-1.5 text-left leading-snug transition-opacity",
+        "relative flex w-full flex-col gap-1 overflow-hidden rounded-lg px-2 py-1.5 text-left leading-snug transition-colors",
         roomy && "min-h-[4.25rem] justify-center rounded-xl px-3 py-2",
-        filled ? gradient : "border border-dashed border-destructive/50 text-destructive",
+        filled ? "border border-border bg-card pl-3.5 text-foreground shadow-sm" : "border border-dashed border-destructive/50 text-destructive",
         !readOnly && !filled && "hover:bg-destructive/5",
-        !readOnly && filled && "hover:opacity-90",
+        !readOnly && filled && "hover:bg-muted/40",
       )}
     >
-      <span className="text-[10px] tabular-nums opacity-70">
-        คาบ {ordinal}
-        {time && <span className="block">{time}</span>}
-      </span>
-      <span className={cn("line-clamp-2 pr-4 text-xs", filled && "font-semibold")}>{topic?.title ?? (taught ? "สอนแล้ว" : "ว่าง")}</span>
+      {filled && <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1.5", look.tone)} />}
+      {filled && (
+        <span className="flex items-center gap-1.5">
+          <span title={look.badge.title} className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums", look.badge.className)}>
+            {look.code}
+          </span>
+          <span className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-semibold", look.grade.className)}>{look.grade.label}</span>
+        </span>
+      )}
+      {topics.length > 0 ? (
+        topics.map((t) => (
+          <span key={t.id} className="line-clamp-2 pr-4 text-xs font-semibold">
+            {t.title}
+          </span>
+        ))
+      ) : (
+        <span className={cn("pr-4 text-xs", taught && "font-semibold")}>{taught ? "สอนแล้ว" : "ว่าง"}</span>
+      )}
       {taught &&
         (slot?.completed_on_plan ? (
           <CheckmarkCircleIcon className="absolute right-1.5 top-1.5 h-3.5 w-3.5" aria-label="สอนตามแผน" />

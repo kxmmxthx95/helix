@@ -68,20 +68,27 @@ export function useAssignmentScheduleEntries(assignmentId: string | null) {
   });
 }
 
+/** A slot row plus the ids of its placed topics, in order. */
+export type PlanSlot = TeachingPlanSlot & { topic_ids: string[] };
+
 /** Slots of many assignments at once — list-card progress and the manager overview. */
 export function useTeachingPlanSlots(assignmentIds: string[]) {
   return useQuery({
     queryKey: ["teaching_plan_slots", [...assignmentIds].sort()],
     enabled: assignmentIds.length > 0,
-    queryFn: async (): Promise<TeachingPlanSlot[]> => {
+    queryFn: async (): Promise<PlanSlot[]> => {
       const { data, error } = await supabase
         .from("teaching_plan_slots")
-        .select("*")
+        .select("*, topics:teaching_plan_slot_topics(topic_id, position)")
         .in("teaching_assignment_id", assignmentIds)
         .order("slot_date")
         .order("period_no");
       if (error) throw error;
-      return data;
+      const rows = data as unknown as (TeachingPlanSlot & { topics: { topic_id: string; position: number }[] })[];
+      return rows.map(({ topics, ...slot }) => ({
+        ...slot,
+        topic_ids: [...topics].sort((a, b) => a.position - b.position).map((t) => t.topic_id),
+      }));
     },
   });
 }
@@ -99,13 +106,32 @@ function useSlotMutation<V>(fn: (v: V) => PromiseLike<{ error: Error | null }>) 
   });
 }
 
-/** Puts a topic into a slot (upsert; leaves any taught-state columns untouched). */
+/** Adds a topic to a period (creates the slot row if needed; re-adding is a no-op). */
 export function usePlaceTopic() {
-  return useSlotMutation((v: SlotKey & { topic_id: string }) =>
-    supabase.from("teaching_plan_slots").upsert(v, { onConflict: "teaching_assignment_id,slot_date,period_no" }),
-  );
+  return useSlotMutation(async (v: SlotKey & { topic_id: string; position: number }) => {
+    const { teaching_assignment_id, slot_date, period_no } = v;
+    const slot = await supabase
+      .from("teaching_plan_slots")
+      .upsert({ teaching_assignment_id, slot_date, period_no }, { onConflict: "teaching_assignment_id,slot_date,period_no" })
+      .select("id")
+      .single();
+    if (slot.error) return slot;
+    return supabase
+      .from("teaching_plan_slot_topics")
+      .upsert({ slot_id: slot.data.id, topic_id: v.topic_id, position: v.position }, { onConflict: "slot_id,topic_id", ignoreDuplicates: true });
+  });
 }
 
+/** Removes one topic; a slot left with no topic and not taught is deleted too. */
+export function useRemoveTopic() {
+  return useSlotMutation(async (v: { slot: PlanSlot; topic_id: string }) => {
+    const res = await supabase.from("teaching_plan_slot_topics").delete().eq("slot_id", v.slot.id).eq("topic_id", v.topic_id);
+    if (res.error || v.slot.completed_at || v.slot.topic_ids.length > 1) return res;
+    return supabase.from("teaching_plan_slots").delete().eq("id", v.slot.id);
+  });
+}
+
+/** Clears the whole period (its topics go with it). */
 export function useClearSlot() {
   return useSlotMutation((id: string) => supabase.from("teaching_plan_slots").delete().eq("id", id));
 }
@@ -136,10 +162,10 @@ export function useReopenSlot() {
   );
 }
 
-export function slotStats(slots: TeachingPlanSlot[], totalSlots: number) {
+export function slotStats(slots: PlanSlot[], totalSlots: number) {
   const completed = slots.filter((s) => s.completed_at !== null).length;
   const offPlan = slots.filter((s) => s.completed_on_plan === false).length;
-  const planned = slots.filter((s) => s.topic_id !== null).length;
+  const planned = slots.filter((s) => s.topic_ids.length > 0).length;
   return { completed, offPlan, planned, total: totalSlots, pct: totalSlots ? Math.round((completed / totalSlots) * 100) : 0 };
 }
 
@@ -176,7 +202,7 @@ export function useAssignmentProgress(assignments: TeachingAssignment[], departm
           ? computeSlots(range, entries.filter((e) => e.teaching_assignment_id === a.id), deptEvents).length
           : 0;
         const mine = slots.filter((s) => s.teaching_assignment_id === a.id);
-        const next = mine.find((s) => s.topic_id && !s.completed_at && s.slot_date >= today);
+        const next = mine.find((s) => s.topic_ids.length > 0 && !s.completed_at && s.slot_date >= today);
         return [a.id, { stats: slotStats(mine, total), next }] as const;
       }),
     );

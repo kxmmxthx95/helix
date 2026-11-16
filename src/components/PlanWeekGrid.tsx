@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { RestaurantIcon } from "@/components/icons";
-import { PlanCard } from "@/components/PlanMonthGrid";
-import type { PlanTopicItem } from "@/hooks/useTeachingPlanSlots";
-import type { PeriodDefinition, TeachingPlanSlot } from "@/lib/database.types";
+import { PlanCard, type PlanLook, placedTopics } from "@/components/PlanMonthGrid";
+import type { PlanSlot, PlanTopicItem } from "@/hooks/useTeachingPlanSlots";
+import type { PeriodDefinition } from "@/lib/database.types";
 import { hhmm, teachingOrdinal } from "@/lib/periods";
 import { addDays, type SlotCell } from "@/lib/planSlots";
 import { cn } from "@/lib/utils";
@@ -17,10 +17,9 @@ type Props = {
   cells: SlotCell[];
   /** Reason a whole day is closed (holiday name / นอกภาคเรียน), or null. */
   closed: (date: string) => string | null;
-  slotAt: (c: { date: string; periodNo: number }) => TeachingPlanSlot | undefined;
+  slotAt: (c: { date: string; periodNo: number }) => PlanSlot | undefined;
   topics: PlanTopicItem[];
-  /** Subject card gradient classes — same as the timetable. */
-  gradient: string;
+  look: PlanLook;
   today: string;
   readOnly: boolean;
   onOpen: (c: SlotCell) => void;
@@ -37,15 +36,12 @@ export function PlanWeekGrid(p: Props) {
   const listDay = picked ?? days.find((d) => live.has(d) && dateOf(d) === p.today) ?? days.find((d) => live.has(d)) ?? days[0] ?? 1;
 
   const cell = (day: number, no: number) => p.cells.find((c) => c.date === dateOf(day) && c.periodNo === no);
-  const card = (c: SlotCell, day: number) => {
-    const pd = periodAt.get(`${day}-${c.periodNo}`);
+  const card = (c: SlotCell) => {
     return (
       <PlanCard
-        ordinal={teachingOrdinal(p.periods, day, c.periodNo)}
-        time={pd ? `${hhmm(pd.start_time)}–${hhmm(pd.end_time)}` : ""}
         slot={p.slotAt(c)}
-        topic={p.topics.find((t) => t.id === p.slotAt(c)?.topic_id)}
-        gradient={p.gradient}
+        topics={placedTopics(p.topics, p.slotAt(c))}
+        look={p.look}
         readOnly={p.readOnly}
         onOpen={() => p.onOpen(c)}
         roomy
@@ -102,7 +98,7 @@ export function PlanWeekGrid(p: Props) {
                       {hhmm(pd.end_time)}
                     </p>
                   </div>
-                  <div className="min-w-0 flex-1">{c ? card(c, listDay) : <p className="min-h-[4.25rem] rounded-xl bg-muted/40" />}</div>
+                  <div className="min-w-0 flex-1">{c ? card(c) : <p className="min-h-[4.25rem] rounded-xl bg-muted/40" />}</div>
                 </li>
               );
             })}
@@ -169,7 +165,7 @@ export function PlanWeekGrid(p: Props) {
                     const c = cell(d, no);
                     return (
                       <td key={d} className="border-l border-border p-1">
-                        {c ? card(c, d) : <div aria-disabled="true" className={cn("min-h-[4.25rem] rounded-lg bg-muted/60", !live.has(d) && "opacity-60")} />}
+                        {c ? card(c) : <div aria-disabled="true" className={cn("min-h-[4.25rem] rounded-lg bg-muted/60", !live.has(d) && "opacity-60")} />}
                       </td>
                     );
                   })}
