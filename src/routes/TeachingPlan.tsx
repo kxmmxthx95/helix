@@ -1,6 +1,6 @@
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { ChevronForward } from "@/components/icons";
+import { ChevronForward, CopyIcon } from "@/components/icons";
 import { PlanProgress, useAssignmentLabel } from "@/components/TeachingPlanParts";
 import { Card, EmptyState, Skeleton } from "@/components/ui";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
@@ -61,8 +61,7 @@ function MyTeachingPlan() {
           ? "ยังไม่ได้วางหัวข้อ"
           : "ไม่มีคาบที่วางแผนไว้ข้างหน้า";
 
-  const hasMates = (a: (typeof assignments)[number]) =>
-    !!a.group_id && assignments.some((b) => b.id !== a.id && b.group_id === a.group_id);
+  const canMerge = assignments.length > 1;
 
   if (!me) return null;
   if (!isLoading && assignments.length === 0) {
@@ -106,7 +105,7 @@ function MyTeachingPlan() {
                   {p && <PlanProgress stats={p.stats} className="mt-2" />}
                   <p className="mt-1.5 truncate text-xs text-muted-foreground">{nextText(p)}</p>
                 </Link>
-                {hasMates(a) && (
+                {canMerge && (
                   <Link
                     to={`/teaching-plan/${a.id}?merge=1`}
                     className="absolute bottom-2.5 right-3 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium"
@@ -124,6 +123,7 @@ function MyTeachingPlan() {
           <table className="w-full text-[13px]">
             <thead className="text-left text-xs">
               <tr>
+                <th className="px-4 py-3">รหัสวิชา</th>
                 <th className="px-4 py-3">วิชา</th>
                 <th className="px-4 py-3">ชั้น</th>
                 <th className="px-4 py-3">ห้อง</th>
@@ -136,7 +136,7 @@ function MyTeachingPlan() {
               {isLoading
                 ? [0, 1, 2].map((i) => (
                     <tr key={i} role="status" aria-label="กำลังโหลด" className="h-14 border-t border-border first:border-t-0">
-                      {["w-40", "w-24", "w-12", "w-48", "w-32"].map((w, j) => (
+                      {["w-16", "w-40", "w-24", "w-12", "w-48", "w-32"].map((w, j) => (
                         <td key={j} className="px-4 py-0">
                           <Skeleton className={`h-3 ${w}`} />
                         </td>
@@ -153,6 +153,7 @@ function MyTeachingPlan() {
                         onClick={() => navigate(`/teaching-plan/${a.id}`)}
                         className="h-14 cursor-pointer border-t border-border first:border-t-0"
                       >
+                        <td className="px-4 py-0 tabular-nums text-muted-foreground">{l.code}</td>
                         <td className="px-4 py-0">
                           <Link
                             to={`/teaching-plan/${a.id}`}
@@ -160,7 +161,6 @@ function MyTeachingPlan() {
                             className="block min-w-0"
                           >
                             <p className="truncate text-sm font-medium">{l.name}</p>
-                            <p className="font-mono text-xs tabular-nums text-muted-foreground">{l.code}</p>
                           </Link>
                         </td>
                         <td className="px-4 py-0">
@@ -171,13 +171,15 @@ function MyTeachingPlan() {
                         <td className="px-4 py-0 text-xs text-muted-foreground">{nextText(p)}</td>
                         <td className="px-4 py-0 text-muted-foreground">
                           <div className="flex items-center justify-end gap-3">
-                            {hasMates(a) && (
+                            {canMerge && (
                               <Link
                                 to={`/teaching-plan/${a.id}?merge=1`}
                                 onClick={(e) => e.stopPropagation()}
-                                className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted"
+                                aria-label="รวมแผน"
+                                title="รวมแผน"
+                                className="inline-flex size-8 items-center justify-center rounded-full hover:bg-muted"
                               >
-                                รวมแผน
+                                <CopyIcon className="h-4 w-4" />
                               </Link>
                             )}
                             <ChevronForward className="h-3 w-3" />

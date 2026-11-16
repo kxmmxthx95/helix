@@ -73,6 +73,13 @@ const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 
 /** 6 weeks × 7 days (Sun-start), enough to cover any month plus lead/trail days. */
+const GRADE_STAGES: [string, (code: string) => boolean][] = [
+  ["อนุบาล", (c) => c.startsWith("K")],
+  ["ประถมศึกษา", (c) => c.startsWith("P")],
+  ["มัธยมศึกษาตอนต้น", (c) => /^M[1-3]$/.test(c)],
+  ["มัธยมศึกษาตอนปลาย", (c) => /^M[4-6]$/.test(c)],
+];
+
 function buildCalendarDays(monthStart: Date): Date[] {
   const leadingEmpty = monthStart.getDay(); // Sun=0..Sat=6
   const gridStart = addDays(monthStart, -leadingEmpty);
@@ -968,14 +975,22 @@ function EventSheet({
         )}
 
         {blocksPeriods && gradeChoices.length > 0 && (
-          <FormSection title="ระดับชั้นที่เกี่ยวข้อง (ไม่เลือก = ทุกระดับชั้น)">
-            {gradeChoices.map((g) => (
-              <div key={g.id} className="flex items-center justify-between gap-4 text-sm leading-5">
-                <span>{gradeShortLabel(g.code)}</span>
-                <Switch size="sm" checked={draft.gradeLevelIds.includes(g.id)} onChange={(on) => toggleGrade(g.id, on)} label={g.code} />
-              </div>
-            ))}
-          </FormSection>
+          <>
+            <p className="-mb-2 text-xs text-muted-foreground">ระดับชั้นที่เกี่ยวข้อง (ไม่เลือก = ทุกระดับชั้น)</p>
+            {GRADE_STAGES.map(([title, test]) => {
+              const rows = gradeChoices.filter((g) => test(g.code.trim().toUpperCase()));
+              return rows.length === 0 ? null : (
+                <FormSection key={title} title={title}>
+                  {rows.map((g) => (
+                    <div key={g.id} className="flex items-center justify-between gap-4 text-sm leading-5">
+                      <span>{gradeShortLabel(g.code)}</span>
+                      <Switch size="xs" checked={draft.gradeLevelIds.includes(g.id)} onChange={(on) => toggleGrade(g.id, on)} label={g.code} />
+                    </div>
+                  ))}
+                </FormSection>
+              );
+            })}
+          </>
         )}
 
         {blocksPeriods && affected > 0 && (

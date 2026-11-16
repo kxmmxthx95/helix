@@ -3,6 +3,7 @@ import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import type { slotStats } from "@/hooks/useTeachingPlanSlots";
 import type { TeachingAssignment } from "@/lib/database.types";
+import { gradeShortLabel } from "@/lib/gradeLevels";
 import { cn } from "@/lib/utils";
 
 /** Thin progress bar with an "n/N คาบ" label. */
@@ -48,7 +49,7 @@ export function useAssignmentLabel(departmentId: string | null) {
       code: s?.code ?? "—",
       learningArea: learningAreas.find((x) => x.id === s?.learning_area_id)?.name ?? "",
       name: s?.name_th ?? "—",
-      grade: g?.name ?? "—",
+      grade: g ? gradeShortLabel(g.code) : "—",
       room: c?.name ?? "—",
       where: [g?.name, c?.name].filter(Boolean).join(" · ") || "—",
     };

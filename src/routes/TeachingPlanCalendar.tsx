@@ -133,9 +133,7 @@ export function TeachingPlanCalendar() {
   }
 
   const info = label(assignment);
-  const mates = assignment.group_id
-    ? myAssignments.filter((a) => a.id !== assignment.id && a.group_id === assignment.group_id)
-    : [];
+  const mates = myAssignments.filter((a) => a.id !== assignment.id);
   const readOnly = assignment.teacher_id !== me.id;
   const room = classrooms.find((c) => c.id === assignment.classroom_id);
   const gradeCode = gradeLevels.find((g) => g.id === room?.grade_level_id)?.code;
@@ -436,7 +434,7 @@ function MergePlanSheet({
 }) {
   const toast = useToast();
   const copy = useCopyPlanToGroup();
-  const [off, setOff] = useState<Set<string>>(new Set());
+  const [off, setOff] = useState<Set<string>>(() => new Set(mates.map((m) => m.id)));
   const targets = mates.filter((m) => !off.has(m.id)).map((m) => m.id);
   const mine = sourceSlots.filter((s) => s.teaching_assignment_id === source.id);
 
@@ -459,7 +457,7 @@ function MergePlanSheet({
       open
       onOpenChange={(o) => !o && onClose()}
       title="รวมแผน"
-      description="คัดลอกหัวข้อของวิชานี้ไปยังห้องที่เรียนรวมกัน (ไม่ทับคาบที่มีหัวข้ออยู่แล้ว ไม่คัดลอกสถานะสอนแล้ว)"
+      description="คัดลอกหัวข้อของวิชานี้ไปยังวิชาที่เลือก (ไม่ทับคาบที่มีหัวข้ออยู่แล้ว ไม่คัดลอกสถานะสอนแล้ว)"
       bottomOnPhone
       closable
       footer={
