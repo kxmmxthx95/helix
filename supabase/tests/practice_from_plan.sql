@@ -52,3 +52,16 @@ begin
   end;
 end $$;
 rollback;
+
+-- 0175: INSERT ... RETURNING as an authenticated teacher/admin must pass the select policy.
+begin;
+do $$
+declare v_user uuid; v_topic uuid; v_id uuid;
+begin
+  select pr.profile_id into strict v_user from profile_roles pr where pr.role = 'super_admin' limit 1;
+  select id into strict v_topic from plan_topics limit 1;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_user, 'role', 'authenticated')::text, true);
+  set local role authenticated;
+  insert into practice_sets (created_by, topic_id) values (v_user, v_topic) returning id into v_id;
+end $$;
+rollback;
