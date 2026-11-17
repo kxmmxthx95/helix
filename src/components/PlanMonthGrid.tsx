@@ -27,6 +27,7 @@ type Props = {
   onOpen: (c: SlotCell) => void;
   /** Drag a filled card onto another period: moves its topics there. */
   assignmentId: string;
+  marked: MarkedPoints;
   onMove?: (from: DragPoint, to: DragPoint) => void;
 };
 
@@ -59,7 +60,7 @@ export function PlanMonthGrid(p: Props) {
                 </p>
                 {inMonth && event && <p className="rounded-lg bg-muted px-1.5 py-1 text-muted-foreground">{event}</p>}
                 {inMonth &&
-                  p.othersOnDate(d).map((o) => <OtherCard key={o.id} other={o} onOpen={p.readOnly ? undefined : () => p.onOpenOther(o)} onMove={p.onMove} />)}
+                  p.othersOnDate(d).map((o) => <OtherCard key={o.id} other={o} marked={p.marked.has(pointKey(o))} onOpen={p.readOnly ? undefined : () => p.onOpenOther(o)} onMove={p.onMove} />)}
                 {dayCells.map((c) => {
                   return (
                     <PlanCard
@@ -71,6 +72,7 @@ export function PlanMonthGrid(p: Props) {
                       readOnly={p.readOnly}
                       onOpen={() => p.onOpen(c)}
                       point={{ assignmentId: p.assignmentId, date: c.date, periodNo: c.periodNo }}
+                      marked={p.marked.has(pointKey({ assignmentId: p.assignmentId, date: c.date, periodNo: c.periodNo }))}
                       onMove={p.onMove}
                     />
                   );
@@ -92,14 +94,14 @@ export function placedTopics(topics: PlanTopicItem[], slot: PlanSlot | undefined
 /** A linked subject's own period (this subject does not meet then): shown read-only. */
 export type PlanOther = { id: string; assignmentId: string; date: string; periodNo: number; code: string; title: string; topics: PlanTopicItem[]; taught: boolean; look: PlanLook };
 
-export function OtherCard({ other, onOpen, roomy = false, onMove }: { other: PlanOther; onOpen?: () => void; roomy?: boolean; onMove?: (from: DragPoint, to: DragPoint) => void }) {
+export function OtherCard({ other, onOpen, roomy = false, onMove, marked = false }: { marked?: boolean; other: PlanOther; onOpen?: () => void; roomy?: boolean; onMove?: (from: DragPoint, to: DragPoint) => void }) {
   const point = { assignmentId: other.assignmentId, date: other.date, periodNo: other.periodNo };
   // Placed topics: same look as the subject's own card.
   if (other.topics.length > 0) {
-    return <PlanCard slot={undefined} topics={other.topics} look={other.look} readOnly={!onOpen} onOpen={onOpen ?? (() => {})} roomy={roomy} point={point} onMove={onMove} />;
+    return <PlanCard slot={undefined} topics={other.topics} look={other.look} readOnly={!onOpen} onOpen={onOpen ?? (() => {})} roomy={roomy} point={point} onMove={onMove} marked={marked} />;
   }
   return (
-    <DragBox point={point} onMove={onMove} canDrag={false} canDrop={!!onOpen && !other.taught}>
+    <DragBox point={point} onMove={onMove} marked={marked} canDrag={false} canDrop={!!onOpen && !other.taught}>
     <button
       type="button"
       disabled={!onOpen}
@@ -144,6 +146,9 @@ const DRAG_TYPE = "application/x-plan-cell";
 
 /** A period of one assignment (this plan's or a linked subject's): where a drag starts or ends. */
 export type DragPoint = { assignmentId: string; date: string; periodNo: number };
+export const pointKey = (p: DragPoint) => `${p.assignmentId}#${p.date}#${p.periodNo}`;
+/** Periods ticked in multi-place mode, by pointKey. */
+export type MarkedPoints = ReadonlyMap<string, DragPoint>;
 
 /** Native drag & drop wrapper: a card with topics can be dragged onto another period (move its topics there). */
 function DragBox({
@@ -151,8 +156,10 @@ function DragBox({
   onMove,
   canDrag,
   canDrop,
+  marked = false,
   children,
 }: {
+  marked?: boolean;
   point?: DragPoint;
   onMove?: (from: DragPoint, to: DragPoint) => void;
   canDrag: boolean;
@@ -163,7 +170,7 @@ function DragBox({
   const on = !!point && !!onMove;
   return (
     <div
-      className={cn("w-full rounded-lg transition-shadow", over && "ring-2 ring-accent")}
+      className={cn("w-full rounded-lg transition-shadow", (over || marked) && "ring-2 ring-accent")}
       draggable={on && canDrag}
       onDragStart={on && canDrag ? (e) => e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(point)) : undefined}
       onDragOver={
@@ -204,7 +211,9 @@ export function PlanCard({
   roomy = false,
   point,
   onMove,
+  marked = false,
 }: {
+  marked?: boolean;
   point?: DragPoint;
   onMove?: (from: DragPoint, to: DragPoint) => void;
   slot: PlanSlot | undefined;
@@ -218,7 +227,7 @@ export function PlanCard({
   const taught = slot?.completed_at != null;
   const filled = topics.length > 0 || taught;
   return (
-    <DragBox point={point} onMove={onMove} canDrag={topics.length > 0 && !taught} canDrop={!taught && !readOnly}>
+    <DragBox point={point} onMove={onMove} marked={marked} canDrag={topics.length > 0 && !taught} canDrop={!taught && !readOnly}>
     <button
       type="button"
       disabled={readOnly}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { RestaurantIcon } from "@/components/icons";
-import { type DragPoint, OtherCard, PlanCard, type PlanLinked, type PlanLook, type PlanOther, placedTopics } from "@/components/PlanMonthGrid";
+import { type DragPoint, type MarkedPoints, OtherCard, PlanCard, type PlanLinked, type PlanLook, type PlanOther, placedTopics, pointKey } from "@/components/PlanMonthGrid";
 import type { PlanSlot, PlanTopicItem } from "@/hooks/useTeachingPlanSlots";
 import type { PeriodDefinition } from "@/lib/database.types";
 import { hhmm, teachingOrdinal } from "@/lib/periods";
@@ -27,6 +27,7 @@ type Props = {
   readOnly: boolean;
   onOpen: (c: SlotCell) => void;
   assignmentId: string;
+  marked: MarkedPoints;
   onMove?: (from: DragPoint, to: DragPoint) => void;
 };
 
@@ -45,7 +46,7 @@ export function PlanWeekGrid(p: Props) {
 
   const cell = (day: number, no: number) => p.cells.find((c) => c.date === dateOf(day) && c.periodNo === no);
   const others = (day: number, no: number) =>
-    p.othersOnDate(dateOf(day)).filter((o) => o.periodNo === no).map((o) => <OtherCard key={o.id} other={o} roomy onOpen={p.readOnly ? undefined : () => p.onOpenOther(o)} onMove={p.onMove} />);
+    p.othersOnDate(dateOf(day)).filter((o) => o.periodNo === no).map((o) => <OtherCard key={o.id} other={o} marked={p.marked.has(pointKey(o))} roomy onOpen={p.readOnly ? undefined : () => p.onOpenOther(o)} onMove={p.onMove} />);
   const card = (c: SlotCell) => {
     return (
       <PlanCard
@@ -56,6 +57,7 @@ export function PlanWeekGrid(p: Props) {
         readOnly={p.readOnly}
         onOpen={() => p.onOpen(c)}
         point={{ assignmentId: p.assignmentId, date: c.date, periodNo: c.periodNo }}
+        marked={p.marked.has(pointKey({ assignmentId: p.assignmentId, date: c.date, periodNo: c.periodNo }))}
         onMove={p.onMove}
         roomy
       />

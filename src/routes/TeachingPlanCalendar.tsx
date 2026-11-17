@@ -5,7 +5,7 @@ import { usePlanSubjects } from "@/hooks/usePlan";
 import { useAuth } from "@/auth/AuthProvider";
 import { CheckmarkCircleIcon, ChevronBack, ChevronForward, Search } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { type DragPoint, PlanMonthGrid, type PlanLook, type PlanOther, placedTopics } from "@/components/PlanMonthGrid";
+import { type DragPoint, type MarkedPoints, PlanMonthGrid, type PlanLook, type PlanOther, placedTopics, pointKey } from "@/components/PlanMonthGrid";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { PlanWeekGrid } from "@/components/PlanWeekGrid";
 import { useAssignmentLabel } from "@/components/TeachingPlanParts";
@@ -118,6 +118,19 @@ export function TeachingPlanCalendar() {
   const { data: linkedEntries = [] } = useScheduleEntriesForAssignments(linkedIds);
   const { data: linkedSlots = [] } = useTeachingPlanSlots(linkedIds);
   const [armed, setArmed] = useState<PlanTopicItem | null>(null); // topic chosen in the drawer, placed on the next tapped cell
+  const [multi, setMulti] = useState(false); // multi-place: taps tick periods, one button places the armed topic in all
+  const [marked, setMarked] = useState<MarkedPoints>(new Map());
+  const endArm = () => {
+    setArmed(null);
+    setMulti(false);
+    setMarked(new Map());
+  };
+  const toggleMark = (pt: DragPoint) =>
+    setMarked((m) => {
+      const n = new Map(m);
+      if (!n.delete(pointKey(pt))) n.set(pointKey(pt), pt);
+      return n;
+    });
 
   const range = assignment ? termRange(terms, assignment, departmentId) : null;
   const deptEvents = useMemo(
@@ -227,6 +240,7 @@ export function TeachingPlanCalendar() {
   // A linked subject's period: edits go to that assignment (the DB mirrors them back here when it meets).
   function openOther(o: PlanOther) {
     if (!armed) return setPickedOther(o);
+    if (multi) return o.taught ? undefined : toggleMark({ assignmentId: o.assignmentId, date: o.date, periodNo: o.periodNo });
     place.mutate(
       {
         teaching_assignment_id: o.assignmentId,
@@ -256,8 +270,29 @@ export function TeachingPlanCalendar() {
     }
   }
 
+  // Multi-place: put the armed topic in every ticked period (appended); failures stay ticked for a retry.
+  async function placeMarked() {
+    if (!armed) return;
+    const failed = new Map(marked);
+    let err: unknown = null;
+    for (const [key, pt] of marked) {
+      const cur = [...slots, ...linkedSlots].find((x) => x.teaching_assignment_id === pt.assignmentId && x.slot_date === pt.date && x.period_no === pt.periodNo);
+      try {
+        if (!cur?.topic_ids.includes(armed.id)) {
+          await place.mutateAsync({ teaching_assignment_id: pt.assignmentId, slot_date: pt.date, period_no: pt.periodNo, topic_id: armed.id, position: cur?.topic_ids.length ?? 0 });
+        }
+        failed.delete(key);
+      } catch (e) {
+        err = e;
+      }
+    }
+    setMarked(failed);
+    if (err) toast(`วางไม่สำเร็จ ${failed.size} ช่อง${err instanceof Error ? `: ${err.message}` : ""}`, "error");
+  }
+
   function openCell(cell: SlotCell) {
     if (!armed) return setPicked(cell);
+    if (multi) return slotAt(cell)?.completed_at ? undefined : toggleMark({ assignmentId: assignment!.id, date: cell.date, periodNo: cell.periodNo });
     place.mutate(
       {
         teaching_assignment_id: assignment!.id,
@@ -380,6 +415,7 @@ export function TeachingPlanCalendar() {
                 readOnly={readOnly}
                 onOpen={openCell}
                 assignmentId={assignment.id}
+                marked={marked}
                 onMove={moveSlot}
               />
             ) : (
@@ -398,6 +434,7 @@ export function TeachingPlanCalendar() {
                 readOnly={readOnly}
                 onOpen={openCell}
                 assignmentId={assignment.id}
+                marked={marked}
                 onMove={moveSlot}
               />
             )}
@@ -406,9 +443,27 @@ export function TeachingPlanCalendar() {
       )}
 
       {armed && (
-        <div className="mt-2 flex shrink-0 items-center gap-2 rounded-xl bg-accent-soft px-3 py-2 text-sm">
-          <span className="min-w-0 flex-1 truncate">แตะช่องในปฏิทินเพื่อวาง: <b>{armed.title}</b></span>
-          <Button size="sm" variant="outline" onClick={() => setArmed(null)}>
+        <div className="mt-2 flex shrink-0 flex-wrap items-center gap-2 rounded-xl bg-accent-soft px-3 py-2 text-sm">
+          <span className="min-w-0 flex-1 truncate">
+            {multi ? "แตะช่องเพื่อติ๊ก" : "แตะช่องในปฏิทินเพื่อวาง"}: <b>{armed.title}</b>
+          </span>
+          <Button
+            size="sm"
+            variant={multi ? "default" : "outline"}
+            aria-pressed={multi}
+            onClick={() => {
+              setMulti((v) => !v);
+              setMarked(new Map());
+            }}
+          >
+            เลือกหลายช่อง
+          </Button>
+          {multi && (
+            <Button size="sm" variant="accent" disabled={marked.size === 0 || place.isPending} onClick={() => void placeMarked()}>
+              วาง {marked.size} ช่อง
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={endArm}>
             เสร็จ
           </Button>
         </div>
@@ -423,7 +478,7 @@ export function TeachingPlanCalendar() {
                 <p className="text-[11px] text-muted-foreground">หัวข้อที่เลือกไว้</p>
                 <p className="truncate text-sm font-semibold">{armed.title}</p>
               </div>
-              <Button size="sm" variant="outline" onClick={() => setArmed(null)}>
+              <Button size="sm" variant="outline" onClick={endArm}>
                 ยกเลิก
               </Button>
             </div>
