@@ -8,8 +8,7 @@ import { cn } from "@/lib/utils";
 export const SheetStyleContext = createContext<"drawer" | "ios">("drawer");
 
 /** True below the lg breakpoint (phones and tablets). */
-export function usePhone() {
-  const q = "(max-width: 1023px)";
+export function usePhone(q = "(max-width: 1023px)") {
   const [phone, setPhone] = useState(() => typeof window !== "undefined" && window.matchMedia(q).matches);
   useEffect(() => {
     const m = window.matchMedia(q);
@@ -75,7 +74,8 @@ export function Sheet({
 }) {
   const [expanded, setExpanded] = useState(false);
   const effectiveWide = resizable ? (expanded ? "full" : true) : wide;
-  const phone = usePhone();
+  // Touch tablets (iPad landscape, ≥ lg) also get the bottom sheet.
+  const phone = usePhone("(max-width: 1023px), (pointer: coarse) and (max-width: 1400px)");
   const ios = (useContext(SheetStyleContext) === "ios" || bottomOnPhone) && phone;
 
   return (

@@ -5,7 +5,7 @@ import { usePlanSubjects } from "@/hooks/usePlan";
 import { useAuth } from "@/auth/AuthProvider";
 import { CheckmarkCircleIcon, ChevronBack, ChevronForward, Search } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { PlanMonthGrid, type PlanLook, type PlanOther, placedTopics } from "@/components/PlanMonthGrid";
+import { type DragPoint, PlanMonthGrid, type PlanLook, type PlanOther, placedTopics } from "@/components/PlanMonthGrid";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { PlanWeekGrid } from "@/components/PlanWeekGrid";
 import { useAssignmentLabel } from "@/components/TeachingPlanParts";
@@ -134,6 +134,19 @@ export function TeachingPlanCalendar() {
     return slots.filter((s) => s.topic_ids.length > 0 && !s.completed_at && !live.has(`${s.slot_date}#${s.period_no}`));
   }, [slots, cells]);
 
+  // Timetable-card look (stripe colour, badges) of an assignment.
+  const lookOf = (a: TeachingAssignment): PlanLook => {
+    const room = classrooms.find((c) => c.id === a.classroom_id);
+    const gradeCode = gradeLevels.find((g) => g.id === room?.grade_level_id)?.code;
+    const gradeLabel = room ? `${gradeCode ? gradeShortLabel(gradeCode) : "—"}/${room.name}` : "—";
+    return {
+      tone: styling.color(a.subject_id, a.classroom_id),
+      code: subjects.find((x) => x.id === a.subject_id)?.code ?? "—",
+      grade: { label: gradeLabel, className: levelTone(gradeLabel) },
+      badge: { className: styling.typeBadge(a.subject_id), title: styling.typeLabel(a.subject_id) },
+    };
+  };
+
   // Periods of linked subjects where this subject has none (this term's slot rule, per linked subject).
   const othersByDate = useMemo(() => {
     const out = new Map<string, PlanOther[]>();
@@ -157,6 +170,7 @@ export function TeachingPlanCalendar() {
             title: `${label(m).name} · ${label(m).grade}/${label(m).room}`,
             topics: placedTopics(topics, sl),
             taught: sl?.completed_at != null,
+            look: lookOf(m),
           },
         ]);
       }
@@ -187,15 +201,7 @@ export function TeachingPlanCalendar() {
     (a) => a.id !== assignment.id && gradeOf(a) === gradeOf(assignment) && planIds(a.subject_id).some((id) => mine.includes(id)),
   );
   const readOnly = assignment.teacher_id !== me.id;
-  const room = classrooms.find((c) => c.id === assignment.classroom_id);
-  const gradeCode = gradeLevels.find((g) => g.id === room?.grade_level_id)?.code;
-  const gradeLabel = room ? `${gradeCode ? gradeShortLabel(gradeCode) : "—"}/${room.name}` : "—";
-  const look: PlanLook = {
-    tone: styling.color(assignment.subject_id, assignment.classroom_id),
-    code: subjects.find((x) => x.id === assignment.subject_id)?.code ?? "—",
-    grade: { label: gradeLabel, className: levelTone(gradeLabel) },
-    badge: { className: styling.typeBadge(assignment.subject_id), title: styling.typeLabel(assignment.subject_id) },
-  };
+  const look = lookOf(assignment);
   // Linked subjects that also meet on this date + period (same rule the DB mirror uses).
   const linkedAt = (c: { date: string; periodNo: number }) =>
     linkedEntries
@@ -231,6 +237,23 @@ export function TeachingPlanCalendar() {
       },
       { onError: (e) => toast(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ", "error") },
     );
+  }
+
+  // Drag & drop: move a period's topics to another period (append), then clear the source. Works across linked subjects (topics are shared in the plan group).
+  async function moveSlot(from: DragPoint, to: DragPoint) {
+    const find = (pt: DragPoint) =>
+      [...slots, ...linkedSlots].find((s) => s.teaching_assignment_id === pt.assignmentId && s.slot_date === pt.date && s.period_no === pt.periodNo);
+    const src = find(from);
+    if (!src || src.completed_at || src.topic_ids.length === 0) return;
+    const base = find(to)?.topic_ids.length ?? 0;
+    try {
+      for (const [i, topic_id] of src.topic_ids.entries()) {
+        await place.mutateAsync({ teaching_assignment_id: to.assignmentId, slot_date: to.date, period_no: to.periodNo, topic_id, position: base + i });
+      }
+      await clearSlot.mutateAsync(src.id);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "ย้ายไม่สำเร็จ", "error");
+    }
   }
 
   function openCell(cell: SlotCell) {
@@ -356,6 +379,8 @@ export function TeachingPlanCalendar() {
                 today={today()}
                 readOnly={readOnly}
                 onOpen={openCell}
+                assignmentId={assignment.id}
+                onMove={moveSlot}
               />
             ) : (
               <PlanMonthGrid
@@ -372,6 +397,8 @@ export function TeachingPlanCalendar() {
                 today={today()}
                 readOnly={readOnly}
                 onOpen={openCell}
+                assignmentId={assignment.id}
+                onMove={moveSlot}
               />
             )}
           </div>
@@ -387,7 +414,7 @@ export function TeachingPlanCalendar() {
         </div>
       )}
 
-      <Sheet open={topicsOpen} onOpenChange={setTopicsOpen} title="หัวข้อ" description="เลือกหัวข้อ แล้วแตะช่องในปฏิทินเพื่อวาง" closable>
+      <Sheet open={topicsOpen} onOpenChange={setTopicsOpen} title="หัวข้อ" description="เลือกหัวข้อ แล้วแตะช่องในปฏิทินเพื่อวาง" closable bottomOnPhone>
         <div className="space-y-3">
           {armed && (
             <div className="relative flex items-center gap-3 overflow-hidden rounded-xl border border-border bg-card py-2.5 pl-4 pr-3 shadow-sm">

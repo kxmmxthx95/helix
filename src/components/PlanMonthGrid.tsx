@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AlertTriangle, CheckmarkCircleIcon, LinkIcon } from "@/components/icons";
 import type { PlanSlot, PlanTopicItem } from "@/hooks/useTeachingPlanSlots";
 import type { PeriodDefinition } from "@/lib/database.types";
@@ -24,6 +25,9 @@ type Props = {
   today: string;
   readOnly: boolean;
   onOpen: (c: SlotCell) => void;
+  /** Drag a filled card onto another period: moves its topics there. */
+  assignmentId: string;
+  onMove?: (from: DragPoint, to: DragPoint) => void;
 };
 
 /** Month calendar (Mon–Sat) whose day cells hold timetable-style period cards of this subject. */
@@ -55,7 +59,7 @@ export function PlanMonthGrid(p: Props) {
                 </p>
                 {inMonth && event && <p className="rounded-lg bg-muted px-1.5 py-1 text-muted-foreground">{event}</p>}
                 {inMonth &&
-                  p.othersOnDate(d).map((o) => <OtherCard key={o.id} other={o} onOpen={p.readOnly ? undefined : () => p.onOpenOther(o)} />)}
+                  p.othersOnDate(d).map((o) => <OtherCard key={o.id} other={o} onOpen={p.readOnly ? undefined : () => p.onOpenOther(o)} onMove={p.onMove} />)}
                 {dayCells.map((c) => {
                   return (
                     <PlanCard
@@ -66,6 +70,8 @@ export function PlanMonthGrid(p: Props) {
                       look={p.look}
                       readOnly={p.readOnly}
                       onOpen={() => p.onOpen(c)}
+                      point={{ assignmentId: p.assignmentId, date: c.date, periodNo: c.periodNo }}
+                      onMove={p.onMove}
                     />
                   );
                 })}
@@ -84,24 +90,30 @@ export function placedTopics(topics: PlanTopicItem[], slot: PlanSlot | undefined
 }
 
 /** A linked subject's own period (this subject does not meet then): shown read-only. */
-export type PlanOther = { id: string; assignmentId: string; date: string; periodNo: number; code: string; title: string; topics: PlanTopicItem[]; taught: boolean };
+export type PlanOther = { id: string; assignmentId: string; date: string; periodNo: number; code: string; title: string; topics: PlanTopicItem[]; taught: boolean; look: PlanLook };
 
-export function OtherCard({ other, onOpen, roomy = false }: { other: PlanOther; onOpen?: () => void; roomy?: boolean }) {
+export function OtherCard({ other, onOpen, roomy = false, onMove }: { other: PlanOther; onOpen?: () => void; roomy?: boolean; onMove?: (from: DragPoint, to: DragPoint) => void }) {
+  const point = { assignmentId: other.assignmentId, date: other.date, periodNo: other.periodNo };
+  // Placed topics: same look as the subject's own card.
+  if (other.topics.length > 0) {
+    return <PlanCard slot={undefined} topics={other.topics} look={other.look} readOnly={!onOpen} onOpen={onOpen ?? (() => {})} roomy={roomy} point={point} onMove={onMove} />;
+  }
   return (
+    <DragBox point={point} onMove={onMove} canDrag={false} canDrop={!!onOpen && !other.taught}>
     <button
       type="button"
       disabled={!onOpen}
       onClick={onOpen}
       title={other.title}
       className={cn(
-        "flex w-full flex-col gap-1 rounded-lg border border-accent/30 bg-accent/5 px-2 py-1.5 text-left text-xs leading-snug transition-colors",
+        "flex w-full flex-col gap-1 rounded-lg border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-left text-xs leading-snug transition-colors",
         roomy && "min-h-[4.25rem] justify-center rounded-xl px-3 py-2",
-        onOpen && "hover:bg-accent/10",
+        onOpen && "hover:bg-destructive/10",
       )}
     >
       <span className="flex items-center gap-1.5">
-        <LinkIcon className="h-3 w-3 shrink-0 text-accent" />
-        <span className="rounded-md bg-accent/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-accent">{other.code}</span>
+        <LinkIcon className="h-3 w-3 shrink-0 text-destructive" />
+        <span className="rounded-md bg-destructive/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-destructive">{other.code}</span>
         <span className="ml-auto text-[10px] tabular-nums text-muted-foreground">คาบ {other.periodNo}</span>
       </span>
       {other.topics.length > 0 ? (
@@ -114,6 +126,7 @@ export function OtherCard({ other, onOpen, roomy = false }: { other: PlanOther; 
         <span className="text-muted-foreground">{other.taught ? "สอนแล้ว" : "ว่าง"}</span>
       )}
     </button>
+    </DragBox>
   );
 }
 
@@ -127,6 +140,59 @@ export type PlanLook = {
   badge: { className: string; title: string };
 };
 
+const DRAG_TYPE = "application/x-plan-cell";
+
+/** A period of one assignment (this plan's or a linked subject's): where a drag starts or ends. */
+export type DragPoint = { assignmentId: string; date: string; periodNo: number };
+
+/** Native drag & drop wrapper: a card with topics can be dragged onto another period (move its topics there). */
+function DragBox({
+  point,
+  onMove,
+  canDrag,
+  canDrop,
+  children,
+}: {
+  point?: DragPoint;
+  onMove?: (from: DragPoint, to: DragPoint) => void;
+  canDrag: boolean;
+  canDrop: boolean;
+  children: React.ReactNode;
+}) {
+  const [over, setOver] = useState(false);
+  const on = !!point && !!onMove;
+  return (
+    <div
+      className={cn("w-full rounded-lg transition-shadow", over && "ring-2 ring-accent")}
+      draggable={on && canDrag}
+      onDragStart={on && canDrag ? (e) => e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(point)) : undefined}
+      onDragOver={
+        on && canDrop
+          ? (e) => {
+              if (e.dataTransfer.types.includes(DRAG_TYPE)) {
+                e.preventDefault();
+                setOver(true);
+              }
+            }
+          : undefined
+      }
+      onDragLeave={on ? () => setOver(false) : undefined}
+      onDrop={
+        on && canDrop
+          ? (e) => {
+              e.preventDefault();
+              setOver(false);
+              const from = JSON.parse(e.dataTransfer.getData(DRAG_TYPE) || "null") as DragPoint | null;
+              if (from && (from.assignmentId !== point.assignmentId || from.date !== point.date || from.periodNo !== point.periodNo)) onMove(from, point);
+            }
+          : undefined
+      }
+    >
+      {children}
+    </div>
+  );
+}
+
 /** Timetable-style period card; `roomy` = week grid size, default = compact for month cells. */
 export function PlanCard({
   slot,
@@ -136,7 +202,11 @@ export function PlanCard({
   readOnly,
   onOpen,
   roomy = false,
+  point,
+  onMove,
 }: {
+  point?: DragPoint;
+  onMove?: (from: DragPoint, to: DragPoint) => void;
   slot: PlanSlot | undefined;
   linked?: PlanLinked[];
   topics: PlanTopicItem[];
@@ -148,6 +218,7 @@ export function PlanCard({
   const taught = slot?.completed_at != null;
   const filled = topics.length > 0 || taught;
   return (
+    <DragBox point={point} onMove={onMove} canDrag={topics.length > 0 && !taught} canDrop={!taught && !readOnly}>
     <button
       type="button"
       disabled={readOnly}
@@ -200,5 +271,6 @@ export function PlanCard({
           <AlertTriangle className="absolute right-1.5 top-1.5 h-3.5 w-3.5" aria-label="สอนไม่ตามแผน" />
         ))}
     </button>
+    </DragBox>
   );
 }

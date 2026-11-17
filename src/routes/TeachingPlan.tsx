@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { ChevronForward, LinkIcon } from "@/components/icons";
+import { AlertTriangle, CalendarIcon, ChevronForward, InfoIcon, LinkIcon, TimeIcon } from "@/components/icons";
 import { PlanProgress, useAssignmentLabel } from "@/components/TeachingPlanParts";
 import { Card, EmptyState, Skeleton } from "@/components/ui";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
@@ -70,15 +70,32 @@ function MyTeachingPlan() {
     !!a.plan_group_id && assignments.some((b) => b.id !== a.id && b.plan_group_id === a.plan_group_id);
 
   const statusBadge = (p: ReturnType<typeof progress.get>) => {
-    const tone =
+    const [Icon, tone] =
       !p || p.stats.total === 0
-        ? "bg-fill text-muted-foreground"
+        ? [InfoIcon, "text-muted-foreground"]
         : p.next
-          ? "bg-success/10 text-success"
+          ? [CalendarIcon, "text-success"]
           : p.stats.planned === 0
-            ? "bg-destructive/10 text-destructive"
-            : "bg-warning/10 text-warning";
-    return <span className={`inline-flex h-6 items-center rounded-full px-2.5 text-xs font-medium ${tone}`}>{nextText(p)}</span>;
+            ? [AlertTriangle, "text-destructive"]
+            : [TimeIcon, "text-warning"];
+    const text = nextText(p);
+    return (
+      <span
+        role="img"
+        aria-label={text}
+        title={text}
+        className={`inline-flex h-6 items-center gap-1 text-xs font-medium tabular-nums ${tone}`}
+      >
+        <Icon className="h-3.5 w-3.5" />
+        {!p || p.stats.total === 0
+          ? "ไม่มีคาบสอน"
+          : p.next
+            ? `ถัดไป ${new Date(`${p.next.slot_date}T00:00:00Z`).toLocaleDateString("th-TH", { day: "numeric", month: "short", timeZone: "UTC" })} · คาบ ${p.next.period_no}`
+            : p.stats.planned === 0
+              ? "ยังไม่วางหัวข้อ"
+              : "ไม่มีคาบข้างหน้า"}
+      </span>
+    );
   };
 
   if (!me) return null;
@@ -127,7 +144,7 @@ function MyTeachingPlan() {
                   to={`/teaching-plan/${a.id}?merge=1`}
                   className={cn(
                     "absolute bottom-2.5 right-3 rounded-full border px-2.5 py-1 text-xs font-medium",
-                    linked(a) ? "border-accent/40 bg-accent/10 text-accent" : "border-border bg-card",
+                    linked(a) ? "border-success/40 text-success" : "border-border",
                   )}
                 >
                   รวมแผน
@@ -197,7 +214,7 @@ function MyTeachingPlan() {
                               title={linked(a) ? "รวมแผนอยู่" : "รวมแผน"}
                               className={cn(
                                 "inline-flex size-8 items-center justify-center rounded-full hover:bg-muted",
-                                linked(a) && "bg-accent/10 text-accent",
+                                linked(a) && "text-success",
                               )}
                             >
                               <LinkIcon className="h-4 w-4" />
