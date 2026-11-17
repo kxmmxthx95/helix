@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { RestaurantIcon } from "@/components/icons";
-import { PlanCard, type PlanLook, placedTopics } from "@/components/PlanMonthGrid";
+import { OtherCard, PlanCard, type PlanLinked, type PlanLook, type PlanOther, placedTopics } from "@/components/PlanMonthGrid";
 import type { PlanSlot, PlanTopicItem } from "@/hooks/useTeachingPlanSlots";
 import type { PeriodDefinition } from "@/lib/database.types";
 import { hhmm, teachingOrdinal } from "@/lib/periods";
@@ -18,6 +18,9 @@ type Props = {
   /** Reason a whole day is closed (holiday name / นอกภาคเรียน), or null. */
   closed: (date: string) => string | null;
   slotAt: (c: { date: string; periodNo: number }) => PlanSlot | undefined;
+  linkedAt: (c: { date: string; periodNo: number }) => PlanLinked[];
+  othersOnDate: (date: string) => PlanOther[];
+  onOpenOther: (o: PlanOther) => void;
   topics: PlanTopicItem[];
   look: PlanLook;
   today: string;
@@ -32,14 +35,20 @@ export function PlanWeekGrid(p: Props) {
   const periodAt = new Map(p.periods.map((x) => [`${x.day_of_week}-${x.period_no}`, x]));
   const dateOf = (day: number) => addDays(p.week, day - 1);
   const [picked, setPicked] = useState<number | null>(null);
-  const live = new Set(p.cells.map((c) => days.find((d) => dateOf(d) === c.date)).filter((d): d is number => d != null));
+  const live = new Set([
+    ...p.cells.map((c) => days.find((d) => dateOf(d) === c.date)),
+    ...days.filter((d) => p.othersOnDate(dateOf(d)).length > 0),
+  ].filter((d): d is number => d != null));
   const listDay = picked ?? days.find((d) => live.has(d) && dateOf(d) === p.today) ?? days.find((d) => live.has(d)) ?? days[0] ?? 1;
 
   const cell = (day: number, no: number) => p.cells.find((c) => c.date === dateOf(day) && c.periodNo === no);
+  const others = (day: number, no: number) =>
+    p.othersOnDate(dateOf(day)).filter((o) => o.periodNo === no).map((o) => <OtherCard key={o.id} other={o} onOpen={p.readOnly ? undefined : () => p.onOpenOther(o)} />);
   const card = (c: SlotCell) => {
     return (
       <PlanCard
         slot={p.slotAt(c)}
+        linked={p.linkedAt(c)}
         topics={placedTopics(p.topics, p.slotAt(c))}
         look={p.look}
         readOnly={p.readOnly}
@@ -98,7 +107,10 @@ export function PlanWeekGrid(p: Props) {
                       {hhmm(pd.end_time)}
                     </p>
                   </div>
-                  <div className="min-w-0 flex-1">{c ? card(c) : <p className="min-h-[4.25rem] rounded-xl bg-muted/40" />}</div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    {c ? card(c) : others(listDay, pd.period_no)}
+                    {!c && others(listDay, pd.period_no).length === 0 && <p className="min-h-[4.25rem] rounded-xl bg-muted/40" />}
+                  </div>
                 </li>
               );
             })}
@@ -165,7 +177,13 @@ export function PlanWeekGrid(p: Props) {
                     const c = cell(d, no);
                     return (
                       <td key={d} className="border-l border-border p-1">
-                        {c ? card(c) : <div aria-disabled="true" className={cn("min-h-[4.25rem] rounded-lg bg-muted/60", !live.has(d) && "opacity-60")} />}
+                        {c ? (
+                          card(c)
+                        ) : others(d, no).length > 0 ? (
+                          <div className="space-y-1">{others(d, no)}</div>
+                        ) : (
+                          <div aria-disabled="true" className={cn("min-h-[4.25rem] rounded-lg bg-muted/60", !live.has(d) && "opacity-60")} />
+                        )}
                       </td>
                     );
                   })}

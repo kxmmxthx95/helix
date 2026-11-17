@@ -1,6 +1,7 @@
+import { useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { ChevronForward, CopyIcon } from "@/components/icons";
+import { ChevronForward, LinkIcon } from "@/components/icons";
 import { PlanProgress, useAssignmentLabel } from "@/components/TeachingPlanParts";
 import { Card, EmptyState, Skeleton } from "@/components/ui";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
@@ -48,8 +49,12 @@ function MyTeachingPlan() {
   const { profile: me } = useAuth();
   const navigate = useNavigate();
   const departmentId = me?.department_id ?? null;
-  const { data: assignments = [], isLoading } = useMyTeachingAssignments(me?.id ?? null);
+  const { data: mine = [], isLoading } = useMyTeachingAssignments(me?.id ?? null);
   const label = useAssignmentLabel(departmentId);
+  const assignments = useMemo(
+    () => [...mine].sort((x, y) => label(x).code.localeCompare(label(y).code, "th", { numeric: true })),
+    [mine, label],
+  );
   const { progress } = useAssignmentProgress(assignments, departmentId);
 
   const nextText = (p: ReturnType<typeof progress.get>) =>
@@ -60,6 +65,9 @@ function MyTeachingPlan() {
         : p.stats.planned === 0
           ? "ยังไม่ได้วางหัวข้อ"
           : "ไม่มีคาบที่วางแผนไว้ข้างหน้า";
+
+  const linked = (a: (typeof assignments)[number]) =>
+    !!a.plan_group_id && assignments.some((b) => b.id !== a.id && b.plan_group_id === a.plan_group_id);
 
   const statusBadge = (p: ReturnType<typeof progress.get>) => {
     const tone =
@@ -117,7 +125,10 @@ function MyTeachingPlan() {
                 </Link>
                 <Link
                   to={`/teaching-plan/${a.id}?merge=1`}
-                  className="absolute bottom-2.5 right-3 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium"
+                  className={cn(
+                    "absolute bottom-2.5 right-3 rounded-full border px-2.5 py-1 text-xs font-medium",
+                    linked(a) ? "border-accent/40 bg-accent/10 text-accent" : "border-border bg-card",
+                  )}
                 >
                   รวมแผน
                 </Link>
@@ -183,10 +194,13 @@ function MyTeachingPlan() {
                               to={`/teaching-plan/${a.id}?merge=1`}
                               onClick={(e) => e.stopPropagation()}
                               aria-label="รวมแผน"
-                              title="รวมแผน"
-                              className="inline-flex size-8 items-center justify-center rounded-full hover:bg-muted"
+                              title={linked(a) ? "รวมแผนอยู่" : "รวมแผน"}
+                              className={cn(
+                                "inline-flex size-8 items-center justify-center rounded-full hover:bg-muted",
+                                linked(a) && "bg-accent/10 text-accent",
+                              )}
                             >
-                              <CopyIcon className="h-4 w-4" />
+                              <LinkIcon className="h-4 w-4" />
                             </Link>
                             <ChevronForward className="h-3 w-3" />
                           </div>

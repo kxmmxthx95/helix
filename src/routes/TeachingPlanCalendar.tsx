@@ -5,12 +5,12 @@ import { usePlanSubjects } from "@/hooks/usePlan";
 import { useAuth } from "@/auth/AuthProvider";
 import { CheckmarkCircleIcon, ChevronBack, ChevronForward, Search } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
-import { PlanMonthGrid, type PlanLook, placedTopics } from "@/components/PlanMonthGrid";
+import { PlanMonthGrid, type PlanLook, type PlanOther, placedTopics } from "@/components/PlanMonthGrid";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { PlanWeekGrid } from "@/components/PlanWeekGrid";
 import { useAssignmentLabel } from "@/components/TeachingPlanParts";
 import { useToast } from "@/components/Toast";
-import { Button, EmptyState, Input, Select, Spinner } from "@/components/ui";
+import { Button, EmptyState, FormSection, Input, Select, Spinner, Switch } from "@/components/ui";
 import { useAcademicEvents, useAllAcademicTerms } from "@/hooks/useAcademicTerms";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { useSubjects } from "@/hooks/useCurriculum";
@@ -23,6 +23,7 @@ import {
   useAssignmentScheduleEntries,
   type PlanSlot,
   useClearSlot,
+  useScheduleEntriesForAssignments,
   useSetPlanLink,
   usePlaceTopic,
   useRemoveTopic,
@@ -32,7 +33,7 @@ import {
 } from "@/hooks/useTeachingPlanSlots";
 import type { TeachingAssignment } from "@/lib/database.types";
 import { mergePeriods, withTimes } from "@/lib/periods";
-import { addDays, computeSlots, eventApplies, type SlotCell, termRange, weekStart } from "@/lib/planSlots";
+import { addDays, computeSlots, eventApplies, isoDow, type SlotCell, termRange, weekStart } from "@/lib/planSlots";
 import { supabase } from "@/lib/supabase";
 import { useTimetableStyling } from "@/routes/Timetable";
 import { cn } from "@/lib/utils";
@@ -102,10 +103,20 @@ export function TeachingPlanCalendar() {
   const [view, setView] = useState<"week" | "month">("week");
   const [anchor, setAnchor] = useState(today); // any date in the shown week/month
   const [picked, setPicked] = useState<SlotCell | null>(null);
+  const [pickedOther, setPickedOther] = useState<PlanOther | null>(null); // a linked subject's period
   const [topicsOpen, setTopicsOpen] = useState(false);
   const [search] = useSearchParams();
   const [mergeOpen, setMergeOpen] = useState(search.get("merge") === "1");
   const { data: myAssignments = [] } = useMyTeachingAssignments(me?.id ?? null);
+  const linkedIds = useMemo(
+    () =>
+      assignment?.plan_group_id
+        ? myAssignments.filter((a) => a.id !== assignment.id && a.plan_group_id === assignment.plan_group_id).map((a) => a.id)
+        : [],
+    [assignment, myAssignments],
+  );
+  const { data: linkedEntries = [] } = useScheduleEntriesForAssignments(linkedIds);
+  const { data: linkedSlots = [] } = useTeachingPlanSlots(linkedIds);
   const [armed, setArmed] = useState<PlanTopicItem | null>(null); // topic chosen in the drawer, placed on the next tapped cell
 
   const range = assignment ? termRange(terms, assignment, departmentId) : null;
@@ -122,6 +133,36 @@ export function TeachingPlanCalendar() {
     const live = new Set(cells.map((c) => `${c.date}#${c.periodNo}`));
     return slots.filter((s) => s.topic_ids.length > 0 && !s.completed_at && !live.has(`${s.slot_date}#${s.period_no}`));
   }, [slots, cells]);
+
+  // Periods of linked subjects where this subject has none (this term's slot rule, per linked subject).
+  const othersByDate = useMemo(() => {
+    const out = new Map<string, PlanOther[]>();
+    if (!range || linkedIds.length === 0) return out;
+    const own = new Set(cells.map((c) => `${c.date}#${c.periodNo}`));
+    for (const id of linkedIds) {
+      const m = myAssignments.find((a) => a.id === id);
+      if (!m) continue;
+      const entries = linkedEntries.filter((e) => e.teaching_assignment_id === id);
+      for (const c of computeSlots(range, withTimes(entries, periods, found?.gradeLevelId ?? null), deptEvents)) {
+        if (own.has(`${c.date}#${c.periodNo}`)) continue;
+        const sl = linkedSlots.find((s) => s.teaching_assignment_id === id && s.slot_date === c.date && s.period_no === c.periodNo);
+        out.set(c.date, [
+          ...(out.get(c.date) ?? []),
+          {
+            id: `${id}#${c.date}#${c.periodNo}`,
+            assignmentId: id,
+            date: c.date,
+            periodNo: c.periodNo,
+            code: label(m).code,
+            title: `${label(m).name} · ${label(m).grade}/${label(m).room}`,
+            topics: placedTopics(topics, sl),
+            taught: sl?.completed_at != null,
+          },
+        ]);
+      }
+    }
+    return out;
+  }, [range, linkedIds, linkedEntries, linkedSlots, cells, deptEvents, myAssignments, topics, label, periods, found?.gradeLevelId]);
 
   if (isLoading) {
     return (
@@ -155,6 +196,15 @@ export function TeachingPlanCalendar() {
     grade: { label: gradeLabel, className: levelTone(gradeLabel) },
     badge: { className: styling.typeBadge(assignment.subject_id), title: styling.typeLabel(assignment.subject_id) },
   };
+  // Linked subjects that also meet on this date + period (same rule the DB mirror uses).
+  const linkedAt = (c: { date: string; periodNo: number }) =>
+    linkedEntries
+      .filter((e) => e.period_no === c.periodNo && e.day_of_week === isoDow(c.date))
+      .flatMap((e) => {
+        const m = myAssignments.find((a) => a.id === e.teaching_assignment_id);
+        return m ? [{ code: label(m).code, title: `${label(m).name} · ${label(m).grade}/${label(m).room}` }] : [];
+      });
+  const othersOnDate = (date: string) => othersByDate.get(date) ?? [];
   const slotAt = (c: { date: string; periodNo: number }) =>
     slots.find((s) => s.slot_date === c.date && s.period_no === c.periodNo);
   const stats = slotStats(slots, cells.length);
@@ -167,6 +217,21 @@ export function TeachingPlanCalendar() {
   const closed = (d: string) =>
     deptEvents.find((e) => !e.students_attend && e.start_date <= d && d <= e.end_date)?.name ?? null;
   const closedWeek = (d: string) => (!range || d < range.start || d > range.end ? "นอกภาคเรียน" : closed(d));
+
+  // A linked subject's period: edits go to that assignment (the DB mirrors them back here when it meets).
+  function openOther(o: PlanOther) {
+    if (!armed) return setPickedOther(o);
+    place.mutate(
+      {
+        teaching_assignment_id: o.assignmentId,
+        slot_date: o.date,
+        period_no: o.periodNo,
+        topic_id: armed.id,
+        position: linkedSlots.find((s) => s.teaching_assignment_id === o.assignmentId && s.slot_date === o.date && s.period_no === o.periodNo)?.topic_ids.length ?? 0,
+      },
+      { onError: (e) => toast(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ", "error") },
+    );
+  }
 
   function openCell(cell: SlotCell) {
     if (!armed) return setPicked(cell);
@@ -283,6 +348,9 @@ export function TeachingPlanCalendar() {
                 cells={cells}
                 closed={closedWeek}
                 slotAt={slotAt}
+                linkedAt={linkedAt}
+                othersOnDate={othersOnDate}
+                onOpenOther={openOther}
                 topics={topics}
                 look={look}
                 today={today()}
@@ -296,6 +364,9 @@ export function TeachingPlanCalendar() {
                 cells={cells}
                 closed={closed}
                 slotAt={slotAt}
+                linkedAt={linkedAt}
+                othersOnDate={othersOnDate}
+                onOpenOther={openOther}
                 topics={topics}
                 look={look}
                 today={today()}
@@ -352,6 +423,25 @@ export function TeachingPlanCalendar() {
         />
       )}
 
+      {pickedOther && !readOnly && (
+        <SlotSheet
+          key={pickedOther.id}
+          assignmentId={pickedOther.assignmentId}
+          cell={{ date: pickedOther.date, dayOfWeek: isoDow(pickedOther.date), periodNo: pickedOther.periodNo }}
+          slot={linkedSlots.find(
+            (s) => s.teaching_assignment_id === pickedOther.assignmentId && s.slot_date === pickedOther.date && s.period_no === pickedOther.periodNo,
+          )}
+          suffix={pickedOther.code}
+          topics={topics}
+          countOf={(id) => linkedSlots.filter((s) => s.teaching_assignment_id === pickedOther.assignmentId && s.topic_ids.includes(id)).length}
+          tone={(() => {
+            const m = myAssignments.find((a) => a.id === pickedOther.assignmentId);
+            return m ? styling.color(m.subject_id, m.classroom_id) : "bg-muted";
+          })()}
+          onClose={() => setPickedOther(null)}
+        />
+      )}
+
       {picked && !readOnly && (
         <SlotSheet
           key={`${picked.date}#${picked.periodNo}`}
@@ -405,7 +495,6 @@ function MergePlanSheet({
       open
       onOpenChange={(o) => !o && onClose()}
       title="รวมแผน"
-      description="ห้องที่ติ๊กจะใช้แผนเดียวกัน: วางหรือลบหัวข้อห้องไหน ห้องอื่นตามในคาบเดียวกัน (วัน+คาบตรงกัน) ไม่แตะคาบที่สอนแล้ว"
       bottomOnPhone
       closable
       footer={
@@ -419,35 +508,41 @@ function MergePlanSheet({
         </div>
       }
     >
-      <div className="space-y-2">
-        {mates.length === 0 && (
+      <div className="space-y-4">
+        {mates.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             ไม่มีวิชาอื่นให้รวม (รวมได้เฉพาะวิชาที่คุณสอน ชั้นเดียวกัน และใช้ผังการเรียนเดียวกัน เช่น คณิตพื้นฐาน + คณิตเพิ่มเติม)
           </p>
+        ) : (
+          <FormSection title="เลือกวิชาที่จะรวมแผน">
+            {mates.map((m) => {
+              const info = label(m);
+              return (
+                <div key={m.id} className="flex items-center justify-between gap-4 text-sm leading-5">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{info.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="tabular-nums">{info.code}</span> · {info.grade}/{info.room}
+                    </p>
+                  </div>
+                  <Switch
+                    size="xs"
+                    checked={on.has(m.id)}
+                    label={`${info.name} ${info.grade}/${info.room}`}
+                    onChange={(v) =>
+                      setOn((o) => {
+                        const n = new Set(o);
+                        if (v) n.add(m.id);
+                        else n.delete(m.id);
+                        return n;
+                      })
+                    }
+                  />
+                </div>
+              );
+            })}
+          </FormSection>
         )}
-        {mates.map((m) => {
-          const info = label(m);
-          return (
-            <label key={m.id} className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5">
-              <input
-                type="checkbox"
-                className="size-4"
-                checked={on.has(m.id)}
-                onChange={(e) =>
-                  setOn((o) => {
-                    const n = new Set(o);
-                    if (e.target.checked) n.add(m.id);
-                    else n.delete(m.id);
-                    return n;
-                  })
-                }
-              />
-              <p className="min-w-0 flex-1 truncate text-sm font-medium">
-                {info.name} · {info.grade}/{info.room}
-              </p>
-            </label>
-          );
-        })}
       </div>
     </Sheet>
   );
@@ -460,6 +555,7 @@ function SlotSheet({
   topics,
   countOf,
   tone,
+  suffix,
   onClose,
 }: {
   assignmentId: string;
@@ -469,6 +565,8 @@ function SlotSheet({
   countOf: (topicId: string) => number;
   /** Subject stripe colour (same as the timetable cards). */
   tone: string;
+  /** Which subject this period belongs to (shown for a linked subject's period). */
+  suffix?: string;
   onClose: () => void;
 }) {
   const toast = useToast();
@@ -485,7 +583,7 @@ function SlotSheet({
     <Sheet
       open
       onOpenChange={(o) => !o && onClose()}
-      title={`${DAY[cell.dayOfWeek]} ${fmt(cell.date)} · คาบ ${cell.periodNo}`}
+      title={`${DAY[cell.dayOfWeek]} ${fmt(cell.date)} · คาบ ${cell.periodNo}${suffix ? ` · ${suffix}` : ""}`}
       bottomOnPhone
       closable
     >

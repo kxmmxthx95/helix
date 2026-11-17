@@ -189,7 +189,7 @@ export function slotStats(slots: PlanSlot[], totalSlots: number) {
 }
 
 /** Schedule periods of many assignments at once. */
-function useScheduleEntriesForAssignments(ids: string[]) {
+export function useScheduleEntriesForAssignments(ids: string[]) {
   return useQuery({
     queryKey: ["schedule_entries", "by_assignments", [...ids].sort()],
     enabled: ids.length > 0,

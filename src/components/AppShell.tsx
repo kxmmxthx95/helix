@@ -425,12 +425,32 @@ const TABS = [
   },
 ];
 
+// macOS-Settings-style tile: white glyph on a coloured rounded square, one colour per menu group.
+const SECTION_TONE: Record<string, string> = {
+  "": "bg-gradient-to-b from-sky-400 to-sky-600",
+  การสอนและห้องเรียน: "bg-gradient-to-b from-orange-400 to-orange-600",
+  การเงิน: "bg-gradient-to-b from-green-400 to-green-600",
+  งานวิชาการ: "bg-gradient-to-b from-blue-400 to-blue-600",
+  บริหารจัดการ: "bg-gradient-to-b from-slate-400 to-slate-600",
+  บุคลากร: "bg-gradient-to-b from-purple-400 to-purple-600",
+  สนับสนุน: "bg-gradient-to-b from-pink-400 to-pink-600",
+  สอบและแบบฝึกหัด: "bg-gradient-to-b from-indigo-400 to-indigo-600",
+};
+
+function NavIcon({ icon: Icon, section }: { icon: (p: { className?: string }) => React.JSX.Element; section: string }) {
+  return (
+    <span className={cn("grid size-7 shrink-0 place-items-center rounded-[30%] text-white shadow-sm ring-1 ring-inset ring-white/20", SECTION_TONE[section] ?? "bg-slate-500")}>
+      <Icon className="h-4 w-4" />
+    </span>
+  );
+}
+
 const SIDEBAR_KEY = "helix-sidebar-collapsed";
 
 const navDrawerLink = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "group font-ui tappable flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
-    isActive ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-foreground/5",
+    "group font-ui tappable flex min-h-10 items-center gap-3 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors",
+    isActive ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-foreground/5",
   );
 
 /** Bare top-level link (no group): looks like a section header, no icon. */
@@ -753,14 +773,14 @@ function AppShellInner() {
                     className={({ isActive }) =>
                       cn(
                         "group font-ui tappable flex items-center rounded-lg text-[13px] font-semibold transition-colors",
-                        collapsed ? "justify-center px-0 py-2.5" : "gap-3 px-2.5 py-2",
+                        collapsed ? "justify-center px-0 py-2" : "gap-2.5 px-2 py-1.5",
                         isActive
-                          ? "bg-card text-foreground shadow-[inset_0_1px_3px_rgb(0_0_0/0.12)]"
-                          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                          ? "bg-accent text-accent-foreground"
+                          : "text-foreground hover:bg-foreground/5",
                       )
                     }
                   >
-                    <Icon className="h-4 w-4 shrink-0" />
+                    <NavIcon icon={Icon} section={section} />
                     {!collapsed && <span className="truncate">{label}</span>}
                   </NavLink>
                 ))}
@@ -937,7 +957,7 @@ function AppShellInner() {
                           onClick={closeNav}
                           className={section ? navDrawerLink : navDrawerTopLink}
                         >
-                          {section && <Icon className="h-[18px] w-[18px] shrink-0" />}
+                          {section && <NavIcon icon={Icon} section={section} />}
                           <span className="truncate">{label}</span>
                         </NavLink>
                       ))}
