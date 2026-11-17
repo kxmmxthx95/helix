@@ -7,6 +7,7 @@ import {
   BookIcon,
   ChevronBack,
   ChevronForward,
+  LibraryIcon,
   ListIcon,
   PencilIcon,
   Plus,
@@ -49,7 +50,7 @@ import {
   useSubmitPracticeAttempt,
 } from "@/hooks/usePractice";
 import { useDepartments } from "@/hooks/useProfiles";
-import { usePlanOutline, usePlanSubjects } from "@/hooks/usePlan";
+import { usePlanOutline, usePlanSubjects, type PlanLessonNode } from "@/hooks/usePlan";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { GradeBadges, SubjectTile } from "@/routes/CurriculumMap";
@@ -143,13 +144,11 @@ function TeacherPractice({
   const [view, setView] = useState<"grid" | "list">("grid");
   const [subjectId, setSubjectId] = useState("");
   const [gradeId, setGradeId] = useState("");
-  const [lessonId, setLessonId] = useState("");
   const [topic, setTopic] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     setSubjectId("");
     setGradeId("");
-    setLessonId("");
     setTopic(null);
   }, [departmentId]);
 
@@ -160,15 +159,12 @@ function TeacherPractice({
         subject={subject}
         grades={grades}
         gradeId={gradeId}
-        lessonId={lessonId}
         topic={topic}
         setGradeId={setGradeId}
-        setLessonId={setLessonId}
         setTopic={setTopic}
         onExit={() => {
           setSubjectId("");
           setGradeId("");
-          setLessonId("");
         }}
       />
     );
@@ -314,20 +310,16 @@ function PlanOutline({
   subject,
   grades,
   gradeId,
-  lessonId,
   topic,
   setGradeId,
-  setLessonId,
   setTopic,
   onExit,
 }: {
   subject: { id: string; name: string };
   grades: GradeLevel[];
   gradeId: string;
-  lessonId: string;
   topic: { id: string; name: string } | null;
   setGradeId: (id: string) => void;
-  setLessonId: (id: string) => void;
   setTopic: (t: { id: string; name: string } | null) => void;
   onExit: () => void;
 }) {
@@ -341,86 +333,40 @@ function PlanOutline({
   }
 
   const gradeLessons = lessons.filter((l) => l.grade_level_id === activeGradeId);
-  const lesson = gradeLessons.find((l) => l.id === lessonId) ?? null;
-  if (!lesson) {
-    return (
-      <PlanPickTable
-        backLabel={subject.name}
-        onBack={onExit}
-        tabs={
-          sortedGrades.length > 1 && (
-            <div className="scrollbar-hidden flex w-full shrink-0 gap-0 overflow-x-auto border-b border-border" role="tablist">
-              {sortedGrades.map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeGradeId === g.id}
-                  onClick={() => setGradeId(g.id)}
-                  className={cn(
-                    "-mb-px inline-flex h-8 min-w-0 flex-1 items-center justify-center border-b-2 px-3 text-xs font-medium transition-colors",
-                    activeGradeId === g.id
-                      ? "border-foreground text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <span className="truncate">{gradeShortLabel(g.code)}</span>
-                </button>
-              ))}
-            </div>
-          )
-        }
-        columnLabel="บทเรียน"
-        rows={gradeLessons.map((l) => ({ id: l.id, name: l.name, hint: `${l.topics.length} หัวข้อ` }))}
-        onOpen={setLessonId}
-        emptyTitle="ยังไม่มีบทเรียนในผังการเรียน"
-      />
-    );
-  }
-  return (
-    <PlanPickTable
-      backLabel={lesson.name}
-      onBack={() => setLessonId("")}
-      columnLabel="หัวข้อ"
-      rows={lesson.topics}
-      onOpen={(id) => setTopic(lesson.topics.find((t) => t.id === id) ?? null)}
-      emptyTitle="ยังไม่มีหัวข้อในบทเรียนนี้"
-    />
-  );
-}
 
-/** One drill-down level (ชั้น / บทเรียน / หัวข้อ) — read-only list from ผังการเรียน; click a row to go deeper. */
-function PlanPickTable({
-  backLabel,
-  onBack,
-  tabs,
-  columnLabel,
-  rows,
-  onOpen,
-  emptyTitle,
-}: {
-  backLabel: string;
-  onBack: () => void;
-  /** Line tabs (e.g. ชั้น) shown under the back button. */
-  tabs?: React.ReactNode;
-  columnLabel: string;
-  rows: { id: string; name: string; hint?: string }[];
-  onOpen: (id: string) => void;
-  emptyTitle: string;
-}) {
   return (
     <div className="page-fill">
       <div className="toolbar shrink-0">
-        <Button size="sm" variant="ghost" onClick={onBack}>
-          <ChevronForward className="h-3 w-3 rotate-180" /> {backLabel}
+        <Button size="sm" variant="ghost" onClick={onExit}>
+          <ChevronForward className="h-3 w-3 rotate-180" /> {subject.name}
         </Button>
       </div>
-      {tabs}
+      {sortedGrades.length > 1 && (
+        <div className="scrollbar-hidden flex w-full shrink-0 gap-0 overflow-x-auto border-b border-border" role="tablist">
+          {sortedGrades.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              role="tab"
+              aria-selected={activeGradeId === g.id}
+              onClick={() => setGradeId(g.id)}
+              className={cn(
+                "-mb-px inline-flex h-8 min-w-0 flex-1 items-center justify-center border-b-2 px-3 text-xs font-medium transition-colors",
+                activeGradeId === g.id
+                  ? "border-foreground text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <span className="truncate">{gradeShortLabel(g.code)}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
-      {rows.length === 0 ? (
+      {gradeLessons.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
-            title={emptyTitle}
+            title="ยังไม่มีบทเรียนในผังการเรียน"
             description="เพิ่มได้ที่หน้าผังการเรียน (ฝ่ายวิชาการ)"
             action={
               <Link to="/curriculum-map" className="text-xs underline">
@@ -430,32 +376,77 @@ function PlanPickTable({
           />
         </div>
       ) : (
-        <div className="table-panel flex-1">
-          <div className="table-panel-scroll">
-            <table className="w-full min-w-[24rem] text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">{columnLabel}</th>
-                  <th className="px-3 py-2 font-medium" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr
-                    key={r.id}
-                    onClick={() => onOpen(r.id)}
-                    className="cursor-pointer border-t border-border hover:bg-muted"
-                  >
-                    <td className="px-3 py-3 font-medium">{r.name}</td>
-                    <td className="px-3 py-3 text-right text-muted-foreground">
-                      {r.hint}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="scrollbar-hidden -mx-2 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-2 pb-2">
+          {gradeLessons.map((l, i) => (
+            <PlanLessonCard key={l.id} lesson={l} index={i} onOpenTopic={setTopic} />
+          ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** One ผังการเรียน lesson as a collapsible card (read-only) — its topics open that topic's แบบฝึกหัด. */
+function PlanLessonCard({
+  lesson,
+  index,
+  onOpenTopic,
+}: {
+  lesson: PlanLessonNode;
+  index: number;
+  onOpenTopic: (t: { id: string; name: string }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl bg-card shadow-card">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-3 p-3 text-left"
+      >
+        <ChevronForward className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-bold text-accent">
+          {index + 1}
+        </span>
+        <LibraryIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-bold">{lesson.name}</div>
+          {lesson.tags.length > 0 && (
+            <ul className="mt-1 flex flex-wrap gap-1">
+              {lesson.tags.map(({ linkId, subject }) => (
+                <li
+                  key={linkId}
+                  title={subject.name_th}
+                  className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium uppercase text-accent"
+                >
+                  {subject.code}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <span className="shrink-0 text-[11px] text-muted-foreground">{lesson.topics.length} หัวข้อ</span>
+      </button>
+      {open && (
+        <ol className="flex flex-col border-t border-border px-3 py-2">
+          {lesson.topics.length === 0 && <li className="py-1 text-[11px] text-muted-foreground">ยังไม่มีหัวข้อ</li>}
+          {lesson.topics.map((t, i) => (
+            <li key={t.id}>
+              <button
+                type="button"
+                onClick={() => onOpenTopic({ id: t.id, name: t.name })}
+                className="flex w-full items-center gap-2 rounded-md px-1 py-2 text-left text-xs hover:bg-muted"
+              >
+                <span className="w-9 shrink-0 tabular-nums text-muted-foreground">
+                  {index + 1}.{i + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate">{t.name}</span>
+                <ChevronForward className="h-3 w-3 shrink-0 text-muted-foreground" />
+              </button>
+            </li>
+          ))}
+        </ol>
       )}
     </div>
   );
