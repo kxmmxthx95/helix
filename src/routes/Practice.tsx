@@ -627,7 +627,7 @@ function SetDetail({
             {avgScore != null && ` · เฉลี่ย ${avgScore} คะแนน`}
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setAddingQuestion(true)}>
+        <Button size="sm" onClick={() => setAddingQuestion(true)}>
           <Plus className="h-3 w-3" /> เพิ่มโจทย์
         </Button>
       </div>
