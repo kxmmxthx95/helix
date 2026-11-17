@@ -629,7 +629,8 @@ export function QuestionSheet({
         className="max-w-3xl"
         centered
       >
-        {QuestionFormFields(form)}
+        {/* Mounted only while open: a closed <dialog> keeps its children, and two always-mounted Plate editors seeded from the same EMPTY_PROMPT nodes corrupt Slate's node->path maps ("Unable to find the path for Slate node"). */}
+        {open && QuestionFormFields(form)}
       </Modal>
     );
 

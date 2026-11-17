@@ -645,6 +645,7 @@ function SetDetail({ set, onBack, autoAdd = false }: { set: PracticeSet; onBack:
 
       {me && (
         <QuestionSheet
+          key={editingQuestion?.id ?? "none"}
           open={!!editingQuestion}
           onOpenChange={(v) => !v && setEditingQuestion(null)}
           subjectId={set.subject_id}
