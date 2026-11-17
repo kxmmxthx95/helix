@@ -18,10 +18,10 @@ import { STATUS_LABEL } from "@/routes/Attendance";
 
 export const STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent", "leave"];
 export const SEGMENT_STYLE: Record<AttendanceStatus, string> = {
-  present: "bg-success/15 text-success ring-1 ring-inset ring-success/40",
-  late: "bg-warning/15 text-warning ring-1 ring-inset ring-warning/40",
-  absent: "bg-destructive/15 text-destructive ring-1 ring-inset ring-destructive/40",
-  leave: "bg-fill-strong text-foreground ring-1 ring-inset ring-border",
+  present: "bg-success/15 text-success",
+  late: "bg-warning/15 text-warning",
+  absent: "bg-destructive/15 text-destructive",
+  leave: "bg-fill-strong text-foreground",
 };
 
 /** Morning-assembly (เข้าแถว) check-in for the teacher's homeroom(s), today only. Same table the daily page writes. */

@@ -55,51 +55,36 @@ function DayList({ day, open, onPick }: { day: SheetDay; open: boolean; onPick: 
           {isToday ? `เช็คแล้ว ${takenCount}/${day.periods.length} คาบ` : `${day.periods.length} คาบ`}
         </span>
       </div>
-      <ul className="space-y-2.5">
+      <ul className="divide-y divide-border overflow-hidden rounded-xl bg-card">
         {day.periods.map((p) => {
           const [from = "", to = ""] = p.time.split("–");
           const started = !isToday || nowMin >= minutesOf(from);
           const current = isToday && started && nowMin < minutesOf(to);
           const done = taken.has(p.entryId);
+          const status = done ? null : !started ? "ยังไม่ถึงเวลา" : isToday ? (current ? "กำลังสอน · รอเช็คชื่อ" : "รอเช็คชื่อ") : null;
           return (
             <li key={p.entryId}>
               <button
                 type="button"
                 disabled={!started}
                 onClick={() => onPick(p.entryId)}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-2xl border bg-card p-4 text-left transition-colors hover:bg-muted active:bg-muted",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:hover:bg-card",
-                  current ? "border-accent" : "border-border",
-                )}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent disabled:cursor-not-allowed disabled:hover:bg-card"
               >
+                <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.hex }} />
                 <span className="min-w-0 flex-1">
-                  <span className="flex items-start gap-2">
-                    <span aria-hidden className="mt-[7px] h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: p.hex }} />
-                    <span className="min-w-0 break-words text-base font-semibold leading-snug text-foreground">{p.subjectName}</span>
+                  <span className="block break-words text-[15px] font-medium leading-snug text-foreground">{p.subjectName}</span>
+                  <span className="mt-0.5 block text-[13px] text-muted-foreground">
+                    {p.room} · คาบ {p.ordinal} · {p.time} · {p.subjectCode}
                   </span>
-                  <span className="mt-1 block pl-[18px] text-sm text-foreground/80">
-                    {p.room} · คาบ {p.ordinal}
-                  </span>
-                  <span className="block pl-[18px] text-[13px] text-muted-foreground">
-                    {p.time} · {p.subjectCode}
-                  </span>
-                  {done ? (
-                    <span className="ml-[18px] mt-2 inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
-                      <CheckmarkCircleIcon className="h-3.5 w-3.5" />
-                      เช็คแล้ว
-                    </span>
-                  ) : !started ? (
-                    <span className="ml-[18px] mt-2 inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      ยังไม่ถึงเวลา
-                    </span>
-                  ) : isToday ? (
-                    <span className="ml-[18px] mt-2 inline-flex rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent">
-                      {current ? "กำลังสอน · รอเช็คชื่อ" : "รอเช็คชื่อ"}
-                    </span>
-                  ) : null}
+                  {status && <span className={cn("mt-0.5 block text-[13px]", current ? "text-accent" : "text-muted-foreground")}>{status}</span>}
                 </span>
-                <ChevronForward className="h-4 w-4 shrink-0 text-muted-foreground" />
+                {done ? (
+                  <span role="img" aria-label="เช็คแล้ว" className="shrink-0 text-success">
+                    <CheckmarkCircleIcon className="h-5 w-5" />
+                  </span>
+                ) : (
+                  <ChevronForward className="h-4 w-4 shrink-0 text-muted-foreground" />
+                )}
               </button>
             </li>
           );
@@ -233,8 +218,8 @@ export function PeriodDaySheet({
           </div>
         )
       ) : (
-        <div className="space-y-3">
-          <p className="truncate text-sm font-semibold">
+        <div className="space-y-1">
+          <p className="truncate pb-2 text-sm font-semibold">
             {picked.subjectCode} {picked.subjectName}
           </p>
           {future && <p className="text-xs text-muted-foreground">ยังไม่ถึงวันนี้ — ดูรายชื่อได้ แต่เช็คชื่อล่วงหน้าไม่ได้</p>}
@@ -247,21 +232,21 @@ export function PeriodDaySheet({
           ) : roster.length === 0 ? (
             <EmptyState title="ไม่พบข้อมูล" description="ไม่มีนักเรียนกำลังศึกษาในห้องนี้" />
           ) : (
-            <ul className="space-y-2">
+            <ul className="divide-y divide-border">
               {roster.map((s) => {
                 const name = `${s.first_name} ${s.last_name}`;
                 const status = marks.get(s.id);
                 const locked = !!onLeave?.has(s.id); // server force-locks approved leave to 'leave' (migration 0037)
                 return (
-                  <li key={s.id} className="rounded-xl bg-secondary p-3">
+                  <li key={s.id} className="py-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <Avatar name={name} src={s.profile ? avatarUrl(s.profile) : null} className="h-10 w-10 text-xs" />
+                      <Avatar name={name} src={s.profile ? avatarUrl(s.profile) : null} className="h-10 w-10 border border-border text-xs" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-foreground">{name}</p>
                         <p className="truncate font-mono text-xs text-foreground/70">{s.student_code}</p>
                       </div>
                     </div>
-                    <div role="group" aria-label={`สถานะของ ${name}`} className="mt-2 grid grid-cols-4 gap-0.5 rounded-lg bg-card p-0.5 shadow-card">
+                    <div role="group" aria-label={`สถานะของ ${name}`} className="mt-2 grid grid-cols-4 gap-0.5 rounded-lg bg-muted p-0.5">
                       {STATUS_ORDER.map((st) => (
                         <button
                           key={st}
