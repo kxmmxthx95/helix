@@ -518,11 +518,14 @@ function Segmented<T extends string>({
   value,
   options,
   onChange,
+  activeClass,
 }: {
   label: string;
   value: T;
   options: [T, string][];
   onChange: (v: T) => void;
+  /** Selected-state classes per option; defaults to the neutral muted pill. */
+  activeClass?: Partial<Record<T, string>>;
 }) {
   return (
     <div role="radiogroup" aria-label={label} className="flex h-9 rounded-lg border border-border bg-card p-0.5">
@@ -535,7 +538,7 @@ function Segmented<T extends string>({
           onClick={() => onChange(v)}
           className={cn(
             "min-w-0 flex-1 truncate rounded-md px-3 text-xs font-medium transition-colors",
-            value === v ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground",
+            value === v ? (activeClass?.[v] ?? "bg-muted text-foreground") : "text-muted-foreground hover:text-foreground",
           )}
         >
           {text}
@@ -567,6 +570,11 @@ function QuestionFormFields(form: ReturnType<typeof useQuestionForm>) {
             value={form.difficulty}
             options={Object.entries(DIFFICULTY_LABEL) as [ExamQuestionDifficulty, string][]}
             onChange={form.setDifficulty}
+            activeClass={{
+              easy: "bg-success/15 text-success",
+              medium: "bg-accent/15 text-accent",
+              hard: "bg-destructive/15 text-destructive",
+            }}
           />
         </div>
       </div>
