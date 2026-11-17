@@ -273,31 +273,11 @@ function PlanOutline({
 }) {
   const { data: lessons = [] } = usePlanOutline(subject.id);
   const gradeIds = [...new Set(lessons.map((l) => l.grade_level_id))];
-  const gradeSkipped = gradeIds.length === 1;
-  const activeGradeId = gradeSkipped ? gradeIds[0] : gradeId;
-  const gradeLabel = (id: string) => {
-    const g = grades.find((x) => x.id === id);
-    return g ? gradeShortLabel(g.code) : "ชั้น";
-  };
+  const sortedGrades = grades.filter((g) => gradeIds.includes(g.id)).sort((a, b) => a.sort_order - b.sort_order);
+  const activeGradeId = sortedGrades.find((g) => g.id === gradeId)?.id ?? sortedGrades[0]?.id ?? "";
 
   if (topic) {
     return <TopicExercises topic={topic} onBack={() => setTopic(null)} />;
-  }
-
-  if (!activeGradeId && gradeIds.length > 1) {
-    return (
-      <PlanPickTable
-        backLabel={subject.name}
-        onBack={onExit}
-        columnLabel="ระดับชั้น"
-        rows={grades
-          .filter((g) => gradeIds.includes(g.id))
-          .sort((a, b) => a.sort_order - b.sort_order)
-          .map((g) => ({ id: g.id, name: gradeShortLabel(g.code) }))}
-        onOpen={setGradeId}
-        emptyTitle="ยังไม่มีระดับชั้น"
-      />
-    );
   }
 
   const gradeLessons = lessons.filter((l) => l.grade_level_id === activeGradeId);
@@ -305,8 +285,31 @@ function PlanOutline({
   if (!lesson) {
     return (
       <PlanPickTable
-        backLabel={gradeSkipped || !activeGradeId ? subject.name : gradeLabel(activeGradeId)}
-        onBack={gradeSkipped || !activeGradeId ? onExit : () => setGradeId("")}
+        backLabel={subject.name}
+        onBack={onExit}
+        tabs={
+          sortedGrades.length > 1 && (
+            <div className="scrollbar-hidden flex w-full shrink-0 gap-0 overflow-x-auto border-b border-border" role="tablist">
+              {sortedGrades.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeGradeId === g.id}
+                  onClick={() => setGradeId(g.id)}
+                  className={cn(
+                    "-mb-px inline-flex h-8 min-w-0 flex-1 items-center justify-center border-b-2 px-3 text-xs font-medium transition-colors",
+                    activeGradeId === g.id
+                      ? "border-foreground text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <span className="truncate">{gradeShortLabel(g.code)}</span>
+                </button>
+              ))}
+            </div>
+          )
+        }
         columnLabel="บทเรียน"
         rows={gradeLessons.map((l) => ({ id: l.id, name: l.name, hint: `${l.topics.length} หัวข้อ` }))}
         onOpen={setLessonId}
@@ -330,6 +333,7 @@ function PlanOutline({
 function PlanPickTable({
   backLabel,
   onBack,
+  tabs,
   columnLabel,
   rows,
   onOpen,
@@ -337,6 +341,8 @@ function PlanPickTable({
 }: {
   backLabel: string;
   onBack: () => void;
+  /** Line tabs (e.g. ชั้น) shown under the back button. */
+  tabs?: React.ReactNode;
   columnLabel: string;
   rows: { id: string; name: string; hint?: string }[];
   onOpen: (id: string) => void;
@@ -349,6 +355,7 @@ function PlanPickTable({
           <ChevronForward className="h-3 w-3 rotate-180" /> {backLabel}
         </Button>
       </div>
+      {tabs}
 
       {rows.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
