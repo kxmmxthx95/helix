@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import {
+  AppsIcon,
   BookIcon,
   ChevronBack,
   ChevronForward,
+  ListIcon,
   PencilIcon,
   Plus,
   Search,
@@ -138,6 +140,7 @@ function TeacherPractice({
   const { data: planSubjects = [] } = usePlanSubjects(departmentId || null);
   const { data: grades = [] } = useGradeLevels(departmentId || null);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<"grid" | "list">("grid");
   const [subjectId, setSubjectId] = useState("");
   const [gradeId, setGradeId] = useState("");
   const [lessonId, setLessonId] = useState("");
@@ -204,6 +207,23 @@ function TeacherPractice({
             aria-label="ค้นหา"
           />
         </div>
+        <div className="flex h-8 rounded-lg border border-border bg-card p-0.5">
+          {(["grid", "list"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-label={v === "grid" ? "มุมมองกริด" : "มุมมองรายการ"}
+              aria-pressed={view === v}
+              onClick={() => setView(v)}
+              className={cn(
+                "flex h-full w-8 items-center justify-center rounded-md",
+                view === v ? "bg-muted text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {v === "grid" ? <AppsIcon className="h-3.5 w-3.5" /> : <ListIcon className="h-3.5 w-3.5" />}
+            </button>
+          ))}
+        </div>
       </div>
 
       {!departmentId ? (
@@ -216,6 +236,46 @@ function TeacherPractice({
             title="ไม่พบรายวิชา"
             description={planSubjects.length === 0 ? "ยังไม่มีวิชาในผังการเรียน" : "ลองเปลี่ยนคำค้นหา"}
           />
+        </div>
+      ) : view === "list" ? (
+        <div className="table-panel rounded-none border-t border-border shadow-none">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[32rem] text-[13px]">
+              <thead className="text-left text-xs">
+                <tr>
+                  <th className="px-4 py-3">วิชา</th>
+                  <th className="px-4 py-3">ระดับชั้น</th>
+                  <th className="px-4 py-3 text-right">บท</th>
+                  <th className="px-4 py-3 text-right">หัวข้อ</th>
+                  <th className="w-10 px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((s) => (
+                  <tr
+                    key={s.id}
+                    onClick={() => setSubjectId(s.id)}
+                    className="h-14 cursor-pointer border-t border-border first:border-t-0 active:bg-muted"
+                  >
+                    <td className="max-w-xs px-4 py-2">
+                      <span className="flex items-center gap-3">
+                        <SubjectTile subject={s} size="sm" />
+                        <span className="truncate">{s.name}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <GradeBadges grades={gradeOf(s)} />
+                    </td>
+                    <td className="px-4 py-2 text-right">{s.lessonCount}</td>
+                    <td className="px-4 py-2 text-right">{s.topicCount}</td>
+                    <td className="px-4 py-2 text-muted-foreground">
+                      <ChevronForward className="h-3 w-3" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
