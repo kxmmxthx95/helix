@@ -728,14 +728,14 @@ function AppShellInner() {
       className={cn(
         "fixed inset-0 flex overflow-hidden overscroll-none max-lg:flex-col max-lg:gap-0 max-lg:p-0 lg:flex-row lg:p-2",
         // iPad/touch: full-bleed, no floating-card frame (p-2 strip showed as a bottom border)
-        "[@media(pointer:coarse)]:p-0 [@media(pointer:coarse)]:gap-0",
+        "[@media(pointer:coarse)]:p-0 [@media(pointer:coarse)]:gap-0 lg:[@media(pointer:coarse)]:pt-[env(safe-area-inset-top,0px)] lg:[@media(pointer:coarse)]:pb-[env(safe-area-inset-bottom,0px)]",
         collapsed ? "lg:gap-0" : "lg:gap-2",
       )}
     >
       <div className="absolute inset-0 z-0 bg-shell" aria-hidden />
 
       {/* Desktop sidebar toggle — fixed at header slot (p-2 + px-3) whether expanded or collapsed */}
-      <div className="pointer-events-none absolute left-3 top-4 z-20 hidden lg:block">
+      <div className="pointer-events-none absolute left-3 top-4 z-20 hidden lg:block [@media(pointer:coarse)]:top-[calc(1rem+env(safe-area-inset-top,0px))]">
         <div className="pointer-events-auto">{sidebarToggle}</div>
       </div>
 
