@@ -43,7 +43,7 @@ export function PlanWeekGrid(p: Props) {
 
   const cell = (day: number, no: number) => p.cells.find((c) => c.date === dateOf(day) && c.periodNo === no);
   const others = (day: number, no: number) =>
-    p.othersOnDate(dateOf(day)).filter((o) => o.periodNo === no).map((o) => <OtherCard key={o.id} other={o} onOpen={p.readOnly ? undefined : () => p.onOpenOther(o)} />);
+    p.othersOnDate(dateOf(day)).filter((o) => o.periodNo === no).map((o) => <OtherCard key={o.id} other={o} roomy onOpen={p.readOnly ? undefined : () => p.onOpenOther(o)} />);
   const card = (c: SlotCell) => {
     return (
       <PlanCard

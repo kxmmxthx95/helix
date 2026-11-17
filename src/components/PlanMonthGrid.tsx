@@ -86,7 +86,7 @@ export function placedTopics(topics: PlanTopicItem[], slot: PlanSlot | undefined
 /** A linked subject's own period (this subject does not meet then): shown read-only. */
 export type PlanOther = { id: string; assignmentId: string; date: string; periodNo: number; code: string; title: string; topics: PlanTopicItem[]; taught: boolean };
 
-export function OtherCard({ other, onOpen }: { other: PlanOther; onOpen?: () => void }) {
+export function OtherCard({ other, onOpen, roomy = false }: { other: PlanOther; onOpen?: () => void; roomy?: boolean }) {
   return (
     <button
       type="button"
@@ -95,6 +95,7 @@ export function OtherCard({ other, onOpen }: { other: PlanOther; onOpen?: () => 
       title={other.title}
       className={cn(
         "flex w-full flex-col gap-1 rounded-lg border border-accent/30 bg-accent/5 px-2 py-1.5 text-left text-xs leading-snug transition-colors",
+        roomy && "min-h-[4.25rem] justify-center rounded-xl px-3 py-2",
         onOpen && "hover:bg-accent/10",
       )}
     >
