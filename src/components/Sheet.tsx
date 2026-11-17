@@ -87,7 +87,7 @@ export function Sheet({
             ios
               ? "fixed inset-x-0 bottom-0 z-50 flex max-h-[94dvh] flex-col overflow-hidden rounded-t-[14px] bg-background text-foreground shadow-[0_-8px_30px_rgba(0,0,0,0.18)] outline-none"
               : cn(
-                  "drawer-float fixed inset-y-2 z-50 flex w-[calc(100%-1rem)] flex-col overflow-hidden rounded-2xl text-foreground outline-none",
+                  "drawer-float fixed top-[max(0.5rem,env(safe-area-inset-top,0px))] bottom-[max(0.5rem,env(safe-area-inset-bottom,0px))] z-50 flex w-[calc(100%-1rem)] flex-col overflow-hidden rounded-2xl text-foreground outline-none",
                   effectiveWide === "full" ? "" : effectiveWide ? "max-w-2xl" : "max-w-[24rem]",
                   side === "left" ? "left-2" : "right-2",
                 ),

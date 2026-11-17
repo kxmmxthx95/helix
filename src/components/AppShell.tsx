@@ -478,6 +478,15 @@ const pageVariants = {
  * Outer frame never scrolls — only the main pane does.
  */
 export function AppShell() {
+  // iOS paints the strip below the web view (home-indicator / window edge) with the body colour:
+  // match the shell so it blends with the sidebar instead of flashing white.
+  useEffect(() => {
+    const prev = document.body.style.backgroundColor;
+    document.body.style.backgroundColor = "hsl(var(--shell))";
+    return () => {
+      document.body.style.backgroundColor = prev;
+    };
+  }, []);
   return (
     <MobileHeaderProvider>
       <AppShellInner />
