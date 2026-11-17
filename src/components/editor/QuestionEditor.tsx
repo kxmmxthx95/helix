@@ -7,7 +7,6 @@ import { useRef, useState } from "react";
 import { BoldIcon, FormulaIcon, HighlightIcon, ImageIcon, ItalicIcon, ListIcon, UnderlineIcon } from "@/components/icons";
 import { useToast } from "@/components/Toast";
 import { Button } from "@/components/ui";
-import { cn } from "@/lib/utils";
 import { examQuestionPlugins } from "./plateConfig";
 import { FormulaDrawer } from "./FormulaDrawer";
 
@@ -41,14 +40,24 @@ export function QuestionEditor({
 
   return (
     <Plate editor={editor} onChange={({ value: next }) => onChange(next)}>
-      <Toolbar compact={compact} />
-      <PlateContent
-        className={cn(
-          "rounded-lg border border-input bg-background px-2.5 py-2 text-xs outline-none transition-colors focus-visible:border-ring",
-          compact ? "min-h-9" : "min-h-48",
-        )}
-        placeholder={placeholder}
-      />
+      {compact ? (
+        // One row: text box, then the formula/image buttons.
+        <div className="flex items-start gap-1">
+          <PlateContent
+            className="min-h-9 min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 py-2 text-xs outline-none transition-colors focus-visible:border-ring"
+            placeholder={placeholder}
+          />
+          <Toolbar compact />
+        </div>
+      ) : (
+        // Toolbar and text share one bordered box.
+        <div className="rounded-lg border border-input bg-background transition-colors focus-within:border-ring">
+          <div className="border-b border-border">
+            <Toolbar compact={false} />
+          </div>
+          <PlateContent className="min-h-40 px-3 py-2.5 text-sm outline-none" placeholder={placeholder} />
+        </div>
+      )}
     </Plate>
   );
 }
@@ -62,7 +71,7 @@ function Toolbar({ compact }: { compact: boolean }) {
   const listButton = useListToolbarButton(listState);
 
   return (
-    <div className="mb-1.5 flex flex-wrap items-center gap-0.5 p-1">
+    <div className="flex flex-wrap items-center gap-0.5 p-1">
       {!compact && (
         <>
           <Button size="icon" variant="ghost" aria-label="ตัวหนา" onMouseDown={(e) => e.preventDefault()} onClick={() => editor.tf.toggleMark("bold")}>

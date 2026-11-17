@@ -47,12 +47,6 @@ function emptyLabelJson(): Value {
   return [{ type: "p", children: [{ text: "" }] }];
 }
 
-const TYPE_LABEL: Record<ExamQuestionType, string> = {
-  multiple_choice: "ปรนัย (เลือกตอบ)",
-  true_false: "ถูก/ผิด",
-  short_answer: "เติมคำ",
-};
-
 const DIFFICULTY_LABEL: Record<ExamQuestionDifficulty, string> = {
   easy: "ง่าย",
   medium: "ปานกลาง",
@@ -512,42 +506,76 @@ function useQuestionForm({
   };
 }
 
+const TYPE_SHORT_LABEL: Record<ExamQuestionType, string> = {
+  multiple_choice: "ปรนัย",
+  true_false: "ถูก/ผิด",
+  short_answer: "เติมคำ",
+};
+
+/** Small pill-group picker — fixed handful of options, no dropdown needed. */
+function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: [T, string][];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className="flex h-9 rounded-lg border border-border bg-card p-0.5">
+      {options.map(([v, text]) => (
+        <button
+          key={v}
+          type="button"
+          role="radio"
+          aria-checked={value === v}
+          onClick={() => onChange(v)}
+          className={cn(
+            "min-w-0 flex-1 truncate rounded-md px-3 text-xs font-medium transition-colors",
+            value === v ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {text}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function QuestionFormFields(form: ReturnType<typeof useQuestionForm>) {
   return (
-    <div className="space-y-3">
-      {!form.isEdit && (
-        <Field label="ประเภทคำถาม">
-          <Select value={form.type} onChange={(e) => form.setType(e.target.value as ExamQuestionType)}>
-            {Object.entries(TYPE_LABEL).map(([v, label]) => (
-              <option key={v} value={v}>
-                {label}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      )}
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+        {!form.isEdit && (
+          <div className="min-w-[14rem] flex-1 space-y-1">
+            <span className="font-ui text-xs font-medium">ประเภท</span>
+            <Segmented
+              label="ประเภทคำถาม"
+              value={form.type}
+              options={Object.entries(TYPE_SHORT_LABEL) as [ExamQuestionType, string][]}
+              onChange={form.setType}
+            />
+          </div>
+        )}
+        <div className="min-w-[14rem] flex-1 space-y-1">
+          <span className="font-ui text-xs font-medium">ความยาก</span>
+          <Segmented
+            label="ความยาก"
+            value={form.difficulty}
+            options={Object.entries(DIFFICULTY_LABEL) as [ExamQuestionDifficulty, string][]}
+            onChange={form.setDifficulty}
+          />
+        </div>
+      </div>
+
       <div className="space-y-1">
         <span className="font-ui text-xs font-medium">โจทย์</span>
         <QuestionEditor value={form.prompt} onChange={form.setPrompt} ensureQuestionId={form.ensureQuestionId} />
       </div>
-      <div className="flex gap-3">
-        <div className="w-32 shrink-0">
-          <Field label="ความยาก">
-            <Select value={form.difficulty} onChange={(e) => form.setDifficulty(e.target.value as ExamQuestionDifficulty)}>
-              {Object.entries(DIFFICULTY_LABEL).map(([v, label]) => (
-                <option key={v} value={v}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </div>
-        <div className="min-w-0 flex-1">
-          <Field label="ชื่อเนื้อหา">
-            <Input value={form.topic} onChange={(e) => form.setTopic(e.target.value)} placeholder="เช่น สมการเชิงเส้น" />
-          </Field>
-        </div>
-      </div>
+
       {form.type === "short_answer" ? (
         <Field label="เฉลย (ไม่สนตัวพิมพ์เล็ก/ใหญ่)">
           <Input value={form.correctAnswer} onChange={(e) => form.setCorrectAnswer(e.target.value)} />
@@ -560,6 +588,10 @@ function QuestionFormFields(form: ReturnType<typeof useQuestionForm>) {
           ensureQuestionId={form.ensureQuestionId}
         />
       )}
+
+      <Field label="ชื่อเนื้อหา (ไม่บังคับ)">
+        <Input value={form.topic} onChange={(e) => form.setTopic(e.target.value)} placeholder="เช่น สมการเชิงเส้น" />
+      </Field>
     </div>
   );
 }
@@ -692,18 +724,26 @@ function ChoiceEditor({
     // contenteditable is a <div>, not an <input>) to the label's first nested
     // form control — every click into a choice's rich editor was jumping focus
     // to choice 0's radio. Same classes as Field, plain <div> instead.
-    <div className="block space-y-1">
-      <span className="font-ui text-xs font-medium">ตัวเลือก (เลือกตัวที่ถูกไว้ 1 ข้อ)</span>
+    <div className="block space-y-2">
+      <div className="flex items-baseline justify-between">
+        <span className="font-ui text-xs font-medium">ตัวเลือก</span>
+        <span className="text-[11px] text-muted-foreground">กดตัวอักษรเพื่อเลือกข้อที่ถูก</span>
+      </div>
       <div className="space-y-2">
         {choices.map((c, i) => (
           <div key={i} className="flex items-start gap-2">
-            <input
-              type="radio"
-              className="mt-3"
-              checked={c.is_correct}
-              onChange={() => onChange(choices.map((ch, j) => ({ ...ch, is_correct: j === i })))}
-              aria-label={`ตัวเลือกที่ถูก ${i + 1}`}
-            />
+            <button
+              type="button"
+              aria-pressed={c.is_correct}
+              aria-label={`ตั้งตัวเลือก ${String.fromCharCode(65 + i)} เป็นคำตอบที่ถูก`}
+              onClick={() => onChange(choices.map((ch, j) => ({ ...ch, is_correct: j === i })))}
+              className={cn(
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors",
+                c.is_correct ? "bg-success text-white" : "bg-muted text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {String.fromCharCode(65 + i)}
+            </button>
             <div className="min-w-0 flex-1">
               <QuestionEditor
                 compact
@@ -716,14 +756,13 @@ function ChoiceEditor({
                   )
                 }
                 ensureQuestionId={ensureQuestionId}
-                placeholder={`ตัวเลือกที่ ${i + 1}`}
+                placeholder={`ตัวเลือก ${String.fromCharCode(65 + i)}`}
               />
             </div>
             {choices.length > 2 && (
               <Button
                 size="icon"
                 variant="ghost"
-                className="mt-1"
                 aria-label="ลบตัวเลือก"
                 onClick={() => onChange(choices.filter((_, j) => j !== i))}
               >
@@ -734,7 +773,7 @@ function ChoiceEditor({
         ))}
         <Button
           size="sm"
-          variant="outline"
+          variant="ghost"
           onClick={() => onChange([...choices, { label: "", label_json: emptyLabelJson(), is_correct: false }])}
         >
           <Plus className="h-3 w-3" /> เพิ่มตัวเลือก
