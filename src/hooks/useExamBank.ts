@@ -84,7 +84,8 @@ export function useCreateExamQuestion() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (draft: {
-      subject_id: string;
+      subject_id: string | null;
+      plan_topic_id?: string | null;
       question_type: ExamQuestionType;
       prompt: string;
       prompt_json: PlateValue;

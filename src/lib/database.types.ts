@@ -728,7 +728,9 @@ export type ExamQuestionDifficulty = "easy" | "medium" | "hard";
 /** A bank question, owned by subject_id — any teacher teaching that subject can read/write it. See migration 0047. */
 export type ExamQuestion = {
   id: string;
-  subject_id: string;
+  /** Null for a question typed straight into a ผังการเรียน topic (plan_topic_id set). See migration 0174. */
+  subject_id: string | null;
+  plan_topic_id: string | null;
   question_type: ExamQuestionType;
   /** App-derived plaintext copy of prompt_json — index/preview use only (exam-bank table row, session-builder picker). */
   prompt: string;
@@ -998,7 +1000,8 @@ export type DocTaskFile = {
 /** A set of bank questions to practice — either curated by a teacher (visible to every classroom currently studying the subject) or a student's own self-serve random pull. Every PracticeAttempt points at one of these either way. */
 export type PracticeSet = {
   id: string;
-  subject_id: string;
+  /** Null for a set hung off a ผังการเรียน topic alone (topic_id set). See migration 0174. */
+  subject_id: string | null;
   created_by: string;
   is_teacher_curated: boolean;
   /** Required iff is_teacher_curated — see migration 0056's SubjectPicker -> lesson -> topic flow. Null on self-serve sets. */
@@ -1864,7 +1867,7 @@ export type Database = {
         changes: unknown;
         created_at: string;
       }>;
-      exam_questions: Table<ExamQuestion, InsertOf<ExamQuestion, "correct_answer" | "points" | "difficulty" | "topic">>;
+      exam_questions: Table<ExamQuestion, InsertOf<ExamQuestion, "subject_id" | "plan_topic_id" | "correct_answer" | "points" | "difficulty" | "topic">>;
       exam_question_choices: Table<ExamQuestionChoice, InsertOf<ExamQuestionChoice, "is_correct" | "position">>;
       exam_sessions: Table<
         ExamSession,
@@ -1926,7 +1929,7 @@ export type Database = {
       doc_files: Table<DocFile, InsertOf<DocFile, "description" | "topic_id" | "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
       doc_tasks: Table<DocTask, InsertOf<DocTask, "description" | "department_id" | "learning_area_id">>;
       doc_task_files: Table<DocTaskFile, InsertOf<DocTaskFile, "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
-      practice_sets: Table<PracticeSet, InsertOf<PracticeSet, "title" | "topic_id" | "topic" | "difficulty">>;
+      practice_sets: Table<PracticeSet, InsertOf<PracticeSet, "subject_id" | "title" | "topic_id" | "topic" | "difficulty">>;
       practice_set_questions: Table<PracticeSetQuestion, PracticeSetQuestion>;
       practice_attempts: Table<
         PracticeAttempt,

@@ -321,7 +321,7 @@ function SubjectList({
   );
 }
 
-function GradeBadges({ grades }: { grades: GradeLevel[] }) {
+export function GradeBadges({ grades }: { grades: GradeLevel[] }) {
   if (grades.length === 0) return <span className="text-[11px] text-muted-foreground">ยังไม่มีเนื้อหา</span>;
   return (
     <span className="flex flex-wrap gap-1">
@@ -1545,7 +1545,7 @@ function SubjectTagPicker({
   );
 }
 
-function SubjectTile({ subject, size = "md" }: { subject: { color: string | null; icon: string | null }; size?: "sm" | "md" }) {
+export function SubjectTile({ subject, size = "md" }: { subject: { color: string | null; icon: string | null }; size?: "sm" | "md" }) {
   const Icon = planIconFor(subject.icon);
   const sm = size === "sm";
   return (

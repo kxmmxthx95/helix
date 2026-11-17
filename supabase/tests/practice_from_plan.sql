@@ -28,3 +28,27 @@ begin
   end;
 end $$;
 rollback;
+
+-- 0174: topic-only set + question (no subject), one curated set per topic.
+begin;
+do $$
+declare
+  v_topic uuid; v_user uuid; v_set uuid; v_q uuid;
+begin
+  select pt.id into strict v_topic from plan_topics pt limit 1;
+  select id into strict v_user from profiles limit 1;
+  insert into practice_sets (created_by, topic_id) values (v_user, v_topic) returning id into v_set;
+  insert into exam_questions (plan_topic_id, question_type, prompt, created_by)
+    values (v_topic, 'multiple_choice', 'x', v_user) returning id into v_q;
+  begin
+    insert into practice_sets (created_by, topic_id) values (v_user, v_topic);
+    raise exception 'second curated set for a topic was accepted';
+  exception when unique_violation then null;
+  end;
+  begin
+    insert into exam_questions (question_type, prompt, created_by) values ('multiple_choice', 'x', v_user);
+    raise exception 'question without subject or topic was accepted';
+  exception when check_violation then null;
+  end;
+end $$;
+rollback;

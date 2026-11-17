@@ -6,6 +6,7 @@ import { EMPTY_PROMPT } from "@/components/editor/plateConfig";
 import { QuestionEditor } from "@/components/editor/QuestionEditor";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { ChevronForward, DocumentTextIcon, HighlightIcon, PencilIcon, Plus, X } from "@/components/icons";
+import { Modal } from "@/components/Modal";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Select, Skeleton } from "@/components/ui";
@@ -321,12 +322,15 @@ export function ExamBank() {
 
 function useQuestionForm({
   subjectId,
+  planTopicId = null,
   teacherId,
   question,
   onSaved,
   defaultTopic = "",
 }: {
-  subjectId: string;
+  subjectId: string | null;
+  /** Question belongs to a ผังการเรียน topic instead of a catalog subject (0174). */
+  planTopicId?: string | null;
   teacherId: string;
   question: ExamQuestionWithChoices | null;
   onSaved: (id: string) => void;
@@ -411,6 +415,7 @@ function useQuestionForm({
       create.mutate(
         {
           subject_id: subjectId,
+          plan_topic_id: planTopicId,
           question_type: type,
           prompt: promptText,
           prompt_json: prompt,
@@ -461,6 +466,7 @@ function useQuestionForm({
       draftInsert.current = create
         .mutateAsync({
           subject_id: subjectId,
+          plan_topic_id: planTopicId,
           question_type: type,
           prompt: "",
           prompt_json: EMPTY_PROMPT,
@@ -574,6 +580,8 @@ export function QuestionSheet({
   open,
   onOpenChange,
   subjectId,
+  planTopicId,
+  modal,
   teacherId,
   question,
   onSaved,
@@ -582,7 +590,10 @@ export function QuestionSheet({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  subjectId: string;
+  subjectId: string | null;
+  planTopicId?: string | null;
+  /** Centered pop-up (Modal) instead of the side drawer. */
+  modal?: boolean;
   teacherId: string;
   question: ExamQuestionWithChoices | null;
   onSaved?: (id: string) => void;
@@ -593,6 +604,7 @@ export function QuestionSheet({
 }) {
   const form = useQuestionForm({
     subjectId,
+    planTopicId,
     teacherId,
     question,
     defaultTopic,
@@ -601,6 +613,25 @@ export function QuestionSheet({
       onSaved?.(id);
     },
   });
+
+  const saveButton = (
+    <Button className="w-full" onClick={form.save} disabled={!form.canSave || form.pending}>
+      บันทึก
+    </Button>
+  );
+  if (modal)
+    return (
+      <Modal
+        open={open}
+        onOpenChange={onOpenChange}
+        title={form.isEdit ? "แก้ไขแบบฝึกหัด" : "เพิ่มแบบฝึกหัด"}
+        footer={saveButton}
+        className="max-w-3xl"
+        centered
+      >
+        {QuestionFormFields(form)}
+      </Modal>
+    );
 
   return (
     <Sheet

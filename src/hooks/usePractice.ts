@@ -13,67 +13,46 @@ import { supabase } from "@/lib/supabase";
 // bank. Separate from สอบออนไลน์ (useExams.ts). See migration 0053.
 
 // ------------------------------------------------------ topics (from ผังการเรียน)
-// วิชา -> ชั้น -> บทเรียน -> หัวข้อ: read-only view of the plan (0088); only
-// ฝ่ายวิชาการ edits it, on the ผังการเรียน page. See migration 0173.
+// หัวข้อจากผังการเรียน (0088): only ฝ่ายวิชาการ edits it, on the ผังการเรียน page. See migrations 0173/0174.
 
-export type PracticeLessonItem = {
-  id: string;
-  name: string;
-  gradeLevelId: string;
-  topics: { id: string; name: string }[];
-};
-
-/** Plan lessons (all grades, topics nested) that fit a catalog subject — name-prefix of the plan subject or tagged (plan_lesson_subjects); same rule as usePlanTopics / plan_topic_fits_subject. */
-export function usePracticePlanLessons(subject: { id: string; name_th: string; department_id: string } | null) {
+/** The one teacher-curated set of a ผังการเรียน topic (0174), or null before the first add. */
+export function useTopicPracticeSet(topicId: string | null) {
   return useQuery({
-    queryKey: ["plan", "practice_lessons", subject?.id],
-    enabled: !!subject,
-    queryFn: async (): Promise<PracticeLessonItem[]> => {
-      const cols = "id,name,sort_order,grade_level_id,grade_levels!inner(department_id,sort_order),plan_topics(id,name,sort_order)";
-      const { data: subs, error: e1 } = await supabase.from("plan_subjects").select("id,name").eq("department_id", subject!.department_id);
-      if (e1) throw e1;
-      const matched = subs.filter((s) => subject!.name_th.trim().startsWith(s.name.trim()));
-      const [byName, tagged] = await Promise.all([
-        matched.length
-          ? supabase.from("plan_lessons").select(cols).in("subject_id", matched.map((s) => s.id)).eq("grade_levels.department_id", subject!.department_id)
-          : Promise.resolve({ data: [], error: null }),
-        supabase.from("plan_lesson_subjects").select(`plan_lessons!inner(${cols})`).eq("subject_id", subject!.id),
-      ]);
-      if (byName.error) throw byName.error;
-      if (tagged.error) throw tagged.error;
-      type Row = {
-        id: string;
-        name: string;
-        sort_order: number;
-        grade_level_id: string;
-        grade_levels: { sort_order: number };
-        plan_topics: { id: string; name: string; sort_order: number }[];
-      };
-      const rows = [
-        ...((byName.data ?? []) as unknown as Row[]),
-        ...(tagged.data as unknown as { plan_lessons: Row }[]).map((r) => r.plan_lessons),
-      ];
-      return [...new Map(rows.map((l) => [l.id, l])).values()]
-        .sort((a, b) => a.grade_levels.sort_order - b.grade_levels.sort_order || a.sort_order - b.sort_order)
-        .map((l) => ({
-          id: l.id,
-          name: l.name,
-          gradeLevelId: l.grade_level_id,
-          topics: [...l.plan_topics].sort((a, b) => a.sort_order - b.sort_order).map(({ id, name }) => ({ id, name })),
-        }));
+    queryKey: ["practice_sets", "by_topic", topicId],
+    enabled: !!topicId,
+    queryFn: async (): Promise<PracticeSet | null> => {
+      const { data, error } = await supabase
+        .from("practice_sets")
+        .select("*")
+        .eq("topic_id", topicId!)
+        .eq("is_teacher_curated", true)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
     },
   });
 }
 
-/** Topics by id — resolves a practice_set's displayed name (its topic's name) without a per-set query. */
+/** Topics by id — resolves a practice_set's displayed name (its topic's name) and its ผังการเรียน subject (for grouping topic-only sets) without a per-set query. */
+export type PracticeTopicInfo = { id: string; name: string; planSubjectId: string; planSubjectName: string };
+
 export function usePracticeTopicsByIds(topicIds: string[]) {
   return useQuery({
     queryKey: ["plan", "topics_by_ids", topicIds],
     enabled: topicIds.length > 0,
-    queryFn: async (): Promise<{ id: string; name: string }[]> => {
-      const { data, error } = await supabase.from("plan_topics").select("id,name").in("id", topicIds);
+    queryFn: async (): Promise<PracticeTopicInfo[]> => {
+      const { data, error } = await supabase
+        .from("plan_topics")
+        .select("id,name,plan_lessons(subject_id,plan_subjects(name))")
+        .in("id", topicIds);
       if (error) throw error;
-      return data;
+      type Row = { id: string; name: string; plan_lessons: { subject_id: string; plan_subjects: { name: string } | null } | null };
+      return (data as unknown as Row[]).map((t) => ({
+        id: t.id,
+        name: t.name,
+        planSubjectId: t.plan_lessons?.subject_id ?? "",
+        planSubjectName: t.plan_lessons?.plan_subjects?.name ?? "—",
+      }));
     },
   });
 }
@@ -202,7 +181,7 @@ export function usePracticeAttemptCount(setId: string | null) {
 export function useCreatePracticeSet() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (draft: { subject_id: string; created_by: string; topic_id: string; title?: string | null }) => {
+    mutationFn: async (draft: { subject_id: string | null; created_by: string; topic_id: string; title?: string | null }) => {
       const { data: inserted, error } = await supabase
         .from("practice_sets")
         .insert({ ...draft, is_teacher_curated: true })
@@ -288,10 +267,11 @@ export function useAvailablePracticeSets(subjectIds: string[]) {
     queryKey: ["practice_sets", "available", subjectIds],
     enabled: subjectIds.length > 0,
     queryFn: async (): Promise<PracticeSet[]> => {
+      // subject_id null = topic-only set (0174); RLS narrows those to the student's grade.
       const { data, error } = await supabase
         .from("practice_sets")
         .select("*")
-        .in("subject_id", subjectIds)
+        .or(`subject_id.in.(${subjectIds.join(",")}),subject_id.is.null`)
         .eq("is_teacher_curated", true)
         .order("created_at", { ascending: false });
       if (error) throw error;
