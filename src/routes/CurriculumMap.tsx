@@ -364,7 +364,7 @@ function SubjectPlan({
   }
 
   return (
-    <div className="scrollbar-hidden flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
+    <div className="scrollbar-hidden -mx-2 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-2 pb-2">
       <div>
         <Button className="active:scale-100" size="sm" variant="ghost" onClick={onBack}>
           <ChevronForward className="h-3 w-3 rotate-180" /> รายวิชาทั้งหมด
