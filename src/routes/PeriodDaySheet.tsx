@@ -31,6 +31,17 @@ export type SheetDay = { date: string; label: string; periods: DayPeriod[] };
 const thaiDate = (iso: string, opts: Intl.DateTimeFormatOptions) =>
   new Intl.DateTimeFormat("th-TH", { ...opts, timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
 
+// Thai weekday colours, Sunday first.
+const DAY_TONE = [
+  "bg-red-500/15 text-red-700 dark:text-red-300",
+  "bg-yellow-500/20 text-yellow-800 dark:text-yellow-300",
+  "bg-pink-500/15 text-pink-700 dark:text-pink-300",
+  "bg-green-500/15 text-green-700 dark:text-green-300",
+  "bg-orange-500/15 text-orange-700 dark:text-orange-300",
+  "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+  "bg-purple-500/15 text-purple-700 dark:text-purple-300",
+];
+
 const minutesOf = (hhmm: string) => {
   const [h = 0, m = 0] = hhmm.split(":").map(Number);
   return h * 60 + m;
@@ -47,11 +58,11 @@ function DayList({ day, open, onPick }: { day: SheetDay; open: boolean; onPick: 
       <div className="mb-2 flex items-baseline justify-between gap-3 px-1">
         <h3 className="min-w-0 text-[15px] font-semibold text-foreground">
           {day.label}
-          <span className="ml-2 text-[13px] font-normal text-muted-foreground">
-            {thaiDate(day.date, { weekday: "short", day: "numeric", month: "short" })}
+          <span className={cn("ml-2 rounded-full px-2 py-0.5 text-[13px] font-medium", DAY_TONE[new Date(`${day.date}T00:00:00Z`).getUTCDay()])}>
+            {thaiDate(day.date, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
           </span>
         </h3>
-        <span className="shrink-0 text-xs text-muted-foreground">
+        <span className={cn("shrink-0 text-xs", !isToday ? "text-muted-foreground" : takenCount === day.periods.length ? "text-success" : "text-destructive")}>
           {isToday ? `เช็คแล้ว ${takenCount}/${day.periods.length} คาบ` : `${day.periods.length} คาบ`}
         </span>
       </div>
@@ -68,15 +79,24 @@ function DayList({ day, open, onPick }: { day: SheetDay; open: boolean; onPick: 
                 type="button"
                 disabled={!started}
                 onClick={() => onPick(p.entryId)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent disabled:cursor-not-allowed disabled:hover:bg-card"
+                className="relative flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent disabled:cursor-not-allowed disabled:hover:bg-card"
               >
-                <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.hex }} />
+                <span aria-hidden className="absolute inset-y-3 left-0 w-1 rounded-r-full" style={{ backgroundColor: p.hex }} />
                 <span className="min-w-0 flex-1">
                   <span className="block break-words text-[15px] font-medium leading-snug text-foreground">{p.subjectName}</span>
-                  <span className="mt-0.5 block text-[13px] text-muted-foreground">
-                    {p.room} · คาบ {p.ordinal} · {p.time} · {p.subjectCode}
+                  <span className="mt-1.5 flex flex-col items-start gap-1">
+                    <span
+                      style={{ "--tint": p.hex } as React.CSSProperties}
+                      className="rounded-md border border-[var(--tint)] bg-card px-2 py-0.5 text-xs font-medium text-[color-mix(in_srgb,var(--tint)_55%,hsl(var(--foreground)))]"
+                    >
+                      {p.subjectCode}
+                    </span>
+                    <span className={cn("rounded-md border border-current bg-card px-2 py-0.5 text-xs font-medium", levelTone(p.room).replace(/bg-\S+/g, ""))}>{p.room}</span>
+                    <span className="rounded-md border border-accent bg-card px-2 py-0.5 text-xs font-medium text-accent">
+                      คาบ {p.ordinal} · {p.time}
+                    </span>
                   </span>
-                  {status && <span className={cn("mt-0.5 block text-[13px]", current ? "text-accent" : "text-muted-foreground")}>{status}</span>}
+                  {status && <span className={cn("mt-1.5 block text-[13px]", current ? "text-accent" : "text-muted-foreground")}>{status}</span>}
                 </span>
                 {done ? (
                   <span role="img" aria-label="เช็คแล้ว" className="shrink-0 text-success">
