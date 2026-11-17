@@ -943,19 +943,19 @@ function EventSheet({
           ))}
           {draft.students_attend && (
             <div className="flex items-center justify-between gap-4 text-sm leading-5">
-              <span>แทนคาบเรียน (นักเรียนมา แต่ไม่มีเรียนในช่วงนี้)</span>
+              <span>งดสอนตามปกติ (นักเรียนมา แต่ไม่มีคาบเรียนในช่วงนี้)</span>
               <Switch
                 size="sm"
                 checked={draft.replaces_classes}
                 onChange={(on) => setDraft({ ...draft, replaces_classes: on })}
-                label="แทนคาบเรียน"
+                label="งดสอนตามปกติ"
               />
             </div>
           )}
         </FormSection>
 
         {windowed && (
-          <FormSection title="ช่วงเวลาที่แทนคาบ (ว่าง = ทั้งวัน)">
+          <FormSection title="ช่วงเวลาที่งดสอน (ว่าง = ทั้งวัน)">
             <Field label="เวลาเริ่ม">
               <Input
                 type="time"
