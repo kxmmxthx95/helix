@@ -5,129 +5,76 @@ import type {
   ExamQuestionDifficulty,
   PracticeAttempt,
   PracticeAttemptAnswer,
-  PracticeLesson,
   PracticeSet,
-  PracticeTopic,
 } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
 // แบบฝึกหัด — ungraded, retry-anytime practice against the exam_questions
 // bank. Separate from สอบออนไลน์ (useExams.ts). See migration 0053.
 
-// ------------------------------------------------------ lessons/topics catalog
-// วิชา -> บทเรียนหลัก -> เนื้อหาย่อย — the create-set flow's picker chain.
-// See migration 0056.
+// ------------------------------------------------------ topics (from ผังการเรียน)
+// วิชา -> ชั้น -> บทเรียน -> หัวข้อ: read-only view of the plan (0088); only
+// ฝ่ายวิชาการ edits it, on the ผังการเรียน page. See migration 0173.
 
-export function usePracticeLessons(subjectId: string | null) {
+export type PracticeLessonItem = {
+  id: string;
+  name: string;
+  gradeLevelId: string;
+  topics: { id: string; name: string }[];
+};
+
+/** Plan lessons (all grades, topics nested) that fit a catalog subject — name-prefix of the plan subject or tagged (plan_lesson_subjects); same rule as usePlanTopics / plan_topic_fits_subject. */
+export function usePracticePlanLessons(subject: { id: string; name_th: string; department_id: string } | null) {
   return useQuery({
-    queryKey: ["practice_lessons", subjectId],
-    enabled: !!subjectId,
-    queryFn: async (): Promise<PracticeLesson[]> => {
-      const { data, error } = await supabase
-        .from("practice_lessons")
-        .select("*")
-        .eq("subject_id", subjectId!)
-        .order("sort_order");
-      if (error) throw error;
-      return data;
+    queryKey: ["plan", "practice_lessons", subject?.id],
+    enabled: !!subject,
+    queryFn: async (): Promise<PracticeLessonItem[]> => {
+      const cols = "id,name,sort_order,grade_level_id,grade_levels!inner(department_id,sort_order),plan_topics(id,name,sort_order)";
+      const { data: subs, error: e1 } = await supabase.from("plan_subjects").select("id,name").eq("department_id", subject!.department_id);
+      if (e1) throw e1;
+      const matched = subs.filter((s) => subject!.name_th.trim().startsWith(s.name.trim()));
+      const [byName, tagged] = await Promise.all([
+        matched.length
+          ? supabase.from("plan_lessons").select(cols).in("subject_id", matched.map((s) => s.id)).eq("grade_levels.department_id", subject!.department_id)
+          : Promise.resolve({ data: [], error: null }),
+        supabase.from("plan_lesson_subjects").select(`plan_lessons!inner(${cols})`).eq("subject_id", subject!.id),
+      ]);
+      if (byName.error) throw byName.error;
+      if (tagged.error) throw tagged.error;
+      type Row = {
+        id: string;
+        name: string;
+        sort_order: number;
+        grade_level_id: string;
+        grade_levels: { sort_order: number };
+        plan_topics: { id: string; name: string; sort_order: number }[];
+      };
+      const rows = [
+        ...((byName.data ?? []) as unknown as Row[]),
+        ...(tagged.data as unknown as { plan_lessons: Row }[]).map((r) => r.plan_lessons),
+      ];
+      return [...new Map(rows.map((l) => [l.id, l])).values()]
+        .sort((a, b) => a.grade_levels.sort_order - b.grade_levels.sort_order || a.sort_order - b.sort_order)
+        .map((l) => ({
+          id: l.id,
+          name: l.name,
+          gradeLevelId: l.grade_level_id,
+          topics: [...l.plan_topics].sort((a, b) => a.sort_order - b.sort_order).map(({ id, name }) => ({ id, name })),
+        }));
     },
   });
 }
 
-export function useCreatePracticeLesson() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (draft: { subject_id: string; name: string; sort_order?: number }): Promise<PracticeLesson> => {
-      const { data, error } = await supabase.from("practice_lessons").insert(draft).select().single();
-      if (error) throw error;
-      return data;
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_lessons"] }),
-  });
-}
-
-export function useUpdatePracticeLesson() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, ...patch }: { id: string; name?: string; sort_order?: number }) => {
-      const { error } = await supabase.from("practice_lessons").update(patch).eq("id", id);
-      if (error) throw error;
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_lessons"] }),
-  });
-}
-
-export function useDeletePracticeLesson() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("practice_lessons").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_lessons"] }),
-  });
-}
-
-export function usePracticeTopics(lessonId: string | null) {
-  return useQuery({
-    queryKey: ["practice_topics", lessonId],
-    enabled: !!lessonId,
-    queryFn: async (): Promise<PracticeTopic[]> => {
-      const { data, error } = await supabase
-        .from("practice_topics")
-        .select("*")
-        .eq("lesson_id", lessonId!)
-        .order("sort_order");
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
-/** Topics by id — used to resolve a practice_set's displayed name (its topic's name) in the sets list/detail without a per-set query. */
+/** Topics by id — resolves a practice_set's displayed name (its topic's name) without a per-set query. */
 export function usePracticeTopicsByIds(topicIds: string[]) {
   return useQuery({
-    queryKey: ["practice_topics", "by_ids", topicIds],
+    queryKey: ["plan", "topics_by_ids", topicIds],
     enabled: topicIds.length > 0,
-    queryFn: async (): Promise<PracticeTopic[]> => {
-      const { data, error } = await supabase.from("practice_topics").select("*").in("id", topicIds);
+    queryFn: async (): Promise<{ id: string; name: string }[]> => {
+      const { data, error } = await supabase.from("plan_topics").select("id,name").in("id", topicIds);
       if (error) throw error;
       return data;
     },
-  });
-}
-
-export function useCreatePracticeTopic() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (draft: { lesson_id: string; name: string; sort_order?: number }): Promise<PracticeTopic> => {
-      const { data, error } = await supabase.from("practice_topics").insert(draft).select().single();
-      if (error) throw error;
-      return data;
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_topics"] }),
-  });
-}
-
-export function useUpdatePracticeTopic() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, ...patch }: { id: string; name?: string; sort_order?: number }) => {
-      const { error } = await supabase.from("practice_topics").update(patch).eq("id", id);
-      if (error) throw error;
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_topics"] }),
-  });
-}
-
-export function useDeletePracticeTopic() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("practice_topics").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["practice_topics"] }),
   });
 }
 
@@ -251,7 +198,7 @@ export function usePracticeAttemptCount(setId: string | null) {
   });
 }
 
-/** Creates an empty teacher-curated set against a topic (วิชา -> บทเรียนหลัก -> เนื้อหาย่อย — an optional title distinguishes multiple sets under the same topic; falls back to the topic's name when blank) — questions get added afterward in the set's own detail view, same two-step flow as exam_sessions (useCreateExamSession creates the shell, useSetSessionQuestions fills it in). */
+/** Creates an empty teacher-curated set against a topic (วิชา -> ชั้น -> บทเรียน -> หัวข้อ จากผังการเรียน — an optional title distinguishes multiple sets under the same topic; falls back to the topic's name when blank) — questions get added afterward in the set's own detail view, same two-step flow as exam_sessions (useCreateExamSession creates the shell, useSetSessionQuestions fills it in). */
 export function useCreatePracticeSet() {
   const qc = useQueryClient();
   return useMutation({

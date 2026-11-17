@@ -879,26 +879,6 @@ export type ExamAttemptEvent = {
 // แบบฝึกหัด — ungraded, retry-anytime practice, separate from ข้อสอบ above.
 // Reuses the exam_questions bank as its question source. See migration 0053.
 
-/** บทเรียนหลัก — top level of the practice catalog under a subject. See migration 0056. */
-export type PracticeLesson = {
-  id: string;
-  subject_id: string;
-  name: string;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-};
-
-/** เนื้อหาย่อย — one topic under a practice_lessons row; a teacher-curated PracticeSet always points at one of these. See migration 0056. */
-export type PracticeTopic = {
-  id: string;
-  lesson_id: string;
-  name: string;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-};
-
 /** เอกสาร — บทเรียนหลัก under (subject, grade level). Own catalog, separate from practice_lessons. See migration 0071. */
 export type DocLesson = {
   id: string;
@@ -1946,8 +1926,6 @@ export type Database = {
       doc_files: Table<DocFile, InsertOf<DocFile, "description" | "topic_id" | "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
       doc_tasks: Table<DocTask, InsertOf<DocTask, "description" | "department_id" | "learning_area_id">>;
       doc_task_files: Table<DocTaskFile, InsertOf<DocTaskFile, "review_status" | "review_note" | "reviewed_by" | "reviewed_at">>;
-      practice_lessons: Table<PracticeLesson, InsertOf<PracticeLesson, "sort_order" | "created_at" | "updated_at">>;
-      practice_topics: Table<PracticeTopic, InsertOf<PracticeTopic, "sort_order" | "created_at" | "updated_at">>;
       practice_sets: Table<PracticeSet, InsertOf<PracticeSet, "title" | "topic_id" | "topic" | "difficulty">>;
       practice_set_questions: Table<PracticeSetQuestion, PracticeSetQuestion>;
       practice_attempts: Table<

@@ -67,7 +67,11 @@ function ShowMore({ shown, total, onMore }: { shown: number; total: number; onMo
   );
 }
 const errorText = (err: unknown, fallback: string) =>
-  (err as { code?: string })?.code === DUPLICATE ? "มีชื่อนี้อยู่แล้ว" : fallback;
+  (err as { code?: string })?.code === DUPLICATE
+    ? "มีชื่อนี้อยู่แล้ว"
+    : err instanceof Error && err.message.startsWith("ลบไม่ได้") // practice_sets restrict, see usePlan useWrite
+      ? err.message
+      : fallback;
 
 export function CurriculumMap() {
   const { profile: me } = useAuth();
@@ -355,7 +359,7 @@ function SubjectPlan({
     if (!confirm(`ลบวิชา "${subject.name}"?${extra}`)) return;
     remove.mutate(subject.id, {
       onSuccess: onBack,
-      onError: () => toast("ลบไม่สำเร็จ", "error"),
+      onError: (err) => toast(errorText(err, "ลบไม่สำเร็จ"), "error"),
     });
   }
 
@@ -677,7 +681,7 @@ function LessonCard({
   function deleteLesson() {
     const extra = lesson.topics.length ? ` หัวข้อ ${lesson.topics.length} หัวข้อในบทนี้จะถูกลบด้วย` : "";
     if (!confirm(`ลบบทเรียน "${lesson.name}"?${extra}`)) return;
-    removeLesson.mutate(lesson.id, { onError: fail("ลบไม่สำเร็จ") });
+    removeLesson.mutate(lesson.id, { onError: (err) => toast(errorText(err, "ลบไม่สำเร็จ"), "error") });
   }
 
   function dropOn(targetId: string) {
@@ -854,7 +858,7 @@ function LessonCard({
               mayEdit={mayEdit}
               onRename={(name) => renameTopic.mutate({ id: t.id, name })}
               onDelete={() => {
-                if (confirm(`ลบหัวข้อ "${t.name}"?`)) removeTopic.mutate(t.id, { onError: fail("ลบไม่สำเร็จ") });
+                if (confirm(`ลบหัวข้อ "${t.name}"?`)) removeTopic.mutate(t.id, { onError: (err) => toast(errorText(err, "ลบไม่สำเร็จ"), "error") });
               }}
               deleting={removeTopic.isPending}
               dragging={dragId === t.id}

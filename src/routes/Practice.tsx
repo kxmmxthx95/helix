@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import {
@@ -32,30 +33,23 @@ import {
 import { useMyCurrentClassroom } from "@/hooks/useExams";
 import {
   useAvailablePracticeSets,
-  useCreatePracticeLesson,
   useCreatePracticeSet,
-  useCreatePracticeTopic,
   useCreateSelfServePracticeSet,
-  useDeletePracticeLesson,
   useDeletePracticeSet,
-  useDeletePracticeTopic,
   useExamQuestionsByIds,
   useMyPracticeAttempts,
   useMyPracticeSets,
   useMySubjects,
   usePracticeAttemptAnswers,
   usePracticeAttemptCount,
-  usePracticeLessons,
+  usePracticePlanLessons,
   usePracticeSetProgress,
   usePracticeSetQuestions,
-  usePracticeTopics,
   usePracticeTopicsByIds,
   useSavePracticeAnswer,
   useSetPracticeSetQuestions,
   useStartOrResumePracticeAttempt,
   useSubmitPracticeAttempt,
-  useUpdatePracticeLesson,
-  useUpdatePracticeTopic,
 } from "@/hooks/usePractice";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
@@ -291,6 +285,7 @@ function TeacherPractice({
 
   // Drill-down: รายวิชา -> บทเรียน -> เนื้อหาย่อย -> แบบฝึกหัด (each level its own table).
   const [subjectId, setSubjectId] = useState("");
+  const [gradeId, setGradeId] = useState("");
   const [lessonId, setLessonId] = useState("");
   const [topic, setTopic] = useState<{ id: string; name: string } | null>(
     null,
@@ -302,33 +297,23 @@ function TeacherPractice({
   }
 
   const subject = subjects.find((s) => s.id === subjectId) ?? null;
-  if (subject && lessonId && topic) {
-    return (
-      <TopicSetsTable
-        subjectId={subject.id}
-        topic={topic}
-        createdBy={me.id}
-        onBack={() => setTopic(null)}
-        onOpenSet={setSelected}
-      />
-    );
-  }
-  if (subject && lessonId) {
-    return (
-      <TopicTable
-        subject={subject}
-        lessonId={lessonId}
-        onBack={() => setLessonId("")}
-        onOpenTopic={setTopic}
-      />
-    );
-  }
   if (subject) {
     return (
-      <LessonTable
+      <SubjectOutline
         subject={subject}
-        onBack={() => setSubjectId("")}
-        onOpenLesson={setLessonId}
+        createdBy={me.id}
+        gradeId={gradeId}
+        lessonId={lessonId}
+        topic={topic}
+        setGradeId={setGradeId}
+        setLessonId={setLessonId}
+        setTopic={setTopic}
+        onExit={() => {
+          setSubjectId("");
+          setGradeId("");
+          setLessonId("");
+        }}
+        onOpenSet={setSelected}
       />
     );
   }
@@ -475,148 +460,127 @@ function TeacherPractice({
   );
 }
 
-/** บทเรียนหลัก ของวิชาที่เลือก — คลิกแถวเข้าเนื้อหาย่อย, มีแถวเพิ่มบทเรียนหลักในตัว. */
-function LessonTable({
+/** วิชา -> ชั้น -> บทเรียน -> หัวข้อ -> ชุดแบบฝึกหัด, lessons/topics read from ผังการเรียน. The ชั้น level is skipped when the subject only has one grade. */
+function SubjectOutline({
   subject,
-  onBack,
-  onOpenLesson,
+  createdBy,
+  gradeId,
+  lessonId,
+  topic,
+  setGradeId,
+  setLessonId,
+  setTopic,
+  onExit,
+  onOpenSet,
 }: {
   subject: Subject;
-  onBack: () => void;
-  onOpenLesson: (lessonId: string) => void;
+  createdBy: string;
+  gradeId: string;
+  lessonId: string;
+  topic: { id: string; name: string } | null;
+  setGradeId: (id: string) => void;
+  setLessonId: (id: string) => void;
+  setTopic: (t: { id: string; name: string } | null) => void;
+  onExit: () => void;
+  onOpenSet: (set: PracticeSet) => void;
 }) {
-  const { data: lessons = [] } = usePracticeLessons(subject.id);
-  const createLesson = useCreatePracticeLesson();
-  const updateLesson = useUpdatePracticeLesson();
-  const deleteLesson = useDeletePracticeLesson();
-  const toast = useToast();
+  const { data: lessons = [] } = usePracticePlanLessons(subject);
+  const gradeIds = [...new Set(lessons.map((l) => l.gradeLevelId))];
+  const { data: grades = [] } = useGradeLevelsByIds(gradeIds);
+  const gradeSkipped = gradeIds.length === 1;
+  const activeGradeId = gradeSkipped ? gradeIds[0] : gradeId;
+  const gradeLabel = (id: string) => {
+    const g = grades.find((x) => x.id === id);
+    return g ? gradeShortLabel(g.code) : "ชั้น";
+  };
 
+  if (topic) {
+    return (
+      <TopicSetsTable
+        subjectId={subject.id}
+        topic={topic}
+        createdBy={createdBy}
+        onBack={() => setTopic(null)}
+        onOpenSet={onOpenSet}
+      />
+    );
+  }
+
+  if (!activeGradeId && gradeIds.length > 1) {
+    return (
+      <PlanPickTable
+        backLabel={subject.name_th}
+        onBack={onExit}
+        columnLabel="ระดับชั้น"
+        rows={[...grades]
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((g) => ({ id: g.id, name: gradeShortLabel(g.code) }))}
+        onOpen={setGradeId}
+        emptyTitle="ยังไม่มีระดับชั้น"
+      />
+    );
+  }
+
+  const gradeLessons = lessons.filter((l) => l.gradeLevelId === activeGradeId);
+  const lesson = gradeLessons.find((l) => l.id === lessonId) ?? null;
+  if (!lesson) {
+    return (
+      <PlanPickTable
+        backLabel={gradeSkipped || !activeGradeId ? subject.name_th : gradeLabel(activeGradeId)}
+        onBack={gradeSkipped || !activeGradeId ? onExit : () => setGradeId("")}
+        columnLabel="บทเรียน"
+        rows={gradeLessons.map((l) => ({ id: l.id, name: l.name, hint: `${l.topics.length} หัวข้อ` }))}
+        onOpen={setLessonId}
+        emptyTitle="ยังไม่มีบทเรียนในผังการเรียน"
+      />
+    );
+  }
   return (
-    <div className="page-fill">
-      <div className="toolbar shrink-0">
-        <Button size="sm" variant="ghost" onClick={onBack}>
-          <ChevronForward className="h-3 w-3 rotate-180" /> {subject.name_th}
-        </Button>
-      </div>
-
-      {lessons.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState
-            title="ยังไม่มีบทเรียนหลัก"
-            description="เพิ่มบทเรียนหลักด้านล่างเพื่อเริ่มจัดหมวดแบบฝึกหัด"
-          />
-        </div>
-      ) : (
-        <div className="table-panel flex-1">
-          <div className="table-panel-scroll">
-            <table className="w-full min-w-[24rem] text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">บทเรียนหลัก</th>
-                  <th className="px-3 py-2 font-medium" />
-                </tr>
-              </thead>
-              <tbody>
-                {lessons.map((l) => (
-                  <tr
-                    key={l.id}
-                    className="border-t border-border hover:bg-muted"
-                  >
-                    <td
-                      className="cursor-pointer px-3 py-3 font-medium"
-                      onClick={() => onOpenLesson(l.id)}
-                    >
-                      {l.name}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <EditableName
-                          value={l.name}
-                          onSave={(name) =>
-                            updateLesson.mutate({ id: l.id, name })
-                          }
-                        />
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          aria-label="ลบบทเรียน"
-                          onClick={() => {
-                            if (
-                              !confirm(
-                                `ลบบทเรียน "${l.name}"? เนื้อหาย่อยทั้งหมดในบทเรียนนี้จะถูกลบด้วย`,
-                              )
-                            )
-                              return;
-                            deleteLesson.mutate(l.id, {
-                              onError: () =>
-                                toast(
-                                  "ลบไม่สำเร็จ อาจมีชุดฝึกหัดใช้เนื้อหาย่อยนี้อยู่",
-                                  "error",
-                                ),
-                            });
-                          }}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      <div className="shrink-0 rounded-lg border border-border bg-card p-3">
-        <NewNameInput
-          placeholder="เพิ่มบทเรียนหลัก"
-          onAdd={(name) =>
-            createLesson.mutate(
-              { subject_id: subject.id, name, sort_order: lessons.length },
-              { onError: () => toast("เพิ่มไม่สำเร็จ", "error") },
-            )
-          }
-        />
-      </div>
-    </div>
+    <PlanPickTable
+      backLabel={lesson.name}
+      onBack={() => setLessonId("")}
+      columnLabel="หัวข้อ"
+      rows={lesson.topics}
+      onOpen={(id) => setTopic(lesson.topics.find((t) => t.id === id) ?? null)}
+      emptyTitle="ยังไม่มีหัวข้อในบทเรียนนี้"
+    />
   );
 }
 
-/** เนื้อหาย่อย ของบทเรียนที่เลือก — คลิกแถวเข้าดูแบบฝึกหัดของเนื้อหานั้น, มีแถวเพิ่มเนื้อหาย่อยในตัว. */
-function TopicTable({
-  subject,
-  lessonId,
+/** One drill-down level (ชั้น / บทเรียน / หัวข้อ) — read-only list from ผังการเรียน; click a row to go deeper. */
+function PlanPickTable({
+  backLabel,
   onBack,
-  onOpenTopic,
+  columnLabel,
+  rows,
+  onOpen,
+  emptyTitle,
 }: {
-  subject: Subject;
-  lessonId: string;
+  backLabel: string;
   onBack: () => void;
-  onOpenTopic: (topic: { id: string; name: string }) => void;
+  columnLabel: string;
+  rows: { id: string; name: string; hint?: string }[];
+  onOpen: (id: string) => void;
+  emptyTitle: string;
 }) {
-  const { data: lessons = [] } = usePracticeLessons(subject.id);
-  const lesson = lessons.find((l) => l.id === lessonId) ?? null;
-  const { data: topics = [] } = usePracticeTopics(lessonId);
-  const createTopic = useCreatePracticeTopic();
-  const updateTopic = useUpdatePracticeTopic();
-  const deleteTopic = useDeletePracticeTopic();
-  const toast = useToast();
-
   return (
     <div className="page-fill">
       <div className="toolbar shrink-0">
         <Button size="sm" variant="ghost" onClick={onBack}>
-          <ChevronForward className="h-3 w-3 rotate-180" />{" "}
-          {lesson?.name ?? "เนื้อหาย่อย"}
+          <ChevronForward className="h-3 w-3 rotate-180" /> {backLabel}
         </Button>
       </div>
 
-      {topics.length === 0 ? (
+      {rows.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
-            title="ยังไม่มีเนื้อหาย่อย"
-            description="เพิ่มเนื้อหาย่อยด้านล่างเพื่อเริ่มเพิ่มแบบฝึกหัด"
+            title={emptyTitle}
+            description="เพิ่มได้ที่หน้าผังการเรียน (ฝ่ายวิชาการ)"
+            action={
+              <Link to="/curriculum-map" className="text-xs underline">
+                ไปที่ผังการเรียน
+              </Link>
+            }
           />
         </div>
       ) : (
@@ -625,48 +589,20 @@ function TopicTable({
             <table className="w-full min-w-[24rem] text-xs">
               <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 font-medium">เนื้อหาย่อย</th>
+                  <th className="px-3 py-2 font-medium">{columnLabel}</th>
                   <th className="px-3 py-2 font-medium" />
                 </tr>
               </thead>
               <tbody>
-                {topics.map((t) => (
+                {rows.map((r) => (
                   <tr
-                    key={t.id}
-                    className="border-t border-border hover:bg-muted"
+                    key={r.id}
+                    onClick={() => onOpen(r.id)}
+                    className="cursor-pointer border-t border-border hover:bg-muted"
                   >
-                    <td
-                      className="cursor-pointer px-3 py-3 font-medium"
-                      onClick={() => onOpenTopic(t)}
-                    >
-                      {t.name}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <EditableName
-                          value={t.name}
-                          onSave={(name) =>
-                            updateTopic.mutate({ id: t.id, name })
-                          }
-                        />
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          aria-label="ลบเนื้อหาย่อย"
-                          onClick={() => {
-                            if (!confirm(`ลบเนื้อหาย่อย "${t.name}"?`)) return;
-                            deleteTopic.mutate(t.id, {
-                              onError: () =>
-                                toast(
-                                  "ลบไม่สำเร็จ อาจมีชุดฝึกหัดใช้เนื้อหาย่อยนี้อยู่",
-                                  "error",
-                                ),
-                            });
-                          }}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
+                    <td className="px-3 py-3 font-medium">{r.name}</td>
+                    <td className="px-3 py-3 text-right text-muted-foreground">
+                      {r.hint}
                     </td>
                   </tr>
                 ))}
@@ -675,18 +611,6 @@ function TopicTable({
           </div>
         </div>
       )}
-
-      <div className="shrink-0 rounded-lg border border-border bg-card p-3">
-        <NewNameInput
-          placeholder="เพิ่มเนื้อหาย่อย"
-          onAdd={(name) =>
-            createTopic.mutate(
-              { lesson_id: lessonId, name, sort_order: topics.length },
-              { onError: () => toast("เพิ่มไม่สำเร็จ", "error") },
-            )
-          }
-        />
-      </div>
     </div>
   );
 }

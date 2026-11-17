@@ -82,7 +82,12 @@ function useWrite<V>(fn: (v: V) => PromiseLike<{ error: Error | null }>) {
   return useMutation({
     mutationFn: async (v: V) => {
       const { error } = await fn(v);
-      if (error) throw error;
+      if (error) {
+        // 0173: practice_sets.topic_id is on delete restrict — a topic/lesson/subject with แบบฝึกหัด can't go.
+        if ((error as { code?: string }).code === "23503" && error.message.includes("practice_sets"))
+          throw new Error("ลบไม่ได้ มีแบบฝึกหัดผูกกับหัวข้อนี้อยู่");
+        throw error;
+      }
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["plan"] }),
   });
