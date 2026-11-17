@@ -11,6 +11,28 @@ import PlanetOutline from "react-ionicons/lib/PlanetOutline";
 import HeartOutline from "react-ionicons/lib/HeartOutline";
 import ColorPaletteOutline from "react-ionicons/lib/ColorPaletteOutline";
 import type React from "react";
+import AirplaneFill from "react-ionicons/lib/Airplane";
+import AppsFill from "react-ionicons/lib/Apps";
+import BarChartFill from "react-ionicons/lib/BarChart";
+import BookFill from "react-ionicons/lib/Book";
+import BriefcaseFill from "react-ionicons/lib/Briefcase";
+import CalendarFill from "react-ionicons/lib/Calendar";
+import CheckmarkCircleFill from "react-ionicons/lib/CheckmarkCircle";
+import ClipboardFill from "react-ionicons/lib/Clipboard";
+import DocumentTextFill from "react-ionicons/lib/DocumentText";
+import GridFill from "react-ionicons/lib/Grid";
+import HomeFill from "react-ionicons/lib/Home";
+import LibraryFill from "react-ionicons/lib/Library";
+import LocationFill from "react-ionicons/lib/Location";
+import NotificationsFill from "react-ionicons/lib/Notifications";
+import PeopleFill from "react-ionicons/lib/People";
+import PersonAddFill from "react-ionicons/lib/PersonAdd";
+import PricetagFill from "react-ionicons/lib/Pricetag";
+import RibbonFill from "react-ionicons/lib/Ribbon";
+import SchoolFill from "react-ionicons/lib/School";
+import ShieldFill from "react-ionicons/lib/Shield";
+import TimeFill from "react-ionicons/lib/Time";
+import WatchFill from "react-ionicons/lib/Watch";
 // Deep imports — the package barrel pulls every icon into the main chunk.
 import BusinessOutline from "react-ionicons/lib/BusinessOutline";
 import ChevronDownOutline from "react-ionicons/lib/ChevronDownOutline";
@@ -254,3 +276,31 @@ export function CoinIcon({ className, size }: IconProps) {
     </svg>
   );
 }
+
+/** Filled glyphs, used only by sidebar NavIcon tiles (macOS Settings look). */
+export const FILLED_ICON = new Map<unknown, unknown>([
+  [LayoutDashboard, wrap(GridFill)],
+  [Users, wrap(PeopleFill)],
+  [GraduationCap, wrap(SchoolFill)],
+  [HomeIcon, wrap(HomeFill)],
+  [AppsIcon, wrap(AppsFill)],
+  [BookIcon, wrap(BookFill)],
+  [LibraryIcon, wrap(LibraryFill)],
+  [LocationIcon, wrap(LocationFill)],
+  [PersonAddIcon, wrap(PersonAddFill)],
+  [TimeIcon, wrap(TimeFill)],
+  [TimetableIcon, wrap(GridFill)],
+  [CalendarIcon, wrap(CalendarFill)],
+  [ClipboardIcon, wrap(ClipboardFill)],
+  [DocumentTextIcon, wrap(DocumentTextFill)],
+  [CheckmarkCircleIcon, wrap(CheckmarkCircleFill)],
+  [CheckboxOutlineIcon, wrap(Checkbox)],
+  [RibbonIcon, wrap(RibbonFill)],
+  [WatchIcon, wrap(WatchFill)],
+  [AirplaneIcon, wrap(AirplaneFill)],
+  [BriefcaseIcon, wrap(BriefcaseFill)],
+  [ShieldIcon, wrap(ShieldFill)],
+  [BarChartIcon, wrap(BarChartFill)],
+  [PricetagIcon, wrap(PricetagFill)],
+  [NotificationIcon, wrap(NotificationsFill)],
+]);

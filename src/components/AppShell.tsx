@@ -36,6 +36,7 @@ import {
   TimetableIcon,
   Users,
   WatchIcon,
+  FILLED_ICON,
 } from "@/components/icons";
 import { NavLink, useLocation, useNavigate, useOutlet } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
@@ -437,9 +438,10 @@ const SECTION_TONE: Record<string, string> = {
   สอบและแบบฝึกหัด: "bg-gradient-to-b from-indigo-400 to-indigo-600",
 };
 
-function NavIcon({ icon: Icon, section }: { icon: (p: { className?: string }) => React.JSX.Element; section: string }) {
+function NavIcon({ icon, section }: { icon: (p: { className?: string }) => React.JSX.Element; section: string }) {
+  const Icon = (FILLED_ICON.get(icon) as typeof icon | undefined) ?? icon;
   return (
-    <span className={cn("grid size-7 shrink-0 place-items-center rounded-[30%] text-white shadow-sm ring-1 ring-inset ring-white/20", SECTION_TONE[section] ?? "bg-slate-500")}>
+    <span className={cn("grid size-7 shrink-0 place-items-center rounded-[30%] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.35),0_0_0_0.5px_rgb(0_0_0/0.25)]", SECTION_TONE[section] ?? "bg-slate-500")}>
       <Icon className="h-4 w-4" />
     </span>
   );
