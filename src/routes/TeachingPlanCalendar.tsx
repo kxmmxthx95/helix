@@ -690,8 +690,8 @@ function TopicPicker({
                 aria-pressed={on}
                 onClick={() => onPick(t)}
                 className={cn(
-                  "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors active:bg-muted",
-                  on ? "bg-card font-semibold ring-2 ring-inset ring-accent" : "hover:bg-muted/60",
+                  "flex min-h-12 w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors active:bg-muted",
+                  on ? "font-semibold text-accent" : "hover:bg-muted/60",
                 )}
               >
                 <span className="min-w-0 flex-1 leading-snug">{t.title}</span>
@@ -700,8 +700,8 @@ function TopicPicker({
                 ) : (
                   <span
                     className={cn(
-                      "shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums",
-                      n === 0 ? "bg-warning/10 text-warning" : "bg-success/10 text-success",
+                      "shrink-0 text-xs tabular-nums",
+                      n === 0 ? "text-muted-foreground/70" : "font-medium text-success",
                     )}
                   >
                     {n === 0 ? "ยังไม่วาง" : `${n} คาบ`}
@@ -753,7 +753,7 @@ function LessonCards({
                 <ChevronForward className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
               </span>
             </summary>
-            <div className="space-y-0.5 border-t border-border px-1.5 py-1.5">{items.map(children)}</div>
+            <div className="divide-y divide-border/60 border-t border-border px-1.5">{items.map(children)}</div>
           </details>
         );
       })}

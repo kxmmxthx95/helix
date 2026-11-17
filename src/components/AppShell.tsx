@@ -628,7 +628,8 @@ function AppShellInner() {
         ? "โปรไฟล์"
         : location.pathname.startsWith("/card-topup/")
           ? "เติมเงิน"
-          : "ระบบจัดการสถานศึกษา");
+          : // sub-pages (e.g. /teaching-plan/:id) keep their menu's name
+            tabs.find((t) => t.to !== "/" && location.pathname.startsWith(`${t.to}/`))?.label ?? "ระบบจัดการสถานศึกษา");
 
   const themeLabel =
     preference === "system" ? "ตามระบบ" : preference === "dark" ? "โหมดมืด" : "โหมดสว่าง";
