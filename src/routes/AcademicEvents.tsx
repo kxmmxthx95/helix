@@ -88,12 +88,13 @@ function buildCalendarDays(monthStart: Date): Date[] {
 
 // Pre-fills students_attend/staff_attend when the event type changes — still
 // editable, not enforced by the DB (a school might have a real exception).
-const ATTEND_DEFAULTS: Record<AcademicEventType, { students_attend: boolean; staff_attend: boolean }> = {
-  holiday: { students_attend: false, staff_attend: false },
-  suspended: { students_attend: false, staff_attend: false },
-  teacher_workday: { students_attend: false, staff_attend: true },
-  school_event: { students_attend: true, staff_attend: true },
-  exam_period: { students_attend: true, staff_attend: true },
+const ATTEND_DEFAULTS: Record<AcademicEventType, { students_attend: boolean; staff_attend: boolean; replaces_classes: boolean }> = {
+  holiday: { students_attend: false, staff_attend: false, replaces_classes: false },
+  suspended: { students_attend: false, staff_attend: false, replaces_classes: false },
+  teacher_workday: { students_attend: false, staff_attend: true, replaces_classes: false },
+  school_event: { students_attend: true, staff_attend: true, replaces_classes: false },
+  // Exam weeks: students come in but normal lessons don't run, so the teaching plan skips these periods.
+  exam_period: { students_attend: true, staff_attend: true, replaces_classes: true },
 };
 
 type CalView = "month" | "week" | "day" | "list";

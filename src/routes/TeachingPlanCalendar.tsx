@@ -100,6 +100,7 @@ export function TeachingPlanCalendar() {
   const { data: slots = [] } = useTeachingPlanSlots(ids);
   const place = usePlaceTopic();
   const clearSlot = useClearSlot();
+  const removeTopic = useRemoveTopic();
   const [view, setView] = useState<"week" | "month">("week");
   const [anchor, setAnchor] = useState(today); // any date in the shown week/month
   const [picked, setPicked] = useState<SlotCell | null>(null);
@@ -241,6 +242,8 @@ export function TeachingPlanCalendar() {
   function openOther(o: PlanOther) {
     if (!armed) return setPickedOther(o);
     if (multi) return o.taught ? undefined : toggleMark({ assignmentId: o.assignmentId, date: o.date, periodNo: o.periodNo });
+    const cur = linkedSlots.find((s) => s.teaching_assignment_id === o.assignmentId && s.slot_date === o.date && s.period_no === o.periodNo);
+    if (cur?.topic_ids.includes(armed.id)) return unplace(cur); // tapping again cancels
     place.mutate(
       {
         teaching_assignment_id: o.assignmentId,
@@ -290,9 +293,17 @@ export function TeachingPlanCalendar() {
     if (err) toast(`วางไม่สำเร็จ ${failed.size} ช่อง${err instanceof Error ? `: ${err.message}` : ""}`, "error");
   }
 
+  // Tap the armed topic's period again: take it back out (a taught period keeps its topics).
+  function unplace(slot: PlanSlot) {
+    if (!armed || slot.completed_at) return;
+    removeTopic.mutate({ slot, topic_id: armed.id }, { onError: (e) => toast(e instanceof Error ? e.message : "ยกเลิกไม่สำเร็จ", "error") });
+  }
+
   function openCell(cell: SlotCell) {
     if (!armed) return setPicked(cell);
     if (multi) return slotAt(cell)?.completed_at ? undefined : toggleMark({ assignmentId: assignment!.id, date: cell.date, periodNo: cell.periodNo });
+    const cur = slotAt(cell);
+    if (cur?.topic_ids.includes(armed.id)) return unplace(cur); // tapping again cancels
     place.mutate(
       {
         teaching_assignment_id: assignment!.id,
