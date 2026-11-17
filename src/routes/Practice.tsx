@@ -18,7 +18,6 @@ import {
   EmptyState,
   Field,
   Input,
-  Pagination,
   Select,
   Skeleton,
 } from "@/components/ui";
@@ -59,7 +58,6 @@ import {
   useUpdatePracticeTopic,
 } from "@/hooks/usePractice";
 import { useDepartments } from "@/hooks/useProfiles";
-import { usePagination } from "@/hooks/usePagination";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManage, isOrgWide } from "@/lib/roles";
@@ -290,12 +288,6 @@ function TeacherPractice({
       );
     return a.code.localeCompare(b.code);
   });
-  const { page, setPage, pageCount, pageRows } = usePagination(sortedSubjects, [
-    learningAreaId,
-    gradeLevelId,
-    managerDepartmentId,
-    search,
-  ]);
 
   // Drill-down: รายวิชา -> บทเรียน -> เนื้อหาย่อย -> แบบฝึกหัด (each level its own table).
   const [subjectId, setSubjectId] = useState("");
@@ -442,7 +434,7 @@ function TeacherPractice({
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map((s) => {
+                {sortedSubjects.map((s) => {
                   const gradeLevel = s.suggested_grade_level_id
                     ? gradeLevelById.get(s.suggested_grade_level_id)
                     : null;
@@ -476,9 +468,6 @@ function TeacherPractice({
                 })}
               </tbody>
             </table>
-          </div>
-          <div className="shrink-0 border-t border-border px-4">
-            <Pagination page={page} pageCount={pageCount} onChange={setPage} />
           </div>
         </div>
       )}
