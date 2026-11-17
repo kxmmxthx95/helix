@@ -919,9 +919,9 @@ function EventSheet({
         {orgWide && (
           <FormSection title="แผนกที่เกี่ยวข้อง (ไม่เลือก = ทั้งโรงเรียน)">
             {departments.map((d) => (
-              <div key={d.id} className="flex items-center justify-between gap-4 text-sm leading-5">
+              <div key={d.id} className="flex min-h-10 items-center justify-between gap-4 text-sm leading-5">
                 <span>{d.name}</span>
-                <Switch size="sm" checked={draft.departmentIds.includes(d.id)} onChange={(on) => toggleDepartment(d.id, on)} label={d.name} />
+                <Switch size="xs" checked={draft.departmentIds.includes(d.id)} onChange={(on) => toggleDepartment(d.id, on)} label={d.name} />
               </div>
             ))}
           </FormSection>
@@ -936,16 +936,19 @@ function EventSheet({
               ["notify_users", "ส่งการแจ้งเตือนให้ผู้ใช้ที่เกี่ยวข้อง"],
             ] as const
           ).map(([k, label]) => (
-            <div key={k} className="flex items-center justify-between gap-4 text-sm leading-5">
+            <div key={k} className="flex min-h-10 items-center justify-between gap-4 text-sm leading-5">
               <span>{label}</span>
-              <Switch size="sm" checked={draft[k]} onChange={(on) => setDraft({ ...draft, [k]: on })} label={label} />
+              <Switch size="xs" checked={draft[k]} onChange={(on) => setDraft({ ...draft, [k]: on })} label={label} />
             </div>
           ))}
           {draft.students_attend && (
-            <div className="flex items-center justify-between gap-4 text-sm leading-5">
-              <span>งดสอนตามปกติ (นักเรียนมา แต่ไม่มีคาบเรียนในช่วงนี้)</span>
+            <div className="flex min-h-10 items-center justify-between gap-4 text-sm leading-5">
+              <span className="leading-4">
+                งดสอนตามปกติ
+                <span className="block text-[11px] leading-3 text-muted-foreground">นักเรียนมา แต่ไม่มีคาบเรียนในช่วงนี้</span>
+              </span>
               <Switch
-                size="sm"
+                size="xs"
                 checked={draft.replaces_classes}
                 onChange={(on) => setDraft({ ...draft, replaces_classes: on })}
                 label="งดสอนตามปกติ"
@@ -983,7 +986,7 @@ function EventSheet({
               return rows.length === 0 ? null : (
                 <FormSection key={title} title={title}>
                   {rows.map((g) => (
-                    <div key={g.id} className="flex items-center justify-between gap-4 text-sm leading-5">
+                    <div key={g.id} className="flex min-h-10 items-center justify-between gap-4 text-sm leading-5">
                       <span>{gradeShortLabel(g.code)}</span>
                       <Switch size="xs" checked={draft.gradeLevelIds.includes(g.id)} onChange={(on) => toggleGrade(g.id, on)} label={g.code} />
                     </div>
