@@ -721,7 +721,16 @@ export function QuestionSheet({
         open={open}
         onOpenChange={onOpenChange}
         title={form.isEdit ? "แก้ไขแบบฝึกหัด" : "เพิ่มแบบฝึกหัด"}
-        footer={saveButton}
+        footer={
+          <div className="flex gap-2">
+            <Button variant="outline" className="shrink-0" onClick={() => onOpenChange(false)}>
+              ยกเลิก
+            </Button>
+            <Button className="flex-1" onClick={form.save} disabled={!form.canSave || form.pending}>
+              บันทึก
+            </Button>
+          </div>
+        }
         className="max-w-3xl"
         centered
       >
