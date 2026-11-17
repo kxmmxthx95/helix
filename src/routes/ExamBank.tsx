@@ -347,6 +347,7 @@ function useQuestionForm({
   const [correctAnswer, setCorrectAnswer] = useState(question?.correct_answer ?? "");
   const [difficulty, setDifficulty] = useState<ExamQuestionDifficulty>(question?.difficulty ?? "medium");
   const [topic, setTopic] = useState(question?.topic ?? defaultTopic);
+  const [tags, setTags] = useState<string[]>(question?.tags ?? []);
   const [choices, setChoices] = useState<ChoiceDraft[]>(
     question?.choices.map((c) => ({ label: c.label, label_json: c.label_json, is_correct: c.is_correct })) ?? [
       { label: "", label_json: emptyLabelJson(), is_correct: true },
@@ -362,6 +363,7 @@ function useQuestionForm({
     setCorrectAnswer("");
     setDifficulty("medium");
     setTopic(defaultTopic);
+    setTags([]);
     setChoices([
       { label: "", label_json: emptyLabelJson(), is_correct: true },
       { label: "", label_json: emptyLabelJson(), is_correct: false },
@@ -392,6 +394,7 @@ function useQuestionForm({
           correct_answer: type === "short_answer" ? correctAnswer.trim() : null,
           difficulty,
           topic: topic.trim() || null,
+          tags,
           choices: type === "short_answer" ? undefined : finalChoices,
         },
         {
@@ -417,6 +420,7 @@ function useQuestionForm({
           correct_answer: type === "short_answer" ? correctAnswer.trim() : null,
           difficulty,
           topic: topic.trim() || null,
+          tags,
           created_by: teacherId,
           choices: finalChoices,
         },
@@ -497,6 +501,8 @@ function useQuestionForm({
     setDifficulty,
     topic,
     setTopic,
+    tags,
+    setTags,
     /** Question belongs to a ผังการเรียน topic — the free-text topic field is hidden. */
     topicLocked: !!planTopicId,
     choices,
@@ -550,6 +556,47 @@ function Segmented<T extends string>({
   );
 }
 
+const MAX_TAGS = 10;
+
+/** Chip input: Enter or comma adds, Backspace on an empty box removes the last, duplicates ignored. */
+function TagInput({ value, onChange }: { value: string[]; onChange: (tags: string[]) => void }) {
+  const [draft, setDraft] = useState("");
+
+  function commit() {
+    const t = draft.trim().slice(0, 40);
+    setDraft("");
+    if (t && !value.includes(t) && value.length < MAX_TAGS) onChange([...value, t]);
+  }
+
+  return (
+    <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-lg border border-input bg-background px-2 py-1.5 transition-colors focus-within:border-ring">
+      {value.map((t) => (
+        <span key={t} className="flex items-center gap-1 rounded-full bg-accent/15 py-0.5 pl-2.5 pr-1.5 text-[11px] font-medium text-accent">
+          {t}
+          <button type="button" aria-label={`ลบแท็ก ${t}`} onClick={() => onChange(value.filter((x) => x !== t))} className="hover:text-destructive">
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            commit();
+          } else if (e.key === "Backspace" && !draft && value.length) onChange(value.slice(0, -1));
+        }}
+        onBlur={commit}
+        disabled={value.length >= MAX_TAGS}
+        placeholder={value.length ? "" : "พิมพ์แท็กแล้วกด Enter"}
+        aria-label="เพิ่มแท็ก"
+        className="min-w-[8rem] flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+      />
+    </div>
+  );
+}
+
 function QuestionFormFields(form: ReturnType<typeof useQuestionForm>) {
   return (
     <div className="space-y-5">
@@ -599,7 +646,12 @@ function QuestionFormFields(form: ReturnType<typeof useQuestionForm>) {
         />
       )}
 
-      {!form.topicLocked && (
+      {form.topicLocked ? (
+        <div className="space-y-1">
+          <span className="font-ui text-xs font-medium">แท็ก</span>
+          <TagInput value={form.tags} onChange={form.setTags} />
+        </div>
+      ) : (
         <Field label="ชื่อเนื้อหา (ไม่บังคับ)">
           <Input value={form.topic} onChange={(e) => form.setTopic(e.target.value)} placeholder="เช่น สมการเชิงเส้น" />
         </Field>

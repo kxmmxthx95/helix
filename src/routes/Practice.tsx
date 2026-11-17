@@ -720,6 +720,11 @@ function SetDetail({
                       >
                         {DIFFICULTY_LABEL[q.difficulty]}
                       </span>
+                      {q.tags.map((t) => (
+                        <span key={t} className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-normal text-accent">
+                          {t}
+                        </span>
+                      ))}
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
                       <Button

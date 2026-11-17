@@ -742,6 +742,8 @@ export type ExamQuestion = {
   difficulty: ExamQuestionDifficulty;
   /** Free-text bank tag (e.g. หน่วยการเรียนรู้) — same scope as difficulty. See migration 0052. */
   topic: string | null;
+  /** Free-form labels (max 10), teacher-side only. See migration 0176. */
+  tags: string[];
   points: number;
   created_by: string;
   created_at: string;
@@ -1867,7 +1869,7 @@ export type Database = {
         changes: unknown;
         created_at: string;
       }>;
-      exam_questions: Table<ExamQuestion, InsertOf<ExamQuestion, "subject_id" | "plan_topic_id" | "correct_answer" | "points" | "difficulty" | "topic">>;
+      exam_questions: Table<ExamQuestion, InsertOf<ExamQuestion, "subject_id" | "plan_topic_id" | "correct_answer" | "points" | "difficulty" | "topic" | "tags">>;
       exam_question_choices: Table<ExamQuestionChoice, InsertOf<ExamQuestionChoice, "is_correct" | "position">>;
       exam_sessions: Table<
         ExamSession,

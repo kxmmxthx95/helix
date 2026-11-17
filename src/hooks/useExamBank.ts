@@ -93,6 +93,7 @@ export function useCreateExamQuestion() {
       correct_answer: string | null;
       difficulty: ExamQuestionDifficulty;
       topic: string | null;
+      tags?: string[];
       created_by: string;
       choices: ChoiceDraft[];
     }) => {
@@ -133,6 +134,7 @@ export function useUpdateExamQuestion() {
       correct_answer?: string | null;
       difficulty?: ExamQuestionDifficulty;
       topic?: string | null;
+      tags?: string[];
       choices?: ChoiceDraft[];
     }) => {
       if (Object.keys(patch).length > 0) {
