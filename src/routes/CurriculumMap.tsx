@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { AppsIcon, BookIcon, CheckboxIcon, ChevronForward, ClipboardIcon, CopyIcon, DocumentTextIcon, GripIcon, LibraryIcon, LinkIcon, ListIcon, PaletteIcon, Plus, PricetagIcon, PrintIcon, Search, SquareIcon, TrashIcon, Upload, X } from "@/components/icons";
+import { AppsIcon, BookIcon, CheckboxIcon, ChevronForward, ClipboardIcon, CopyIcon, DocumentTextIcon, GripIcon, LinkIcon, ListIcon, PaletteIcon, Plus, PricetagIcon, PrintIcon, Search, SquareIcon, TrashIcon, Upload, X } from "@/components/icons";
 import { ImportPlanSheet } from "@/components/ImportPlanSheet";
 import { FileTile } from "@/components/FileTile";
 import { Modal } from "@/components/Modal";
@@ -702,7 +702,7 @@ function LessonCard({
 
   return (
     <div className="rounded-xl bg-card shadow-card">
-      <div className="flex items-center gap-3 p-3">
+      <div className="group flex items-center gap-3 p-3">
         <button
           type="button"
           aria-expanded={open}
@@ -715,7 +715,6 @@ function LessonCard({
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-bold text-accent">
           {index + 1}
         </span>
-        <LibraryIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-bold">{lesson.name}</div>
           {lesson.tags.length > 0 && (
@@ -752,6 +751,7 @@ function LessonCard({
         >
           <PrintIcon className="h-3 w-3" />
         </Button>
+        <div className="flex shrink-0 items-center transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-within:!opacity-100">
         {mayEdit && copyTargets.length > 0 && (
           <Button
             className="active:scale-100"
@@ -796,6 +796,7 @@ function LessonCard({
             </Button>
           </>
         )}
+        </div>
       </div>
 
       {copying && <CopyLessonModal lesson={lesson} subjectId={subjectId} targets={copyTargets} onClose={() => setCopying(false)} />}
@@ -870,7 +871,7 @@ function LessonCard({
         </ol>
         {mayEdit && (
           <form
-            className="flex gap-2 pt-1"
+            className="flex items-center gap-2 pt-1"
             onSubmit={(e) => {
               e.preventDefault();
               addTopic();
@@ -880,12 +881,15 @@ function LessonCard({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={200}
-              placeholder="เพิ่มหัวข้อ"
+              placeholder="+ เพิ่มหัวข้อ"
               aria-label={`เพิ่มหัวข้อในบทเรียน ${lesson.name}`}
+              className="border-transparent bg-transparent shadow-none hover:bg-muted focus:border-border focus:bg-card"
             />
-            <Button type="submit" size="icon" variant="outline" disabled={!title.trim() || createTopic.isPending} aria-label="เพิ่มหัวข้อ">
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
+            {title.trim() && (
+              <Button type="submit" size="icon" variant="ghost" disabled={createTopic.isPending} aria-label="เพิ่มหัวข้อ">
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </form>
         )}
       </div>
@@ -924,7 +928,7 @@ function TopicRow({
 
   return (
     <li
-      className={cn("flex flex-col gap-1 py-1 text-xs", dragging && "opacity-40")}
+      className={cn("group flex flex-col gap-1 py-1.5 text-xs", dragging && "opacity-40")}
       onDragOver={(e) => mayEdit && e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
@@ -950,7 +954,7 @@ function TopicRow({
         <span className="w-9 shrink-0 text-left tabular-nums text-muted-foreground">{label}</span>
         <span className="min-w-0 flex-1 truncate">{topic.name}</span>
         {mayEdit && (
-          <>
+          <div className="flex shrink-0 items-center gap-2 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-within:!opacity-100">
             <button
               type="button"
               aria-label={`เชื่อมเอกสารกับหัวข้อ ${topic.name}`}
@@ -969,7 +973,7 @@ function TopicRow({
             >
               <X className="h-3.5 w-3.5" />
             </button>
-          </>
+          </div>
         )}
       </div>
       <LinkedFiles files={topic.files} mayEdit={mayEdit} onUnlink={(id, done) => unlink.mutate(id, done)} indent />
