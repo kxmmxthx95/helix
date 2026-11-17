@@ -710,11 +710,6 @@ export function QuestionSheet({
     },
   });
 
-  const saveButton = (
-    <Button className="w-full" onClick={form.save} disabled={!form.canSave || form.pending}>
-      บันทึก
-    </Button>
-  );
   if (modal)
     return (
       <Modal
