@@ -461,7 +461,7 @@ function TopicExercises({ topic, onBack }: { topic: { id: string; name: string }
   const [created, setCreated] = useState<PracticeSet | null>(null);
   const set = existing ?? created;
 
-  if (set) return <SetDetail set={set} onBack={onBack} autoAdd={!!created && !existing} />;
+  if (set) return <SetDetail set={set} onBack={onBack} autoAdd={!!created && !existing} topicName={topic.name} />;
 
   return (
     <div className="page-fill">
@@ -569,7 +569,18 @@ export function EditableName({
   );
 }
 
-function SetDetail({ set, onBack, autoAdd = false }: { set: PracticeSet; onBack: () => void; autoAdd?: boolean }) {
+function SetDetail({
+  set,
+  onBack,
+  autoAdd = false,
+  topicName,
+}: {
+  set: PracticeSet;
+  onBack: () => void;
+  autoAdd?: boolean;
+  /** Known up front by the topic page; avoids waiting on the topic lookup so the form can prefill "ชื่อเนื้อหา" on first render. */
+  topicName?: string;
+}) {
   const { profile: me } = useAuth();
   const { data: setQuestions = [] } = usePracticeSetQuestions(set.id);
   const { data: progress, isLoading } = usePracticeSetProgress(set.id);
@@ -630,7 +641,7 @@ function SetDetail({ set, onBack, autoAdd = false }: { set: PracticeSet; onBack:
           modal
           teacherId={me.id}
           question={null}
-          defaultTopic={topic?.name}
+          defaultTopic={topicName ?? topic?.name}
           onSaved={(id) =>
             setSetQuestions.mutate(
               {
