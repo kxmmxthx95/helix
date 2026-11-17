@@ -726,7 +726,7 @@ function AppShellInner() {
   return (
     <div
       className={cn(
-        "fixed inset-0 flex overflow-hidden overscroll-none max-lg:flex-col max-lg:gap-0 max-lg:p-0 lg:flex-row lg:p-2",
+        "fixed inset-0 flex overflow-hidden overscroll-none [@media(display-mode:standalone)]:min-h-[100lvh] max-lg:flex-col max-lg:gap-0 max-lg:p-0 lg:flex-row lg:p-2",
         // iPad/touch: full-bleed, no floating-card frame (p-2 strip showed as a bottom border)
         "[@media(pointer:coarse)]:p-0 [@media(pointer:coarse)]:gap-0 lg:[@media(pointer:coarse)]:pt-[env(safe-area-inset-top,0px)] lg:[@media(pointer:coarse)]:pb-[env(safe-area-inset-bottom,0px)]",
         collapsed ? "lg:gap-0" : "lg:gap-2",
