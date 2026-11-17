@@ -91,7 +91,7 @@ export function TeachingPlanCalendar() {
   const { data: planSubjects = [] } = usePlanSubjects(departmentId);
   const styling = useTimetableStyling(subjects, classrooms, gradeLevels);
   const subjectName = subjects.find((x) => x.id === assignment?.subject_id)?.name_th ?? null;
-  const { data: topics = [] } = usePlanTopics(departmentId, found?.gradeLevelId ?? null, subjectName);
+  const { data: topics = [] } = usePlanTopics(departmentId, found?.gradeLevelId ?? null, subjectName, assignment?.subject_id ?? null);
   const label = useAssignmentLabel(departmentId);
   const { data: terms = [] } = useAllAcademicTerms();
   const { data: events = [] } = useAcademicEvents();
@@ -405,7 +405,7 @@ export function TeachingPlanCalendar() {
             topics={topics}
             countOf={countOf}
             selectedIds={armed ? [armed.id] : []}
-            emptyText="ยังไม่มีผังการเรียนของวิชานี้ (ชื่อวิชาต้องขึ้นต้นด้วยชื่อวิชาในผังการเรียน) และระดับชั้นนี้"
+            emptyText="ยังไม่มีผังการเรียนของวิชานี้ในระดับชั้นนี้ (ผูกวิชาที่บทเรียนในผังการเรียน หรือตั้งชื่อวิชาให้ขึ้นต้นด้วยชื่อวิชาในผัง)"
             onPick={(t) => {
               setArmed(t);
               setTopicsOpen(false);

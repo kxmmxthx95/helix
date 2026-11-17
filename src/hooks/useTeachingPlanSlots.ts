@@ -22,26 +22,44 @@ export function groupByLesson(topics: PlanTopicItem[]): [string, PlanTopicItem[]
 }
 
 /**
- * Topics offered for an assignment: ผังการเรียน (0088) is independent of subjects, so the
- * plan_subject is matched by name within the department, lessons by the classroom's grade level.
+ * Topics offered for an assignment: ผังการเรียน (0088) is independent of subjects, so a lesson counts when
+ * its plan_subject name is a prefix of the subject name ("ฟิสิกส์เพิ่มเติม" ~ "ฟิสิกส์"), or when the lesson
+ * is tagged with the subject (plan_lesson_subjects, the "ผูกวิชา" link). Lessons are of the classroom's grade level.
+ * Mirrors check_teaching_plan_slot_topic (0171).
  */
-export function usePlanTopics(departmentId: string | null, gradeLevelId: string | null, subjectName: string | null) {
+export function usePlanTopics(
+  departmentId: string | null,
+  gradeLevelId: string | null,
+  subjectName: string | null,
+  subjectId: string | null,
+) {
   return useQuery({
-    queryKey: ["plan_topics_for", departmentId, gradeLevelId, subjectName],
+    queryKey: ["plan_topics_for", departmentId, gradeLevelId, subjectName, subjectId],
     enabled: !!departmentId && !!gradeLevelId && !!subjectName,
     queryFn: async (): Promise<PlanTopicItem[]> => {
       const { data: subs, error: e1 } = await supabase.from("plan_subjects").select("id,name").eq("department_id", departmentId!);
       if (e1) throw e1;
-      // name prefix: "คณิตศาสตร์พื้นฐาน" ~ ผัง "คณิตศาสตร์" (mirrors check_teaching_plan_slot)
       const matched = subs.filter((s) => subjectName!.trim().startsWith(s.name));
-      if (matched.length === 0) return [];
-      const { data: lessons, error: e2 } = await supabase
-        .from("plan_lessons")
-        .select("id,name")
-        .in("subject_id", matched.map((s) => s.id))
-        .eq("grade_level_id", gradeLevelId!)
-        .order("sort_order");
-      if (e2) throw e2;
+      const byName = matched.length
+        ? await supabase
+            .from("plan_lessons")
+            .select("id,name,sort_order")
+            .in("subject_id", matched.map((s) => s.id))
+            .eq("grade_level_id", gradeLevelId!)
+        : { data: [], error: null };
+      if (byName.error) throw byName.error;
+      const tagged = subjectId
+        ? await supabase
+            .from("plan_lesson_subjects")
+            .select("plan_lessons!inner(id,name,sort_order,grade_level_id)")
+            .eq("subject_id", subjectId)
+            .eq("plan_lessons.grade_level_id", gradeLevelId!)
+        : { data: [], error: null };
+      if (tagged.error) throw tagged.error;
+      const byTag = (tagged.data as unknown as { plan_lessons: { id: string; name: string; sort_order: number } }[]).map((r) => r.plan_lessons);
+      const lessons = [...new Map([...(byName.data ?? []), ...byTag].map((l) => [l.id, l])).values()].sort(
+        (a, b) => a.sort_order - b.sort_order,
+      );
       if (lessons.length === 0) return [];
       const { data: topics, error: e3 } = await supabase
         .from("plan_topics")
