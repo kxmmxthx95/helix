@@ -1,12 +1,12 @@
 import { FileUp, Plus, Search, SlidersHorizontal, X } from "@/components/icons";
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { useFocusDrag } from "@/components/BannerAdjust";
 import { DEFAULT_SCENE_THEME, SCENE_THEMES } from "@/components/scene/themes";
 import { ImportSubjectsSheet } from "@/components/ImportSubjectsSheet";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, Input, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
+import { Button, Card, EmptyState, Field, FormSection, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import {
   useDeleteSubject,
   useLearningAreas,
@@ -18,8 +18,6 @@ import {
   type SubjectFilters,
 } from "@/hooks/useCurriculum";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
-import { useFillPageSize } from "@/hooks/useFillPageSize";
-import { usePagination } from "@/hooks/usePagination";
 import { useDepartments } from "@/hooks/useProfiles";
 import type { GradingMethod, GradeLevel, LearningArea, Subject, SubjectType } from "@/lib/database.types";
 import { canManage, isOrgWide } from "@/lib/roles";
@@ -60,48 +58,6 @@ const GRADING_METHOD_LABEL: Record<GradingMethod, string> = {
   pass_fail: "ผ่าน/ไม่ผ่าน",
 };
 
-type SubjectSortKey =
-  | "code"
-  | "name_th"
-  | "learning_area"
-  | "grade_level"
-  | "term"
-  | "subject_type"
-  | "credits"
-  | "hours_per_week";
-
-function SortTh({
-  label,
-  column,
-  sortKey,
-  sortDir,
-  onSort,
-  className,
-}: {
-  label: string;
-  column: SubjectSortKey;
-  sortKey: SubjectSortKey;
-  sortDir: "asc" | "desc";
-  onSort: (key: SubjectSortKey) => void;
-  className?: string;
-}) {
-  const active = sortKey === column;
-  return (
-    <th className={className ?? "px-3 py-2 font-medium"} aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
-      <button
-        type="button"
-        className="tappable inline-flex items-center gap-1 text-left hover:text-foreground"
-        onClick={() => onSort(column)}
-      >
-        {label}
-        <span className={active ? "text-foreground" : "text-muted-foreground/40"} aria-hidden>
-          {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
-        </span>
-      </button>
-    </th>
-  );
-}
-
 export function Subjects() {
   const { profile: me } = useAuth();
   const { data: departments = [] } = useDepartments();
@@ -111,8 +67,6 @@ export function Subjects() {
   const [importing, setImporting] = useState(false);
   const [pickedDept, setPickedDept] = useState("");
   // Default cascade: ระดับชั้น → ภาคเรียน → ประเภท → รหัส (header click overrides primary).
-  const [sortKey, setSortKey] = useState<SubjectSortKey>("grade_level");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const orgWide = me ? isOrgWide(me.roles) : false;
   const mayEdit = me ? canManage(me.roles) : false;
@@ -153,18 +107,12 @@ export function Subjects() {
   const sortedRows = useMemo(() => {
     if (!rows) return [];
     const list = [...rows];
-    const dir = sortDir === "asc" ? 1 : -1;
-    const cascade: SubjectSortKey[] = ["grade_level", "term", "subject_type", "code"];
-    const keys = [sortKey, ...cascade.filter((k) => k !== sortKey)];
+    const keys = ["grade_level", "term", "subject_type", "code"] as const;
 
-    function cmpKey(a: Subject, b: Subject, key: SubjectSortKey): number {
+    function cmpKey(a: Subject, b: Subject, key: (typeof keys)[number]): number {
       switch (key) {
         case "code":
           return a.code.localeCompare(b.code, "th", { numeric: true });
-        case "name_th":
-          return a.name_th.localeCompare(b.name_th, "th");
-        case "learning_area":
-          return topAreaLabel(a.learning_area_id).localeCompare(topAreaLabel(b.learning_area_id), "th");
         case "grade_level": {
           const ao = a.suggested_grade_level_id ? (gradeSort.get(a.suggested_grade_level_id) ?? 999) : 999;
           const bo = b.suggested_grade_level_id ? (gradeSort.get(b.suggested_grade_level_id) ?? 999) : 999;
@@ -174,39 +122,19 @@ export function Subjects() {
           return (a.suggested_term ?? 999) - (b.suggested_term ?? 999);
         case "subject_type":
           return SUBJECT_TYPE_ORDER[a.subject_type] - SUBJECT_TYPE_ORDER[b.subject_type];
-        case "credits":
-          return a.credits - b.credits;
-        case "hours_per_week":
-          return a.hours_per_week - b.hours_per_week;
       }
     }
 
     list.sort((a, b) => {
-      for (let i = 0; i < keys.length; i++) {
-        const cmp = cmpKey(a, b, keys[i]!);
-        if (cmp !== 0) return i === 0 ? cmp * dir : cmp;
+      for (const k of keys) {
+        const cmp = cmpKey(a, b, k);
+        if (cmp !== 0) return cmp;
       }
       return 0;
     });
     return list;
-  }, [rows, sortKey, sortDir, areaById, gradeSort]);
+  }, [rows, gradeSort]);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const tableReady = Boolean(rows && rows.length > 0);
-  const pageSize = useFillPageSize(scrollRef, tableReady);
-  const { page, setPage, pageCount, pageRows } = usePagination(
-    sortedRows,
-    [filters, departmentId, sortKey, sortDir],
-    pageSize,
-  );
-
-  function onSort(key: SubjectSortKey) {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else {
-      setSortKey(key);
-      setSortDir("asc");
-    }
-  }
 
   const activeFilterCount = [
     filters.learningAreaId,
@@ -290,7 +218,7 @@ export function Subjects() {
               </li>
             ))}
           </ul>
-          <div className="table-panel hidden lg:flex">
+          <div className="table-panel table-bare hidden lg:flex">
             <table className="w-full text-xs">
               <thead className="bg-muted text-left text-xs text-muted-foreground">
                 <tr>
@@ -342,7 +270,7 @@ export function Subjects() {
       {departmentId && rows && rows.length > 0 && (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
           <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto lg:hidden">
-            {pageRows.map((row) => (
+            {sortedRows.map((row) => (
               <li key={row.id}>
                 <div
                   role={mayEdit ? "button" : undefined}
@@ -417,24 +345,24 @@ export function Subjects() {
             ))}
           </ul>
 
-          <div className="table-panel hidden lg:flex">
-            <div ref={scrollRef} className="table-panel-scroll">
+          <div className="table-panel table-bare hidden lg:flex">
+            <div className="table-panel-scroll">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
                   <tr>
-                    <SortTh label="รหัส" column="code" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-                    <SortTh label="ชื่อวิชา" column="name_th" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-                    <SortTh label="กลุ่มสาระ" column="learning_area" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-                    <SortTh label="ระดับชั้น" column="grade_level" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-                    <SortTh label="ภาคเรียน" column="term" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-                    <SortTh label="หน่วยกิต" column="credits" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-                    <SortTh label="จำนวนชั่วโมง" column="hours_per_week" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
-                    <SortTh label="ประเภท" column="subject_type" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                    <th className="px-3 py-2 font-medium">รหัส</th>
+                    <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
+                    <th className="px-3 py-2 font-medium">กลุ่มสาระ</th>
+                    <th className="px-3 py-2 font-medium">ระดับชั้น</th>
+                    <th className="px-3 py-2 font-medium">ภาคเรียน</th>
+                    <th className="px-3 py-2 font-medium">หน่วยกิต</th>
+                    <th className="px-3 py-2 font-medium">จำนวนชั่วโมง</th>
+                    <th className="px-3 py-2 font-medium">ประเภท</th>
                     {mayEdit && <th className="px-3 py-2" />}
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((row) => (
+                  {sortedRows.map((row) => (
                     <tr
                       key={row.id}
                       onClick={() => mayEdit && setEditing(row)}
@@ -497,7 +425,6 @@ export function Subjects() {
               </table>
             </div>
           </div>
-          <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </div>
       )}
 
@@ -716,7 +643,8 @@ function EditSubjectSheet({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!current) return;
-    if (!current.learning_area_id || !current.subject_type) return;
+    if (!current.code.trim() || !current.name_th.trim()) return toast("กรอกรหัสวิชาและชื่อวิชา", "error");
+    if (!current.learning_area_id || !current.subject_type) return toast("เลือกกลุ่มสาระและประเภทวิชา", "error");
     save.mutate(
       { ...current, ...(isNew ? {} : { id: (target as Subject).id }), ...(canSetCover ? { cover, coverFocus, sceneTheme } : {}) },
       {
@@ -753,8 +681,9 @@ function EditSubjectSheet({
       }
     >
       {current && (
-        <form id="edit-subject" onSubmit={submit} className="space-y-4">
+        <form id="edit-subject" onSubmit={submit} noValidate className="space-y-4">
           {canSetCover && (
+            <FormSection>
             <Field label="ปกวิชา">
               {(() => {
                 const shown = coverPreview !== undefined ? coverPreview : !isNew ? subjectCoverUrl(target as Subject) : null;
@@ -797,9 +726,7 @@ function EditSubjectSheet({
                 );
               })()}
             </Field>
-          )}
 
-          {canSetCover && (
             <Field label="ธีมฉากด่าน">
               <Select value={sceneTheme ?? savedTheme} onChange={(e) => setSceneTheme(e.target.value)}>
                 {Object.entries(SCENE_THEMES).map(([key, t]) => (
@@ -809,18 +736,18 @@ function EditSubjectSheet({
                 ))}
               </Select>
             </Field>
+            </FormSection>
           )}
 
-          <Field label="รหัสวิชา">
-            <Input value={current.code} onChange={(e) => setDraft({ ...current, code: e.target.value })} required />
+          <FormSection>
+          <Field label="รหัสวิชา" required>
+            <Input value={current.code} onChange={(e) => setDraft({ ...current, code: e.target.value })} />
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="ชื่อวิชา (ไทย)">
+          <Field label="ชื่อวิชา (ไทย)" required>
               <Input
                 value={current.name_th}
                 onChange={(e) => setDraft({ ...current, name_th: e.target.value })}
-                required
               />
             </Field>
             <Field label="ชื่อวิชา (อังกฤษ)">
@@ -829,13 +756,13 @@ function EditSubjectSheet({
                 onChange={(e) => setDraft({ ...current, name_en: e.target.value || null })}
               />
             </Field>
-          </div>
+          </FormSection>
 
-          <Field label="กลุ่มสาระการเรียนรู้">
+          <FormSection>
+          <Field label="กลุ่มสาระการเรียนรู้" required>
             <Select
               value={selectedTopId}
               onChange={(e) => setDraft({ ...current, learning_area_id: e.target.value })}
-              required
               placeholder="เลือกสาระการเรียนรู้"
             >
               {topLevelAreas.map((a) => (
@@ -889,7 +816,7 @@ function EditSubjectSheet({
             </Field>
           )}
 
-          <Field label="ประเภทวิชา">
+          <Field label="ประเภทวิชา" required>
             <Select
               value={current.subject_type}
               onChange={(e) => {
@@ -901,7 +828,6 @@ function EditSubjectSheet({
                   grading_method: subject_type === "activity" ? "pass_fail" : "graded",
                 });
               }}
-              required
               placeholder="เลือกประเภทวิชา"
             >
               {(Object.keys(SUBJECT_TYPE_LABEL) as SubjectType[]).map((t) => (
@@ -912,11 +838,10 @@ function EditSubjectSheet({
             </Select>
           </Field>
 
-          <Field label="วิธีประเมินผล">
+          <Field label="วิธีประเมินผล" required>
             <Select
               value={current.grading_method}
               onChange={(e) => setDraft({ ...current, grading_method: e.target.value as GradingMethod })}
-              required
             >
               {(Object.keys(GRADING_METHOD_LABEL) as GradingMethod[]).map((g) => (
                 <option key={g} value={g}>
@@ -925,31 +850,27 @@ function EditSubjectSheet({
               ))}
             </Select>
           </Field>
+          </FormSection>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="หน่วยกิต">
+          <FormSection>
+            <Field label="หน่วยกิต" required>
               <Input
                 type="number"
                 step="0.5"
                 min="0"
                 value={current.credits}
                 onChange={(e) => setDraft({ ...current, credits: Number(e.target.value) })}
-                required
               />
             </Field>
-            <Field label="ชั่วโมง/สัปดาห์">
+            <Field label="ชั่วโมง/สัปดาห์" required>
               <Input
                 type="number"
                 min="0"
                 step="1"
                 value={current.hours_per_week}
                 onChange={(e) => setDraft({ ...current, hours_per_week: Number(e.target.value) })}
-                required
               />
             </Field>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <Field label="ระดับชั้นที่แนะนำ">
               <Select
                 value={current.suggested_grade_level_id ?? ""}
@@ -973,9 +894,10 @@ function EditSubjectSheet({
                 <option value="2">เทอม 2</option>
               </Select>
             </Field>
-          </div>
+          </FormSection>
 
           {!isNew && (
+            <FormSection>
             <Field label="สถานะ">
               <Select
                 value={current.is_active ? "active" : "inactive"}
@@ -985,6 +907,7 @@ function EditSubjectSheet({
                 <option value="inactive">ปิดใช้งาน</option>
               </Select>
             </Field>
+            </FormSection>
           )}
         </form>
       )}

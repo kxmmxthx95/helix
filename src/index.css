@@ -482,6 +482,12 @@
     background-color: hsl(var(--muted));
   }
 
+  /* Borderless variant: no card shadow/fill, rows sit on the page. */
+  .table-panel.table-bare {
+    background: none;
+    box-shadow: none;
+    border-radius: 0;
+  }
   .table-panel-scroll {
     min-height: 0;
     flex: 1 1 auto;
@@ -494,7 +500,7 @@
     flex: 1 1 auto;
     flex-direction: column;
     gap: 1rem;
-    padding-bottom: 2rem;
+    padding-bottom: 0.5rem;
   }
 
   /* Page that owns its bottom gutter (stat cards pinned to the bottom): drop <main>'s own bottom padding so short and long pages end the same distance from the edge. */
