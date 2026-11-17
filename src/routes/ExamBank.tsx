@@ -497,7 +497,7 @@ function useQuestionForm({
     setDifficulty,
     topic,
     setTopic,
-    /** Topic comes from a ผังการเรียน topic — shown, not editable. */
+    /** Question belongs to a ผังการเรียน topic — the free-text topic field is hidden. */
     topicLocked: !!planTopicId,
     choices,
     setChoices,
@@ -599,15 +599,11 @@ function QuestionFormFields(form: ReturnType<typeof useQuestionForm>) {
         />
       )}
 
-      <Field label={form.topicLocked ? "ชื่อเนื้อหา" : "ชื่อเนื้อหา (ไม่บังคับ)"}>
-        <Input
-          value={form.topic}
-          onChange={(e) => form.setTopic(e.target.value)}
-          placeholder="เช่น สมการเชิงเส้น"
-          readOnly={form.topicLocked}
-          className={form.topicLocked ? "cursor-default bg-muted text-muted-foreground focus-visible:border-input" : undefined}
-        />
-      </Field>
+      {!form.topicLocked && (
+        <Field label="ชื่อเนื้อหา (ไม่บังคับ)">
+          <Input value={form.topic} onChange={(e) => form.setTopic(e.target.value)} placeholder="เช่น สมการเชิงเส้น" />
+        </Field>
+      )}
     </div>
   );
 }
