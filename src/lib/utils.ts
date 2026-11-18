@@ -18,12 +18,3 @@ const BANGKOK_HOUR = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Bangkok"
 export function leaveClosedForToday() {
   return Number(BANGKOK_HOUR.format(new Date())) >= 8;
 }
-
-/** Earliest selectable leave start date: tomorrow once today's cutoff has passed. */
-export function minLeaveStartIso() {
-  const today = todayIso();
-  if (!leaveClosedForToday()) return today;
-  const d = new Date(`${today}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + 1);
-  return d.toISOString().slice(0, 10);
-}

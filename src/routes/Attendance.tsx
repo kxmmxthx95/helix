@@ -25,6 +25,7 @@ import {
   type PendingStudentLeaveRequest,
 } from "@/hooks/useStudentLeave";
 import { leaveAttachmentUrl } from "@/hooks/useLeave";
+import { StudentLeaveSection } from "@/routes/Dashboard";
 import type { AttendanceRecord, AttendanceStatus } from "@/lib/database.types";
 import { avatarUrl } from "@/hooks/useAvatar";
 import type { StudentListItem } from "@/hooks/useStudents";
@@ -335,7 +336,7 @@ export function Attendance() {
       </Sheet>
 
       {view === "leave_requests" ? (
-        <LeaveRequestsPanel approverId={me.id} />
+        <LeaveRequestsPanel approverId={me.id} classroomId={classroomId} academicYear={academicYear} />
       ) : !classroomId ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
@@ -369,9 +370,50 @@ export function Attendance() {
 // src/routes/Leave.tsx. Approval auto-fills attendance_records via a DB
 // trigger (migration 0035) — nothing to do here beyond flipping the status.
 
-function LeaveRequestsPanel({ approverId }: { approverId: string }) {
+function LeaveRequestsPanel({ approverId, classroomId, academicYear }: { approverId: string; classroomId: string | null; academicYear: number }) {
   const { data: pending = [], isLoading } = usePendingStudentLeaveApprovals();
   const setStatus = useSetStudentLeaveStatus();
+  return (
+    <div className="space-y-4">
+      <FileLeaveForStudent filerId={approverId} classroomId={classroomId} academicYear={academicYear} />
+      <PendingLeaveList approverId={approverId} pending={pending} isLoading={isLoading} setStatus={setStatus} />
+    </div>
+  );
+}
+
+/** Teacher/manager files leave for a student of the picked room — saved already approved (migration 0178), so it works after the 08:00 cutoff. */
+function FileLeaveForStudent({ filerId, classroomId, academicYear }: { filerId: string; classroomId: string | null; academicYear: number }) {
+  const { data: roster = [] } = useClassroomRoster(classroomId, academicYear);
+  const [studentId, setStudentId] = useState("");
+  const student = roster.find((s) => s.id === studentId);
+  useEffect(() => setStudentId(""), [classroomId]);
+  if (!classroomId) return null;
+  return (
+    <Card className="space-y-3">
+      <p className="text-sm font-medium">ยื่นลาแทนนักเรียน</p>
+      <Select value={studentId} onChange={(e) => setStudentId(e.target.value)} aria-label="นักเรียน" placeholder="เลือกนักเรียน">
+        {roster.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.student_code} · {s.first_name} {s.last_name}
+          </option>
+        ))}
+      </Select>
+      {student && <StudentLeaveSection key={student.id} student={student} submittedBy={filerId} showName={false} onBehalf />}
+    </Card>
+  );
+}
+
+function PendingLeaveList({
+  approverId,
+  pending,
+  isLoading,
+  setStatus,
+}: {
+  approverId: string;
+  pending: PendingStudentLeaveRequest[];
+  isLoading: boolean;
+  setStatus: ReturnType<typeof useSetStudentLeaveStatus>;
+}) {
 
   if (isLoading) {
     return (

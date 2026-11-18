@@ -82,6 +82,8 @@ export function useRequestStudentLeave() {
       reason: string;
       leaveTypeId: string;
       file: File | null;
+      /** Teacher/manager filing for the student: inserted already approved (migration 0178). */
+      onBehalf?: boolean;
     }) => {
       const attachmentPath = params.file ? await uploadLeaveAttachment(params.submittedBy, params.file) : null;
       const { error } = await supabase.from("student_leave_requests").insert({
@@ -92,10 +94,18 @@ export function useRequestStudentLeave() {
         reason: params.reason,
         leave_type_id: params.leaveTypeId,
         attachment_path: attachmentPath,
+        ...(params.onBehalf && {
+          status: "approved" as const,
+          approved_by: params.submittedBy,
+          approved_at: new Date().toISOString(),
+        }),
       });
       if (error) throw error;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["student_leave_requests"] }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["student_leave_requests"] });
+      void qc.invalidateQueries({ queryKey: ["attendance_records"] });
+    },
   });
 }
 

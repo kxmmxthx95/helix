@@ -40,7 +40,7 @@ import {
 import { useDepartments, useRoleSubtitle } from "@/hooks/useProfiles";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { avatarUrl } from "@/hooks/useAvatar";
-import { cn, leaveClosedForToday, minLeaveStartIso, todayIso } from "@/lib/utils";
+import { cn, leaveClosedForToday, todayIso } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
 import { bangkokTime } from "@/routes/TimeTracking";
 import { dayCount } from "@/routes/NewLeaveSheet";
@@ -1324,7 +1324,7 @@ export function BehaviorScoreSection({ student, showName = true }: { student: St
 }
 
 /** role="student"/"parent" only — teacher/admin approve these at Attendance.tsx's "คำขอลา" view instead. */
-export function StudentLeaveSection({ student, submittedBy, showName = true }: { student: Student; submittedBy: string; showName?: boolean }) {
+export function StudentLeaveSection({ student, submittedBy, showName = true, onBehalf = false }: { student: Student; submittedBy: string; showName?: boolean; onBehalf?: boolean }) {
   const toast = useToast();
   const { data, isLoading, isError, refetch } = useStudentLeaveRequests(student.id);
   const requests = data ?? [];
@@ -1344,6 +1344,9 @@ export function StudentLeaveSection({ student, submittedBy, showName = true }: {
   const needsAttachment =
     !!selectedType?.requires_attachment_after_days && days > selectedType.requires_attachment_after_days && !file;
   const err = (bad: boolean, msg: string) => (attempted && bad ? msg : undefined);
+  // Mirrors check_student_leave_cutoff() (0177/0178); teachers filing on behalf are exempt.
+  const today = todayIso();
+  const cutoffBlocked = !onBehalf && leaveClosedForToday() && !!startDate && !!endDate && startDate <= today && endDate >= today;
 
   function reset() {
     setLeaveTypeId("");
@@ -1356,17 +1359,17 @@ export function StudentLeaveSection({ student, submittedBy, showName = true }: {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    const invalid = [!leaveTypeId, !startDate, !endDate || (!!startDate && endDate < startDate), !reason.trim(), needsAttachment].filter(Boolean).length;
+    const invalid = [!leaveTypeId, !startDate, !endDate || (!!startDate && endDate < startDate), !reason.trim(), needsAttachment, cutoffBlocked].filter(Boolean).length;
     if (invalid) {
       setAttempted(true);
       toast(`กรอกข้อมูลให้ถูกต้อง (${invalid} ช่อง)`, "error");
       return;
     }
     request.mutate(
-      { studentId: student.id, submittedBy, leaveTypeId, startDate, endDate, reason: reason.trim(), file },
+      { studentId: student.id, submittedBy, leaveTypeId, startDate, endDate, reason: reason.trim(), file, onBehalf },
       {
         onSuccess: () => {
-          toast("ส่งคำขอลาสำเร็จ");
+          toast(onBehalf ? "บันทึกการลาสำเร็จ" : "ส่งคำขอลาสำเร็จ");
           reset();
           setTab("history");
         },
@@ -1408,8 +1411,10 @@ export function StudentLeaveSection({ student, submittedBy, showName = true }: {
 
       {tab === "form" && (
         <form className="space-y-4" onSubmit={submit} noValidate>
-          {leaveClosedForToday() && (
-            <p className="px-1 text-xs text-muted-foreground">เลย 08:00 น. แล้ว ยื่นลาวันนี้ไม่ได้ เลือกวันเริ่มตั้งแต่พรุ่งนี้ หรือติดต่อครูประจำชั้น</p>
+          {!onBehalf && leaveClosedForToday() && (
+            <p className={cn("px-1 text-xs", attempted && cutoffBlocked ? "text-destructive" : "text-muted-foreground")}>
+              เลย 08:00 น. แล้ว ยื่นลาที่รวมวันนี้ไม่ได้ ติดต่อครูประจำชั้น หรือยื่นแยกเป็นช่วงก่อนวันนี้/ตั้งแต่พรุ่งนี้
+            </p>
           )}
           <FormSection>
             <Field label="ประเภทการลา" required error={err(!leaveTypeId, "เลือกประเภทการลา")}>
@@ -1422,10 +1427,10 @@ export function StudentLeaveSection({ student, submittedBy, showName = true }: {
               </Select>
             </Field>
             <Field label="วันเริ่ม" required error={err(!startDate, "เลือกวันเริ่ม")}>
-              <Input type="date" value={startDate} min={minLeaveStartIso()} onChange={(e) => setStartDate(e.target.value)} />
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </Field>
             <Field label="วันสิ้นสุด" required error={err(!endDate, "เลือกวันสิ้นสุด") ?? err(!!startDate && !!endDate && endDate < startDate, "ต้องไม่ก่อนวันเริ่ม")}>
-              <Input type="date" value={endDate} min={startDate || minLeaveStartIso()} onChange={(e) => setEndDate(e.target.value)} />
+              <Input type="date" value={endDate} min={startDate || undefined} onChange={(e) => setEndDate(e.target.value)} />
             </Field>
             <div className="flex min-h-[3.25rem] items-center justify-between gap-4 text-sm leading-5">
               <span>รวม</span>
@@ -1457,7 +1462,7 @@ export function StudentLeaveSection({ student, submittedBy, showName = true }: {
               ยกเลิก
             </Button>
             <Button type="submit" className="flex-1" disabled={request.isPending}>
-              {request.isPending ? <Spinner className="h-3 w-3" /> : "ส่งคำขอ"}
+              {request.isPending ? <Spinner className="h-3 w-3" /> : onBehalf ? "บันทึกการลา" : "ส่งคำขอ"}
             </Button>
           </div>
         </form>
