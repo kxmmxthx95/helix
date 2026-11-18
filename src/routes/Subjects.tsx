@@ -137,6 +137,7 @@ export function Subjects() {
 
 
   const activeFilterCount = [
+    orgWide ? pickedDept : "",
     filters.learningAreaId,
     filters.gradeLevelId,
     filters.term ? String(filters.term) : "",
@@ -148,21 +149,6 @@ export function Subjects() {
     <div className="page-fill">
       <div className="flex shrink-0 flex-col gap-2">
         <div className="flex gap-2">
-          {orgWide && pickableDepartments.length > 0 && (
-            <Select
-              className="w-40 shrink-0"
-              value={pickedDept}
-              onChange={(e) => setPickedDept(e.target.value)}
-              aria-label="แผนก"
-              placeholder="เลือกแผนก"
-            >
-              {pickableDepartments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </Select>
-          )}
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -257,7 +243,7 @@ export function Subjects() {
 
       {!departmentId && (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="เลือกแผนก" description="เลือกแผนกด้านบนเพื่อดูรายวิชา" />
+          <EmptyState title="เลือกแผนก" description="เลือกแผนกในตัวกรองเพื่อดูรายวิชา" />
         </div>
       )}
 
@@ -444,6 +430,18 @@ export function Subjects() {
         }
       >
         <div className="space-y-4">
+          <FormSection>
+          {orgWide && pickableDepartments.length > 0 && (
+            <Field label="แผนก">
+              <Select value={pickedDept} onChange={(e) => setPickedDept(e.target.value)} placeholder="เลือกแผนก">
+                {pickableDepartments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
           <Field label="กลุ่มสาระการเรียนรู้">
             <Select
               value={filters.learningAreaId}
@@ -472,6 +470,9 @@ export function Subjects() {
             </Select>
           </Field>
 
+          </FormSection>
+
+          <FormSection>
           <Field label="ภาคเรียน">
             <Select
               value={filters.term ? String(filters.term) : ""}
@@ -508,6 +509,7 @@ export function Subjects() {
               <option value="all">ทั้งหมด (รวมปิดใช้งาน)</option>
             </Select>
           </Field>
+          </FormSection>
         </div>
       </Sheet>
 
