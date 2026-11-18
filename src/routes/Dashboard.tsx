@@ -40,7 +40,7 @@ import {
 import { useDepartments, useRoleSubtitle } from "@/hooks/useProfiles";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { avatarUrl } from "@/hooks/useAvatar";
-import { cn, todayIso } from "@/lib/utils";
+import { cn, leaveClosedForToday, minLeaveStartIso, todayIso } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
 import { bangkokTime } from "@/routes/TimeTracking";
 import { dayCount } from "@/routes/NewLeaveSheet";
@@ -1408,6 +1408,9 @@ export function StudentLeaveSection({ student, submittedBy, showName = true }: {
 
       {tab === "form" && (
         <form className="space-y-4" onSubmit={submit} noValidate>
+          {leaveClosedForToday() && (
+            <p className="px-1 text-xs text-muted-foreground">เลย 08:00 น. แล้ว ยื่นลาวันนี้ไม่ได้ เลือกวันเริ่มตั้งแต่พรุ่งนี้ หรือติดต่อครูประจำชั้น</p>
+          )}
           <FormSection>
             <Field label="ประเภทการลา" required error={err(!leaveTypeId, "เลือกประเภทการลา")}>
               <Select value={leaveTypeId} onChange={(e) => setLeaveTypeId(e.target.value)} placeholder="เลือกประเภท">
@@ -1419,10 +1422,10 @@ export function StudentLeaveSection({ student, submittedBy, showName = true }: {
               </Select>
             </Field>
             <Field label="วันเริ่ม" required error={err(!startDate, "เลือกวันเริ่ม")}>
-              <Input type="date" value={startDate} min={todayIso()} onChange={(e) => setStartDate(e.target.value)} />
+              <Input type="date" value={startDate} min={minLeaveStartIso()} onChange={(e) => setStartDate(e.target.value)} />
             </Field>
             <Field label="วันสิ้นสุด" required error={err(!endDate, "เลือกวันสิ้นสุด") ?? err(!!startDate && !!endDate && endDate < startDate, "ต้องไม่ก่อนวันเริ่ม")}>
-              <Input type="date" value={endDate} min={startDate || todayIso()} onChange={(e) => setEndDate(e.target.value)} />
+              <Input type="date" value={endDate} min={startDate || minLeaveStartIso()} onChange={(e) => setEndDate(e.target.value)} />
             </Field>
             <div className="flex min-h-[3.25rem] items-center justify-between gap-4 text-sm leading-5">
               <span>รวม</span>

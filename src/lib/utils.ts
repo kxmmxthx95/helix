@@ -11,3 +11,19 @@ const BANGKOK_DATE = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok"
 export function todayIso() {
   return BANGKOK_DATE.format(new Date());
 }
+
+const BANGKOK_HOUR = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Bangkok", hour: "2-digit", hourCycle: "h23" });
+
+/** Student leave for today closes at 08:00 Thailand time (mirrors check_student_leave_cutoff(), migration 0177). */
+export function leaveClosedForToday() {
+  return Number(BANGKOK_HOUR.format(new Date())) >= 8;
+}
+
+/** Earliest selectable leave start date: tomorrow once today's cutoff has passed. */
+export function minLeaveStartIso() {
+  const today = todayIso();
+  if (!leaveClosedForToday()) return today;
+  const d = new Date(`${today}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
