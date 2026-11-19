@@ -588,7 +588,7 @@ function EditSubjectSheet({
   // cover: undefined = unchanged, null = remove, File = new image. coverPreview is what the form shows.
   const [cover, setCover] = useState<File | null | undefined>(undefined);
   const [coverPreview, setCoverPreview] = useState<string | null | undefined>(undefined);
-  const canSetCover = me ? isOrgWide(me.roles) : false;
+  const canSetCover = me ? canManage(me.roles) : false;
   // undefined = unchanged; set when the admin drags, or reset to 50/50 on a new/removed cover.
   const [coverFocus, setCoverFocus] = useState<{ x: number; y: number } | undefined>(undefined);
   const savedFocus = target && target !== "new" ? { x: target.cover_focus_x, y: target.cover_focus_y } : { x: 50, y: 50 };
