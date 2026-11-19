@@ -155,7 +155,19 @@ function PeriodCheckInPanel({
     return events.find((ev) => eventApplies(ev, departmentId, grade) && periodReplaced(date, times ?? {}, [ev]))?.name ?? null;
   };
 
-  const openEntry = todaysEntries.find((e) => e.id === openEntryId && !replacedBy(e)) ?? null;
+  // Back-to-back periods of the same assignment (no break between, none replaced by an activity) are checked once.
+  const groups: ScheduleEntryRow[][] = [];
+  for (const e of todaysEntries) {
+    const g = replacedBy(e)
+      ? undefined
+      : groups.find((g) => {
+          const last = g[g.length - 1]!;
+          return last.teaching_assignment_id === e.teaching_assignment_id && last.period_no + 1 === e.period_no && !replacedBy(last);
+        });
+    if (g) g.push(e);
+    else groups.push([e]);
+  }
+  const openGroup = groups.find((g) => g.some((e) => e.id === openEntryId) && !replacedBy(g[0]!)) ?? null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -222,11 +234,11 @@ function PeriodCheckInPanel({
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="ไม่พบข้อมูล" description="ไม่มีคาบสอนของคุณในวันนี้" />
         </div>
-      ) : openEntry ? (
+      ) : openGroup ? (
         <PeriodCheckInGrid
-          key={`${openEntry.id}-${date}`}
-          entry={openEntry}
-          subject={subjects.find((s) => s.id === openEntry.teaching_assignment.subject_id) ?? null}
+          key={`${openGroup[0]!.id}-${date}`}
+          entries={openGroup}
+          subject={subjects.find((s) => s.id === openGroup[0]!.teaching_assignment.subject_id) ?? null}
           date={date}
           academicYear={academicYear}
           recorderId={recorderId}
@@ -248,7 +260,8 @@ function PeriodCheckInPanel({
                 </tr>
               </thead>
               <tbody>
-                {todaysEntries.map((e) => {
+                {groups.map((g) => {
+                  const e = g[0]!;
                   const subject = subjects.find((s) => s.id === e.teaching_assignment.subject_id);
                   const classroom = classroomOf(e.teaching_assignment.classroom_id);
                   const activity = replacedBy(e);
@@ -258,7 +271,7 @@ function PeriodCheckInPanel({
                       onClick={activity ? undefined : () => setOpenEntryId(e.id)}
                       className={cn("border-t border-border", activity ? "text-muted-foreground" : "cursor-pointer hover:bg-muted/50")}
                     >
-                      <td className="px-3 py-2 text-muted-foreground">{e.period_no}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{periodRange(g)}</td>
                       <td className="truncate px-3 py-2">{subject?.code ?? "—"}</td>
                       <td className="truncate px-3 py-2">{subject?.name_th ?? "—"}</td>
                       <td className="truncate px-3 py-2">{department?.name ?? "—"}</td>
@@ -291,15 +304,18 @@ function PeriodCheckInPanel({
   );
 }
 
+const periodRange = (g: ScheduleEntryRow[]) =>
+  g.length === 1 ? g[0]!.period_no : `${g[0]!.period_no}-${g[g.length - 1]!.period_no}`;
+
 function PeriodCheckInGrid({
-  entry,
+  entries,
   subject,
   date,
   academicYear,
   recorderId,
   onBack,
 }: {
-  entry: ScheduleEntryRow;
+  entries: ScheduleEntryRow[];
   subject: Subject | null;
   date: string;
   academicYear: number;
@@ -307,6 +323,7 @@ function PeriodCheckInGrid({
   onBack: () => void;
 }) {
   const toast = useToast();
+  const entry = entries[0]!; // marks are read from the first period; save writes every period in the group
   const { data: roster = [], isLoading: rosterLoading } = useClassroomRoster(
     entry.teaching_assignment.classroom_id,
     academicYear,
@@ -376,17 +393,16 @@ function PeriodCheckInGrid({
   }
 
   function submit() {
-    const rows: PeriodAttendanceDraft[] = roster.map((s) => {
-      const mark = marks.get(s.id)!;
-      return {
+    const rows: PeriodAttendanceDraft[] = entries.flatMap((en) =>
+      roster.map((s) => ({
         student_id: s.id,
-        schedule_entry_id: entry.id,
+        schedule_entry_id: en.id,
         date,
         status: statusOf(s.id) as AttendanceStatus,
-        note: mark.note.trim() || null,
+        note: marks.get(s.id)!.note.trim() || null,
         recorded_by: recorderId,
-      };
-    });
+      })),
+    );
     save.mutate(rows, {
       onSuccess: () => toast("บันทึกเช็คชื่อสำเร็จ"),
       onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
@@ -406,7 +422,7 @@ function PeriodCheckInGrid({
           <ChevronBack className="h-4 w-4" />
         </button>
         <span className="min-w-0 truncate text-xs text-muted-foreground">
-          คาบ {entry.period_no} · {subject?.code ?? "—"} {subject?.name_th ?? ""}
+          คาบ {periodRange(entries)} · {subject?.code ?? "—"} {subject?.name_th ?? ""}
         </span>
         <div className="ml-auto flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={markAllPresent}>
