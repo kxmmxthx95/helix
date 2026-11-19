@@ -17,6 +17,7 @@ import {
   type SubjectDraft,
   type SubjectFilters,
 } from "@/hooks/useCurriculum";
+import { libraryCoverUrl, useSubjectCoverLibrary } from "@/hooks/useSubjectCovers";
 import { useAllGradeLevels, useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
 import type { GradingMethod, GradeLevel, LearningArea, Subject, SubjectType } from "@/lib/database.types";
@@ -588,6 +589,8 @@ function EditSubjectSheet({
   // cover: undefined = unchanged, null = remove, File = new image. coverPreview is what the form shows.
   const [cover, setCover] = useState<File | null | undefined>(undefined);
   const [coverPreview, setCoverPreview] = useState<string | null | undefined>(undefined);
+  const [coverId, setCoverId] = useState<string | undefined>(undefined);
+  const { data: coverLibrary = [] } = useSubjectCoverLibrary();
   const canSetCover = me ? canManage(me.roles) : false;
   // undefined = unchanged; set when the admin drags, or reset to 50/50 on a new/removed cover.
   const [coverFocus, setCoverFocus] = useState<{ x: number; y: number } | undefined>(undefined);
@@ -625,6 +628,7 @@ function EditSubjectSheet({
     setAddingSubArea(false);
     setCover(undefined);
     setCoverPreview(undefined);
+    setCoverId(undefined);
     setCoverFocus(undefined);
     setSceneTheme(undefined);
   }, [target]);
@@ -648,7 +652,7 @@ function EditSubjectSheet({
     if (!current.code.trim() || !current.name_th.trim()) return toast("กรอกรหัสวิชาและชื่อวิชา", "error");
     if (!current.learning_area_id || !current.subject_type) return toast("เลือกกลุ่มสาระและประเภทวิชา", "error");
     save.mutate(
-      { ...current, ...(isNew ? {} : { id: (target as Subject).id }), ...(canSetCover ? { cover, coverFocus, sceneTheme } : {}) },
+      { ...current, ...(isNew ? {} : { id: (target as Subject).id }), ...(canSetCover ? { cover, coverId, coverFocus, sceneTheme } : {}) },
       {
         onSuccess: () => toast("บันทึกวิชาสำเร็จ"),
         onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
@@ -710,6 +714,7 @@ function EditSubjectSheet({
                             if (!f) return;
                             if (f.size > 10 * 1024 * 1024) return toast("ไฟล์ใหญ่เกิน 10 MB", "error");
                             setCover(f);
+                            setCoverId(undefined);
                             setCoverFocus({ x: 50, y: 50 });
                             setCoverPreview(URL.createObjectURL(f));
                           }}
@@ -719,7 +724,7 @@ function EditSubjectSheet({
                         แนะนำ 1600×1000 px (สัดส่วน 16:10) JPG/PNG/WebP ไม่เกิน 10 MB วางส่วนสำคัญไว้กลางภาพ เพราะการ์ดบางขนาดจะตัดขอบ{shown && " · ลากรูปในกรอบเพื่อปรับตำแหน่ง"}
                       </p>
                       {shown && (
-                        <button type="button" className="text-sm font-medium text-destructive" onClick={() => { setCover(null); setCoverPreview(null); setCoverFocus({ x: 50, y: 50 }); }}>
+                        <button type="button" className="text-sm font-medium text-destructive" onClick={() => { setCover(null); setCoverId(undefined); setCoverPreview(null); setCoverFocus({ x: 50, y: 50 }); }}>
                           ลบปก
                         </button>
                       )}
@@ -728,6 +733,29 @@ function EditSubjectSheet({
                 );
               })()}
             </Field>
+
+            {coverLibrary.length > 0 && (
+              <Field label="เลือกจากคลังปก">
+                <Select
+                  value={coverId ?? (coverPreview === undefined && !isNew ? (target as Subject).cover_id ?? "" : "")}
+                  onChange={(e) => {
+                    const c = coverLibrary.find((x) => x.id === e.target.value);
+                    if (!c) return;
+                    setCoverId(c.id);
+                    setCover(undefined);
+                    setCoverPreview(libraryCoverUrl(c));
+                    setCoverFocus({ x: 50, y: 50 });
+                  }}
+                  placeholder="เลือกปก"
+                >
+                  {coverLibrary.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
 
             <Field label="ธีมฉากด่าน">
               <Select value={sceneTheme ?? savedTheme} onChange={(e) => setSceneTheme(e.target.value)}>

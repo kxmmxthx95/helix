@@ -94,13 +94,13 @@ export function useSaveSubject() {
   const qc = useQueryClient();
 
   return useMutation({
-    // cover: undefined = leave as is, null = remove, File = replace.
-    mutationFn: async ({ id, cover, coverFocus, sceneTheme, ...draft }: SubjectDraft & { id?: string; cover?: File | null; coverFocus?: { x: number; y: number }; sceneTheme?: string }) => {
+    // cover: undefined = leave as is, null = remove, File = replace. coverId: library cover to bind (DB trigger sets cover_path).
+    mutationFn: async ({ id, cover, coverId, coverFocus, sceneTheme, ...draft }: SubjectDraft & { id?: string; cover?: File | null; coverId?: string; coverFocus?: { x: number; y: number }; sceneTheme?: string }) => {
       const { subject_type, learning_area_id, ...rest } = draft;
       if (!learning_area_id || !subject_type) {
         throw new Error("กรุณาเลือกกลุ่มสาระและประเภทวิชา");
       }
-      const row = { ...rest, learning_area_id, subject_type, ...(cover === null ? { cover_path: null } : {}), ...(sceneTheme ? { scene_theme: sceneTheme } : {}), ...(coverFocus ? { cover_focus_x: Math.round(coverFocus.x), cover_focus_y: Math.round(coverFocus.y) } : {}) };
+      const row = { ...rest, learning_area_id, subject_type, ...(cover === null ? { cover_path: null, cover_id: null } : {}), ...(coverId ? { cover_id: coverId } : {}), ...(sceneTheme ? { scene_theme: sceneTheme } : {}), ...(coverFocus ? { cover_focus_x: Math.round(coverFocus.x), cover_focus_y: Math.round(coverFocus.y) } : {}) };
       const saved = id
         ? await supabase.from("subjects").update(row).eq("id", id).select("id").single()
         : await supabase.from("subjects").insert(row).select("id").single();
@@ -110,7 +110,7 @@ export function useSaveSubject() {
         const blob = await compressImage(cover, 1600, 0.82);
         const up = await supabase.storage.from("subject-covers").upload(sid, blob, { upsert: true, contentType: "image/jpeg" });
         if (up.error) throw up.error;
-        const { error } = await supabase.from("subjects").update({ cover_path: sid }).eq("id", sid);
+        const { error } = await supabase.from("subjects").update({ cover_id: null, cover_path: sid }).eq("id", sid);
         if (error) throw error;
       }
     },

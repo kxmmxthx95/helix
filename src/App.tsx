@@ -44,6 +44,7 @@ import { CardTopupForm } from "@/routes/CardTopupForm";
 import { StudentCards } from "@/routes/StudentCards";
 import { Tuition } from "@/routes/Tuition";
 import { Leave } from "@/routes/Leave";
+import { SubjectCovers } from "@/routes/SubjectCovers";
 import { LineNotifications } from "@/routes/LineNotifications";
 import { DutyRoster } from "@/routes/DutyRoster";
 import { PeriodAttendance } from "@/routes/PeriodAttendance";
@@ -132,6 +133,7 @@ function Gate() {
         <Route path="staff-attendance" element={<Navigate to="/time-tracking?tab=report" replace />} />
         <Route path="status" element={<StatusManagement />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="subject-covers" element={<SubjectCovers />} />
         <Route path="line-notifications" element={<LineNotifications />} />
         <Route path="profile" element={<Profile />} />
       </Route>

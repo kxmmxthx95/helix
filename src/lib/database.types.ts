@@ -483,13 +483,17 @@ export type Subject = {
   suggested_grade_level_id: string | null;
   suggested_term: number | null;
   is_active: boolean; // soft delete — past academic years may still reference a retired subject
-  cover_path: string | null; // object name in the subject-covers bucket (0134)
+  cover_path: string | null; // object name in the subject-covers bucket (0134); "lib/<cover_id>" when bound to a library cover (0180)
+  cover_id: string | null; // subject_cover_library row this subject is bound to (0180)
   cover_focus_x: number; // focal point of the cover, % 0–100 (0136)
   cover_focus_y: number;
   scene_theme: string; // key of SCENE_THEMES (0137)
   created_at: string;
   updated_at: string;
 };
+
+/** คลังปกรายวิชา (0180) — the image is the object lib/<id> in the subject-covers bucket. */
+export type SubjectCoverLibrary = { id: string; name: string; created_at: string; updated_at: string };
 
 /** แผนการเรียน (วิทย์-คณิต, ศิลป์-คำนวณ, ...) — used by SEC only, but not department-tagged itself. */
 export type StudyPlan = {
@@ -1703,9 +1707,10 @@ export type Database = {
         Subject,
         InsertOf<
           Subject,
-          "name_en" | "is_active" | "suggested_grade_level_id" | "suggested_term" | "grading_method" | "cover_path" | "cover_focus_x" | "cover_focus_y" | "scene_theme"
+          "name_en" | "is_active" | "suggested_grade_level_id" | "suggested_term" | "grading_method" | "cover_path" | "cover_id" | "cover_focus_x" | "cover_focus_y" | "scene_theme"
         >
       >;
+      subject_cover_library: Table<SubjectCoverLibrary, InsertOf<SubjectCoverLibrary, never>>;
       study_plans: Table<StudyPlan, InsertOf<StudyPlan, never>>;
       grade_levels: Table<GradeLevel, InsertOf<GradeLevel, "sort_order" | "is_entry_point">>;
       curriculum_cohorts: Table<CurriculumCohort, InsertOf<CurriculumCohort, never>>;
