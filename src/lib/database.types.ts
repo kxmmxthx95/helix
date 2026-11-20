@@ -792,9 +792,19 @@ export type ExamSession = {
   review_released: boolean;
   /** Per-exam code + single-device lock (migration 0132). Default on; turning it off is logged. */
   strict_mode: boolean;
+  /** Migration 0181 — students only see/start an 'approved' session. */
+  approval_status: ExamApprovalStatus;
+  approval_note: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
   created_at: string;
   updated_at: string;
 };
+
+export type ExamApprovalStatus = "draft" | "pending" | "approved" | "rejected";
+
+/** ผังการเรียน topic a session covers (migration 0181). */
+export type ExamSessionTopic = { session_id: string; topic_id: string };
 
 /** Which of the teacher's own teaching_assignments (classrooms) a session is open to. */
 export type ExamSessionTarget = {
@@ -1888,8 +1898,13 @@ export type Database = {
           | "sync_to_gradebook"
           | "gradebook_item_id"
           | "review_released"
+          | "approval_status"
+          | "approval_note"
+          | "approved_by"
+          | "approved_at"
         >
       >;
+      exam_session_topics: Table<ExamSessionTopic, ExamSessionTopic>;
       exam_session_targets: Table<ExamSessionTarget, ExamSessionTarget>;
       exam_session_questions: Table<ExamSessionQuestion, ExamSessionQuestion>;
       exam_attempts: Table<
@@ -1998,6 +2013,9 @@ export type Database = {
         Args: { p_attempt_id: string };
         Returns: void;
       };
+      submit_exam_session: { Args: { p_id: string }; Returns: undefined };
+      decide_exam_session: { Args: { p_id: string; p_approve: boolean; p_note?: string | null }; Returns: undefined };
+      exam_approval_queue: { Args: Record<string, never>; Returns: ExamSession[] };
       verify_exam_code: { Args: { p_session_id: string; p_code: string }; Returns: "ok" | "wrong" | "locked" };
       unlock_exam_code: { Args: { p_session_id: string; p_student_id: string }; Returns: void };
       claim_exam_attempt: { Args: { p_attempt_id: string }; Returns: ExamClaimStatus };
@@ -2204,6 +2222,7 @@ export type Database = {
       exam_question_type: ExamQuestionType;
       exam_question_difficulty: ExamQuestionDifficulty;
       exam_attempt_status: ExamAttemptStatus;
+      exam_approval_status: ExamApprovalStatus;
       exam_attempt_event_type: ExamAttemptEventType;
       practice_attempt_status: PracticeAttemptStatus;
       employee_status: EmployeeStatus;

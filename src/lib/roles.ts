@@ -54,6 +54,8 @@ const AUDITED: readonly Role[] = ["super_admin", "director", "dept_head", "dept_
 
 /** Department-scoped head of either kind: หัวหน้างาน (dept_head) or ผู้บริหารแผนก (dept_director). Mirrors is_dept_head() in migration 0082. */
 export const isDeptHead = (roles: Role[]) => roles.includes("dept_head") || roles.includes("dept_director");
+/** May be an exam approver (อนุมัติสอบ, 0181) — the server narrows dept_* to the exam topics' department. */
+export const canApproveExams = (roles: Role[]) => isDeptHead(roles) || roles.includes("director") || roles.includes("super_admin");
 
 /** Sees every department, not just their own. */
 export const isOrgWide = (roles: Role[]) => roles.some((r) => ORG_WIDE.includes(r));

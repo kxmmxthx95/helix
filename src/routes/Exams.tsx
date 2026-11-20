@@ -38,8 +38,10 @@ import {
   type ExamSessionQuestionRow,
 } from "@/hooks/useExams";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
+import { ApprovalBadge, ExamApprovalTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
 import { SubjectPicker } from "@/routes/ExamBank";
 import type { ExamAttempt, ExamSecurityEventType, ExamSession, Student } from "@/lib/database.types";
+import { canApproveExams } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 /** Both teacher (create/manage sessions) and student/parent (take exams) render from here — role-branched, same as Assignments.tsx/ScoreRecording.tsx. See migration 0047. */
@@ -48,12 +50,54 @@ export function Exams() {
   const isTeacher = me?.roles.includes("teacher") ?? false;
   const isParent = me?.roles.includes("parent") ?? false;
 
-  if (isTeacher) return <TeacherExams teacherId={me!.id} />;
+  if (isTeacher || canApproveExams(me?.roles ?? [])) return <StaffExams teacherId={isTeacher ? me!.id : null} canApprove={canApproveExams(me?.roles ?? [])} />;
   if (myStudent || isParent) return <StudentExams />;
   return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
 }
 
 // ============================================================== teacher side
+
+type StaffTab = "rooms" | "topics" | "approve";
+
+/** Tabs: ห้องสอบ + หัวข้อการสอบ (teachers), อนุมัติสอบ (approvers) — see migration 0181. */
+function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canApprove: boolean }) {
+  const [tab, setTab] = useState<StaffTab>(teacherId ? "rooms" : "approve");
+  const pending = useExamApprovalPendingCount(canApprove);
+  const tabs: [StaffTab, string][] = [
+    ...(teacherId ? ([["rooms", "ห้องสอบ"], ["topics", "หัวข้อการสอบ"]] as [StaffTab, string][]) : []),
+    ...(canApprove ? ([["approve", pending > 0 ? `อนุมัติสอบ (${pending})` : "อนุมัติสอบ"]] as [StaffTab, string][]) : []),
+  ];
+  return (
+    <div className="page-fill">
+      {tabs.length > 1 && (
+        <div className="scrollbar-hidden flex shrink-0 gap-2 overflow-x-auto" role="tablist">
+          {tabs.map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={tab === key}
+              onClick={() => setTab(key)}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                tab === key ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-foreground/5",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {tab === "rooms" && teacherId && <TeacherExams teacherId={teacherId} />}
+      {(tab === "topics" || tab === "approve") && (
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {tab === "topics" && teacherId && <ExamTopicsTab teacherId={teacherId} />}
+          {tab === "approve" && canApprove && <ExamApprovalTab />}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function TeacherExams({ teacherId }: { teacherId: string }) {
   const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
@@ -116,6 +160,7 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
                   <th className="px-3 py-2 font-medium">ชื่อสอบ</th>
                   <th className="px-3 py-2 font-medium">วิชา</th>
                   <th className="px-3 py-2 font-medium">เปิด – ปิด</th>
+                  <th className="px-3 py-2 font-medium">สถานะ</th>
                   <th className="px-3 py-2 font-medium" />
                 </tr>
               </thead>
@@ -132,6 +177,7 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
                       {new Date(s.opens_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })} –{" "}
                       {new Date(s.closes_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}
                     </td>
+                    <td className="px-3 py-2"><ApprovalBadge status={s.approval_status} /></td>
                     <td className="px-3 py-2 text-right">
                       <Button
                         size="icon"

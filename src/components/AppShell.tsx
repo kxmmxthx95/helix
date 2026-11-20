@@ -53,6 +53,7 @@ import { useRoleSubtitle } from "@/hooks/useProfiles";
 import { useSchoolSettings } from "@/hooks/useSettings";
 import { profileFullName } from "@/lib/database.types";
 import {
+  canApproveExams,
   canIssueBarcode,
   canManage,
   canManageAcademic,
@@ -600,7 +601,8 @@ function AppShellInner() {
         (profile &&
           (profile.roles.includes("teacher") ||
             profile.roles.includes("student") ||
-            profile.roles.includes("parent")))) &&
+            profile.roles.includes("parent") ||
+            canApproveExams(profile.roles)))) &&
       (!t.teacherOrManagerOrStudentOrParentOnly ||
         (profile &&
           (profile.roles.includes("teacher") ||
