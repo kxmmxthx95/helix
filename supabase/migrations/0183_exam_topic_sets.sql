@@ -61,6 +61,7 @@ alter table exam_sessions alter column topic_set_id set not null;
 drop trigger exam_sessions_notify_status on exam_sessions;
 drop trigger exam_sessions_approval_guard on exam_sessions;
 drop trigger exam_session_questions_scope on exam_session_questions;
+drop trigger exam_session_topics_scope on exam_session_topics;
 
 drop function notify_exam_status();
 drop function exam_sessions_approval_guard();
