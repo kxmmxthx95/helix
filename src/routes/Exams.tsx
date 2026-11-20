@@ -24,6 +24,7 @@ import {
   useMyAttempts,
   useMyCurrentClassroom,
   useMyExamSessions,
+  useMyTopicSets,
   useSaveAnswer,
   useSecurityEvents,
   useSessionAttempts,
@@ -31,6 +32,8 @@ import {
   useStartOrResumeAttempt,
   useStudentNames,
   useSubmitAttempt,
+  useTopicSetsTopics,
+  useTopicSetTopicIds,
   useUnlockExamCode,
   useUpdateExamSession,
   useVerifyExamCode,
@@ -38,7 +41,7 @@ import {
   type ExamSessionQuestionRow,
 } from "@/hooks/useExams";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
-import { ApprovalBadge, ExamApprovalTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
+import { ExamApprovalTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
 import { SubjectPicker } from "@/routes/ExamBank";
 import type { ExamAttempt, ExamSecurityEventType, ExamSession, Student } from "@/lib/database.types";
 import { canApproveExams } from "@/lib/roles";
@@ -59,7 +62,7 @@ export function Exams() {
 
 type StaffTab = "rooms" | "topics" | "approve";
 
-/** Tabs: ห้องสอบ + หัวข้อการสอบ (teachers), อนุมัติสอบ (approvers) — see migration 0181. */
+/** Tabs: ห้องสอบ + หัวข้อการสอบ (teachers), อนุมัติสอบ (approvers) — see migration 0183. */
 function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canApprove: boolean }) {
   const [tab, setTab] = useState<StaffTab>(teacherId ? "rooms" : "approve");
   const pending = useExamApprovalPendingCount(canApprove);
@@ -160,7 +163,6 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
                   <th className="px-3 py-2 font-medium">ชื่อสอบ</th>
                   <th className="px-3 py-2 font-medium">วิชา</th>
                   <th className="px-3 py-2 font-medium">เปิด – ปิด</th>
-                  <th className="px-3 py-2 font-medium">สถานะ</th>
                   <th className="px-3 py-2 font-medium" />
                 </tr>
               </thead>
@@ -177,7 +179,6 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
                       {new Date(s.opens_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })} –{" "}
                       {new Date(s.closes_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}
                     </td>
-                    <td className="px-3 py-2"><ApprovalBadge status={s.approval_status} /></td>
                     <td className="px-3 py-2 text-right">
                       <Button
                         size="icon"
@@ -209,7 +210,7 @@ function SwitchRow({ label, checked, onChange }: { label: string; checked: boole
   return (
     <div className="flex min-h-[3.25rem] items-center justify-between gap-4 text-sm leading-5">
       <span>{label}</span>
-      <Switch size="sm" label={label} checked={checked} onChange={onChange} />
+      <Switch size="xs" label={label} checked={checked} onChange={onChange} />
     </div>
   );
 }
@@ -241,6 +242,15 @@ function CreateSessionSheet({
   const [shuffleChoices, setShuffleChoices] = useState(true);
   const [syncGradebook, setSyncGradebook] = useState(false);
   const [targetIds, setTargetIds] = useState<string[]>([]);
+  const [topicSetId, setTopicSetId] = useState("");
+
+  const { data: mySets = [] } = useMyTopicSets(teacherId);
+  const approvedSets = mySets.filter((s) => s.approval_status === "approved" && s.subject_id === subjectId);
+  const { data: setTopics } = useTopicSetsTopics(approvedSets.map((s) => s.id));
+  const setLabel = (id: string) => {
+    const names = (setTopics?.get(id) ?? []).map((t) => t.topic);
+    return names.length === 0 ? "ไม่ระบุหัวข้อ" : `${names.slice(0, 2).join(", ")}${names.length > 2 ? ` +${names.length - 2}` : ""}`;
+  };
 
   const targets = assignments.filter((a) => a.subject_id === subjectId);
   const classroomIds = [...new Set(targets.map((a) => a.classroom_id))];
@@ -259,10 +269,11 @@ function CreateSessionSheet({
     setDuration("");
     setMaxAttempts("1");
     setTargetIds([]);
+    setTopicSetId("");
   }
 
   const canSave =
-    subjectId && title.trim() &&
+    subjectId && topicSetId && title.trim() &&
     (noSchedule || (opensAt && closesAt && new Date(closesAt) > new Date(opensAt))) &&
     targetIds.length > 0;
 
@@ -288,6 +299,7 @@ function CreateSessionSheet({
         shuffle_questions: shuffleQuestions,
         shuffle_choices: shuffleChoices,
         sync_to_gradebook: syncGradebook,
+        topic_set_id: topicSetId,
         teaching_assignment_ids: targetIds,
         questions: [],
       },
@@ -323,9 +335,29 @@ function CreateSessionSheet({
             onChange={(id) => {
               setSubjectId(id);
               setTargetIds([]);
+              setTopicSetId("");
             }}
           />
         </Field>
+        {subjectId && (
+          <Field label="ชุดหัวข้อการสอบ" required>
+            <select
+              className="h-10 w-full rounded-lg border border-border bg-background px-2 text-sm"
+              value={topicSetId}
+              onChange={(e) => setTopicSetId(e.target.value)}
+            >
+              <option value="">{approvedSets.length === 0 ? "ยังไม่มีชุดหัวข้อที่อนุมัติ" : "เลือกชุดหัวข้อ"}</option>
+              {approvedSets.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {setLabel(s.id)}
+                </option>
+              ))}
+            </select>
+            {approvedSets.length === 0 && (
+              <p className="mt-1 text-xs text-muted-foreground">ส่งชุดหัวข้อขออนุมัติที่แท็บ “หัวข้อการสอบ” ก่อน</p>
+            )}
+          </Field>
+        )}
         <FormSection>
           <Field label="ชื่อการสอบ" required>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น สอบกลางภาค" />
@@ -593,7 +625,10 @@ function EditSessionQuestionsSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { data: questions = [] } = useExamQuestions(open ? session.subject_id : null);
+  const { data: bank = [] } = useExamQuestions(open ? session.subject_id : null);
+  const setTopicIds = useTopicSetTopicIds(open ? session.topic_set_id : null);
+  // Legacy sessions migrated from before topic sets may have a set with no topics: offer the whole bank.
+  const questions = setTopicIds.length === 0 ? bank : bank.filter((q) => q.plan_topic_id && setTopicIds.includes(q.plan_topic_id));
   const setQuestions = useSetSessionQuestions();
   const toast = useToast();
   const [questionIds, setQuestionIds] = useState<string[]>([]);
@@ -633,7 +668,7 @@ function EditSessionQuestionsSheet({
     >
       <Field label={`ข้อสอบ (เลือกแล้ว ${questionIds.length} ข้อ, รวม ${totalPoints} คะแนน)`} required>
         <div className="max-h-96 space-y-1.5 overflow-y-auto rounded-lg border border-border p-2">
-          {questions.length === 0 && <p className="text-xs text-muted-foreground">คลังข้อสอบวิชานี้ยังว่าง</p>}
+          {questions.length === 0 && <p className="text-xs text-muted-foreground">ไม่มีข้อสอบในหัวข้อของชุดที่อนุมัติ (เพิ่มในคลังข้อสอบโดยระบุหัวข้อ)</p>}
           {questions.map((q) => (
             <label key={q.id} className="flex items-start gap-2 text-xs">
               <input

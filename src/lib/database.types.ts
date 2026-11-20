@@ -792,7 +792,19 @@ export type ExamSession = {
   review_released: boolean;
   /** Per-exam code + single-device lock (migration 0132). Default on; turning it off is logged. */
   strict_mode: boolean;
-  /** Migration 0181 — students only see/start an 'approved' session. */
+  /** Migration 0183 — students only see/start a session whose topic set is 'approved'. */
+  topic_set_id: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExamApprovalStatus = "draft" | "pending" | "approved" | "rejected";
+
+/** ชุดหัวข้อการสอบ: one subject + ผังการเรียน topics, approved before sessions can use it (migration 0183). */
+export type ExamTopicSet = {
+  id: string;
+  teacher_id: string;
+  subject_id: string;
   approval_status: ExamApprovalStatus;
   approval_note: string | null;
   approved_by: string | null;
@@ -800,11 +812,7 @@ export type ExamSession = {
   created_at: string;
   updated_at: string;
 };
-
-export type ExamApprovalStatus = "draft" | "pending" | "approved" | "rejected";
-
-/** ผังการเรียน topic a session covers (migration 0181). */
-export type ExamSessionTopic = { session_id: string; topic_id: string };
+export type ExamTopicSetTopic = { set_id: string; topic_id: string };
 
 /** Which of the teacher's own teaching_assignments (classrooms) a session is open to. */
 export type ExamSessionTarget = {
@@ -1898,13 +1906,13 @@ export type Database = {
           | "sync_to_gradebook"
           | "gradebook_item_id"
           | "review_released"
-          | "approval_status"
-          | "approval_note"
-          | "approved_by"
-          | "approved_at"
         >
       >;
-      exam_session_topics: Table<ExamSessionTopic, ExamSessionTopic>;
+      exam_topic_sets: Table<
+        ExamTopicSet,
+        InsertOf<ExamTopicSet, "approval_status" | "approval_note" | "approved_by" | "approved_at">
+      >;
+      exam_topic_set_topics: Table<ExamTopicSetTopic, ExamTopicSetTopic>;
       exam_session_targets: Table<ExamSessionTarget, ExamSessionTarget>;
       exam_session_questions: Table<ExamSessionQuestion, ExamSessionQuestion>;
       exam_attempts: Table<
@@ -2013,9 +2021,8 @@ export type Database = {
         Args: { p_attempt_id: string };
         Returns: void;
       };
-      submit_exam_session: { Args: { p_id: string }; Returns: undefined };
-      decide_exam_session: { Args: { p_id: string; p_approve: boolean; p_note?: string | null }; Returns: undefined };
-      exam_approval_queue: { Args: Record<string, never>; Returns: ExamSession[] };
+      submit_exam_topic_set: { Args: { p_id: string }; Returns: undefined };
+      decide_exam_topic_set: { Args: { p_id: string; p_approve: boolean; p_note?: string | null }; Returns: undefined };
       verify_exam_code: { Args: { p_session_id: string; p_code: string }; Returns: "ok" | "wrong" | "locked" };
       unlock_exam_code: { Args: { p_session_id: string; p_student_id: string }; Returns: void };
       claim_exam_attempt: { Args: { p_attempt_id: string }; Returns: ExamClaimStatus };

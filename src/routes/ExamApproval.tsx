@@ -1,25 +1,29 @@
 import { useMemo, useState } from "react";
+import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, EmptyState, Field, Skeleton } from "@/components/ui";
-import { useSubjectsByIds } from "@/hooks/useExamBank";
+import { useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
 import {
-  useDecideExamSession,
-  useExamApprovalQueue,
-  useExamReviewQuestions,
-  useExamSessionsTopics,
-  useExamSessionTargets,
-  useMyExamSessions,
-  useSetSessionTopics,
-  useSubmitExamSession,
+  useCreateTopicSet,
+  useDecideTopicSet,
+  useDeleteTopicSet,
+  useMyTopicSets,
+  useSetTopicSetTopics,
+  useSubmitTopicSet,
+  useTopicSetQueue,
+  useTopicSetsTopics,
   type ExamTopicLabel,
 } from "@/hooks/useExams";
 import { usePlanOutline, usePlanSubjects } from "@/hooks/usePlan";
 import { useProfilesByIds } from "@/hooks/usePractice";
-import type { ExamApprovalStatus, ExamSession, Subject } from "@/lib/database.types";
+import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
+import type { ExamApprovalStatus, ExamTopicSet, Subject } from "@/lib/database.types";
+import { SubjectPicker } from "@/routes/ExamBank";
 import { cn } from "@/lib/utils";
 
-// อนุมัติสอบ (migration 0181): teachers pick ผังการเรียน topics and submit, heads approve.
+// ชุดหัวข้อการสอบ (migration 0183): teachers submit a subject + ผังการเรียน topics, heads approve,
+// then sessions are opened from an approved set.
 
 const STATUS_LABEL: Record<ExamApprovalStatus, string> = {
   draft: "ร่าง",
@@ -55,74 +59,100 @@ function TopicChips({ topics }: { topics: ExamTopicLabel[] | undefined }) {
   );
 }
 
-const fmt = (iso: string) => new Date(iso).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" });
-
 // ============================================================ teacher: หัวข้อการสอบ
 
 export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
-  const { data: sessions = [], isLoading } = useMyExamSessions(teacherId);
-  const { data: subjects = [] } = useSubjectsByIds([...new Set(sessions.map((s) => s.subject_id))]);
+  const { data: sets = [], isLoading } = useMyTopicSets(teacherId);
+  const { data: subjects = [] } = useSubjectsByIds([...new Set(sets.map((s) => s.subject_id))]);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
-  const { data: topicsBySession } = useExamSessionsTopics(sessions.map((s) => s.id));
-  const [editing, setEditing] = useState<ExamSession | null>(null);
-  const submit = useSubmitExamSession();
+  const { data: topicsBySet } = useTopicSetsTopics(sets.map((s) => s.id));
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<ExamTopicSet | null>(null);
+  const submit = useSubmitTopicSet();
+  const remove = useDeleteTopicSet();
   const toast = useToast();
-
-  if (isLoading) return <Skeleton className="h-40 w-full rounded-2xl" />;
-  if (sessions.length === 0)
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <EmptyState title="ยังไม่มีรอบสอบ" description="สร้างรอบสอบในแท็บ “ห้องสอบ” ก่อน แล้วกลับมาเลือกหัวข้อเพื่อขออนุมัติ" />
-      </div>
-    );
 
   return (
     <div className="space-y-2">
-      {sessions.map((s) => {
-        const topics = topicsBySession?.get(s.id);
-        const editable = s.approval_status === "draft" || s.approval_status === "rejected";
-        return (
-          <div key={s.id} className="space-y-2 rounded-xl border border-border bg-card p-3 text-xs">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-sm font-medium">{s.title}</p>
-                <p className="text-muted-foreground">
-                  {subjectById.get(s.subject_id)?.name_th ?? "—"} · {fmt(s.opens_at)} – {fmt(s.closes_at)}
-                </p>
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setCreating(true)}>
+          + สร้างชุดหัวข้อ
+        </Button>
+      </div>
+      {isLoading ? (
+        <Skeleton className="h-40 w-full rounded-2xl" />
+      ) : sets.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center py-16">
+          <EmptyState title="ยังไม่มีชุดหัวข้อ" description="สร้างชุดหัวข้อและส่งขออนุมัติ แล้วจึงเปิดสอบจากชุดที่อนุมัติแล้วได้" />
+        </div>
+      ) : (
+        sets.map((s) => {
+          const topics = topicsBySet?.get(s.id);
+          const editable = s.approval_status !== "pending";
+          const submittable = s.approval_status === "draft" || s.approval_status === "rejected";
+          return (
+            <div key={s.id} className="space-y-2 rounded-xl border border-border bg-card p-3 text-xs">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-medium">{subjectById.get(s.subject_id)?.name_th ?? "—"}</p>
+                <ApprovalBadge status={s.approval_status} />
               </div>
-              <ApprovalBadge status={s.approval_status} />
-            </div>
-            <TopicChips topics={topics} />
-            {s.approval_status === "rejected" && s.approval_note && (
-              <p className="rounded-lg bg-destructive/10 px-2 py-1.5 text-destructive">เหตุผลที่ไม่อนุมัติ: {s.approval_note}</p>
-            )}
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setEditing(s)}>
-                เลือกหัวข้อ
-              </Button>
-              {editable && (
-                <Button
-                  size="sm"
-                  disabled={submit.isPending}
-                  onClick={() =>
-                    submit.mutate(s.id, {
-                      onSuccess: () => toast("ส่งขออนุมัติแล้ว"),
-                      onError: (e) => toast(e instanceof Error ? e.message : "ส่งไม่สำเร็จ", "error"),
-                    })
-                  }
-                >
-                  ส่งขออนุมัติ
-                </Button>
+              <TopicChips topics={topics} />
+              {s.approval_status === "rejected" && s.approval_note && (
+                <p className="rounded-lg bg-destructive/10 px-2 py-1.5 text-destructive">เหตุผลที่ไม่อนุมัติ: {s.approval_note}</p>
               )}
+              <div className="flex gap-2">
+                {editable && (
+                  <Button size="sm" variant="outline" onClick={() => setEditing(s)}>
+                    เลือกหัวข้อ
+                  </Button>
+                )}
+                {submittable && (
+                  <Button
+                    size="sm"
+                    disabled={submit.isPending}
+                    onClick={() =>
+                      submit.mutate(s.id, {
+                        onSuccess: () => toast("ส่งขออนุมัติแล้ว"),
+                        onError: (e) => toast(e instanceof Error ? e.message : "ส่งไม่สำเร็จ", "error"),
+                      })
+                    }
+                  >
+                    ส่งขออนุมัติ
+                  </Button>
+                )}
+                {editable && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={remove.isPending}
+                    onClick={() => {
+                      if (!confirm("ลบชุดหัวข้อนี้?")) return;
+                      remove.mutate(s.id, { onError: () => toast("ลบไม่ได้ อาจมีห้องสอบใช้ชุดหัวข้อนี้อยู่", "error") });
+                    }}
+                  >
+                    ลบ
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })
+      )}
+      {creating && (
+        <NewSetSheet
+          teacherId={teacherId}
+          onClose={() => setCreating(false)}
+          onCreated={(set) => {
+            setCreating(false);
+            setEditing(set);
+          }}
+        />
+      )}
       {editing && (
         <TopicPickerSheet
-          session={editing}
+          set={editing}
           subject={subjectById.get(editing.subject_id)}
-          current={(topicsBySession?.get(editing.id) ?? []).map((t) => t.topic_id)}
+          current={(topicsBySet?.get(editing.id) ?? []).map((t) => t.topic_id)}
           onClose={() => setEditing(null)}
         />
       )}
@@ -130,14 +160,66 @@ export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
   );
 }
 
+function NewSetSheet({
+  teacherId,
+  onClose,
+  onCreated,
+}: {
+  teacherId: string;
+  onClose: () => void;
+  onCreated: (set: ExamTopicSet) => void;
+}) {
+  const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
+  const { data: subjects = [] } = useSubjectsByIds([...new Set(assignments.map((a) => a.subject_id))]);
+  const { data: gradeLevels = [] } = useGradeLevelsByIds(
+    [...new Set(subjects.map((s) => s.suggested_grade_level_id).filter((id): id is string => !!id))],
+  );
+  const gradeLevelById = new Map(gradeLevels.map((g) => [g.id, g]));
+  const [subjectId, setSubjectId] = useState("");
+  const create = useCreateTopicSet();
+  const toast = useToast();
+
+  return (
+    <Sheet
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title="สร้างชุดหัวข้อ"
+      footer={
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+            ยกเลิก
+          </Button>
+          <Button
+            type="button"
+            className="flex-1"
+            disabled={!subjectId || create.isPending}
+            onClick={() =>
+              create.mutate(
+                { teacher_id: teacherId, subject_id: subjectId },
+                { onSuccess: onCreated, onError: () => toast("สร้างไม่สำเร็จ", "error") },
+              )
+            }
+          >
+            ถัดไป
+          </Button>
+        </div>
+      }
+    >
+      <Field label="วิชา" required>
+        <SubjectPicker subjects={subjects} gradeLevelById={gradeLevelById} value={subjectId} onChange={setSubjectId} />
+      </Field>
+    </Sheet>
+  );
+}
+
 /** ผังการเรียน topics offered for a catalog subject — mirrors plan_topic_fits_subject (name prefix, or lesson tagged with the subject). */
 function TopicPickerSheet({
-  session,
+  set,
   subject,
   current,
   onClose,
 }: {
-  session: ExamSession;
+  set: ExamTopicSet;
   subject: Subject | undefined;
   current: string[];
   onClose: () => void;
@@ -146,7 +228,7 @@ function TopicPickerSheet({
   const [planSubjectId, setPlanSubjectId] = useState("");
   const { data: lessons = [], isLoading } = usePlanOutline(planSubjectId || null);
   const [picked, setPicked] = useState<string[]>(current);
-  const save = useSetSessionTopics();
+  const save = useSetTopicSetTopics();
   const toast = useToast();
 
   const prefixMatch = (name: string) => !!subject && subject.name_th.trim().startsWith(name.trim());
@@ -169,7 +251,7 @@ function TopicPickerSheet({
 
   function submit() {
     save.mutate(
-      { sessionId: session.id, current, next: picked },
+      { setId: set.id, current, next: picked },
       {
         onSuccess: () => {
           toast("บันทึกหัวข้อแล้ว");
@@ -185,7 +267,7 @@ function TopicPickerSheet({
       open
       onOpenChange={(o) => !o && onClose()}
       title="เลือกหัวข้อการสอบ"
-      description={session.title}
+      description={subject?.name_th}
       footer={
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
@@ -198,8 +280,8 @@ function TopicPickerSheet({
       }
     >
       <div className="space-y-3">
-        {session.approval_status === "approved" && (
-          <p className="rounded-lg bg-warning/15 px-2 py-1.5 text-xs">การแก้หัวข้อหลังอนุมัติ จะส่งรอบสอบกลับไปรออนุมัติใหม่</p>
+        {set.approval_status === "approved" && (
+          <p className="rounded-lg bg-warning/15 px-2 py-1.5 text-xs">การแก้หัวข้อหลังอนุมัติ จะกลับเป็นร่าง ต้องส่งขออนุมัติใหม่ (แก้ไม่ได้ถ้ามีห้องสอบใช้ชุดนี้แล้ว)</p>
         )}
         <Field label="วิชาในผังการเรียน">
           <select
@@ -246,19 +328,21 @@ type Filter = ExamApprovalStatus;
 const FILTERS: Filter[] = ["pending", "approved", "rejected"];
 
 export function useExamApprovalPendingCount(enabled: boolean) {
-  const { data = [] } = useExamApprovalQueue(enabled);
+  const { profile } = useAuth();
+  const { data = [] } = useTopicSetQueue(enabled, profile?.id ?? null);
   return data.filter((s) => s.approval_status === "pending").length;
 }
 
 export function ExamApprovalTab() {
-  const { data: queue = [], isLoading } = useExamApprovalQueue(true);
+  const { profile } = useAuth();
+  const { data: queue = [], isLoading } = useTopicSetQueue(true, profile?.id ?? null);
   const [filter, setFilter] = useState<Filter>("pending");
-  const [selected, setSelected] = useState<ExamSession | null>(null);
+  const [selected, setSelected] = useState<ExamTopicSet | null>(null);
   const { data: subjects = [] } = useSubjectsByIds([...new Set(queue.map((s) => s.subject_id))]);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
   const { data: teachers = [] } = useProfilesByIds([...new Set(queue.map((s) => s.teacher_id))]);
   const teacherById = new Map(teachers.map((t) => [t.id, `${t.first_name} ${t.last_name}`]));
-  const { data: topicsBySession } = useExamSessionsTopics(queue.map((s) => s.id));
+  const { data: topicsBySet } = useTopicSetsTopics(queue.map((s) => s.id));
   const shown = queue.filter((s) => s.approval_status === filter);
   const count = (f: Filter) => queue.filter((s) => s.approval_status === f).length;
 
@@ -286,7 +370,7 @@ export function ExamApprovalTab() {
         <Skeleton className="h-40 w-full rounded-2xl" />
       ) : shown.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title={filter === "pending" ? "ไม่มีรอบสอบที่รออนุมัติ" : "ไม่มีรายการ"} />
+          <EmptyState title={filter === "pending" ? "ไม่มีชุดหัวข้อที่รออนุมัติ" : "ไม่มีรายการ"} />
         </div>
       ) : (
         shown.map((s) => (
@@ -297,13 +381,11 @@ export function ExamApprovalTab() {
             className="block w-full space-y-1.5 rounded-xl border border-border bg-card p-3 text-left text-xs hover:bg-muted"
           >
             <div className="flex items-start justify-between gap-2">
-              <p className="text-sm font-medium">{s.title}</p>
+              <p className="text-sm font-medium">{subjectById.get(s.subject_id)?.name_th ?? "—"}</p>
               <ApprovalBadge status={s.approval_status} />
             </div>
-            <p className="text-muted-foreground">
-              {subjectById.get(s.subject_id)?.name_th ?? "—"} · ครู {teacherById.get(s.teacher_id) ?? "—"}
-            </p>
-            <TopicChips topics={topicsBySession?.get(s.id)} />
+            <p className="text-muted-foreground">ครู {teacherById.get(s.teacher_id) ?? "—"}</p>
+            <TopicChips topics={topicsBySet?.get(s.id)} />
           </button>
         ))
       )}
@@ -311,10 +393,10 @@ export function ExamApprovalTab() {
       {selected && (
         <ReviewSheet
           // Re-pick from the live queue so the sheet reflects the decision just made.
-          session={queue.find((s) => s.id === selected.id) ?? selected}
+          set={queue.find((s) => s.id === selected.id) ?? selected}
           subject={subjectById.get(selected.subject_id)}
           teacher={teacherById.get(selected.teacher_id)}
-          topics={topicsBySession?.get(selected.id)}
+          topics={topicsBySet?.get(selected.id)}
           onClose={() => setSelected(null)}
         />
       )}
@@ -323,30 +405,27 @@ export function ExamApprovalTab() {
 }
 
 function ReviewSheet({
-  session,
+  set,
   subject,
   teacher,
   topics,
   onClose,
 }: {
-  session: ExamSession;
+  set: ExamTopicSet;
   subject: Subject | undefined;
   teacher: string | undefined;
   topics: ExamTopicLabel[] | undefined;
   onClose: () => void;
 }) {
-  const { data: questions = [], isLoading } = useExamReviewQuestions(session.id);
-  const { data: targets = [] } = useExamSessionTargets(session.id);
-  const decide = useDecideExamSession();
+  const decide = useDecideTopicSet();
   const toast = useToast();
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
-  const pending = session.approval_status === "pending";
-  const total = questions.reduce((n, q) => n + Number(q.points), 0);
+  const pending = set.approval_status === "pending";
 
   function run(approve: boolean) {
     decide.mutate(
-      { id: session.id, approve, note },
+      { id: set.id, approve, note },
       {
         onSuccess: () => {
           toast(approve ? "อนุมัติแล้ว" : "ไม่อนุมัติแล้ว");
@@ -361,8 +440,8 @@ function ReviewSheet({
     <Sheet
       open
       onOpenChange={(o) => !o && onClose()}
-      title={session.title}
-      description={`${subject?.name_th ?? "—"} · ครู ${teacher ?? "—"}`}
+      title={subject?.name_th ?? "ชุดหัวข้อการสอบ"}
+      description={`ครู ${teacher ?? "—"}`}
       footer={
         pending ? (
           rejecting ? (
@@ -398,50 +477,12 @@ function ReviewSheet({
     >
       <div className="space-y-3 text-xs">
         <div className="flex items-center gap-2">
-          <ApprovalBadge status={session.approval_status} />
-          {session.approval_note && <span className="text-muted-foreground">{session.approval_note}</span>}
+          <ApprovalBadge status={set.approval_status} />
+          {set.approval_note && <span className="text-muted-foreground">{set.approval_note}</span>}
         </div>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-          <dt className="text-muted-foreground">เปิด – ปิด</dt>
-          <dd>
-            {fmt(session.opens_at)} – {fmt(session.closes_at)}
-          </dd>
-          <dt className="text-muted-foreground">เวลาทำ</dt>
-          <dd>{session.duration_minutes ? `${session.duration_minutes} นาที` : "ไม่จำกัด"}</dd>
-          <dt className="text-muted-foreground">สอบได้</dt>
-          <dd>{session.max_attempts} ครั้ง</dd>
-          <dt className="text-muted-foreground">ห้อง</dt>
-          <dd>{targets.length} ห้อง</dd>
-        </dl>
         <div>
           <p className="mb-1 font-medium">หัวข้อการสอบ</p>
           <TopicChips topics={topics} />
-        </div>
-        <div>
-          <p className="mb-1 font-medium">
-            ข้อสอบ {questions.length} ข้อ ({total} คะแนน)
-          </p>
-          {isLoading && <Skeleton className="h-20 w-full" />}
-          <ol className="space-y-2">
-            {questions.map((q, i) => (
-              <li key={q.question_id} className="rounded-lg border border-border p-2">
-                <p>
-                  {i + 1}. {q.prompt} <span className="text-muted-foreground">({q.points} คะแนน)</span>
-                </p>
-                {q.choices.length > 0 ? (
-                  <ul className="mt-1 space-y-0.5">
-                    {q.choices.map((c) => (
-                      <li key={c.position} className={cn(c.is_correct && "font-medium text-success")}>
-                        {c.is_correct ? "✓" : "•"} {c.label}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-1 font-medium text-success">เฉลย: {q.correct_answer}</p>
-                )}
-              </li>
-            ))}
-          </ol>
         </div>
       </div>
     </Sheet>

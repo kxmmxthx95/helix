@@ -9,6 +9,7 @@ import type {
   ExamCodeState,
   ExamSecurityEvent,
   ExamSession,
+  ExamTopicSet,
 } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
 
@@ -118,6 +119,7 @@ export function useCreateExamSession() {
       shuffle_questions: boolean;
       shuffle_choices: boolean;
       sync_to_gradebook: boolean;
+      topic_set_id: string;
       teaching_assignment_ids: string[];
       questions: { question_id: string; points: number }[];
     }) => {
@@ -514,139 +516,144 @@ export function useStudentNames(ids: string[]) {
   });
 }
 
-// ----------------------------------------------------- อนุมัติสอบ (migration 0181)
+// ------------------------------------------------ ชุดหัวข้อการสอบ (migration 0183)
 
 export type ExamTopicLabel = { topic_id: string; topic: string; lesson: string };
 
-/** Topics (with their lesson name) covered by each of the given sessions. */
-export function useExamSessionsTopics(sessionIds: string[]) {
-  const key = [...sessionIds].sort();
+/** The teacher's own topic sets, newest first. */
+export function useMyTopicSets(teacherId: string | null) {
   return useQuery({
-    queryKey: ["exam_session_topics", key],
-    enabled: key.length > 0,
-    queryFn: async (): Promise<Map<string, ExamTopicLabel[]>> => {
+    queryKey: ["exam_topic_sets", "mine", teacherId],
+    enabled: !!teacherId,
+    queryFn: async (): Promise<ExamTopicSet[]> => {
       const { data, error } = await supabase
-        .from("exam_session_topics")
-        .select("session_id, topic_id, topic:plan_topics(name, sort_order, lesson:plan_lessons(name, sort_order))")
-        .in("session_id", key);
-      if (error) throw error;
-      type Row = {
-        session_id: string;
-        topic_id: string;
-        topic: { name: string; sort_order: number; lesson: { name: string; sort_order: number } | null } | null;
-      };
-      const map = new Map<string, ExamTopicLabel[]>();
-      for (const r of data as unknown as Row[]) {
-        const list = map.get(r.session_id) ?? [];
-        list.push({ topic_id: r.topic_id, topic: r.topic?.name ?? "—", lesson: r.topic?.lesson?.name ?? "—" });
-        map.set(r.session_id, list);
-      }
-      return map;
-    },
-  });
-}
-
-/** Replaces a session's topics, touching only the diff (an unchanged set must not bounce an approved session back to pending). */
-export function useSetSessionTopics() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ sessionId, current, next }: { sessionId: string; current: string[]; next: string[] }) => {
-      const removed = current.filter((id) => !next.includes(id));
-      const added = next.filter((id) => !current.includes(id));
-      if (removed.length > 0) {
-        const { error } = await supabase.from("exam_session_topics").delete().eq("session_id", sessionId).in("topic_id", removed);
-        if (error) throw error;
-      }
-      if (added.length > 0) {
-        const { error } = await supabase
-          .from("exam_session_topics")
-          .insert(added.map((topic_id) => ({ session_id: sessionId, topic_id })));
-        if (error) throw error;
-      }
-    },
-    onSettled: () => {
-      void qc.invalidateQueries({ queryKey: ["exam_session_topics"] });
-      void qc.invalidateQueries({ queryKey: ["exam_sessions"] });
-    },
-  });
-}
-
-export function useSubmitExamSession() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.rpc("submit_exam_session", { p_id: id });
-      if (error) throw error;
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["exam_sessions"] }),
-  });
-}
-
-/** Sessions the caller can decide on (never their own) — pending, approved and rejected. */
-export function useExamApprovalQueue(enabled: boolean) {
-  return useQuery({
-    queryKey: ["exam_sessions", "approval_queue"],
-    enabled,
-    queryFn: async (): Promise<ExamSession[]> => {
-      const { data, error } = await supabase.rpc("exam_approval_queue");
+        .from("exam_topic_sets")
+        .select("*")
+        .eq("teacher_id", teacherId!)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
   });
 }
 
-export function useDecideExamSession() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, approve, note }: { id: string; approve: boolean; note?: string }) => {
-      const { error } = await supabase.rpc("decide_exam_session", { p_id: id, p_approve: approve, p_note: note ?? null });
+/** Topics (with their lesson name) of each of the given sets. */
+export function useTopicSetsTopics(setIds: string[]) {
+  const key = [...setIds].sort();
+  return useQuery({
+    queryKey: ["exam_topic_set_topics", key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<Map<string, ExamTopicLabel[]>> => {
+      const { data, error } = await supabase
+        .from("exam_topic_set_topics")
+        .select("set_id, topic_id, topic:plan_topics(name, sort_order, lesson:plan_lessons(name, sort_order))")
+        .in("set_id", key);
       if (error) throw error;
+      type Row = {
+        set_id: string;
+        topic_id: string;
+        topic: { name: string; sort_order: number; lesson: { name: string; sort_order: number } | null } | null;
+      };
+      const map = new Map<string, ExamTopicLabel[]>();
+      for (const r of data as unknown as Row[]) {
+        const list = map.get(r.set_id) ?? [];
+        list.push({ topic_id: r.topic_id, topic: r.topic?.name ?? "—", lesson: r.topic?.lesson?.name ?? "—" });
+        map.set(r.set_id, list);
+      }
+      return map;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["exam_sessions"] }),
   });
 }
 
-export type ExamReviewQuestion = {
-  question_id: string;
-  position: number;
-  points: number;
-  question_type: string;
-  prompt: string;
-  correct_answer: string | null;
-  choices: { label: string; is_correct: boolean; position: number }[];
-};
-
-/** Full paper incl. the key — read-only, for the approver. */
-export function useExamReviewQuestions(sessionId: string | null) {
-  return useQuery({
-    queryKey: ["exam_session_questions", "review", sessionId],
-    enabled: !!sessionId,
-    queryFn: async (): Promise<ExamReviewQuestion[]> => {
-      const { data, error } = await supabase
-        .from("exam_session_questions")
-        .select(
-          "question_id, position, points, question:exam_questions(question_type, prompt, correct_answer, choices:exam_question_choices(label, is_correct, position))",
-        )
-        .eq("session_id", sessionId!)
-        .order("position", { ascending: true });
+/** Creates an empty draft set for a subject, then returns it so the caller can open the topic picker. */
+export function useCreateTopicSet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ teacher_id, subject_id }: { teacher_id: string; subject_id: string }) => {
+      const { data, error } = await supabase.from("exam_topic_sets").insert({ teacher_id, subject_id }).select().single();
       if (error) throw error;
-      type Row = {
-        question_id: string;
-        position: number;
-        points: number;
-        question: Omit<ExamReviewQuestion, "question_id" | "position" | "points"> & {
-          choices: ExamReviewQuestion["choices"];
-        } | null;
-      };
-      return (data as unknown as Row[]).map((r) => ({
-        question_id: r.question_id,
-        position: r.position,
-        points: r.points,
-        question_type: r.question?.question_type ?? "",
-        prompt: r.question?.prompt ?? "—",
-        correct_answer: r.question?.correct_answer ?? null,
-        choices: (r.question?.choices ?? []).sort((a, b) => a.position - b.position),
-      }));
+      return data as ExamTopicSet;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["exam_topic_sets"] }),
+  });
+}
+
+/** Replaces a set's topics, touching only the diff. */
+export function useSetTopicSetTopics() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ setId, current, next }: { setId: string; current: string[]; next: string[] }) => {
+      const removed = current.filter((id) => !next.includes(id));
+      const added = next.filter((id) => !current.includes(id));
+      if (removed.length > 0) {
+        const { error } = await supabase.from("exam_topic_set_topics").delete().eq("set_id", setId).in("topic_id", removed);
+        if (error) throw error;
+      }
+      if (added.length > 0) {
+        const { error } = await supabase.from("exam_topic_set_topics").insert(added.map((topic_id) => ({ set_id: setId, topic_id })));
+        if (error) throw error;
+      }
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["exam_topic_set_topics"] });
+      void qc.invalidateQueries({ queryKey: ["exam_topic_sets"] });
     },
   });
+}
+
+export function useDeleteTopicSet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("exam_topic_sets").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["exam_topic_sets"] }),
+  });
+}
+
+export function useSubmitTopicSet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc("submit_exam_topic_set", { p_id: id });
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["exam_topic_sets"] }),
+  });
+}
+
+/** Sets the caller can decide on (never their own) — pending, approved and rejected; RLS limits it to their department. */
+export function useTopicSetQueue(enabled: boolean, ownId: string | null) {
+  return useQuery({
+    queryKey: ["exam_topic_sets", "queue", ownId],
+    enabled: enabled && !!ownId,
+    queryFn: async (): Promise<ExamTopicSet[]> => {
+      const { data, error } = await supabase
+        .from("exam_topic_sets")
+        .select("*")
+        .neq("teacher_id", ownId!)
+        .neq("approval_status", "draft")
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useDecideTopicSet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, approve, note }: { id: string; approve: boolean; note?: string }) => {
+      const { error } = await supabase.rpc("decide_exam_topic_set", { p_id: id, p_approve: approve, p_note: note ?? null });
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["exam_topic_sets"] }),
+  });
+}
+
+/** topic_ids of one set — the question picker only offers bank questions inside them. */
+export function useTopicSetTopicIds(setId: string | null) {
+  const { data } = useTopicSetsTopics(setId ? [setId] : []);
+  return setId ? (data?.get(setId)?.map((t) => t.topic_id) ?? []) : [];
 }
