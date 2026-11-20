@@ -169,7 +169,6 @@ function PeriodCheckInPanel({
             <table className="w-full min-w-[52rem] table-fixed text-[13px]">
               <thead className="text-left text-xs">
                 <tr>
-                  <th className="w-14 px-4 py-3">คาบ</th>
                   <th className="w-24 px-4 py-3">รหัสวิชา</th>
                   <th className="px-4 py-3">ชื่อวิชา</th>
                   <th className="w-28 px-4 py-3">แผนก</th>
@@ -232,7 +231,6 @@ function PeriodCheckInPanel({
             <table className="w-full min-w-[52rem] table-fixed text-[13px]">
               <thead className="text-left text-xs">
                 <tr>
-                  <th className="w-14 px-4 py-3">คาบ</th>
                   <th className="w-24 px-4 py-3">รหัสวิชา</th>
                   <th className="px-4 py-3">ชื่อวิชา</th>
                   <th className="w-28 px-4 py-3">แผนก</th>
@@ -253,7 +251,6 @@ function PeriodCheckInPanel({
                       onClick={activity ? undefined : () => setOpenEntryId(e.id)}
                       className={cn("h-14 border-t border-border first:border-t-0", activity ? "text-muted-foreground" : "cursor-pointer")}
                     >
-                      <td className="px-4 py-0 text-muted-foreground">{periodRange(g)}</td>
                       <td className="truncate px-4 py-0">{subject?.code ?? "—"}</td>
                       <td className="truncate px-4 py-0">{subject?.name_th ?? "—"}</td>
                       <td className="truncate px-4 py-0">{department?.name ?? "—"}</td>
@@ -285,9 +282,6 @@ function PeriodCheckInPanel({
     </div>
   );
 }
-
-const periodRange = (g: ScheduleEntryRow[]) =>
-  g.length === 1 ? g[0]!.period_no : `${g[0]!.period_no}-${g[g.length - 1]!.period_no}`;
 
 function PeriodCheckInGrid({
   entries,
