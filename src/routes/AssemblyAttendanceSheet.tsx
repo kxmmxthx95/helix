@@ -14,15 +14,11 @@ import { useApprovedLeaveOnDate } from "@/hooks/useStudentLeave";
 import type { AttendanceStatus } from "@/lib/database.types";
 import { levelTone } from "@/lib/gradeLevels";
 import { cn } from "@/lib/utils";
-import { STATUS_LABEL } from "@/routes/Attendance";
+import { SEGMENT_STYLE, STATUS_LABEL } from "@/routes/Attendance";
+
+export { SEGMENT_STYLE };
 
 export const STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent", "leave"];
-export const SEGMENT_STYLE: Record<AttendanceStatus, string> = {
-  present: "bg-success/15 text-success",
-  late: "bg-warning/15 text-warning",
-  absent: "bg-destructive/15 text-destructive",
-  leave: "bg-fill-strong text-foreground",
-};
 
 /** Morning-assembly (เข้าแถว) check-in for the teacher's homeroom(s), today only. Same table the daily page writes. */
 export function AssemblyAttendanceSheet({

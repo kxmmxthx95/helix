@@ -1,31 +1,21 @@
-import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SlidersHorizontal } from "@/components/icons";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { useMobileHeaderEnd } from "@/components/MobileHeaderSlot";
-import { Avatar, Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner } from "@/components/ui";
-import { useToast } from "@/components/Toast";
-import { useAcademicEvents } from "@/hooks/useAcademicTerms";
+import { Avatar, Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
+import { useActiveTerm } from "@/hooks/useAcademicTerms";
 import {
-  type AttendanceDraft,
-  useAttendanceForDate,
   useAttendanceRange,
   useClassroomRoster,
   useHomeroomClassrooms,
   useMyClassroom,
-  useSaveAttendance,
   summarizeAttendance,
 } from "@/hooks/useAttendance";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
 import { useClassrooms } from "@/hooks/useStatusManagement";
-import {
-  usePendingStudentLeaveApprovals,
-  useSetStudentLeaveStatus,
-  type PendingStudentLeaveRequest,
-} from "@/hooks/useStudentLeave";
-import { leaveAttachmentUrl } from "@/hooks/useLeave";
-import { StudentLeaveSection } from "@/routes/Dashboard";
+import { AttendanceMonthView } from "@/routes/Dashboard";
 import type { AttendanceRecord, AttendanceStatus } from "@/lib/database.types";
 import { avatarUrl } from "@/hooks/useAvatar";
 import type { StudentListItem } from "@/hooks/useStudents";
@@ -37,6 +27,13 @@ export const STATUS_LABEL: Record<AttendanceStatus, string> = {
   late: "สาย",
   absent: "ขาด",
   leave: "ลา",
+};
+/** Soft tint of the status colour — the segmented check-in buttons in the dashboard drawers and the read-only badge. */
+export const SEGMENT_STYLE: Record<AttendanceStatus, string> = {
+  present: "bg-success/15 text-success",
+  late: "bg-warning/15 text-warning",
+  absent: "bg-destructive/15 text-destructive",
+  leave: "bg-fill-strong text-foreground",
 };
 const STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent", "leave"];
 /** Selected check-in buttons + summary badges — light: saturated fill; dark: deep fill + mint text. */
@@ -50,28 +47,7 @@ export const STATUS_STYLE: Record<AttendanceStatus, string> = {
     "bg-slate-300 text-slate-800 ring-1 ring-slate-500 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600",
 };
 
-/** Selected segment in the row check-in control — soft tint of the status colour (tokens flip in dark mode). */
-const SEGMENT_STYLE: Record<AttendanceStatus, string> = {
-  present: "bg-success/15 text-success ring-1 ring-inset ring-success/40",
-  late: "bg-warning/15 text-warning ring-1 ring-inset ring-warning/40",
-  absent: "bg-destructive/15 text-destructive ring-1 ring-inset ring-destructive/40",
-  leave: "bg-fill-strong text-foreground ring-1 ring-inset ring-border",
-};
-
-const MONTH_NAMES = Array.from({ length: 12 }, (_, i) =>
-  new Intl.DateTimeFormat("th-TH", { month: "long" }).format(new Date(2000, i, 1)),
-);
-
 const currentAcademicYear = () => new Date().getFullYear() + 543;
-const daysInMonth = (ceYear: number, month: number) => new Date(ceYear, month, 0).getDate();
-
-type ViewTab = "checkin" | "summary" | "leave_requests";
-
-const VIEW_TAB_LABEL: Record<ViewTab, string> = {
-  checkin: "เช็คชื่อ",
-  summary: "สรุปรายเดือน",
-  leave_requests: "คำขอลา",
-};
 
 export function Attendance() {
   const { profile: me, myStudent } = useAuth();
@@ -81,8 +57,9 @@ export function Attendance() {
   const isStudent = me ? isSelfScoped(me.roles) : false;
   const academicYear = currentAcademicYear();
 
-  const [view, setView] = useState<ViewTab>("checkin");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [rangeMin, setRangeMin] = useState<string | undefined>();
+  const [range, setRange] = useState<Range>(() => ({ view: "term", month: todayIso().slice(0, 7), day: todayIso() }));
 
   // student path: read-only summary of their own classroom, no picker.
   const { data: myClassroom } = useMyClassroom(isStudent ? (myStudent?.id ?? null) : null, academicYear);
@@ -109,8 +86,8 @@ export function Attendance() {
   const activeDeptRooms = deptClassrooms.filter((c) => c.is_active);
 
   const activeFilterCount = manager
-    ? [pickedDept, pickedGrade, pickedRoomId].filter(Boolean).length + (view !== "checkin" ? 1 : 0)
-    : [pickedHomeroomId].filter(Boolean).length + (view !== "checkin" ? 1 : 0);
+    ? [pickedDept, pickedGrade, pickedRoomId].filter(Boolean).length
+    : [pickedHomeroomId].filter(Boolean).length;
 
   const headerFilterButton = useMemo(
     () =>
@@ -143,7 +120,7 @@ export function Attendance() {
     return (
       <div className="page-fill">
         {myClassroom ? (
-          <SummaryPanel classroomId={myClassroom.id} classroomLabel={myClassroom.label} academicYear={academicYear} />
+          <SummaryPanel classroomId={myClassroom.id} academicYear={academicYear} departmentId={myStudent?.department_id ?? null} canOpen={false} range={range} onRangeChange={setRange} onMin={setRangeMin} />
         ) : (
           <div className="flex flex-1 items-center justify-center">
             <EmptyState title="ไม่พบข้อมูล" description="ยังไม่มีห้องเรียนในปีการศึกษานี้" />
@@ -154,13 +131,7 @@ export function Attendance() {
   }
 
   const classroomId = manager ? pickedRoomId : pickedHomeroomId;
-  const gradeLevel = gradeLevels.find((g) => g.id === pickedGrade);
   const homeroom = homerooms.find((h) => h.id === pickedHomeroomId);
-  const classroomLabel = manager
-    ? gradeLevel && pickedRoomId
-      ? `${gradeLevel.name}/${activeDeptRooms.find((c) => c.id === pickedRoomId)?.name ?? deptClassrooms.find((c) => c.id === pickedRoomId)?.name ?? ""}`
-      : ""
-    : (homeroom?.label ?? "");
   const departmentId = manager ? pickedDept : (homeroom?.department_id ?? "");
 
   const scopeFilters = manager ? (
@@ -227,29 +198,13 @@ export function Attendance() {
     </Field>
   );
 
-  const viewSelect = (
-    <Field label="มุมมอง">
-      <Select
-        value={view}
-        onChange={(e) => setView(e.target.value as ViewTab)}
-        aria-label="มุมมอง"
-      >
-        {(Object.keys(VIEW_TAB_LABEL) as ViewTab[]).map((v) => (
-          <option key={v} value={v}>
-            {VIEW_TAB_LABEL[v]}
-          </option>
-        ))}
-      </Select>
-    </Field>
-  );
-
   return (
     <div className="page-fill">
-      <div className="hidden shrink-0 grid-cols-4 gap-2 lg:grid">
+      <div className="hidden shrink-0 gap-2 lg:flex">
         {manager ? (
           <>
             <Select
-              className="min-w-0"
+              className="min-w-0 flex-1"
               value={pickedDept}
               onChange={(e) => setPickedDept(e.target.value)}
               aria-label="แผนก"
@@ -262,7 +217,7 @@ export function Attendance() {
               ))}
             </Select>
             <Select
-              className="min-w-0"
+              className="min-w-0 flex-1"
               value={pickedGrade}
               onChange={(e) => setPickedGrade(e.target.value)}
               aria-label="ชั้น"
@@ -276,7 +231,7 @@ export function Attendance() {
               ))}
             </Select>
             <Select
-              className="min-w-0"
+              className="min-w-0 flex-1"
               value={pickedRoomId}
               onChange={(e) => setPickedRoomId(e.target.value)}
               aria-label="ห้อง"
@@ -292,7 +247,7 @@ export function Attendance() {
           </>
         ) : (
           <Select
-            className="col-span-3 min-w-0"
+            className="min-w-0 flex-[3]"
             value={pickedHomeroomId}
             onChange={(e) => setPickedHomeroomId(e.target.value)}
             aria-label="ห้อง"
@@ -305,18 +260,7 @@ export function Attendance() {
             ))}
           </Select>
         )}
-        <Select
-          className="min-w-0"
-          value={view}
-          onChange={(e) => setView(e.target.value as ViewTab)}
-          aria-label="มุมมอง"
-        >
-          {(Object.keys(VIEW_TAB_LABEL) as ViewTab[]).map((v) => (
-            <option key={v} value={v}>
-              {VIEW_TAB_LABEL[v]}
-            </option>
-          ))}
-        </Select>
+        {classroomId && <RangeControls range={range} onChange={setRange} min={rangeMin} />}
       </div>
 
       <Sheet
@@ -331,675 +275,202 @@ export function Attendance() {
       >
         <div className="space-y-4">
           {scopeFilters}
-          {viewSelect}
         </div>
       </Sheet>
 
-      {view === "leave_requests" ? (
-        <LeaveRequestsPanel approverId={me.id} classroomId={classroomId} academicYear={academicYear} />
-      ) : !classroomId ? (
+      {!classroomId ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
             title="เลือกห้องเรียน"
             description={
               !manager && homerooms.length === 0
                 ? "ยังไม่ได้รับมอบหมายเป็นครูประจำชั้นปีนี้"
-                : "เลือกห้องด้านบนเพื่อเช็คชื่อ"
+                : "เลือกห้องด้านบนเพื่อดูสรุปการเข้าเรียน"
             }
           />
         </div>
-      ) : view === "checkin" ? (
-        <CheckInPanel
-          classroomId={classroomId}
-          classroomLabel={classroomLabel}
-          academicYear={academicYear}
-          departmentId={departmentId}
-          recorderId={me.id}
-        />
       ) : (
-        <SummaryPanel classroomId={classroomId} classroomLabel={classroomLabel} academicYear={academicYear} />
+        <SummaryPanel classroomId={classroomId} academicYear={academicYear} departmentId={departmentId || null} canOpen range={range} onRangeChange={setRange} onMin={setRangeMin} />
       )}
     </div>
   );
 }
 
-// -------------------------------------------------------- student leave requests
-// Not gated by the classroom picker above — RLS already scopes the pending
-// list to whatever this teacher/manager may approve (current homeroom, or
-// can_manage() in department), same shape as the staff ApprovalsCard in
-// src/routes/Leave.tsx. Approval auto-fills attendance_records via a DB
-// trigger (migration 0035) — nothing to do here beyond flipping the status.
+// -------------------------------------------------------------- attendance summary
 
-function LeaveRequestsPanel({ approverId, classroomId, academicYear }: { approverId: string; classroomId: string | null; academicYear: number }) {
-  const { data: pending = [], isLoading } = usePendingStudentLeaveApprovals();
-  const setStatus = useSetStudentLeaveStatus();
-  return (
-    <div className="space-y-4">
-      <FileLeaveForStudent filerId={approverId} classroomId={classroomId} academicYear={academicYear} />
-      <PendingLeaveList approverId={approverId} pending={pending} isLoading={isLoading} setStatus={setStatus} />
-    </div>
-  );
-}
+const STATUS_TEXT: Record<AttendanceStatus, string> = {
+  present: "text-success",
+  late: "text-warning",
+  absent: "text-destructive",
+  leave: "text-muted-foreground",
+};
 
-/** Teacher/manager files leave for a student of the picked room — saved already approved (migration 0178), so it works after the 08:00 cutoff. */
-function FileLeaveForStudent({ filerId, classroomId, academicYear }: { filerId: string; classroomId: string | null; academicYear: number }) {
-  const { data: roster = [] } = useClassroomRoster(classroomId, academicYear);
-  const [studentId, setStudentId] = useState("");
-  const student = roster.find((s) => s.id === studentId);
-  useEffect(() => setStudentId(""), [classroomId]);
-  if (!classroomId) return null;
+/** Read-only summary of a room: whole term / one month / one day. Marking happens from the dashboard sheet. */
+type Range = { view: "term" | "month" | "day"; month: string; day: string };
+
+function RangeControls({ range, onChange, min, className }: { range: Range; onChange: (r: Range) => void; min?: string; className?: string }) {
   return (
-    <Card className="space-y-3">
-      <p className="text-sm font-medium">ยื่นลาแทนนักเรียน</p>
-      <Select value={studentId} onChange={(e) => setStudentId(e.target.value)} aria-label="นักเรียน" placeholder="เลือกนักเรียน">
-        {roster.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.student_code} · {s.first_name} {s.last_name}
-          </option>
-        ))}
+    <div className={cn("flex items-center gap-2", className)}>
+      <Select className="w-32 min-w-0" value={range.view} onChange={(e) => onChange({ ...range, view: e.target.value as Range["view"] })} aria-label="มุมมอง">
+        <option value="term">ทั้งเทอม</option>
+        <option value="month">รายเดือน</option>
+        <option value="day">รายวัน</option>
       </Select>
-      {student && <StudentLeaveSection key={student.id} student={student} submittedBy={filerId} showName={false} onBehalf />}
-    </Card>
-  );
-}
-
-function PendingLeaveList({
-  approverId,
-  pending,
-  isLoading,
-  setStatus,
-}: {
-  approverId: string;
-  pending: PendingStudentLeaveRequest[];
-  isLoading: boolean;
-  setStatus: ReturnType<typeof useSetStudentLeaveStatus>;
-}) {
-
-  if (isLoading) {
-    return (
-      <Card className="space-y-2" role="status" aria-label="กำลังโหลด">
-        <Skeleton className="h-4 w-40" />
-        <ul className="divide-y divide-border text-sm">
-          {[0, 1, 2].map((i) => (
-            <li key={i} className="space-y-1.5 py-2">
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-3 w-56" />
-              <div className="flex gap-2">
-                <Skeleton className="h-8 flex-1" />
-                <Skeleton className="h-8 flex-1" />
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Card>
-    );
-  }
-
-  if (pending.length === 0) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <EmptyState title="ไม่พบข้อมูล" description="ไม่มีคำขอลารออนุมัติ" />
-      </div>
-    );
-  }
-
-  return (
-    <Card className="space-y-2">
-      <p className="text-sm font-medium">คำขอลารออนุมัติ ({pending.length})</p>
-      <ul className="divide-y divide-border text-sm">
-        {pending.map((r: PendingStudentLeaveRequest) => (
-          <li key={r.id} className="space-y-1.5 py-2">
-            <p className="font-medium">
-              {r.student ? `${r.student.student_code} · ${r.student.first_name} ${r.student.last_name}` : "—"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {r.start_date} – {r.end_date} ({r.days} วัน) · {r.reason}
-            </p>
-            {r.attachment_path && (
-              <button type="button" className="text-xs text-accent underline" onClick={() => leaveAttachmentUrl(r.attachment_path!).then((u) => window.open(u, "_blank")).catch(() => {})}>
-                ดูไฟล์แนบ
-              </button>
-            )}
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                className="flex-1"
-                disabled={setStatus.isPending}
-                onClick={() => setStatus.mutate({ id: r.id, status: "approved", approvedBy: approverId })}
-              >
-                อนุมัติ
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1"
-                disabled={setStatus.isPending}
-                onClick={() => setStatus.mutate({ id: r.id, status: "rejected", approvedBy: approverId })}
-              >
-                ไม่อนุมัติ
-              </Button>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-}
-
-// ------------------------------------------------------------------ check-in
-
-function CheckInPanel({
-  classroomId,
-  classroomLabel,
-  academicYear,
-  departmentId,
-  recorderId,
-}: {
-  classroomId: string;
-  classroomLabel: string;
-  academicYear: number;
-  departmentId: string;
-  recorderId: string;
-}) {
-  const [date, setDate] = useState(todayIso());
-  const markAllRef = useRef<(() => void) | null>(null);
-  const { data: roster = [], isLoading: rosterLoading } = useClassroomRoster(classroomId, academicYear);
-  const { data: records, isLoading: recordsLoading } = useAttendanceForDate(classroomId, date);
-  const { data: events = [] } = useAcademicEvents();
-
-  const blockedEvent = useMemo(
-    () =>
-      events.find(
-        (e) =>
-          !e.students_attend &&
-          date >= e.start_date &&
-          date <= e.end_date &&
-          (e.departmentIds.length === 0 || e.departmentIds.includes(departmentId)),
-      ),
-    [events, date, departmentId],
-  );
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="toolbar shrink-0">
-        <Input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="w-40"
-          aria-label="วันที่"
-        />
-        {!blockedEvent && !rosterLoading && !recordsLoading && roster.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="ml-auto shrink-0"
-            onClick={() => markAllRef.current?.()}
-          >
-            มาทั้งหมด
-          </Button>
-        )}
-      </div>
-
-      {blockedEvent ? (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ไม่ต้องเช็คชื่อวันนี้" description={blockedEvent.name} />
-        </div>
-      ) : rosterLoading || recordsLoading ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-2" role="status" aria-label="กำลังโหลด">
-          <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto lg:hidden">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <li key={i} className="rounded-lg border border-border p-3">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="mt-1.5 h-3 w-20" />
-                <div className="mt-2 grid grid-cols-4 gap-1">
-                  {[0, 1, 2, 3].map((j) => (
-                    <Skeleton key={j} className="h-7 rounded-full" />
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ul>
-
-          <div className="table-panel hidden lg:flex">
-            <div className="table-panel-scroll">
-              <table className="w-full table-fixed text-xs">
-                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-                  <tr>
-                    <th className="w-24 px-3 py-2 font-medium">รหัสนักเรียน</th>
-                    <th className="w-48 px-3 py-2 font-medium">รายชื่อ</th>
-                    <th className="w-36 px-3 py-2 text-center font-medium">สถานะ</th>
-                    <th className="px-3 py-2 text-center font-medium">หมายเหตุ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <tr key={i} className="border-t border-border">
-                      <td className="px-3 py-2">
-                        <Skeleton className="h-3 w-16" />
-                      </td>
-                      <td className="px-3 py-2">
-                        <Skeleton className="h-3 w-28" />
-                      </td>
-                      <td className="px-3 py-2">
-                        <Skeleton className="mx-auto h-3 w-24" />
-                      </td>
-                      <td className="px-3 py-2">
-                        <Skeleton className="mx-auto h-3 w-24" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      ) : roster.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ไม่พบข้อมูล" description="ไม่มีนักเรียนกำลังศึกษาในห้องนี้" />
-        </div>
-      ) : (
-        <CheckInGrid
-          key={`${classroomId}-${date}`}
-          classroomId={classroomId}
-          classroomLabel={classroomLabel}
-          date={date}
-          roster={roster}
-          existing={records ?? []}
-          recorderId={recorderId}
-          markAllRef={markAllRef}
-        />
+      {range.view === "month" && (
+        <Input type="month" value={range.month} onChange={(e) => e.target.value && onChange({ ...range, month: e.target.value })} className="w-40" aria-label="เดือน" />
+      )}
+      {range.view === "day" && (
+        <Input type="date" value={range.day} min={min} max={todayIso()} onChange={(e) => e.target.value && onChange({ ...range, day: e.target.value })} className="w-40" aria-label="วันที่" />
       )}
     </div>
   );
 }
 
-function CheckInGrid({
-  classroomId,
-  classroomLabel,
-  date,
-  roster,
-  existing,
-  recorderId,
-  markAllRef,
-}: {
-  classroomId: string;
-  classroomLabel: string;
-  date: string;
-  roster: StudentListItem[];
-  existing: AttendanceRecord[];
-  recorderId: string;
-  markAllRef: MutableRefObject<(() => void) | null>;
-}) {
-  const toast = useToast();
-  const save = useSaveAttendance();
-  const existingByStudent = useMemo(() => new Map(existing.map((r) => [r.student_id, r])), [existing]);
-  const [marks, setMarks] = useState<Map<string, { status: AttendanceStatus | null; note: string }>>(
-    () =>
-      new Map(
-        roster.map((s) => {
-          const rec = existingByStudent.get(s.id);
-          return [s.id, { status: rec?.status ?? null, note: rec?.note ?? "" }];
-        }),
-      ),
-  );
-
-  const remaining = roster.filter((s) => !marks.get(s.id)?.status).length;
-  const counts = STATUS_ORDER.map((st) => [st, roster.filter((s) => marks.get(s.id)?.status === st).length] as const);
-
-  markAllRef.current = () => {
-    setMarks(new Map(roster.map((s) => [s.id, { status: "present" as AttendanceStatus, note: "" }])));
-  };
-  useEffect(() => () => {
-    markAllRef.current = null;
-  }, [markAllRef]);
-
-  function setStatus(id: string, status: AttendanceStatus) {
-    setMarks((prev) => {
-      const next = new Map(prev);
-      const current = prev.get(id)?.status ?? null;
-      next.set(id, { status: current === status ? null : status, note: prev.get(id)?.note ?? "" });
-      return next;
-    });
-  }
-
-  function setNote(id: string, note: string) {
-    setMarks((prev) => {
-      const next = new Map(prev);
-      next.set(id, { status: prev.get(id)?.status ?? null, note });
-      return next;
-    });
-  }
-
-  function submit() {
-    const rows: AttendanceDraft[] = roster.map((s) => {
-      const mark = marks.get(s.id)!;
-      return {
-        student_id: s.id,
-        classroom_id: classroomId,
-        date,
-        status: mark.status as AttendanceStatus,
-        note: mark.note.trim() || null,
-        recorded_by: recorderId,
-      };
-    });
-    save.mutate(rows, {
-      onSuccess: () => toast("บันทึกเช็คชื่อสำเร็จ"),
-      onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
-    });
-  }
-
-  function statusButtons(studentId: string, mark: { status: AttendanceStatus | null; note: string }) {
-    return (
-      <div
-        role="group"
-        aria-label="สถานะการเข้าเรียน"
-        className="grid grid-cols-4 gap-0.5 rounded-lg bg-secondary p-0.5 sm:w-60"
-      >
-        {STATUS_ORDER.map((st) => (
-          <button
-            key={st}
-            type="button"
-            aria-pressed={mark.status === st}
-            onClick={() => setStatus(studentId, st)}
-            className={cn(
-              "tappable inline-flex h-9 items-center justify-center rounded-md text-[13px] font-medium transition-colors sm:h-8",
-              mark.status === st ? SEGMENT_STYLE[st] : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {STATUS_LABEL[st]}
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto lg:hidden">
-        {roster.map((s) => {
-          const name = `${s.first_name} ${s.last_name}`;
-          const mark = marks.get(s.id) ?? { status: null, note: "" };
-          const noteOpen = Boolean(mark.status && mark.status !== "present");
-          return (
-            <li key={s.id} className="rounded-xl bg-card p-3 shadow-card">
-              <div className="flex min-w-0 items-center gap-3">
-                <Avatar name={name} src={s.profile ? avatarUrl(s.profile) : null} className="h-10 w-10 text-xs" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{name}</p>
-                  <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{s.student_code}</p>
-                </div>
-                {classroomLabel && (
-                  <span className="max-w-[45%] shrink-0 truncate rounded-md bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">
-                    {classroomLabel}
-                  </span>
-                )}
-              </div>
-              <div className="mt-2">{statusButtons(s.id, mark)}</div>
-              {noteOpen && (
-                <Input
-                  value={mark.note}
-                  onChange={(e) => setNote(s.id, e.target.value)}
-                  placeholder="หมายเหตุ (ถ้ามี)"
-                  className="mt-2 h-8 text-xs"
-                  aria-label={`หมายเหตุของ ${name}`}
-                />
-              )}
-            </li>
-          );
-        })}
-      </ul>
-
-      <div className="table-panel hidden lg:flex">
-        <div className="table-panel-scroll">
-          <table className="w-full table-fixed text-[13px]">
-            <thead className="sticky top-0 z-10 text-left text-xs">
-              <tr>
-                <th className="w-72 px-4 py-3">นักเรียน</th>
-                <th className="w-72 px-4 py-3">สถานะ</th>
-                <th className="px-4 py-3">หมายเหตุ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {roster.map((s) => {
-                const name = `${s.first_name} ${s.last_name}`;
-                const mark = marks.get(s.id) ?? { status: null, note: "" };
-                const noteOpen = Boolean(mark.status && mark.status !== "present");
-                return (
-                  <tr key={s.id} className="h-14 border-t border-border first:border-t-0">
-                    <td className="px-4 py-0">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <Avatar name={name} src={s.profile ? avatarUrl(s.profile) : null} className="h-9 w-9 text-xs" />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{name}</p>
-                          <p className="font-mono text-xs tabular-nums text-muted-foreground">{s.student_code}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-0">{statusButtons(s.id, mark)}</td>
-                    <td className="px-4 py-0">
-                      <Input
-                        value={mark.note}
-                        onChange={(e) => setNote(s.id, e.target.value)}
-                        placeholder="หมายเหตุ (ถ้ามี)"
-                        disabled={!noteOpen}
-                        className={cn("h-8 text-xs", !noteOpen && "invisible")}
-                        aria-label={`หมายเหตุของ ${name}`}
-                        tabIndex={noteOpen ? undefined : -1}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span className="text-[13px] font-medium tabular-nums">
-            {remaining === 0 ? `ครบ ${roster.length} คน` : `เหลืออีก ${remaining} คน`}
-          </span>
-          <span className="flex flex-wrap items-center gap-1.5">
-            {counts
-              .filter(([, n]) => n > 0)
-              .map(([st, n]) => (
-                <span key={st} className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums", SEGMENT_STYLE[st])}>
-                  {STATUS_LABEL[st]} {n}
-                </span>
-              ))}
-          </span>
-        </div>
-        <Button onClick={submit} disabled={remaining > 0 || save.isPending}>
-          {save.isPending ? <Spinner className="h-3 w-3" /> : "บันทึกเช็คชื่อ"}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// -------------------------------------------------------------- monthly summary
-
+/** Read-only summary of a room: whole term / one month / one day. Marking happens from the dashboard sheet. */
 function SummaryPanel({
   classroomId,
-  classroomLabel,
   academicYear,
+  departmentId,
+  canOpen,
+  range,
+  onRangeChange,
+  onMin,
 }: {
   classroomId: string;
-  classroomLabel: string;
   academicYear: number;
+  departmentId: string | null;
+  canOpen: boolean;
+  range: Range;
+  onRangeChange: (r: Range) => void;
+  onMin: (min: string) => void;
 }) {
-  const [year, setYear] = useState(academicYear);
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const ceYear = year - 543;
-  const startDate = `${ceYear}-${String(month).padStart(2, "0")}-01`;
-  const endDate = `${ceYear}-${String(month).padStart(2, "0")}-${String(daysInMonth(ceYear, month)).padStart(2, "0")}`;
-  const years = Array.from({ length: 4 }, (_, i) => academicYear - i);
+  const { view, month, day } = range;
+  const [picked, setPicked] = useState<StudentListItem | null>(null);
+  const byDay = view === "day";
 
-  const { data: roster = [] } = useClassroomRoster(classroomId, year);
-  const { data: records = [], isLoading } = useAttendanceRange({ classroomId, startDate, endDate });
+  // No term dates set → whole academic year (พ.ค. – เม.ย.).
+  const { data: term } = useActiveTerm(departmentId);
+  const ce = academicYear - 543;
+  const start = term?.start_date ?? `${ce}-05-01`;
+  const end = term?.end_date ?? `${ce + 1}-04-30`;
+  useEffect(() => onMin(start), [start, onMin]);
+
+  const { data: roster = [], isLoading: rosterLoading } = useClassroomRoster(classroomId, academicYear);
+  const { data: records = [], isLoading: recordsLoading } = useAttendanceRange({ classroomId, startDate: start, endDate: end });
 
   const byStudent = useMemo(() => {
     const map = new Map<string, AttendanceRecord[]>();
     for (const r of records) {
-      const arr = map.get(r.student_id) ?? [];
-      arr.push(r);
-      map.set(r.student_id, arr);
+      if (view === "month" && !r.date.startsWith(month)) continue;
+      map.set(r.student_id, [...(map.get(r.student_id) ?? []), r]);
     }
     return map;
-  }, [records]);
+  }, [records, view, month]);
+
+  const loading = rosterLoading || recordsLoading;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="toolbar shrink-0">
-        <Select
-          className="w-32 min-w-0"
-          value={String(month)}
-          onChange={(e) => setMonth(Number(e.target.value))}
-          aria-label="เดือน"
-        >
-          {MONTH_NAMES.map((name, i) => (
-            <option key={name} value={i + 1}>
-              {name}
-            </option>
-          ))}
-        </Select>
-        <Select
-          className="w-24 min-w-0"
-          value={String(year)}
-          onChange={(e) => setYear(Number(e.target.value))}
-          aria-label="ปีการศึกษา"
-        >
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </Select>
-        <span className="text-xs text-muted-foreground">{classroomLabel}</span>
-      </div>
+      <RangeControls range={range} onChange={onRangeChange} min={start} className={cn("shrink-0 justify-end", canOpen && "lg:hidden")} />
 
-      {isLoading ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-2" role="status" aria-label="กำลังโหลด">
-          <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto lg:hidden">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <li key={i} className="rounded-lg border border-border p-3">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="mt-1.5 h-3 w-20" />
-                <div className="mt-2 grid grid-cols-4 gap-1">
-                  {[0, 1, 2, 3].map((j) => (
-                    <Skeleton key={j} className="h-10 rounded-lg" />
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ul>
-
-          <div className="table-panel hidden lg:flex">
-            <div className="table-panel-scroll">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
-                    <th className="px-3 py-2 font-medium">รายชื่อ</th>
-                    {STATUS_ORDER.map((st) => (
-                      <th key={st} className="px-3 py-2 text-right font-medium">
-                        {STATUS_LABEL[st]}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <tr key={i} className="border-t border-border">
-                      <td className="px-3 py-2">
-                        <Skeleton className="h-3 w-16" />
-                      </td>
-                      <td className="px-3 py-2">
-                        <Skeleton className="h-3 w-28" />
-                      </td>
-                      {STATUS_ORDER.map((st) => (
-                        <td key={st} className="px-3 py-2 text-right">
-                          <Skeleton className="ml-auto h-3 w-6" />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+      {loading ? (
+        <div role="status" aria-label="กำลังโหลด" className="flex flex-1 items-center justify-center">
+          <Spinner className="h-4 w-4" />
         </div>
       ) : roster.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="ไม่พบข้อมูล" description="ไม่มีนักเรียนกำลังศึกษาในห้องนี้" />
         </div>
       ) : (
-        <>
-          <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto lg:hidden">
-            {roster.map((s) => {
-              const counts = summarizeAttendance(byStudent.get(s.id) ?? []);
-              const name = `${s.first_name} ${s.last_name}`;
-              return (
-                <li key={s.id} className="rounded-lg border border-border p-3">
-                  <p className="truncate text-sm font-medium">{name}</p>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{s.student_code}</p>
-                  <div className="mt-2 grid grid-cols-4 gap-1">
-                    {STATUS_ORDER.map((st) => (
-                      <div
-                        key={st}
-                        className={cn(
-                          "rounded-lg px-2 py-1.5 text-center text-[10px] font-medium",
-                          STATUS_STYLE[st],
-                        )}
-                      >
-                        <p>{STATUS_LABEL[st]}</p>
-                        <p className="mt-0.5 text-sm tabular-nums">{counts[st]}</p>
-                      </div>
-                    ))}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-
-          <div className="table-panel hidden lg:flex">
-            <div className="table-panel-scroll">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
-                    <th className="px-3 py-2 font-medium">รายชื่อ</th>
-                    {STATUS_ORDER.map((st) => (
-                      <th key={st} className="px-3 py-2 text-right font-medium">
+        <div className="table-panel rounded-none border-t border-border shadow-none">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[36rem] table-fixed text-[13px]">
+              <thead className="text-left text-xs">
+                <tr>
+                  <th className="w-64 px-4 py-3">นักเรียน</th>
+                  {!byDay ? (
+                    STATUS_ORDER.map((st) => (
+                      <th key={st} className={cn("px-4 py-3 text-right", STATUS_TEXT[st])}>
                         {STATUS_LABEL[st]}
                       </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {roster.map((s) => {
-                    const counts = summarizeAttendance(byStudent.get(s.id) ?? []);
-                    return (
-                      <tr key={s.id} className="border-t border-border">
-                        <td className="px-3 py-2">{s.student_code}</td>
-                        <td className="px-3 py-2 font-medium">
-                          {s.first_name} {s.last_name}
-                        </td>
-                        {STATUS_ORDER.map((st) => (
-                          <td key={st} className="px-3 py-2 text-right tabular-nums">
+                    ))
+                  ) : (
+                    <>
+                      <th className="w-32 px-4 py-3 text-center">สถานะ</th>
+                      <th className="px-4 py-3">หมายเหตุ</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {roster.map((s) => {
+                  const name = `${s.first_name} ${s.last_name}`;
+                  const mine = byStudent.get(s.id) ?? [];
+                  const counts = summarizeAttendance(mine);
+                  const rec = byDay ? mine.find((r) => r.date === day && r.status) : null;
+                  const who = (
+                    <>
+                      <Avatar name={name} src={s.profile ? avatarUrl(s.profile) : null} className="h-9 w-9 text-xs" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{name}</p>
+                        <p className="font-mono text-xs tabular-nums text-muted-foreground">{s.student_code}</p>
+                      </div>
+                    </>
+                  );
+                  return (
+                    <tr key={s.id} className="h-14 border-t border-border first:border-t-0">
+                      <td className="px-4 py-0">
+                        {canOpen ? (
+                          <button type="button" onClick={() => setPicked(s)} className="flex min-w-0 items-center gap-3 text-left">
+                            {who}
+                          </button>
+                        ) : (
+                          <div className="flex min-w-0 items-center gap-3">{who}</div>
+                        )}
+                      </td>
+                      {!byDay ? (
+                        STATUS_ORDER.map((st) => (
+                          <td
+                            key={st}
+                            className={cn("px-4 py-0 text-right font-medium tabular-nums", counts[st] ? STATUS_TEXT[st] : "text-muted-foreground/50")}
+                          >
                             {counts[st]}
                           </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        ))
+                      ) : (
+                        <>
+                          <td className="px-4 py-0 text-center">
+                            {rec?.status ? (
+                              <span className={cn("inline-flex h-9 min-w-14 items-center justify-center rounded-md px-3 text-[13px] font-semibold", SEGMENT_STYLE[rec.status])}>
+                                {STATUS_LABEL[rec.status]}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="truncate px-4 py-0 text-muted-foreground">{rec?.note ?? ""}</td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </>
+        </div>
       )}
+
+      <Sheet open={!!picked} onOpenChange={(o) => !o && setPicked(null)} title={picked ? `${picked.first_name} ${picked.last_name}` : ""} closable bottomOnPhone>
+        {picked && (
+          <AttendanceMonthView
+            departmentId={picked.department_id}
+            useRecords={(startDate, endDate) => useAttendanceRange({ studentId: picked.id, startDate, endDate })}
+            holiday={(iso, events) =>
+              events.find((e) => !e.students_attend && (e.departmentIds.length === 0 || e.departmentIds.includes(picked.department_id)) && iso >= e.start_date && iso <= e.end_date)?.name ?? null
+            }
+          />
+        )}
+      </Sheet>
     </div>
   );
 }

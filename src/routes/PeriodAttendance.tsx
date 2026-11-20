@@ -2,8 +2,10 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { ChevronBack } from "@/components/icons";
-import { Button, Card, EmptyState, Input, Skeleton, Spinner } from "@/components/ui";
-import { useToast } from "@/components/Toast";
+import { Sheet } from "@/components/Sheet";
+import { AttendanceMonthView } from "@/routes/Dashboard";
+import { Avatar, Card, EmptyState, Input, Select, Skeleton, Spinner } from "@/components/ui";
+import { avatarUrl } from "@/hooks/useAvatar";
 import { useAcademicEvents, useActiveAcademicYear, useActiveTerm } from "@/hooks/useAcademicTerms";
 import { useAllDepartmentPeriods } from "@/hooks/usePeriodDefinitions";
 import { periodTimes } from "@/lib/periods";
@@ -13,18 +15,15 @@ import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
 import {
-  type PeriodAttendanceDraft,
-  useSavePeriodAttendance,
-  usePeriodAttendance,
-  usePeriodAttendanceRange,
+  usePeriodAttendanceByEntries,
   usePeriodAttendanceTakenSet,
 } from "@/hooks/usePeriodAttendance";
 import { useDepartmentSchedule, useTeacherSchedule, type ScheduleEntryRow } from "@/hooks/useSchedule";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
-import { useApprovedLeaveOnDate } from "@/hooks/useStudentLeave";
 import type { AttendanceStatus, Subject } from "@/lib/database.types";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManageAcademic } from "@/lib/roles";
+import { SEGMENT_STYLE } from "@/routes/Attendance";
 import { cn, todayIso } from "@/lib/utils";
 
 // ----------------------------------------------------------- period check-in
@@ -43,18 +42,14 @@ const STATUS_LABEL: Record<AttendanceStatus, string> = {
   leave: "ลา",
 };
 const STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent", "leave"];
-const STATUS_STYLE: Record<AttendanceStatus, string> = {
-  present:
-    "bg-emerald-400 text-emerald-950 ring-1 ring-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 dark:ring-emerald-800",
-  late:
-    "bg-amber-400 text-amber-950 ring-1 ring-amber-700 dark:bg-amber-950 dark:text-amber-300 dark:ring-amber-800",
-  absent: "bg-red-400 text-red-950 ring-1 ring-red-700 dark:bg-red-950 dark:text-red-300 dark:ring-red-800",
-  leave:
-    "bg-slate-300 text-slate-800 ring-1 ring-slate-500 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600",
+const STATUS_TEXT: Record<AttendanceStatus, string> = {
+  present: "text-success",
+  late: "text-warning",
+  absent: "text-destructive",
+  leave: "text-muted-foreground",
 };
 
 const currentAcademicYear = () => new Date().getFullYear() + 543;
-const daysInMonth = (ceYear: number, month: number) => new Date(ceYear, month, 0).getDate();
 
 export function PeriodAttendance() {
   const { profile: me } = useAuth();
@@ -73,7 +68,6 @@ export function PeriodAttendance() {
         isTeacher={isTeacher}
         academic={academic}
         departmentId={me.department_id ?? ""}
-        recorderId={me.id}
       />
     </div>
   );
@@ -84,15 +78,13 @@ function PeriodCheckInPanel({
   isTeacher,
   academic,
   departmentId,
-  recorderId,
 }: {
   teacherId: string;
   isTeacher: boolean;
   academic: boolean;
   departmentId: string;
-  recorderId: string;
 }) {
-  const [date, setDate] = useState(todayIso());
+  const date = todayIso();
   const [searchParams] = useSearchParams();
   const [openEntryId, setOpenEntryId] = useState<string | null>(searchParams.get("entry")); // deep link from the teacher home
 
@@ -171,57 +163,43 @@ function PeriodCheckInPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div className="toolbar shrink-0">
-        <Input
-          type="date"
-          value={date}
-          max={todayIso()}
-          onChange={(e) => {
-            setDate(e.target.value);
-            setOpenEntryId(null);
-          }}
-          className="w-40"
-          aria-label="วันที่"
-        />
-      </div>
-
       {isLoading ? (
-        <div role="status" aria-label="กำลังโหลด" className="table-panel">
-          <div className="table-panel-scroll">
-            <table className="w-full min-w-[52rem] table-fixed text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+        <div role="status" aria-label="กำลังโหลด" className="table-panel rounded-none border-t border-border shadow-none">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[52rem] table-fixed text-[13px]">
+              <thead className="text-left text-xs">
                 <tr>
-                  <th className="w-14 px-3 py-2 font-medium">คาบ</th>
-                  <th className="w-24 px-3 py-2 font-medium">รหัสวิชา</th>
-                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
-                  <th className="w-28 px-3 py-2 font-medium">แผนก</th>
-                  <th className="w-24 px-3 py-2 font-medium">ระดับชั้น</th>
-                  <th className="w-24 px-3 py-2 font-medium">ห้องเรียน</th>
-                  <th className="w-28 px-3 py-2 text-center font-medium">สถานะ</th>
+                  <th className="w-14 px-4 py-3">คาบ</th>
+                  <th className="w-24 px-4 py-3">รหัสวิชา</th>
+                  <th className="px-4 py-3">ชื่อวิชา</th>
+                  <th className="w-28 px-4 py-3">แผนก</th>
+                  <th className="w-24 px-4 py-3">ระดับชั้น</th>
+                  <th className="w-24 px-4 py-3">ห้องเรียน</th>
+                  <th className="w-28 px-4 py-3 text-center">สถานะ</th>
                 </tr>
               </thead>
               <tbody>
                 {[0, 1, 2, 3, 4].map((i) => (
-                  <tr key={i} className="border-t border-border">
-                    <td className="px-3 py-2">
+                  <tr key={i} className="h-14 border-t border-border first:border-t-0">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-4" />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-14" />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-32" />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-16" />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-12" />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-12" />
                     </td>
-                    <td className="px-3 py-2 text-center">
+                    <td className="px-4 py-0 text-center">
                       <Skeleton className="mx-auto h-4 w-16 rounded-full" />
                     </td>
                   </tr>
@@ -238,25 +216,29 @@ function PeriodCheckInPanel({
         <PeriodCheckInGrid
           key={`${openGroup[0]!.id}-${date}`}
           entries={openGroup}
+          assignmentEntryIds={allEntries
+            .filter((e) => e.teaching_assignment_id === openGroup[0]!.teaching_assignment_id)
+            .map((e) => e.id)}
           subject={subjects.find((s) => s.id === openGroup[0]!.teaching_assignment.subject_id) ?? null}
           date={date}
           academicYear={academicYear}
-          recorderId={recorderId}
+          termStart={activeTerm?.start_date ?? null}
+          termEnd={activeTerm?.end_date ?? null}
           onBack={() => setOpenEntryId(null)}
         />
       ) : (
-        <div className="table-panel">
-          <div className="table-panel-scroll">
-            <table className="w-full min-w-[52rem] table-fixed text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+        <div className="table-panel rounded-none border-t border-border shadow-none">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[52rem] table-fixed text-[13px]">
+              <thead className="text-left text-xs">
                 <tr>
-                  <th className="w-14 px-3 py-2 font-medium">คาบ</th>
-                  <th className="w-24 px-3 py-2 font-medium">รหัสวิชา</th>
-                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
-                  <th className="w-28 px-3 py-2 font-medium">แผนก</th>
-                  <th className="w-24 px-3 py-2 font-medium">ระดับชั้น</th>
-                  <th className="w-24 px-3 py-2 font-medium">ห้องเรียน</th>
-                  <th className="w-28 px-3 py-2 text-center font-medium">สถานะ</th>
+                  <th className="w-14 px-4 py-3">คาบ</th>
+                  <th className="w-24 px-4 py-3">รหัสวิชา</th>
+                  <th className="px-4 py-3">ชื่อวิชา</th>
+                  <th className="w-28 px-4 py-3">แผนก</th>
+                  <th className="w-24 px-4 py-3">ระดับชั้น</th>
+                  <th className="w-24 px-4 py-3">ห้องเรียน</th>
+                  <th className="w-28 px-4 py-3 text-center">สถานะ</th>
                 </tr>
               </thead>
               <tbody>
@@ -269,15 +251,15 @@ function PeriodCheckInPanel({
                     <tr
                       key={e.id}
                       onClick={activity ? undefined : () => setOpenEntryId(e.id)}
-                      className={cn("border-t border-border", activity ? "text-muted-foreground" : "cursor-pointer hover:bg-muted/50")}
+                      className={cn("h-14 border-t border-border first:border-t-0", activity ? "text-muted-foreground" : "cursor-pointer")}
                     >
-                      <td className="px-3 py-2 text-muted-foreground">{periodRange(g)}</td>
-                      <td className="truncate px-3 py-2">{subject?.code ?? "—"}</td>
-                      <td className="truncate px-3 py-2">{subject?.name_th ?? "—"}</td>
-                      <td className="truncate px-3 py-2">{department?.name ?? "—"}</td>
-                      <td className="truncate px-3 py-2">{gradeLevelName(e.teaching_assignment.classroom_id)}</td>
-                      <td className="truncate px-3 py-2">{classroom?.name ?? "—"}</td>
-                      <td className="px-3 py-2 text-center">
+                      <td className="px-4 py-0 text-muted-foreground">{periodRange(g)}</td>
+                      <td className="truncate px-4 py-0">{subject?.code ?? "—"}</td>
+                      <td className="truncate px-4 py-0">{subject?.name_th ?? "—"}</td>
+                      <td className="truncate px-4 py-0">{department?.name ?? "—"}</td>
+                      <td className="truncate px-4 py-0">{gradeLevelName(e.teaching_assignment.classroom_id)}</td>
+                      <td className="truncate px-4 py-0">{classroom?.name ?? "—"}</td>
+                      <td className="px-4 py-0 text-center">
                         <span
                           title={activity ?? undefined}
                           className={cn(
@@ -309,105 +291,54 @@ const periodRange = (g: ScheduleEntryRow[]) =>
 
 function PeriodCheckInGrid({
   entries,
+  assignmentEntryIds,
   subject,
   date,
   academicYear,
-  recorderId,
+  termStart,
+  termEnd,
   onBack,
 }: {
   entries: ScheduleEntryRow[];
+  assignmentEntryIds: string[];
   subject: Subject | null;
   date: string;
   academicYear: number;
-  recorderId: string;
+  termStart: string | null;
+  termEnd: string | null;
   onBack: () => void;
 }) {
-  const toast = useToast();
-  const entry = entries[0]!; // marks are read from the first period; save writes every period in the group
+  const entry = entries[0]!;
   const { data: roster = [], isLoading: rosterLoading } = useClassroomRoster(
     entry.teaching_assignment.classroom_id,
     academicYear,
   );
-  const { data: existing = [], isLoading: recordsLoading } = usePeriodAttendance(entry.id, date);
-  const studentIds = useMemo(() => roster.map((s) => s.id), [roster]);
-  const { data: lockedSet = new Set<string>() } = useApprovedLeaveOnDate(studentIds, date);
-  const save = useSavePeriodAttendance();
+  // No term dates set → fall back to the whole academic year (พ.ค. – เม.ย.).
+  const ce = academicYear - 543;
+  const start = termStart ?? `${ce}-05-01`;
+  const end = termEnd ?? `${ce + 1}-04-30`;
+  const { data: records = [], isLoading: recordsLoading } = usePeriodAttendanceByEntries(assignmentEntryIds, start, end);
+  const [view, setView] = useState<"term" | "month" | "day">("term");
+  const [month, setMonth] = useState(date.slice(0, 7));
+  const [day, setDay] = useState(date);
+  const byDay = view === "day";
+  const [picked, setPicked] = useState<(typeof roster)[number] | null>(null);
 
-  const monthStart = `${date.slice(0, 7)}-01`;
-  const monthEnd = `${date.slice(0, 7)}-${String(daysInMonth(Number(date.slice(0, 4)), Number(date.slice(5, 7)))).padStart(2, "0")}`;
-  const { data: monthRecords = [] } = usePeriodAttendanceRange(entry.id, monthStart, monthEnd);
-  const monthCountsByStudent = useMemo(() => {
-    const map = new Map<string, ReturnType<typeof summarizeAttendance>>();
-    for (const s of roster) {
-      map.set(
-        s.id,
-        summarizeAttendance(monthRecords.filter((r) => r.student_id === s.id)),
-      );
+  const byStudent = useMemo(() => {
+    const map = new Map<string, typeof records>();
+    // Back-to-back periods of one day are saved as one mark per period: count each student-day once.
+    const seen = new Set<string>();
+    for (const r of records) {
+      if (view === "month" && !r.date.startsWith(month)) continue;
+      const k = `${r.student_id}|${r.date}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      map.set(r.student_id, [...(map.get(r.student_id) ?? []), r]);
     }
     return map;
-  }, [roster, monthRecords]);
+  }, [records, view, month]);
 
-  const existingByStudent = useMemo(() => new Map(existing.map((r) => [r.student_id, r])), [existing]);
-  const [marks, setMarks] = useState<Map<string, { status: AttendanceStatus | null; note: string }>>(
-    () =>
-      new Map(
-        roster.map((s) => {
-          if (lockedSet.has(s.id)) return [s.id, { status: "leave" as AttendanceStatus, note: "" }];
-          const rec = existingByStudent.get(s.id);
-          return [s.id, { status: rec?.status ?? null, note: rec?.note ?? "" }];
-        }),
-      ),
-  );
-
-  // lockedSet loads async after marks is seeded, so derive 'leave' here instead of trusting marks.
-  const statusOf = (id: string) => (lockedSet.has(id) ? "leave" : marks.get(id)?.status ?? null);
-  const remaining = roster.filter((s) => !statusOf(s.id)).length;
-
-  function setStatus(id: string, status: AttendanceStatus) {
-    if (lockedSet.has(id)) return; // server also force-locks this to 'leave' — see migration 0037
-    setMarks((prev) => {
-      const next = new Map(prev);
-      const current = prev.get(id)?.status ?? null;
-      next.set(id, { status: current === status ? null : status, note: prev.get(id)?.note ?? "" });
-      return next;
-    });
-  }
-
-  function setNote(id: string, note: string) {
-    setMarks((prev) => {
-      const next = new Map(prev);
-      next.set(id, { status: prev.get(id)?.status ?? null, note });
-      return next;
-    });
-  }
-
-  function markAllPresent() {
-    setMarks((prev) => {
-      const next = new Map(prev);
-      for (const s of roster) {
-        if (lockedSet.has(s.id)) continue;
-        next.set(s.id, { status: "present", note: prev.get(s.id)?.note ?? "" });
-      }
-      return next;
-    });
-  }
-
-  function submit() {
-    const rows: PeriodAttendanceDraft[] = entries.flatMap((en) =>
-      roster.map((s) => ({
-        student_id: s.id,
-        schedule_entry_id: en.id,
-        date,
-        status: statusOf(s.id) as AttendanceStatus,
-        note: marks.get(s.id)!.note.trim() || null,
-        recorded_by: recorderId,
-      })),
-    );
-    save.mutate(rows, {
-      onSuccess: () => toast("บันทึกเช็คชื่อสำเร็จ"),
-      onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
-    });
-  }
+  const loading = rosterLoading || recordsLoading;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -422,139 +353,156 @@ function PeriodCheckInGrid({
           <ChevronBack className="h-4 w-4" />
         </button>
         <span className="min-w-0 truncate text-xs text-muted-foreground">
-          คาบ {periodRange(entries)} · {subject?.code ?? "—"} {subject?.name_th ?? ""}
+          {subject?.code ?? "—"} {subject?.name_th ?? ""}
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={markAllPresent}>
-            มาทั้งหมด
-          </Button>
+          <Select
+            className="w-32 min-w-0"
+            value={view}
+            onChange={(e) => setView(e.target.value as typeof view)}
+            aria-label="มุมมอง"
+          >
+            <option value="term">ทั้งเทอม</option>
+            <option value="month">รายเดือน</option>
+            <option value="day">รายวัน</option>
+          </Select>
+          {view === "month" && (
+            <Input
+              type="month"
+              value={month}
+              onChange={(e) => e.target.value && setMonth(e.target.value)}
+              className="w-40"
+              aria-label="เดือน"
+            />
+          )}
+          {byDay && (
+            <Input
+              type="date"
+              value={day}
+              min={start}
+              max={todayIso()}
+              onChange={(e) => e.target.value && setDay(e.target.value)}
+              className="w-40"
+              aria-label="วันที่"
+            />
+          )}
         </div>
       </div>
-      {rosterLoading || recordsLoading ? (
-        <div role="status" aria-label="กำลังโหลด" className="table-panel">
-          <div className="table-panel-scroll">
-            <table className="w-full min-w-[44rem] table-fixed text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="w-24 px-3 py-2 font-medium">รหัสนักเรียน</th>
-                  <th className="w-48 px-3 py-2 font-medium">รายชื่อ</th>
-                  <th className="w-36 px-3 py-2 text-center font-medium">สถานะ</th>
-                  <th className="px-3 py-2 text-center font-medium">หมายเหตุ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <tr key={i} className="border-t border-border">
-                    <td className="px-3 py-2">
-                      <Skeleton className="h-3 w-16" />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Skeleton className="h-3 w-32" />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Skeleton className="mx-auto h-4 w-28 rounded-full" />
-                    </td>
-                    <td className="px-3 py-2">
-                      <Skeleton className="mx-auto h-3 w-24" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {loading ? (
+        <div role="status" aria-label="กำลังโหลด" className="flex flex-1 items-center justify-center">
+          <Spinner className="h-4 w-4" />
         </div>
       ) : roster.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="ไม่พบข้อมูล" description="ไม่มีนักเรียนกำลังศึกษาในห้องนี้" />
         </div>
       ) : (
-        <>
-          <div className="table-panel">
-            <div className="table-panel-scroll">
-              <table className="w-full min-w-[44rem] table-fixed text-xs">
-                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-                  <tr>
-                    <th className="w-24 px-3 py-2 font-medium">รหัสนักเรียน</th>
-                    <th className="w-48 px-3 py-2 font-medium">รายชื่อ</th>
-                    <th className="w-36 px-3 py-2 text-center font-medium">สถานะ</th>
-                    <th className="px-3 py-2 text-center font-medium">หมายเหตุ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {roster.map((s) => {
-                    const name = `${s.first_name} ${s.last_name}`;
-                    const mark = marks.get(s.id) ?? { status: null, note: "" };
-                    const locked = lockedSet.has(s.id);
-                    const noteOpen = Boolean(mark.status && mark.status !== "present" && !locked);
-                    return (
-                      <tr key={s.id} className="border-t border-border">
-                        <td className="px-3 py-2">{s.student_code}</td>
-                        <td className="truncate px-3 py-2 font-medium">{name}</td>
-                        <td className="px-3 py-2">
-                          {locked ? (
-                            <div className="flex justify-center">
+        <div className="table-panel rounded-none border-t border-border shadow-none">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[36rem] table-fixed text-[13px]">
+              <thead className="text-left text-xs">
+                <tr>
+                  <th className="w-64 px-4 py-3">นักเรียน</th>
+                  {!byDay ? (
+                    STATUS_ORDER.map((st) => (
+                      <th key={st} className={cn("px-4 py-3 text-right", STATUS_TEXT[st])}>
+                        {STATUS_LABEL[st]}
+                      </th>
+                    ))
+                  ) : (
+                    <>
+                      <th className="w-32 px-4 py-3 text-center">สถานะ</th>
+                      <th className="px-4 py-3">หมายเหตุ</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {roster.map((s) => {
+                  const name = `${s.first_name} ${s.last_name}`;
+                  const mine = byStudent.get(s.id) ?? [];
+                  const counts = summarizeAttendance(mine);
+                  const rec = !byDay ? null : mine.find((r) => r.date === day);
+                  return (
+                    <tr key={s.id} className="h-14 border-t border-border first:border-t-0">
+                      <td className="px-4 py-0">
+                        <button type="button" onClick={() => setPicked(s)} className="flex min-w-0 items-center gap-3 text-left">
+                          <Avatar name={name} src={s.profile ? avatarUrl(s.profile) : null} className="h-9 w-9 text-xs" />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{name}</p>
+                            <p className="font-mono text-xs tabular-nums text-muted-foreground">{s.student_code}</p>
+                          </div>
+                        </button>
+                      </td>
+                      {!byDay ? (
+                        STATUS_ORDER.map((st) => (
+                          <td
+                            key={st}
+                            className={cn("px-4 py-0 text-right font-medium tabular-nums", counts[st] ? STATUS_TEXT[st] : "text-muted-foreground/50")}
+                          >
+                            {counts[st]}
+                          </td>
+                        ))
+                      ) : (
+                        <>
+                          <td className="px-4 py-0 text-center">
+                            {rec ? (
                               <span
                                 className={cn(
-                                  "inline-flex h-7 items-center justify-center rounded-full px-2 text-[10px] font-medium",
-                                  STATUS_STYLE.leave,
+                                  "inline-flex h-9 min-w-14 items-center justify-center rounded-md px-3 text-[13px] font-semibold",
+                                  SEGMENT_STYLE[rec.status],
                                 )}
                               >
-                                {STATUS_LABEL.leave}
+                                {STATUS_LABEL[rec.status]}
                               </span>
-                            </div>
-                          ) : (
-                            <div className="flex justify-center gap-2">
-                              {STATUS_ORDER.map((st) => (
-                                <button
-                                  key={st}
-                                  type="button"
-                                  onClick={() => setStatus(s.id, st)}
-                                  className={cn(
-                                    "tappable inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-medium",
-                                    mark.status === st
-                                      ? STATUS_STYLE[st]
-                                      : "bg-muted text-muted-foreground hover:bg-muted/70",
-                                  )}
-                                >
-                                  {STATUS_LABEL[st]}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <span className="shrink-0 whitespace-nowrap text-[10px] text-muted-foreground">
-                              {STATUS_ORDER.map((st) => `${STATUS_LABEL[st]} ${monthCountsByStudent.get(s.id)?.[st] ?? 0}`).join(" · ")}
-                            </span>
-                            <Input
-                              value={mark.note}
-                              onChange={(e) => setNote(s.id, e.target.value)}
-                              placeholder="หมายเหตุ (ถ้ามี)"
-                              disabled={!noteOpen}
-                              className={cn("h-7 text-[10px]", !noteOpen && "invisible")}
-                              aria-label={`หมายเหตุของ ${name}`}
-                              tabIndex={noteOpen ? undefined : -1}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="truncate px-4 py-0 text-muted-foreground">{rec?.note ?? ""}</td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          <div className="flex shrink-0 items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground">
-              {remaining === 0 ? `ครบ ${roster.length} คน` : `เหลืออีก ${remaining} คน`}
-            </span>
-            <Button onClick={submit} disabled={remaining > 0 || save.isPending}>
-              {save.isPending ? <Spinner className="h-3 w-3" /> : "บันทึกเช็คชื่อ"}
-            </Button>
-          </div>
-        </>
+        </div>
       )}
+      <Sheet open={!!picked} onOpenChange={(o) => !o && setPicked(null)} title={picked ? `${picked.first_name} ${picked.last_name}` : ""} closable bottomOnPhone>
+        {picked && (
+          <StudentAttendanceCalendar student={picked} assignmentEntryIds={assignmentEntryIds} />
+        )}
+      </Sheet>
     </div>
+  );
+}
+
+function StudentAttendanceCalendar({
+  student,
+  assignmentEntryIds,
+}: {
+  student: { id: string; department_id: string };
+  assignmentEntryIds: string[];
+}) {
+  const useMine = (start: string, end: string) => {
+    const q = usePeriodAttendanceByEntries(assignmentEntryIds, start, end);
+    const seen = new Set<string>();
+    const data = q.data?.filter((r) => {
+      if (r.student_id !== student.id || seen.has(r.date)) return false;
+      seen.add(r.date);
+      return true;
+    });
+    return { data, isLoading: q.isLoading, isError: q.isError, refetch: q.refetch };
+  };
+  return (
+    <AttendanceMonthView
+      departmentId={student.department_id}
+      useRecords={useMine}
+      holiday={(iso, events) =>
+        events.find((e) => !e.students_attend && (e.departmentIds.length === 0 || e.departmentIds.includes(student.department_id)) && iso >= e.start_date && iso <= e.end_date)?.name ?? null
+      }
+    />
   );
 }
