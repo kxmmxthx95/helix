@@ -188,9 +188,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const { data: activeTerm } = useActiveTerm(departmentId || null);
   const scheduleTerm = splitsByTerm ? (activeTerm?.term_type === "term2" ? 2 : 1) : null;
 
-  const { data: entries = [] } = useTeacherSchedule(me.id, academicYear, scheduleTerm);
+  const { data: entries = [], isLoading: loadingEntries } = useTeacherSchedule(me.id, academicYear, scheduleTerm);
   // ponytail: department default periods only — a grade with its own override can show slightly different times; read per-grade periods if that matters
-  const { data: periods = [] } = useDepartmentPeriods(departmentId || null);
+  const { data: periods = [], isLoading: loadingPeriods } = useDepartmentPeriods(departmentId || null);
   const { data: subjects = [] } = useSubjects({
     search: "",
     departmentId,
@@ -238,7 +238,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     return slot ? [{ entry: e, start: toMin(slot.start_time), end: toMin(slot.end_time), startText: hhmm(slot.start_time), endText: hhmm(slot.end_time) }] : [];
   });
 
-  const { data: takenSet = new Set<string>() } = usePeriodAttendanceTakenSet(
+  const { data: takenData } = usePeriodAttendanceTakenSet(
     isToday ? dayEntries.map((e) => e.id) : [],
     today,
   );
@@ -347,7 +347,9 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   ).values()].sort((a, b) => a.code.localeCompare(b.code, "th"));
 
   // ---- open work
-  const unchecked = isToday ? timed.filter((t) => t.start <= nowMin && !takenSet.has(t.entry.id)).length : 0;
+  // Until the taken-set has loaded every started period would look unchecked (a red badge that flashes away).
+  const uncheckedLoading = loadingEntries || loadingPeriods || (isToday && dayEntries.length > 0 && !takenData);
+  const unchecked = isToday && takenData ? timed.filter((t) => t.start <= nowMin && !takenData.has(t.entry.id)).length : 0;
   const { data: homerooms = [] } = useHomeroomClassrooms(me.id, academicYear);
   const homeroomIds = homerooms.map((h) => h.id);
   const assemblyDay = weekdayOf(today) >= 1 && weekdayOf(today) <= 5 && !isHoliday(today);
@@ -419,7 +421,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           },
         ]
       : []),
-    { title: "เช็คชื่อเข้าเรียน", text: unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", sheet: true, badge: unchecked },
+    { title: "เช็คชื่อเข้าเรียน", text: uncheckedLoading ? "กำลังตรวจสอบ…" : unchecked > 0 ? `วันนี้ยังไม่เช็ค ${unchecked} คาบ` : "ไม่มีคาบค้างเช็คชื่อ", to: "/period-attendance", sheet: true, badge: unchecked },
     {
       title: "จัดการใบลา",
       text: pendingTotal > 0 ? `มี ${pendingTotal} ใบรอการอนุมัติ` : "ไม่มีใบลาค้าง",
