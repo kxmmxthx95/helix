@@ -132,6 +132,34 @@ export type PremisesExitRequest = {
   updated_at: string;
 };
 
+/** Student "ขอออกนอกโรงเรียน" — approved BEFORE leaving, return confirmed by the approver. See migration 0184. */
+export type StudentPremisesExitRequest = {
+  id: string;
+  student_id: string;
+  submitted_by: string;
+  date: string;
+  reason: string;
+  exit_time: string;
+  planned_return_time: string | null;
+  no_return: boolean;
+  return_time: string | null;
+  status: PremisesExitStatus;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** One row per device that opted in to web push. See migration 0185. */
+export type PushSubscriptionRow = {
+  id: string;
+  profile_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  created_at: string;
+};
+
 /** Lookup table — schools add categories over time. See migration 0033. */
 export type LeaveType = {
   id: string;
@@ -1796,6 +1824,11 @@ export type Database = {
         PremisesExitRequest,
         InsertOf<PremisesExitRequest, "status" | "approved_by" | "approved_at" | "return_time" | "planned_return_time" | "no_return">
       >;
+      student_premises_exit_requests: Table<
+        StudentPremisesExitRequest,
+        InsertOf<StudentPremisesExitRequest, "planned_return_time" | "no_return" | "return_time" | "status" | "approved_by" | "approved_at">
+      >;
+      push_subscriptions: Table<PushSubscriptionRow, InsertOf<PushSubscriptionRow, never>>;
       leave_types: Table<LeaveType, InsertOf<LeaveType, never>>;
       leave_requests: Table<
         LeaveRequest,
@@ -2207,6 +2240,10 @@ export type Database = {
       pos_student_topups: {
         Args: { p_student_id: string };
         Returns: PosStudentTx[];
+      };
+      save_push_subscription: {
+        Args: { p_endpoint: string; p_p256dh: string; p_auth: string };
+        Returns: void;
       };
       set_line_notifications_enabled: {
         Args: { p_profile_id: string; p_enabled: boolean };

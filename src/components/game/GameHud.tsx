@@ -15,6 +15,7 @@ import {
   DocumentTextIcon,
   LibraryIcon,
   ListIcon,
+  LogOut,
   ProfileIcon,
   PaletteIcon,
   Search,
@@ -35,6 +36,7 @@ import { useMyIslands } from "@/lib/islands";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { SubmitSheet } from "@/routes/Assignments";
+import { StudentExitSection } from "@/routes/StudentExitSection";
 import { Timetable } from "@/routes/Timetable";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
@@ -51,12 +53,13 @@ import {
 } from "@/routes/Dashboard";
 
 type Icon = typeof BookIcon;
-type Panel = "attendance" | "behavior" | "leave" | "bag" | "subjects" | "timetable";
+type Panel = "attendance" | "behavior" | "leave" | "exit" | "bag" | "subjects" | "timetable";
 
 const PANEL_TITLE: Record<Panel, string> = {
   attendance: "เช็คชื่อเข้าแถว",
   behavior: "พฤติกรรม",
   leave: "ใบลา",
+  exit: "ขอออกนอกโรงเรียน",
   bag: "กระเป๋า",
   subjects: "วิชาของฉัน",
   timetable: "ตารางเรียน",
@@ -230,6 +233,7 @@ export function GameHud() {
     { label: "ปฏิทิน", icon: CalendarIcon, color: "linear-gradient(160deg,#ff8aa8,#ff2d55)", onClick: () => navigate("/academic-events") },
     { label: "เอกสาร", icon: LibraryIcon, color: "linear-gradient(160deg,#9aa0ff,#5856d6)", onClick: () => navigate("/documents") },
     { label: "ใบลา", icon: AirplaneIcon, color: "linear-gradient(160deg,#6dd5e6,#32ade6)", onClick: () => setPanel("leave") },
+    { label: "ออกนอก", icon: LogOut, color: "linear-gradient(160deg,#b4b4bc,#737373)", onClick: () => setPanel("exit") },
     { label: "เช็คชื่อเข้าแถว", icon: CheckmarkCircleIcon, color: "linear-gradient(160deg,#5de0b8,#30b0a0)", onClick: () => setPanel("attendance") },
     { label: "พฤติกรรม", icon: RibbonIcon, color: "linear-gradient(160deg,#ffd45e,#ffcc00)", onClick: () => setPanel("behavior") },
     { label: "บัตรเติมเงิน", icon: PricetagIcon, color: "linear-gradient(160deg,#d58bff,#af52de)", onClick: () => navigate("/card-topup") },
@@ -420,6 +424,7 @@ export function GameHud() {
         {myStudent && profile && panel === "attendance" && <AttendanceSummarySection student={myStudent} />}
         {myStudent && profile && panel === "behavior" && <BehaviorScoreSection student={myStudent} showName={false} />}
         {myStudent && profile && panel === "leave" && <StudentLeaveSection student={myStudent} submittedBy={profile.id} showName={false} />}
+        {myStudent && profile && panel === "exit" && <StudentExitSection student={myStudent} submittedBy={profile.id} />}
         {panel === "bag" && <Inventory badges={badges} rank={rank} exp={lifeExp} />}
         {panel === "subjects" && (
           <div className="space-y-3">

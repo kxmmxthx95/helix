@@ -41,6 +41,7 @@ import { StaffClockStatsSheet } from "@/routes/StaffClockStatsSheet";
 import { PeriodDaySheet, type DayPeriod, type SheetDay } from "@/routes/PeriodDaySheet";
 import { bangkokTime } from "@/routes/TimeTracking";
 import { PremisesExitSheet } from "@/routes/PremisesExitSheet";
+import { useConfirmStudentReturn, useDecideStudentExit, useOpenStudentExits } from "@/hooks/useStudentPremisesExit";
 import { TeacherTimetable } from "@/routes/Timetable";
 
 // Teacher home: "what do I teach today" first, open work second. Cards are widget-style (macOS).
@@ -370,7 +371,11 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const { data: pendingLeave = [] } = usePendingStudentLeaveApprovals();
   const { data: staffLeave = [] } = usePendingStaffLeave(me.id, canManage(me.roles));
   const setStaffLeaveStatus = useSetLeaveStatus();
-  const pendingTotal = pendingLeave.length + staffLeave.length;
+  const { data: studentExits = [] } = useOpenStudentExits(today);
+  const decideStudentExit = useDecideStudentExit();
+  const confirmStudentReturn = useConfirmStudentReturn();
+  const pendingExits = studentExits.filter((x) => x.status === "pending");
+  const pendingTotal = pendingLeave.length + staffLeave.length + pendingExits.length;
 
   async function approveAllLeave() {
     if (!confirm(`อนุมัติใบลา ${pendingLeave.length} ใบทั้งหมดหรือไม่?`)) return;
@@ -392,6 +397,15 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     setLeaveStatus.mutate(
       { id, status, approvedBy: me.id },
       { onSuccess: () => toast(`${verb}ใบลาเรียบร้อย`), onError: () => toast(`${verb}ไม่สำเร็จ`, "error") },
+    );
+  }
+
+  function decideExit(id: string, status: "approved" | "rejected") {
+    const verb = status === "approved" ? "อนุมัติ" : "ไม่อนุมัติ";
+    if (status === "rejected" && !confirm("ไม่อนุมัติคำขอออกนอกนี้หรือไม่?")) return;
+    decideStudentExit.mutate(
+      { id, status, approvedBy: me.id },
+      { onSuccess: () => toast(`${verb}คำขอออกนอกเรียบร้อย`), onError: () => toast(`${verb}ไม่สำเร็จ`, "error") },
     );
   }
 
@@ -763,6 +777,57 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         );
         const listBody = (
           <>
+        {studentExits.length > 0 && (
+          <>
+            <h3 className="mb-1 text-xs font-medium text-muted-foreground">นักเรียนขอออกนอก</h3>
+            <ul className="-my-1 mb-3 divide-y divide-border">
+              {studentExits.map((x) => (
+                <li key={x.id} className="flex gap-4 py-5">
+                  <Avatar
+                    name={x.student ? `${x.student.first_name} ${x.student.last_name}` : "—"}
+                    src={x.student ? (studentAvatarUrl(x.student) ?? (x.student.profile ? avatarUrl(x.student.profile) : null)) : null}
+                    className="h-12 w-12 shrink-0 text-sm"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="min-w-0 truncate text-base font-semibold leading-6">{x.student ? `${x.student.first_name} ${x.student.last_name}` : "—"}</p>
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{x.student?.student_code}</span>
+                    </div>
+                    <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                      ออก {bangkokTime(x.exit_time)}
+                      {x.no_return ? " · ไม่กลับ" : x.planned_return_time ? ` · คาดว่ากลับ ${bangkokTime(x.planned_return_time)}` : ""}
+                    </p>
+                    <p className="mt-3 text-sm leading-6">{x.reason}</p>
+                    <div className="mt-4 flex gap-2">
+                      {x.status === "pending" ? (
+                        (["approved", "rejected"] as const).map((st) => (
+                          <button
+                            key={st}
+                            type="button"
+                            disabled={decideStudentExit.isPending}
+                            onClick={() => decideExit(x.id, st)}
+                            className={`inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full border border-input px-4 text-sm font-medium transition-colors hover:bg-muted active:scale-[0.98] disabled:opacity-50 ${st === "rejected" ? "text-destructive" : ""}`}
+                          >
+                            {st === "approved" ? "อนุมัติ" : "ไม่อนุมัติ"}
+                          </button>
+                        ))
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={confirmStudentReturn.isPending}
+                          onClick={() => confirmStudentReturn.mutate(x.id, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
+                          className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-full border border-input px-4 text-sm font-medium transition-colors hover:bg-muted active:scale-[0.98] disabled:opacity-50"
+                        >
+                          กลับมาแล้ว
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
         {staffLeave.length > 0 && (
           <>
             <h3 className="mb-1 text-xs font-medium text-muted-foreground">ใบลาครู</h3>
@@ -807,10 +872,10 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           </>
         )}
         {pendingLeave.length === 0 ? (
-          staffLeave.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีใบลาค้าง</p>
+          staffLeave.length === 0 && studentExits.length === 0 && <p className="py-6 text-center text-sm text-muted-foreground">ไม่มีใบลาค้าง</p>
         ) : (
           <>
-          {staffLeave.length > 0 && <h3 className="mb-1 text-xs font-medium text-muted-foreground">ใบลานักเรียน</h3>}
+          {(staffLeave.length > 0 || studentExits.length > 0) && <h3 className="mb-1 text-xs font-medium text-muted-foreground">ใบลานักเรียน</h3>}
           <ul className="-my-1 divide-y divide-border">
             {pendingLeave.map((l) => (
               <li key={l.id} className="flex gap-4 py-5">
