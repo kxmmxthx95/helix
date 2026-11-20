@@ -34,6 +34,8 @@ export default defineConfig({
       },
 
       workbox: {
+        // Web push handlers (public/push-sw.js) — see migration 0185.
+        importScripts: ["push-sw.js"],
         // Allow large vendor chunks (e.g. three) in the precache manifest.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],

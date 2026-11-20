@@ -3,12 +3,13 @@ import { useAuth } from "@/auth/AuthProvider";
 import { CameraIcon, CopyIcon, Moon, Monitor, NotificationIcon, ProfileIcon, ShieldIcon, Sun } from "@/components/icons";
 import { useTheme, type ThemePreference } from "@/components/ThemeProvider";
 import { useToast } from "@/components/Toast";
-import { Avatar, Button, BuddhistDateSelect, Field, Input, PasswordInput, Spinner } from "@/components/ui";
+import { Avatar, Button, BuddhistDateSelect, Field, Input, PasswordInput, Spinner, Switch } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
 import { useLearningAreas } from "@/hooks/useCurriculum";
 import { useAllGradeLevels } from "@/hooks/useCurriculumStructure";
 import { avatarUrl, useUploadAvatar } from "@/hooks/useAvatar";
 import { LINE_LINK_CODE_TTL_MINUTES, useGenerateLinkCode } from "@/hooks/useLineLink";
+import { usePushSubscription } from "@/hooks/usePushSubscription";
 import { useDepartments, useUpdateMyProfile, type MyProfileEdit } from "@/hooks/useProfiles";
 import { profileFullName } from "@/lib/database.types";
 import { PREFIXES, roleLabels, STUDENT_PREFIXES } from "@/lib/roles";
@@ -265,7 +266,8 @@ export function Profile() {
 
         {section === "notifications" && (
           <>
-            <SectionHeader icon={<NotificationIcon className="h-6 w-6" />} title="การแจ้งเตือน" description="รับแจ้งเตือนงานและคะแนนทาง LINE" />
+            <SectionHeader icon={<NotificationIcon className="h-6 w-6" />} title="การแจ้งเตือน" description="รับแจ้งเตือนทาง LINE และบนเครื่องนี้" />
+            <PushCard />
             <LineLinkCard />
           </>
         )}
@@ -379,6 +381,31 @@ function DisplaySection() {
  * the actual link only happens once the LINE message round-trips.
  */
 // Optional: the school OA's add-friend link, e.g. https://line.me/R/ti/p/@123abcde
+function PushCard() {
+  const toast = useToast();
+  const push = usePushSubscription();
+  return (
+    <div className="space-y-2 rounded-xl bg-muted p-4">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm font-semibold">แจ้งเตือนบนเครื่องนี้</p>
+        <Switch
+          checked={push.subscribed}
+          disabled={!push.supported || push.denied || push.busy}
+          label="แจ้งเตือนบนเครื่องนี้"
+          onChange={(on) => (on ? push.enable() : push.disable()).catch((e) => toast(e instanceof Error ? e.message : "ตั้งค่าไม่สำเร็จ", "error"))}
+        />
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {!push.supported
+          ? "เครื่องนี้ยังใช้ไม่ได้ — บน iPhone ให้ \"เพิ่มไปยังหน้าจอโฮม\" แล้วเปิดจากไอคอนก่อน"
+          : push.denied
+            ? "ปิดการแจ้งเตือนไว้ในเบราว์เซอร์ — เปิดในการตั้งค่าเครื่องก่อน"
+            : "ได้รับแจ้งเตือนเด้งบนหน้าจอแม้ไม่ได้เปิดแอป (ตั้งค่าแยกต่อเครื่อง)"}
+      </p>
+    </div>
+  );
+}
+
 const LINE_OA_URL = import.meta.env.VITE_LINE_OA_URL as string | undefined;
 
 export function LineLinkCard() {
