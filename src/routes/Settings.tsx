@@ -27,11 +27,13 @@ import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, EmptyState, Field, Input, Pagination, Select, Skeleton, Spinner, Switch } from "@/components/ui";
 import {
+  useAcademicEvents,
   useAcademicTerms,
   useSaveAcademicTerm,
   useSetAcademicTermStatus,
   type AcademicTermDraft,
 } from "@/hooks/useAcademicTerms";
+import { useDepartmentPeriods } from "@/hooks/usePeriodDefinitions";
 import {
   schoolLogoUrl,
   useDepartmentSettings,
@@ -62,6 +64,7 @@ import {
 } from "@/hooks/useEmployees";
 import type { AcademicTerm, LeaveType, SalaryGrade, TermStatus, TermType } from "@/lib/database.types";
 import { canManageHr, isDeptHead, isOrgWide, ROLE_LABEL, ROLES, type Role } from "@/lib/roles";
+import { countSchoolDays } from "@/lib/termDays";
 import { cn } from "@/lib/utils";
 
 const TERM_TYPE_LABEL: Record<TermType, string> = {
@@ -627,11 +630,13 @@ const parseDate = (iso: string) => {
 const longDate = (iso: string) =>
   parseDate(iso).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" });
 
-/** "15 พฤษภาคม 2569 – 11 ตุลาคม 2569" plus the span in days, or "—" when either date is unset. */
-function termPeriod(t: AcademicTerm) {
+/** "15 พฤษภาคม 2569 – 11 ตุลาคม 2569" plus the school days inside it (weekends and whole-school closures removed), or "—" when either date is unset. */
+function termPeriod(t: AcademicTerm, teachingWeekdays: number[], closures: { start_date: string; end_date: string }[]) {
   if (!t.start_date || !t.end_date) return { range: "—", days: null };
-  const days = Math.round((parseDate(t.end_date).getTime() - parseDate(t.start_date).getTime()) / 86_400_000);
-  return { range: `${longDate(t.start_date)} – ${longDate(t.end_date)}`, days };
+  return {
+    range: `${longDate(t.start_date)} – ${longDate(t.end_date)}`,
+    days: countSchoolDays(t.start_date, t.end_date, teachingWeekdays, closures),
+  };
 }
 
 function AcademicTermsCard({
@@ -651,6 +656,13 @@ function AcademicTermsCard({
   const { data: terms = [], isLoading } = useAcademicTerms(departmentId);
   const { data: departments = [] } = useDepartments();
   const departmentName = departments.find((d) => d.id === departmentId)?.name ?? "";
+  const { data: periods = [] } = useDepartmentPeriods(departmentId);
+  const { data: events = [] } = useAcademicEvents();
+  const teachingWeekdays = [...new Set(periods.filter((p) => p.period_type === "teaching").map((p) => p.day_of_week))];
+  // Only closures that hit every grade of this department shorten the term (grade-limited ones don't).
+  const closures = events.filter(
+    (e) => !e.students_attend && e.gradeLevelIds.length === 0 && (e.departmentIds.length === 0 || e.departmentIds.includes(departmentId)),
+  );
   const [editing, setEditing] = useState<AcademicTerm | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TermStatus | "">("");
@@ -748,7 +760,7 @@ function AcademicTermsCard({
   }
 
   function card(t: AcademicTerm) {
-    const { range, days } = termPeriod(t);
+    const { range, days } = termPeriod(t, teachingWeekdays, closures);
     const hint = TERM_STATUS_HINT[t.status];
     return (
       <div
@@ -772,7 +784,7 @@ function AcademicTermsCard({
         <div className="text-sm">
           <p className="text-xs text-muted-foreground">ช่วงเวลา</p>
           <p className="font-medium">{range}</p>
-          {days !== null && <p className="text-xs text-muted-foreground">{days} วัน</p>}
+          {days !== null && <p className="text-xs text-muted-foreground">เรียนจริง {days} วัน</p>}
         </div>
         <div className="space-y-1">
           <TermStatusControl term={t} orgWide={orgWide} />
