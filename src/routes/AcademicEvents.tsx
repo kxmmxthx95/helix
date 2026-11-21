@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { CheckmarkCircleIcon, ChevronBack, ChevronForward, DownloadIcon, Plus } from "@/components/icons";
-import { Sheet, SheetStyleContext } from "@/components/Sheet";
+import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Card, Field, FormSection, Input, Select, Skeleton, Spinner, Switch } from "@/components/ui";
 import {
@@ -326,116 +326,114 @@ export function AcademicEvents() {
     <div className="space-y-4">
       {/* Phone layout (<md): attendance-summary style month grid + selected-day agenda. */}
       {phone && (
-        <SheetStyleContext.Provider value="ios">
-          <Sheet open onOpenChange={(o) => !o && navigate(-1)} title="ปฏิทินกิจกรรม" bodyClassName="min-h-[70dvh]">
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            aria-label="เดือนก่อนหน้า"
-            onClick={() => shiftMonth(-1)}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60"
-          >
-            <ChevronBack className="h-4 w-4" />
-          </button>
-          <span className="flex items-center gap-2 text-sm font-semibold">
-            {focus.toLocaleDateString("th-TH", { month: "long", year: "numeric" })}
-            {!sameMonth(focus, new Date()) && (
-              <button type="button" onClick={() => setFocus(new Date())} className="rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium">
-                วันนี้
-              </button>
-            )}
-          </span>
-          <button
-            type="button"
-            aria-label="เดือนถัดไป"
-            onClick={() => shiftMonth(1)}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60"
-          >
-            <ChevronForward className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-7 gap-1.5 text-center">
-          {WEEKDAY_LABEL.map((w) => (
-            <span key={w} className="text-[11px] font-medium text-muted-foreground">
-              {w}
-            </span>
-          ))}
-          {Array.from({ length: monthStart.getDay() }, (_, i) => (
-            <span key={`pad-${i}`} />
-          ))}
-          {monthDays
-            .filter((d) => sameMonth(d, focus))
-            .map((day) => {
-              const iso = toISODate(day);
-              const dayEvents = eventsByDay.get(iso) ?? [];
-              const top = TYPE_PRIORITY.find((t) => dayEvents.some((e) => !e.isTerm && e.event_type === t));
-              const termOnly = !top && dayEvents.some((e) => e.isTerm);
-              return (
-                <button
-                  key={iso}
-                  type="button"
-                  aria-label={`${day.getDate()}${dayEvents.length ? ` ${dayEvents.map((e) => e.name).join(", ")}` : ""}`}
-                  aria-pressed={iso === focusISO}
-                  onClick={() => setFocus(day)}
-                  className={cn(
-                    "relative flex aspect-square items-center justify-center rounded-xl text-sm tabular-nums",
-                    top ? cn("font-semibold text-white", EVENT_TYPE_DOT[top]) : termOnly ? cn("font-semibold text-white", TERM_DOT) : isWeekend(day) ? "bg-muted/30 text-muted-foreground/70" : "bg-muted/60 text-muted-foreground",
-                    iso === todayISO && "font-bold underline underline-offset-2",
-                    iso === focusISO && "ring-2 ring-foreground ring-offset-1 ring-offset-background",
-                  )}
-                >
-                  {day.getDate()}
-                  {dayEvents.length > 1 && (
-                    <span className="absolute right-0.5 top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-background/90 px-0.5 text-[9px] font-bold leading-none text-foreground">
-                      {dayEvents.length}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-        </div>
-
-        <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-          {(Object.keys(EVENT_TYPE_LABEL) as AcademicEventType[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              aria-pressed={!hidden.has(t)}
-              onClick={() =>
-                setHidden((h) => {
-                  const next = new Set(h);
-                  if (!next.delete(t)) next.add(t);
-                  return next;
-                })
-              }
-              className={cn("inline-flex items-center gap-1", hidden.has(t) && "opacity-40 line-through")}
-            >
-              <span aria-hidden className={cn("h-2.5 w-2.5 rounded-full", EVENT_TYPE_DOT[t])} />
-              {EVENT_TYPE_LABEL[t]}
+        <Sheet open onOpenChange={(o) => !o && navigate(-1)} title="ปฏิทินกิจกรรม" bodyClassName="min-h-[70dvh]">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          aria-label="เดือนก่อนหน้า"
+          onClick={() => shiftMonth(-1)}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60"
+        >
+          <ChevronBack className="h-4 w-4" />
+        </button>
+        <span className="flex items-center gap-2 text-sm font-semibold">
+          {focus.toLocaleDateString("th-TH", { month: "long", year: "numeric" })}
+          {!sameMonth(focus, new Date()) && (
+            <button type="button" onClick={() => setFocus(new Date())} className="rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium">
+              วันนี้
             </button>
-          ))}
-        </p>
-
-        <Card className="space-y-3">
-          <p className="text-sm font-semibold">
-            {focus.toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-          </p>
-          {(eventsByDay.get(focusISO) ?? []).length === 0 ? (
-            <p className="py-4 text-center text-xs text-muted-foreground">ไม่มีกิจกรรม</p>
-          ) : (
-            (eventsByDay.get(focusISO) ?? []).map(eventRow)
           )}
-          {canCreateOn(focus) && (
-            <Button variant="outline" size="sm" onClick={() => setCreating(focusISO)}>
-              <Plus className="h-3.5 w-3.5" /> เพิ่มกิจกรรมวันนี้
-            </Button>
-          )}
-        </Card>
+        </span>
+        <button
+          type="button"
+          aria-label="เดือนถัดไป"
+          onClick={() => shiftMonth(1)}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60"
+        >
+          <ChevronForward className="h-4 w-4" />
+        </button>
       </div>
-          </Sheet>
-        </SheetStyleContext.Provider>
+
+      <div className="grid grid-cols-7 gap-1.5 text-center">
+        {WEEKDAY_LABEL.map((w) => (
+          <span key={w} className="text-[11px] font-medium text-muted-foreground">
+            {w}
+          </span>
+        ))}
+        {Array.from({ length: monthStart.getDay() }, (_, i) => (
+          <span key={`pad-${i}`} />
+        ))}
+        {monthDays
+          .filter((d) => sameMonth(d, focus))
+          .map((day) => {
+            const iso = toISODate(day);
+            const dayEvents = eventsByDay.get(iso) ?? [];
+            const top = TYPE_PRIORITY.find((t) => dayEvents.some((e) => !e.isTerm && e.event_type === t));
+            const termOnly = !top && dayEvents.some((e) => e.isTerm);
+            return (
+              <button
+                key={iso}
+                type="button"
+                aria-label={`${day.getDate()}${dayEvents.length ? ` ${dayEvents.map((e) => e.name).join(", ")}` : ""}`}
+                aria-pressed={iso === focusISO}
+                onClick={() => setFocus(day)}
+                className={cn(
+                  "relative flex aspect-square items-center justify-center rounded-xl text-sm tabular-nums",
+                  top ? cn("font-semibold text-white", EVENT_TYPE_DOT[top]) : termOnly ? cn("font-semibold text-white", TERM_DOT) : isWeekend(day) ? "bg-muted/30 text-muted-foreground/70" : "bg-muted/60 text-muted-foreground",
+                  iso === todayISO && "font-bold underline underline-offset-2",
+                  iso === focusISO && "ring-2 ring-foreground ring-offset-1 ring-offset-background",
+                )}
+              >
+                {day.getDate()}
+                {dayEvents.length > 1 && (
+                  <span className="absolute right-0.5 top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-background/90 px-0.5 text-[9px] font-bold leading-none text-foreground">
+                    {dayEvents.length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+      </div>
+
+      <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        {(Object.keys(EVENT_TYPE_LABEL) as AcademicEventType[]).map((t) => (
+          <button
+            key={t}
+            type="button"
+            aria-pressed={!hidden.has(t)}
+            onClick={() =>
+              setHidden((h) => {
+                const next = new Set(h);
+                if (!next.delete(t)) next.add(t);
+                return next;
+              })
+            }
+            className={cn("inline-flex items-center gap-1", hidden.has(t) && "opacity-40 line-through")}
+          >
+            <span aria-hidden className={cn("h-2.5 w-2.5 rounded-full", EVENT_TYPE_DOT[t])} />
+            {EVENT_TYPE_LABEL[t]}
+          </button>
+        ))}
+      </p>
+
+      <Card className="space-y-3">
+        <p className="text-sm font-semibold">
+          {focus.toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        </p>
+        {(eventsByDay.get(focusISO) ?? []).length === 0 ? (
+          <p className="py-4 text-center text-xs text-muted-foreground">ไม่มีกิจกรรม</p>
+        ) : (
+          (eventsByDay.get(focusISO) ?? []).map(eventRow)
+        )}
+        {canCreateOn(focus) && (
+          <Button variant="outline" size="sm" onClick={() => setCreating(focusISO)}>
+            <Plus className="h-3.5 w-3.5" /> เพิ่มกิจกรรมวันนี้
+          </Button>
+        )}
+      </Card>
+    </div>
+        </Sheet>
       )}
 
         <div className={cn("hidden flex-wrap items-center gap-2 md:flex", isStudent && "justify-center")}>

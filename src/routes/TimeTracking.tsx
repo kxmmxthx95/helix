@@ -264,7 +264,6 @@ function ManualRecordButton({ recordedBy }: { recordedBy: string }) {
         onOpenChange={setOpen}
         title="บันทึกเวลาแทน"
         description="สำหรับกรณี GPS มีปัญหา หรือบันทึกย้อนหลัง"
-        bottomOnPhone
         footer={
           <div className="flex gap-2">
             {existing && (

@@ -487,7 +487,7 @@ function ClassroomsList({ me }: { me: NonNullable<ReturnType<typeof useAuth>["pr
         <StatCard tone="muted" icon={<Users className="h-5 w-5" />} label="จำนวนนักเรียนรวม" value={totalStudents} unit="คน" />
       </div>
 
-      <Sheet open={statsOpen} onOpenChange={setStatsOpen} title="สรุปห้องเรียน" bottomOnPhone>
+      <Sheet open={statsOpen} onOpenChange={setStatsOpen} title="สรุปห้องเรียน">
         <div className="grid grid-cols-2 gap-2">
           <StatCard tone="accent" icon={<BookIcon className="h-5 w-5" />} label="ทั้งหมด" value={scoped.length} unit="ห้องเรียน" />
           <StatCard tone="success" icon={<CheckmarkCircleIcon className="h-5 w-5" />} label="กำลังใช้งาน" value={activeCount} unit="ห้องเรียน" />
@@ -767,7 +767,7 @@ function TeacherSheet({ teacherId, classrooms, onClose }: { teacherId: string | 
       ]
     : [];
   return (
-    <Sheet open={teacherId !== null} onOpenChange={(o) => !o && onClose()} title="ครูประจำชั้น" bottomOnPhone closable>
+    <Sheet open={teacherId !== null} onOpenChange={(o) => !o && onClose()} title="ครูประจำชั้น" closable>
       {isLoading || !t ? (
         <Skeleton className="h-40 w-full rounded-xl" />
       ) : (

@@ -239,7 +239,7 @@ function ChildCard({ kid, canAct }: { kid: PortalStudent; canAct: boolean }) {
         </div>
       </Card>
 
-      <Sheet open={historyOpen} onOpenChange={setHistoryOpen} title="ประวัติรายการ" closable bottomOnPhone bodyClassName="px-0 pt-1">
+      <Sheet open={historyOpen} onOpenChange={setHistoryOpen} title="ประวัติรายการ" closable bodyClassName="px-0 pt-1">
         <ul className="divide-y divide-border/60">
           {txs.map((t) => {
             const d = new Date(t.created_at);

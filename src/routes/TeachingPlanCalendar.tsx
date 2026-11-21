@@ -480,7 +480,7 @@ export function TeachingPlanCalendar() {
         </div>
       )}
 
-      <Sheet open={topicsOpen} onOpenChange={setTopicsOpen} title="หัวข้อ" description="เลือกหัวข้อ แล้วแตะช่องในปฏิทินเพื่อวาง" closable bottomOnPhone>
+      <Sheet open={topicsOpen} onOpenChange={setTopicsOpen} title="หัวข้อ" description="เลือกหัวข้อ แล้วแตะช่องในปฏิทินเพื่อวาง" closable>
         <div className="space-y-3">
           {armed && (
             <div className="relative flex items-center gap-3 overflow-hidden rounded-xl border border-border bg-card py-2.5 pl-4 pr-3 shadow-sm">
@@ -588,7 +588,6 @@ function MergePlanSheet({
       open
       onOpenChange={(o) => !o && onClose()}
       title="รวมแผน"
-      bottomOnPhone
       closable
       footer={
         <div className="flex gap-2">
@@ -677,7 +676,6 @@ function SlotSheet({
       open
       onOpenChange={(o) => !o && onClose()}
       title={`${DAY[cell.dayOfWeek]} ${fmt(cell.date)} · คาบ ${cell.periodNo}${suffix ? ` · ${suffix}` : ""}`}
-      bottomOnPhone
       closable
     >
       <div className="space-y-3">

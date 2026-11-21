@@ -83,7 +83,6 @@ export function CoverSheet({
       onOpenChange={onOpenChange}
       title="มอบงานเช็คชื่อให้ครูแทน"
       description="ครูแทนต้องกดยืนยัน และจะเช็คชื่อได้เฉพาะวัน/คาบที่ยืนยัน หลังใบลาได้รับอนุมัติ"
-      bottomOnPhone
       footer={
         <Button type="button" variant="outline" className="w-full" onClick={() => onOpenChange(false)}>
           ปิด
@@ -250,7 +249,7 @@ export function CoverLeavePicker({
     return <CoverSheet leave={leave} actorId={profileId} open onOpenChange={(o) => { if (!o) { setPicked(null); onOpenChange(false); } }} />;
   }
   return (
-    <Sheet open onOpenChange={onOpenChange} title="มอบงานแทน" description="เลือกใบลาที่ต้องการมอบงานเช็คชื่อ" bottomOnPhone>
+    <Sheet open onOpenChange={onOpenChange} title="มอบงานแทน" description="เลือกใบลาที่ต้องการมอบงานเช็คชื่อ">
       {isLoading ? (
         <Spinner />
       ) : live.length === 0 ? (

@@ -71,7 +71,6 @@ export function NewLeaveSheet({ profileId, open, onOpenChange }: { profileId: st
         if (!o) reset();
       }}
       title="ลาใหม่"
-      bottomOnPhone
       footer={
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>

@@ -420,7 +420,6 @@ export function GameHud() {
         onOpenChange={(o) => !o && setPanel(null)}
         title={panel ? PANEL_TITLE[panel] : ""}
         closable
-        bottomOnPhone
         wide={panel === "timetable" ? "full" : false}
         bodyClassName="[&_.page-fill]:min-h-0 [&_.page-fill]:pb-0"
       >

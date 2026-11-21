@@ -969,7 +969,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
         const title = "ใบลารออนุมัติ";
         const description = leaveTab === "list" && pendingTotal > 0 ? `รออนุมัติ ${pendingTotal} ใบ` : undefined;
         return phone ? (
-          <Sheet open={leaveOpen} onOpenChange={setLeaveOpen} title={title} description={description} footer={leaveFooter} bottomOnPhone>
+          <Sheet open={leaveOpen} onOpenChange={setLeaveOpen} title={title} description={description} footer={leaveFooter}>
             {leaveBody}
           </Sheet>
         ) : (
@@ -995,7 +995,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
           </div>
         );
         return phone ? (
-          <Sheet open={timetableOpen} onOpenChange={setTimetableOpen} title="ตารางสอน" bottomOnPhone>
+          <Sheet open={timetableOpen} onOpenChange={setTimetableOpen} title="ตารางสอน">
             {timetable}
           </Sheet>
         ) : (

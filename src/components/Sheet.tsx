@@ -1,11 +1,8 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Drawer } from "vaul";
 import { ContractIcon, ExpandIcon } from "@/components/icons";
 import { Button, CloseButton, SheetFormContext } from "@/components/ui";
 import { cn } from "@/lib/utils";
-
-/** "ios" (student portal): phones get an iPhone-style bottom card sheet with a grabber instead of the side drawer. */
-export const SheetStyleContext = createContext<"drawer" | "ios">("drawer");
 
 /** True below the lg breakpoint (phones and tablets). */
 export function usePhone(q = "(max-width: 1023px)") {
@@ -20,7 +17,8 @@ export function usePhone(q = "(max-width: 1023px)") {
 }
 
 /**
- * Side drawer, floating off all four edges with full rounding + shadow (Vercel-style).
+ * Desktop: side drawer, floating off all four edges with full rounding + shadow (Vercel-style).
+ * Phones / touch tablets: iPhone-style bottom card sheet with a grabber. `wide="full"` fills 94dvh there.
  * Drag-to-dismiss toward the open edge comes from Vaul.
  */
 export function Sheet({
@@ -41,7 +39,6 @@ export function Sheet({
   wide = false,
   side = "right",
   resizable = false,
-  bottomOnPhone = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -69,14 +66,12 @@ export function Sheet({
   side?: "left" | "right";
   /** Adds a header button letting the user toggle between wide and full-screen. Only useful when `wide` is `true` or `"full"`. */
   resizable?: boolean;
-  /** Phones (< lg): open as a bottom card sheet even outside the student portal. */
-  bottomOnPhone?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const effectiveWide = resizable ? (expanded ? "full" : true) : wide;
   // Touch tablets (iPad landscape, ≥ lg) also get the bottom sheet.
   const phone = usePhone("(max-width: 1023px), (pointer: coarse) and (max-width: 1400px)");
-  const ios = (useContext(SheetStyleContext) === "ios" || bottomOnPhone) && phone;
+  const ios = phone;
 
   return (
     <Drawer.Root open={open} onOpenChange={onOpenChange} direction={ios ? "bottom" : side}>
@@ -85,7 +80,7 @@ export function Sheet({
         <Drawer.Content
           className={cn(
             ios
-              ? "fixed inset-x-0 bottom-0 z-50 flex max-h-[94dvh] flex-col overflow-hidden rounded-t-[14px] bg-background text-foreground shadow-[0_-8px_30px_rgba(0,0,0,0.18)] outline-none"
+              ? cn("fixed inset-x-0 bottom-0 z-50 flex max-h-[94dvh] flex-col overflow-hidden rounded-t-[14px] bg-background text-foreground shadow-[0_-8px_30px_rgba(0,0,0,0.18)] outline-none", effectiveWide === "full" && "h-[94dvh]")
               : cn(
                   "drawer-float fixed top-[max(0.5rem,env(safe-area-inset-top,0px))] bottom-[max(0.5rem,env(safe-area-inset-bottom,0px))] z-50 flex w-[calc(100%-1rem)] flex-col overflow-hidden rounded-2xl text-foreground outline-none",
                   effectiveWide === "full" ? "" : effectiveWide ? "max-w-2xl" : "max-w-[24rem]",
@@ -99,7 +94,7 @@ export function Sheet({
             <div className={cn("flex min-w-0 items-center gap-3", ios && "relative")}>
               {icon && <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent", iconClassName)}>{icon}</div>}
               <Drawer.Title className={cn("font-heading min-w-0 flex-1 truncate text-[17px] font-semibold leading-6 tracking-[-0.01em]", ios && "px-10 text-center")}>{title}</Drawer.Title>
-              {resizable && (
+              {resizable && !ios && (
                 <Button
                   size="icon"
                   variant="ghost"

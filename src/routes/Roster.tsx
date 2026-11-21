@@ -747,7 +747,7 @@ export function Roster() {
         </div>
       )}
 
-      <Sheet open={statsOpen && !!rows} onOpenChange={setStatsOpen} title="สรุปจำนวนนักเรียน" bottomOnPhone>
+      <Sheet open={statsOpen && !!rows} onOpenChange={setStatsOpen} title="สรุปจำนวนนักเรียน">
         {rows && (
           <div className="grid grid-cols-2 gap-2">
             <StatCard tone="accent" icon={<UsersIcon className="h-5 w-5" />} label="ทั้งหมด" value={rows.length} unit="คน" />
@@ -1610,7 +1610,6 @@ function CreateStudentLoginSheet({
   return (
     <Sheet
       open={student !== null}
-      bottomOnPhone
       onOpenChange={(open) => !open && close()}
       title="สร้างบัญชีเข้าใช้"
       description={student ? `${student.first_name} ${student.last_name}` : undefined}
@@ -1733,7 +1732,6 @@ function BulkCreateLoginsSheet({
   return (
     <Sheet
       open={open}
-      bottomOnPhone
       onOpenChange={(next) => {
         if (!next) {
           reset();

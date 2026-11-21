@@ -41,7 +41,7 @@ import {
 } from "@/components/icons";
 import { NavLink, useLocation, useNavigate, useOutlet } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { Sheet, SheetStyleContext } from "@/components/Sheet";
+import { Sheet } from "@/components/Sheet";
 import { MobileHeaderProvider, useMobileHeaderSlot } from "@/components/MobileHeaderSlot";
 import { useTheme } from "@/components/ThemeProvider";
 import { useToast } from "@/components/Toast";
@@ -910,91 +910,89 @@ function AppShellInner() {
           </div>
         </header>
 
-        <SheetStyleContext.Provider value="ios">
-        <Sheet
-          open={navOpen}
-          onOpenChange={setNavOpen}
-          title="เมนู"
-          side="left"
-          headerEnd={
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full bg-muted text-foreground"
-              onClick={() => setNavOpen(false)}
-              aria-label="หุบเมนู"
-              title="หุบเมนู"
+      <Sheet
+        open={navOpen}
+        onOpenChange={setNavOpen}
+        title="เมนู"
+        side="left"
+        headerEnd={
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-full bg-muted text-foreground"
+            onClick={() => setNavOpen(false)}
+            aria-label="หุบเมนู"
+            title="หุบเมนู"
+          >
+            <ChevronBack className="h-3 w-3" />
+          </Button>
+        }
+        footerClassName="py-4"
+        footer={
+          <div className="flex items-center gap-2">
+            {avatarButton("h-9 w-9 text-xs")}
+            <button
+              type="button"
+              onClick={() => {
+                drawerNav.current = true;
+                setNavOpen(false);
+                navigate("/profile");
+              }}
+              className="min-w-0 flex-1 text-left tappable"
             >
-              <ChevronBack className="h-3 w-3" />
-            </Button>
-          }
-          footerClassName="py-4"
-          footer={
-            <div className="flex items-center gap-2">
-              {avatarButton("h-9 w-9 text-xs")}
-              <button
-                type="button"
-                onClick={() => {
-                  drawerNav.current = true;
-                  setNavOpen(false);
-                  navigate("/profile");
-                }}
-                className="min-w-0 flex-1 text-left tappable"
-              >
-                <p className="truncate text-sm font-semibold leading-tight">{displayName}</p>
-                {profile && <p className="truncate text-xs leading-tight text-muted-foreground">{roleSubtitle}</p>}
-              </button>
-              <div className="flex shrink-0 items-center">
-                {settingsButton}
-                {themeButton}
-                {updateButton}
-                {signOutButton}
-              </div>
+              <p className="truncate text-sm font-semibold leading-tight">{displayName}</p>
+              {profile && <p className="truncate text-xs leading-tight text-muted-foreground">{roleSubtitle}</p>}
+            </button>
+            <div className="flex shrink-0 items-center">
+              {settingsButton}
+              {themeButton}
+              {updateButton}
+              {signOutButton}
             </div>
-          }
-        >
-          <nav className="flex flex-col gap-4">
-            {tabSections.map(({ section, items }) => {
-              const open = !section || openSections.has(section);
-              return (
-                <div key={section}>
-                  {section && <button
-                    type="button"
-                    aria-expanded={open}
-                    onClick={() => setOpenSections(open ? new Set() : new Set([section]))}
-                    className="tappable flex w-full items-center justify-between px-3 py-2 text-[15px] font-semibold text-foreground"
-                  >
-                    {section}
-                    <ChevronDown className={cn("h-3 w-3 transition-transform", !open && "-rotate-90")} />
-                  </button>}
-                  <div
-                    className={cn(
-                      "grid transition-[grid-template-rows,opacity] duration-200 ease-ios motion-reduce:transition-none",
-                      open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
-                    )}
-                    inert={!open}
-                  >
-                    <div className="flex min-h-0 flex-col gap-0.5 overflow-hidden">
-                      {items.map(({ to, label, icon: Icon }) => (
-                        <NavLink
-                          key={to}
-                          to={to}
-                          end={to === "/"}
-                          onClick={closeNav}
-                          className={section ? navDrawerLink : navDrawerTopLink}
-                        >
-                          {section && <NavIcon icon={Icon} section={section} />}
-                          <span className="truncate">{label}</span>
-                        </NavLink>
-                      ))}
-                    </div>
+          </div>
+        }
+      >
+        <nav className="flex flex-col gap-4">
+          {tabSections.map(({ section, items }) => {
+            const open = !section || openSections.has(section);
+            return (
+              <div key={section}>
+                {section && <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setOpenSections(open ? new Set() : new Set([section]))}
+                  className="tappable flex w-full items-center justify-between px-3 py-2 text-[15px] font-semibold text-foreground"
+                >
+                  {section}
+                  <ChevronDown className={cn("h-3 w-3 transition-transform", !open && "-rotate-90")} />
+                </button>}
+                <div
+                  className={cn(
+                    "grid transition-[grid-template-rows,opacity] duration-200 ease-ios motion-reduce:transition-none",
+                    open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                  )}
+                  inert={!open}
+                >
+                  <div className="flex min-h-0 flex-col gap-0.5 overflow-hidden">
+                    {items.map(({ to, label, icon: Icon }) => (
+                      <NavLink
+                        key={to}
+                        to={to}
+                        end={to === "/"}
+                        onClick={closeNav}
+                        className={section ? navDrawerLink : navDrawerTopLink}
+                      >
+                        {section && <NavIcon icon={Icon} section={section} />}
+                        <span className="truncate">{label}</span>
+                      </NavLink>
+                    ))}
                   </div>
                 </div>
-              );
-            })}
-          </nav>
-        </Sheet>
-        </SheetStyleContext.Provider>
+              </div>
+            );
+          })}
+        </nav>
+      </Sheet>
 
         {!online && (
           <div

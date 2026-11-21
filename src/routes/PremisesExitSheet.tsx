@@ -57,7 +57,6 @@ export function PremisesExitSheet({ profileId, date, open, onOpenChange }: { pro
         if (!o) reset();
       }}
       title="ขอออกนอกโรงเรียน"
-      bottomOnPhone
       footer={
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>

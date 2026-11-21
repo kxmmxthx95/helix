@@ -195,7 +195,6 @@ export function PeriodDaySheet({
       }}
       title={picked ? thaiDate(date, { weekday: "short", day: "numeric", month: "short", year: "numeric" }) : "เช็คชื่อเข้าเรียน"}
       closable
-      bottomOnPhone
       iconClassName="-ml-2 bg-transparent text-foreground"
       icon={
         picked && (

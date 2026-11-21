@@ -43,7 +43,7 @@ export function Modal({
 
   if (asSheet)
     return (
-      <Sheet open={open} onOpenChange={onOpenChange} title={title} description={description} footer={footer} bottomOnPhone closable>
+      <Sheet open={open} onOpenChange={onOpenChange} title={title} description={description} footer={footer} closable>
         {children}
       </Sheet>
     );

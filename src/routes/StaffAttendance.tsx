@@ -260,7 +260,6 @@ function EditStatusSheet({
       onOpenChange={(o) => !o && onClose()}
       title="เปลี่ยนสถานะการมาทำงาน"
       description={row ? `${name} · ${row.date}` : undefined}
-      bottomOnPhone
       footer={
         <div className="flex gap-2">
           {row?.overridden && (

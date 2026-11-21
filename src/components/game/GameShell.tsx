@@ -23,7 +23,7 @@ import {
   TimetableIcon,
 } from "@/components/icons";
 import { MobileHeaderProvider } from "@/components/MobileHeaderSlot";
-import { Sheet, SheetStyleContext } from "@/components/Sheet";
+import { Sheet } from "@/components/Sheet";
 import { useTheme } from "@/components/ThemeProvider";
 import { Avatar } from "@/components/ui";
 import { avatarUrl } from "@/hooks/useAvatar";
@@ -81,9 +81,7 @@ export function GameShell() {
   return (
     <MobileHeaderProvider>
       <MotionConfig reducedMotion="user">
-        <SheetStyleContext.Provider value="ios">
-          <GameShellInner />
-        </SheetStyleContext.Provider>
+        <GameShellInner />
       </MotionConfig>
     </MobileHeaderProvider>
   );

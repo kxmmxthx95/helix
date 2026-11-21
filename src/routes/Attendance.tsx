@@ -460,7 +460,7 @@ function SummaryPanel({
         </div>
       )}
 
-      <Sheet open={!!picked} onOpenChange={(o) => !o && setPicked(null)} title={picked ? `${picked.first_name} ${picked.last_name}` : ""} closable bottomOnPhone>
+      <Sheet open={!!picked} onOpenChange={(o) => !o && setPicked(null)} title={picked ? `${picked.first_name} ${picked.last_name}` : ""} closable>
         {picked && (
           <AttendanceMonthView
             departmentId={picked.department_id}

@@ -254,7 +254,7 @@ export function StudentCards() {
         </p>
       </Modal>
 
-      <Sheet open={!!picked} onOpenChange={(o) => !o && setPicked(null)} title={picked ? fullName(picked) : ""} description={picked?.student_code} bottomOnPhone>
+      <Sheet open={!!picked} onOpenChange={(o) => !o && setPicked(null)} title={picked ? fullName(picked) : ""} description={picked?.student_code}>
         {picked && <StudentCardsPanel key={picked.id} student={picked} cards={cards?.get(picked.id) ?? []} />}
       </Sheet>
     </div>

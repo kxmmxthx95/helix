@@ -11,7 +11,7 @@ export function StaffClockStatsSheet({ open, onOpenChange, me }: { open: boolean
     return { data: q.data?.filter((r) => r.profile_id === me.id), isLoading: q.isLoading, isError: q.isError, refetch: q.refetch };
   };
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} title="สถิติเข้างาน" closable bottomOnPhone>
+    <Sheet open={open} onOpenChange={onOpenChange} title="สถิติเข้างาน" closable>
       <AttendanceMonthView
         departmentId={me.department_id}
         useRecords={useMine}
