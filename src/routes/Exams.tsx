@@ -60,20 +60,20 @@ export function Exams() {
 
 // ============================================================== teacher side
 
-type StaffTab = "rooms" | "topics" | "approve";
+type StaffTab = "rooms" | "schedule" | "topics" | "approve";
 
 /** Tabs: ห้องสอบ + หัวข้อการสอบ (teachers), อนุมัติสอบ (approvers) — see migration 0183. */
 function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canApprove: boolean }) {
   const [tab, setTab] = useState<StaffTab>(teacherId ? "rooms" : "approve");
   const pending = useExamApprovalPendingCount(canApprove);
   const tabs: [StaffTab, string][] = [
-    ...(teacherId ? ([["rooms", "ห้องสอบ"], ["topics", "หัวข้อการสอบ"]] as [StaffTab, string][]) : []),
+    ...(teacherId ? ([["rooms", "ห้องสอบ"], ["schedule", "ตารางสอบ"], ["topics", "หัวข้อการสอบ"]] as [StaffTab, string][]) : []),
     ...(canApprove ? ([["approve", pending > 0 ? `อนุมัติสอบ (${pending})` : "อนุมัติสอบ"]] as [StaffTab, string][]) : []),
   ];
   return (
     <div className="page-fill">
       {tabs.length > 1 && (
-        <div className="scrollbar-hidden flex shrink-0 gap-2 overflow-x-auto" role="tablist">
+        <div className="scrollbar-hidden flex shrink-0 overflow-x-auto border-b border-border" role="tablist">
           {tabs.map(([key, label]) => (
             <button
               key={key}
@@ -82,8 +82,8 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
               aria-selected={tab === key}
               onClick={() => setTab(key)}
               className={cn(
-                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                tab === key ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-foreground/5",
+                "-mb-px h-11 min-w-fit flex-1 whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors",
+                tab === key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
               )}
             >
               {label}
@@ -92,12 +92,53 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
         </div>
       )}
       {tab === "rooms" && teacherId && <TeacherExams teacherId={teacherId} />}
+      {tab === "schedule" && teacherId && <ExamSchedule teacherId={teacherId} />}
       {(tab === "topics" || tab === "approve") && (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {tab === "topics" && teacherId && <ExamTopicsTab teacherId={teacherId} />}
           {tab === "approve" && canApprove && <ExamApprovalTab />}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Agenda of the teacher's exam sessions, grouped by opening day. */
+function ExamSchedule({ teacherId }: { teacherId: string }) {
+  const { data: sessions = [], isLoading } = useMyExamSessions(teacherId);
+  const { data: subjects = [] } = useSubjectsByIds([...new Set(sessions.map((s) => s.subject_id))]);
+  const subjectById = new Map(subjects.map((s) => [s.id, s]));
+  const fmtTime = (d: string) => new Date(d).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+  const byDay = new Map<string, ExamSession[]>();
+  for (const s of [...sessions].sort((a, b) => a.opens_at.localeCompare(b.opens_at))) {
+    const day = new Date(s.opens_at).toLocaleDateString("th-TH", { dateStyle: "full" });
+    byDay.set(day, [...(byDay.get(day) ?? []), s]);
+  }
+
+  if (isLoading) return <Skeleton className="h-40 w-full rounded-2xl" />;
+  if (sessions.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <EmptyState title="ยังไม่มีตารางสอบ" description="ตารางจะแสดงเมื่อมีการเปิดสอบในแท็บ “ห้องสอบ”" />
+      </div>
+    );
+  }
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+      {[...byDay].map(([day, list]) => (
+        <section key={day} className="space-y-2">
+          <h3 className="text-xs font-semibold text-muted-foreground">{day}</h3>
+          {list.map((s) => (
+            <div key={s.id} className="flex items-center gap-4 rounded-xl border border-border bg-card p-3 text-xs">
+              <span className="w-28 shrink-0 font-mono tabular-nums">
+                {fmtTime(s.opens_at)} – {fmtTime(s.closes_at)}
+              </span>
+              <span className="font-medium">{s.title}</span>
+              <span className="ml-auto text-muted-foreground">{subjectById.get(s.subject_id)?.name_th ?? "—"}</span>
+            </div>
+          ))}
+        </section>
+      ))}
     </div>
   );
 }

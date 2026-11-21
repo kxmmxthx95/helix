@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, EmptyState, Field, Skeleton } from "@/components/ui";
+import { Button, EmptyState, Field, Select, Skeleton } from "@/components/ui";
 import { useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
 import {
   useCreateTopicSet,
@@ -73,7 +73,7 @@ export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
   const toast = useToast();
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-1 flex-col gap-2">
       <div className="flex justify-end">
         <Button size="sm" onClick={() => setCreating(true)}>
           + สร้างชุดหัวข้อ
@@ -82,7 +82,7 @@ export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
       {isLoading ? (
         <Skeleton className="h-40 w-full rounded-2xl" />
       ) : sets.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center py-16">
+        <div className="flex flex-1 items-center justify-center">
           <EmptyState title="ยังไม่มีชุดหัวข้อ" description="สร้างชุดหัวข้อและส่งขออนุมัติ แล้วจึงเปิดสอบจากชุดที่อนุมัติแล้วได้" />
         </div>
       ) : (
@@ -348,23 +348,13 @@ export function ExamApprovalTab() {
 
   return (
     <div className="flex flex-1 flex-col gap-3">
-      <div className="scrollbar-hidden flex shrink-0 gap-2 overflow-x-auto" role="tablist" aria-label="สถานะ">
+      <Select className="w-full shrink-0 sm:w-48" aria-label="สถานะ" value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
         {FILTERS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            role="tab"
-            aria-selected={filter === f}
-            onClick={() => setFilter(f)}
-            className={cn(
-              "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-              filter === f ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-foreground/5",
-            )}
-          >
+          <option key={f} value={f}>
             {STATUS_LABEL[f]} ({count(f)})
-          </button>
+          </option>
         ))}
-      </div>
+      </Select>
 
       {isLoading ? (
         <Skeleton className="h-40 w-full rounded-2xl" />

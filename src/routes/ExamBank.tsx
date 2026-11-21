@@ -886,6 +886,7 @@ export function SubjectPicker({
         <span className={cn("flex min-w-0 items-center gap-1.5 truncate", !selected && "text-muted-foreground")}>
           {selected ? (
             <>
+              <span className="shrink-0 font-mono text-muted-foreground">{selected.code}</span>
               <span className="truncate">{selected.name_th}</span>
               {selected.suggested_grade_level_id && gradeLevelById.get(selected.suggested_grade_level_id) && (
                 <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent">
@@ -917,6 +918,7 @@ export function SubjectPicker({
                   s.id === value && "bg-muted font-medium",
                 )}
               >
+                <span className="shrink-0 font-mono text-muted-foreground">{s.code}</span>
                 <span className="min-w-0 flex-1 truncate">{s.name_th}</span>
                 {grade && (
                   <span className="shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] text-accent">
