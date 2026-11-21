@@ -6,18 +6,12 @@ import { Sheet } from "@/components/Sheet";
 import { AttendanceMonthView } from "@/routes/Dashboard";
 import { Avatar, Card, EmptyState, Input, Select, Skeleton, Spinner } from "@/components/ui";
 import { avatarUrl } from "@/hooks/useAvatar";
-import { useAcademicEvents, useActiveAcademicYear, useActiveTerm } from "@/hooks/useAcademicTerms";
-import { useAllDepartmentPeriods } from "@/hooks/usePeriodDefinitions";
-import { periodTimes } from "@/lib/periods";
-import { eventApplies, periodReplaced } from "@/lib/planSlots";
+import { useActiveAcademicYear, useActiveTerm } from "@/hooks/useAcademicTerms";
 import { useClassroomRoster, summarizeAttendance } from "@/hooks/useAttendance";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
-import {
-  usePeriodAttendanceByEntries,
-  usePeriodAttendanceTakenSet,
-} from "@/hooks/usePeriodAttendance";
+import { usePeriodAttendanceByEntries } from "@/hooks/usePeriodAttendance";
 import { useDepartmentSchedule, useTeacherSchedule, type ScheduleEntryRow } from "@/hooks/useSchedule";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import type { AttendanceStatus, Subject } from "@/lib/database.types";
@@ -113,13 +107,12 @@ function PeriodCheckInPanel({
     [ownEntries, deptEntries],
   );
   const isLoading = loadingOwn || (academic && !!departmentId && loadingDept);
-  const weekday = new Date(`${date}T00:00:00`).getDay(); // Sun=0..Sat=6, matches day_of_week 1-6 (จันทร์-เสาร์) directly
-  const todaysEntries = useMemo(
-    () => allEntries.filter((e) => e.day_of_week === weekday).sort((a, b) => a.period_no - b.period_no),
-    [allEntries, weekday],
-  );
-  const scheduleEntryIds = useMemo(() => todaysEntries.map((e) => e.id), [todaysEntries]);
-  const { data: takenSet = new Set<string>() } = usePeriodAttendanceTakenSet(scheduleEntryIds, date);
+  // One card per assignment (subject + classroom), whether or not it meets today. Read-only: check-in lives on the Dashboard.
+  const assignments = useMemo(() => {
+    const m = new Map<string, ScheduleEntryRow[]>();
+    for (const e of allEntries) m.set(e.teaching_assignment_id, [...(m.get(e.teaching_assignment_id) ?? []), e]);
+    return [...m.values()];
+  }, [allEntries]);
 
   const { data: subjects = [] } = useSubjects({
     search: "",
@@ -138,86 +131,38 @@ function PeriodCheckInPanel({
     return code ? gradeShortLabel(code) : "—";
   };
 
-  // Periods replaced by an activity / closure on this date: shown read-only, never checked in (also enforced by DB trigger, 0166).
-  const { data: events = [] } = useAcademicEvents();
-  const { data: allPeriods = [] } = useAllDepartmentPeriods(departmentId || null);
-  const replacedBy = (e: ScheduleEntryRow) => {
-    const grade = classroomOf(e.teaching_assignment.classroom_id)?.grade_level_id ?? null;
-    const times = periodTimes(allPeriods, grade, e.day_of_week, e.period_no);
-    return events.find((ev) => eventApplies(ev, departmentId, grade) && periodReplaced(date, times ?? {}, [ev]))?.name ?? null;
-  };
-
-  // Back-to-back periods of the same assignment (no break between, none replaced by an activity) are checked once.
-  const groups: ScheduleEntryRow[][] = [];
-  for (const e of todaysEntries) {
-    const g = replacedBy(e)
-      ? undefined
-      : groups.find((g) => {
-          const last = g[g.length - 1]!;
-          return last.teaching_assignment_id === e.teaching_assignment_id && last.period_no + 1 === e.period_no && !replacedBy(last);
-        });
-    if (g) g.push(e);
-    else groups.push([e]);
-  }
-  const openGroup = groups.find((g) => g.some((e) => e.id === openEntryId) && !replacedBy(g[0]!)) ?? null;
+  const openGroup = assignments.find((g) => g.some((e) => e.id === openEntryId)) ?? null;
+  const cards = useMemo(
+    () =>
+      assignments
+        .map((g) => ({ g, subject: subjects.find((s) => s.id === g[0]!.teaching_assignment.subject_id) }))
+        .sort(
+          (x, y) =>
+            (x.subject?.code ?? "").localeCompare(y.subject?.code ?? "") ||
+            (classroomOf(x.g[0]!.teaching_assignment.classroom_id)?.name ?? "").localeCompare(
+              classroomOf(y.g[0]!.teaching_assignment.classroom_id)?.name ?? "",
+            ),
+        ),
+    [assignments, subjects, classrooms],
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       {isLoading ? (
-        <div role="status" aria-label="กำลังโหลด" className="table-panel rounded-none border-t border-border shadow-none">
-          <div className="table-panel-scroll scrollbar-hidden">
-            <table className="w-full min-w-[52rem] table-fixed text-[13px]">
-              <thead className="text-left text-xs">
-                <tr>
-                  <th className="w-24 px-4 py-3">รหัสวิชา</th>
-                  <th className="px-4 py-3">ชื่อวิชา</th>
-                  <th className="w-28 px-4 py-3">แผนก</th>
-                  <th className="w-24 px-4 py-3">ระดับชั้น</th>
-                  <th className="w-24 px-4 py-3">ห้องเรียน</th>
-                  <th className="w-28 px-4 py-3 text-center">สถานะ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <tr key={i} className="h-14 border-t border-border first:border-t-0">
-                    <td className="px-4 py-0">
-                      <Skeleton className="h-3 w-4" />
-                    </td>
-                    <td className="px-4 py-0">
-                      <Skeleton className="h-3 w-14" />
-                    </td>
-                    <td className="px-4 py-0">
-                      <Skeleton className="h-3 w-32" />
-                    </td>
-                    <td className="px-4 py-0">
-                      <Skeleton className="h-3 w-16" />
-                    </td>
-                    <td className="px-4 py-0">
-                      <Skeleton className="h-3 w-12" />
-                    </td>
-                    <td className="px-4 py-0">
-                      <Skeleton className="h-3 w-12" />
-                    </td>
-                    <td className="px-4 py-0 text-center">
-                      <Skeleton className="mx-auto h-4 w-16 rounded-full" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div role="status" aria-label="กำลังโหลด" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-28 rounded-2xl" />
+          ))}
         </div>
-      ) : todaysEntries.length === 0 ? (
+      ) : cards.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ไม่พบข้อมูล" description="ไม่มีคาบสอนของคุณในวันนี้" />
+          <EmptyState title="ไม่พบข้อมูล" description="ไม่มีรายวิชาที่คุณสอน" />
         </div>
       ) : openGroup ? (
         <PeriodCheckInGrid
-          key={`${openGroup[0]!.id}-${date}`}
-          entries={openGroup}
-          assignmentEntryIds={allEntries
-            .filter((e) => e.teaching_assignment_id === openGroup[0]!.teaching_assignment_id)
-            .map((e) => e.id)}
+          key={openGroup[0]!.teaching_assignment_id}
+          entry={openGroup[0]!}
+          assignmentEntryIds={openGroup.map((e) => e.id)}
           subject={subjects.find((s) => s.id === openGroup[0]!.teaching_assignment.subject_id) ?? null}
           date={date}
           academicYear={academicYear}
@@ -226,57 +171,23 @@ function PeriodCheckInPanel({
           onBack={() => setOpenEntryId(null)}
         />
       ) : (
-        <div className="table-panel rounded-none border-t border-border shadow-none">
-          <div className="table-panel-scroll scrollbar-hidden">
-            <table className="w-full min-w-[52rem] table-fixed text-[13px]">
-              <thead className="text-left text-xs">
-                <tr>
-                  <th className="w-24 px-4 py-3">รหัสวิชา</th>
-                  <th className="px-4 py-3">ชื่อวิชา</th>
-                  <th className="w-28 px-4 py-3">แผนก</th>
-                  <th className="w-24 px-4 py-3">ระดับชั้น</th>
-                  <th className="w-24 px-4 py-3">ห้องเรียน</th>
-                  <th className="w-28 px-4 py-3 text-center">สถานะ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groups.map((g) => {
-                  const e = g[0]!;
-                  const subject = subjects.find((s) => s.id === e.teaching_assignment.subject_id);
-                  const classroom = classroomOf(e.teaching_assignment.classroom_id);
-                  const activity = replacedBy(e);
-                  return (
-                    <tr
-                      key={e.id}
-                      onClick={activity ? undefined : () => setOpenEntryId(e.id)}
-                      className={cn("h-14 border-t border-border first:border-t-0", activity ? "text-muted-foreground" : "cursor-pointer")}
-                    >
-                      <td className="truncate px-4 py-0">{subject?.code ?? "—"}</td>
-                      <td className="truncate px-4 py-0">{subject?.name_th ?? "—"}</td>
-                      <td className="truncate px-4 py-0">{department?.name ?? "—"}</td>
-                      <td className="truncate px-4 py-0">{gradeLevelName(e.teaching_assignment.classroom_id)}</td>
-                      <td className="truncate px-4 py-0">{classroom?.name ?? "—"}</td>
-                      <td className="px-4 py-0 text-center">
-                        <span
-                          title={activity ?? undefined}
-                          className={cn(
-                            "inline-flex max-w-full truncate rounded-full px-2 py-0.5 text-xs",
-                            activity
-                              ? "bg-accent-soft text-accent"
-                              : takenSet.has(e.id)
-                                ? "bg-success/15 text-success"
-                                : "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          {activity ? `กิจกรรม: ${activity}` : takenSet.has(e.id) ? "เช็คแล้ว" : "ยังไม่เช็ค"}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div className="grid content-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {cards.map(({ g, subject }) => {
+            const e = g[0]!;
+            const classroom = classroomOf(e.teaching_assignment.classroom_id);
+            return (
+              <button key={e.teaching_assignment_id} type="button" onClick={() => setOpenEntryId(e.id)} className="text-left">
+                <Card className="flex h-full flex-col gap-1 transition-colors hover:bg-muted/50">
+                  <span className="text-xs text-muted-foreground">{subject?.code ?? "—"}</span>
+                  <span className="truncate text-base font-semibold">{subject?.name_th ?? "—"}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {gradeLevelName(e.teaching_assignment.classroom_id)} · {classroom?.name ?? "—"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{department?.name ?? "—"}</span>
+                </Card>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -284,7 +195,7 @@ function PeriodCheckInPanel({
 }
 
 function PeriodCheckInGrid({
-  entries,
+  entry,
   assignmentEntryIds,
   subject,
   date,
@@ -293,7 +204,7 @@ function PeriodCheckInGrid({
   termEnd,
   onBack,
 }: {
-  entries: ScheduleEntryRow[];
+  entry: ScheduleEntryRow;
   assignmentEntryIds: string[];
   subject: Subject | null;
   date: string;
@@ -302,7 +213,6 @@ function PeriodCheckInGrid({
   termEnd: string | null;
   onBack: () => void;
 }) {
-  const entry = entries[0]!;
   const { data: roster = [], isLoading: rosterLoading } = useClassroomRoster(
     entry.teaching_assignment.classroom_id,
     academicYear,
