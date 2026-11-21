@@ -833,6 +833,10 @@ export type ExamTopicSet = {
   id: string;
   teacher_id: string;
   subject_id: string;
+  /** One set per teaching assignment (subject × room); null only on legacy sets whose teacher has no assignment. */
+  teaching_assignment_id: string | null;
+  /** "ไม่มีการสอบ" for the room — needs no approval, no session can use it. */
+  no_exam: boolean;
   approval_status: ExamApprovalStatus;
   approval_note: string | null;
   approved_by: string | null;
@@ -1943,7 +1947,7 @@ export type Database = {
       >;
       exam_topic_sets: Table<
         ExamTopicSet,
-        InsertOf<ExamTopicSet, "approval_status" | "approval_note" | "approved_by" | "approved_at">
+        InsertOf<ExamTopicSet, "no_exam" | "approval_status" | "approval_note" | "approved_by" | "approved_at">
       >;
       exam_topic_set_topics: Table<ExamTopicSetTopic, ExamTopicSetTopic>;
       exam_session_targets: Table<ExamSessionTarget, ExamSessionTarget>;

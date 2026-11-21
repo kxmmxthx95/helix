@@ -565,12 +565,26 @@ export function useTopicSetsTopics(setIds: string[]) {
   });
 }
 
-/** Creates an empty draft set for a subject, then returns it so the caller can open the topic picker. */
+/** Ids (of the given sets) that at least one exam session already uses — those are locked. */
+export function useTopicSetsInUse(setIds: string[]) {
+  const key = [...setIds].sort();
+  return useQuery({
+    queryKey: ["exam_topic_sets", "in_use", key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await supabase.from("exam_sessions").select("topic_set_id").in("topic_set_id", key);
+      if (error) throw error;
+      return new Set(data.map((r) => r.topic_set_id));
+    },
+  });
+}
+
+/** Creates the set of one teaching assignment (subject × room). Heads' sets are born approved (server-side). */
 export function useCreateTopicSet() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ teacher_id, subject_id }: { teacher_id: string; subject_id: string }) => {
-      const { data, error } = await supabase.from("exam_topic_sets").insert({ teacher_id, subject_id }).select().single();
+    mutationFn: async (row: { teacher_id: string; subject_id: string; teaching_assignment_id: string; no_exam?: boolean }) => {
+      const { data, error } = await supabase.from("exam_topic_sets").insert(row).select().single();
       if (error) throw error;
       return data as ExamTopicSet;
     },
@@ -598,6 +612,17 @@ export function useSetTopicSetTopics() {
       void qc.invalidateQueries({ queryKey: ["exam_topic_set_topics"] });
       void qc.invalidateQueries({ queryKey: ["exam_topic_sets"] });
     },
+  });
+}
+
+export function useSetNoExam() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, no_exam }: { id: string; no_exam: boolean }) => {
+      const { error } = await supabase.from("exam_topic_sets").update({ no_exam }).eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["exam_topic_sets"] }),
   });
 }
 

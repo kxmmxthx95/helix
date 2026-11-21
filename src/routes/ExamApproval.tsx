@@ -1,25 +1,29 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
+import { ChevronBack } from "@/components/icons";
 import { useToast } from "@/components/Toast";
-import { Button, EmptyState, Field, Select, Skeleton } from "@/components/ui";
-import { useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
+import { Button, EmptyState, Select, Skeleton, Switch } from "@/components/ui";
+import { useClassroomsByIds, useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
 import {
   useCreateTopicSet,
   useDecideTopicSet,
-  useDeleteTopicSet,
   useMyTopicSets,
+  useSetNoExam,
   useSetTopicSetTopics,
   useSubmitTopicSet,
   useTopicSetQueue,
+  useTopicSetsInUse,
   useTopicSetsTopics,
   type ExamTopicLabel,
 } from "@/hooks/useExams";
-import { usePlanOutline, usePlanSubjects } from "@/hooks/usePlan";
+import { useSubjectLinkedLessons } from "@/hooks/usePlan";
+import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useProfilesByIds } from "@/hooks/usePractice";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
-import type { ExamApprovalStatus, ExamTopicSet, Subject } from "@/lib/database.types";
-import { SubjectPicker } from "@/routes/ExamBank";
+import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
+import { isDeptHead } from "@/lib/roles";
+import type { ExamApprovalStatus, ExamTopicSet, Subject, TeachingAssignment } from "@/lib/database.types";
 import { cn } from "@/lib/utils";
 
 // ชุดหัวข้อการสอบ (migration 0183): teachers submit a subject + ผังการเรียน topics, heads approve,
@@ -62,263 +66,243 @@ function TopicChips({ topics }: { topics: ExamTopicLabel[] | undefined }) {
 // ============================================================ teacher: หัวข้อการสอบ
 
 export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
-  const { data: sets = [], isLoading } = useMyTopicSets(teacherId);
-  const { data: subjects = [] } = useSubjectsByIds([...new Set(sets.map((s) => s.subject_id))]);
-  const subjectById = new Map(subjects.map((s) => [s.id, s]));
+  const { profile } = useAuth();
+  const selfApprove = isDeptHead(profile?.roles ?? []);
+  const { data: assignments = [], isLoading: loadingA } = useMyTeachingAssignments(teacherId);
+  const { data: sets = [], isLoading: loadingS } = useMyTopicSets(teacherId);
+  const { data: subjects = [] } = useSubjectsByIds([...new Set(assignments.map((a) => a.subject_id))]);
+  const { data: classrooms = [] } = useClassroomsByIds([...new Set(assignments.map((a) => a.classroom_id))]);
   const { data: topicsBySet } = useTopicSetsTopics(sets.map((s) => s.id));
-  const [creating, setCreating] = useState(false);
-  const [editing, setEditing] = useState<ExamTopicSet | null>(null);
+  const { data: inUse } = useTopicSetsInUse(sets.map((s) => s.id));
+  const colors = useSubjectColors([]); // hue from กลุ่มสาระ only, like the period attendance views
+  const [picking, setPicking] = useState<string | null>(null);
   const submit = useSubmitTopicSet();
-  const remove = useDeleteTopicSet();
+  const createSet = useCreateTopicSet();
+  const setNoExam = useSetNoExam();
   const toast = useToast();
+
+  const subjectById = new Map(subjects.map((s) => [s.id, s]));
+  const classroomById = new Map(classrooms.map((c) => [c.id, c]));
+  const { data: grades = [] } = useGradeLevelsByIds([...new Set(classrooms.map((c) => c.grade_level_id))]);
+  const gradeById = new Map(grades.map((g) => [g.id, g]));
+  const setByAssignment = new Map(sets.filter((s) => s.teaching_assignment_id).map((s) => [s.teaching_assignment_id!, s]));
+  const gradeOf = (classroomId: string) => gradeById.get(classroomById.get(classroomId)?.grade_level_id ?? "");
+  const cards = [...assignments]
+    .filter((a) => subjectById.has(a.subject_id))
+    .sort(
+      (x, y) =>
+        y.academic_year - x.academic_year ||
+        (gradeOf(x.classroom_id)?.sort_order ?? 0) - (gradeOf(y.classroom_id)?.sort_order ?? 0) ||
+        (classroomById.get(x.classroom_id)?.name ?? "").localeCompare(classroomById.get(y.classroom_id)?.name ?? "", "th", { numeric: true }) ||
+        subjectById.get(x.subject_id)!.code.localeCompare(subjectById.get(y.subject_id)!.code),
+    );
+  const pickingAssignment = cards.find((a) => a.id === picking) ?? null;
+
+  function toggleNoExam(a: TeachingAssignment, set: ExamTopicSet | undefined, on: boolean) {
+    const onError = () => toast("บันทึกไม่สำเร็จ", "error");
+    if (set) setNoExam.mutate({ id: set.id, no_exam: on }, { onError });
+    else createSet.mutate({ teacher_id: teacherId, subject_id: a.subject_id, teaching_assignment_id: a.id, no_exam: on }, { onError });
+  }
+
+  if (loadingA || loadingS) return <Skeleton className="h-40 w-full rounded-2xl" />;
+  if (cards.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <EmptyState title="ยังไม่มีวิชาที่ได้รับมอบหมาย" description="เมื่อได้รับมอบหมายวิชาสอนแล้ว จะเลือกหัวข้อการสอบได้ที่นี่" />
+      </div>
+    );
+  }
+
+  if (pickingAssignment) {
+    const pickedSet = setByAssignment.get(pickingAssignment.id) ?? null;
+    return (
+      <TopicPickerPage
+        teacherId={teacherId}
+        assignment={pickingAssignment}
+        set={pickedSet}
+        subject={subjectById.get(pickingAssignment.subject_id)}
+        current={(topicsBySet?.get(pickedSet?.id ?? "") ?? []).map((t) => t.topic_id)}
+        onClose={() => setPicking(null)}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-2">
-      <div className="flex justify-end">
-        <Button size="sm" onClick={() => setCreating(true)}>
-          + สร้างชุดหัวข้อ
-        </Button>
-      </div>
-      {isLoading ? (
-        <Skeleton className="h-40 w-full rounded-2xl" />
-      ) : sets.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ยังไม่มีชุดหัวข้อ" description="สร้างชุดหัวข้อและส่งขออนุมัติ แล้วจึงเปิดสอบจากชุดที่อนุมัติแล้วได้" />
-        </div>
-      ) : (
-        sets.map((s) => {
-          const topics = topicsBySet?.get(s.id);
-          const editable = s.approval_status !== "pending";
-          const submittable = s.approval_status === "draft" || s.approval_status === "rejected";
-          return (
-            <div key={s.id} className="space-y-2 rounded-xl border border-border bg-card p-3 text-xs">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-medium">{subjectById.get(s.subject_id)?.name_th ?? "—"}</p>
-                <ApprovalBadge status={s.approval_status} />
+      {cards.map((a) => {
+        const subject = subjectById.get(a.subject_id)!;
+        const set = setByAssignment.get(a.id);
+        const topics = set ? topicsBySet?.get(set.id) : undefined;
+        const noExam = !!set?.no_exam;
+        const locked = !!set && !!inUse?.has(set.id);
+        const editable = !noExam && !locked && set?.approval_status !== "pending";
+        const submittable = !selfApprove && !noExam && !!set && (set.approval_status === "draft" || set.approval_status === "rejected") && (topics?.length ?? 0) > 0;
+        const classroom = classroomById.get(a.classroom_id);
+        const grade = classroom ? gradeById.get(classroom.grade_level_id) : undefined;
+        const roomLabel = grade ? `${gradeShortLabel(grade.code)}/${classroom?.name}` : (classroom?.name ?? "—");
+        return (
+          <div
+            key={a.id}
+            role={editable ? "button" : undefined}
+            tabIndex={editable ? 0 : undefined}
+            onClick={editable ? () => setPicking(a.id) : undefined}
+            onKeyDown={editable ? (e) => e.key === "Enter" && setPicking(a.id) : undefined}
+            className={cn(
+              "rounded-xl border border-border bg-card p-3 text-xs",
+              editable && "cursor-pointer hover:bg-muted active:bg-muted",
+            )}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className={cn("truncate text-sm font-medium", noExam && "text-muted-foreground")}>{subject.name_th}</p>
+                <p className="mt-1 flex flex-wrap items-center gap-1">
+                  <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(subject.learning_area_id))}>{subject.code}</span>
+                  <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabel))}>{roomLabel}</span>
+                  {set && !noExam && <ApprovalBadge status={set.approval_status} />}
+                </p>
               </div>
-              <TopicChips topics={topics} />
-              {s.approval_status === "rejected" && s.approval_note && (
-                <p className="rounded-lg bg-destructive/10 px-2 py-1.5 text-destructive">เหตุผลที่ไม่อนุมัติ: {s.approval_note}</p>
-              )}
-              <div className="flex gap-2">
-                {editable && (
-                  <Button size="sm" variant="outline" onClick={() => setEditing(s)}>
-                    เลือกหัวข้อ
-                  </Button>
+              <label
+                className="flex shrink-0 items-center gap-2 text-muted-foreground"
+                onClick={(e) => e.stopPropagation()}
+                title={locked ? "มีห้องสอบแล้ว" : undefined}
+              >
+                ไม่มีสอบ
+                <Switch
+                  size="xs"
+                  label={`ไม่มีการสอบ ${subject.name_th}`}
+                  checked={noExam}
+                  disabled={locked || createSet.isPending || setNoExam.isPending}
+                  onChange={(on) => toggleNoExam(a, set, on)}
+                />
+              </label>
+            </div>
+            {!noExam && ((topics?.length ?? 0) > 0 || submittable || (set?.approval_status === "rejected" && set.approval_note)) && (
+              <div className="mt-2 space-y-2">
+                <TopicChips topics={topics} />
+                {set?.approval_status === "rejected" && set.approval_note && (
+                  <p className="rounded-lg bg-destructive/10 px-2 py-1.5 text-destructive">เหตุผลที่ไม่อนุมัติ: {set.approval_note}</p>
                 )}
                 {submittable && (
                   <Button
                     size="sm"
                     disabled={submit.isPending}
-                    onClick={() =>
-                      submit.mutate(s.id, {
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      submit.mutate(set!.id, {
                         onSuccess: () => toast("ส่งขออนุมัติแล้ว"),
-                        onError: (e) => toast(e instanceof Error ? e.message : "ส่งไม่สำเร็จ", "error"),
-                      })
-                    }
+                        onError: (err) => toast(err instanceof Error ? err.message : "ส่งไม่สำเร็จ", "error"),
+                      });
+                    }}
                   >
                     ส่งขออนุมัติ
                   </Button>
                 )}
-                {editable && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={remove.isPending}
-                    onClick={() => {
-                      if (!confirm("ลบชุดหัวข้อนี้?")) return;
-                      remove.mutate(s.id, { onError: () => toast("ลบไม่ได้ อาจมีห้องสอบใช้ชุดหัวข้อนี้อยู่", "error") });
-                    }}
-                  >
-                    ลบ
-                  </Button>
-                )}
               </div>
-            </div>
-          );
-        })
-      )}
-      {creating && (
-        <NewSetSheet
-          teacherId={teacherId}
-          onClose={() => setCreating(false)}
-          onCreated={(set) => {
-            setCreating(false);
-            setEditing(set);
-          }}
-        />
-      )}
-      {editing && (
-        <TopicPickerSheet
-          set={editing}
-          subject={subjectById.get(editing.subject_id)}
-          current={(topicsBySet?.get(editing.id) ?? []).map((t) => t.topic_id)}
-          onClose={() => setEditing(null)}
-        />
-      )}
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function NewSetSheet({
-  teacherId,
-  onClose,
-  onCreated,
-}: {
-  teacherId: string;
-  onClose: () => void;
-  onCreated: (set: ExamTopicSet) => void;
-}) {
-  const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
-  const { data: subjects = [] } = useSubjectsByIds([...new Set(assignments.map((a) => a.subject_id))]);
-  const { data: gradeLevels = [] } = useGradeLevelsByIds(
-    [...new Set(subjects.map((s) => s.suggested_grade_level_id).filter((id): id is string => !!id))],
-  );
-  const gradeLevelById = new Map(gradeLevels.map((g) => [g.id, g]));
-  const [subjectId, setSubjectId] = useState("");
-  const create = useCreateTopicSet();
-  const toast = useToast();
-
-  return (
-    <Sheet
-      open
-      onOpenChange={(o) => !o && onClose()}
-      title="สร้างชุดหัวข้อ"
-      footer={
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
-            ยกเลิก
-          </Button>
-          <Button
-            type="button"
-            className="flex-1"
-            disabled={!subjectId || create.isPending}
-            onClick={() =>
-              create.mutate(
-                { teacher_id: teacherId, subject_id: subjectId },
-                { onSuccess: onCreated, onError: () => toast("สร้างไม่สำเร็จ", "error") },
-              )
-            }
-          >
-            ถัดไป
-          </Button>
-        </div>
-      }
-    >
-      <Field label="วิชา" required>
-        <SubjectPicker subjects={subjects} gradeLevelById={gradeLevelById} value={subjectId} onChange={setSubjectId} />
-      </Field>
-    </Sheet>
-  );
-}
-
 /** ผังการเรียน topics offered for a catalog subject — mirrors plan_topic_fits_subject (name prefix, or lesson tagged with the subject). */
-function TopicPickerSheet({
+function TopicPickerPage({
+  teacherId,
+  assignment,
   set,
   subject,
   current,
   onClose,
 }: {
-  set: ExamTopicSet;
+  teacherId: string;
+  assignment: TeachingAssignment;
+  set: ExamTopicSet | null;
   subject: Subject | undefined;
   current: string[];
   onClose: () => void;
 }) {
-  const { data: planSubjects = [] } = usePlanSubjects(subject?.department_id ?? null);
-  const [planSubjectId, setPlanSubjectId] = useState("");
-  const { data: lessons = [], isLoading } = usePlanOutline(planSubjectId || null);
+  const { profile } = useAuth();
+  const selfApprove = isDeptHead(profile?.roles ?? []);
+  const { data: lessons = [], isLoading } = useSubjectLinkedLessons(subject?.id ?? null);
   const [picked, setPicked] = useState<string[]>(current);
   const save = useSetTopicSetTopics();
+  const createSet = useCreateTopicSet();
   const toast = useToast();
-
-  const prefixMatch = (name: string) => !!subject && subject.name_th.trim().startsWith(name.trim());
-  const visible = useMemo(
-    () =>
-      lessons
-        .map((l) => ({
-          ...l,
-          topics:
-            !subject || prefixMatch(planSubjects.find((p) => p.id === planSubjectId)?.name ?? "") || l.tags.some((t) => t.subject.id === subject.id)
-              ? l.topics
-              : [],
-        }))
-        .filter((l) => l.topics.length > 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lessons, subject, planSubjectId, planSubjects],
-  );
 
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
-  function submit() {
-    save.mutate(
-      { setId: set.id, current, next: picked },
-      {
-        onSuccess: () => {
-          toast("บันทึกหัวข้อแล้ว");
-          onClose();
-        },
-        onError: (e) => toast(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ", "error"),
-      },
-    );
+  async function submit() {
+    try {
+      const setId = set?.id ?? (await createSet.mutateAsync({ teacher_id: teacherId, subject_id: assignment.subject_id, teaching_assignment_id: assignment.id })).id;
+      await save.mutateAsync({ setId, current, next: picked });
+      toast("บันทึกหัวข้อแล้ว");
+      onClose();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ", "error");
+    }
   }
 
   return (
-    <Sheet
-      open
-      onOpenChange={(o) => !o && onClose()}
-      title="เลือกหัวข้อการสอบ"
-      description={subject?.name_th}
-      footer={
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
-            ยกเลิก
-          </Button>
-          <Button type="button" className="flex-1" disabled={save.isPending} onClick={submit}>
-            บันทึก ({picked.length})
-          </Button>
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex shrink-0 items-center gap-2">
+        <Button size="icon" variant="ghost" onClick={onClose} aria-label="ย้อนกลับ">
+          <ChevronBack className="h-4 w-4" />
+        </Button>
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-semibold">เลือกหัวข้อการสอบ</h2>
+          <p className="truncate text-xs text-muted-foreground">
+            {subject ? `${subject.code} ${subject.name_th}` : ""} · เลือกแล้ว {picked.length} หัวข้อ
+          </p>
         </div>
-      }
-    >
-      <div className="space-y-3">
-        {set.approval_status === "approved" && (
-          <p className="rounded-lg bg-warning/15 px-2 py-1.5 text-xs">การแก้หัวข้อหลังอนุมัติ จะกลับเป็นร่าง ต้องส่งขออนุมัติใหม่ (แก้ไม่ได้ถ้ามีห้องสอบใช้ชุดนี้แล้ว)</p>
-        )}
-        <Field label="วิชาในผังการเรียน">
-          <select
-            className="h-10 w-full rounded-lg border border-border bg-background px-2 text-sm"
-            value={planSubjectId}
-            onChange={(e) => setPlanSubjectId(e.target.value)}
-          >
-            <option value="">เลือกวิชา</option>
-            {planSubjects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        {picked.length > 0 && (
-          <p className="text-xs text-muted-foreground">เลือกแล้ว {picked.length} หัวข้อ (รวมหัวข้อจากวิชาอื่นที่เลือกไว้ก่อนหน้า)</p>
-        )}
-        {planSubjectId && isLoading && <Skeleton className="h-24 w-full" />}
-        {planSubjectId && !isLoading && visible.length === 0 && (
-          <p className="text-xs text-muted-foreground">ไม่พบบทเรียนที่ตรงกับวิชานี้ในผังการเรียน</p>
-        )}
-        {visible.map((l) => (
-          <div key={l.id} className="rounded-lg border border-border p-2">
-            <p className="mb-1 text-xs font-medium">{l.name}</p>
-            <div className="space-y-1">
-              {l.topics.map((t) => (
-                <label key={t.id} className="flex items-center gap-2 text-xs">
-                  <input type="checkbox" checked={picked.includes(t.id)} onChange={() => toggle(t.id)} />
-                  {t.name}
-                </label>
-              ))}
-            </div>
-          </div>
-        ))}
       </div>
-    </Sheet>
+      <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto">
+        <div className="space-y-4">
+          {set?.approval_status === "approved" && !selfApprove && (
+            <p className="rounded-lg bg-warning/15 px-2 py-1.5 text-xs">การแก้หัวข้อหลังอนุมัติ จะกลับเป็นร่าง ต้องส่งขออนุมัติใหม่</p>
+          )}
+          {isLoading && <Skeleton className="h-24 w-full" />}
+          {!isLoading && lessons.length === 0 && (
+            <p className="text-xs text-muted-foreground">ยังไม่มีบทเรียนที่ผูกกับวิชานี้ในผังการเรียน</p>
+          )}
+          {lessons.map((l) => {
+            const ids = l.topics.map((t) => t.id);
+            const n = ids.filter((id) => picked.includes(id)).length;
+            const all = n === ids.length;
+            return (
+              <section key={l.id}>
+                <div className="mb-1.5 flex items-center justify-between gap-3 px-1">
+                  <h3 className="min-w-0 truncate text-[13px] font-semibold">{l.name}</h3>
+                  <button
+                    type="button"
+                    className="shrink-0 text-xs text-accent"
+                    onClick={() => setPicked((p) => (all ? p.filter((id) => !ids.includes(id)) : [...new Set([...p, ...ids])]))}
+                  >
+                    {all ? "ล้างทั้งบท" : `เลือกทั้งบท (${n}/${ids.length})`}
+                  </button>
+                </div>
+                <div className="overflow-hidden rounded-xl bg-muted [&>*+*]:relative [&>*+*]:before:absolute [&>*+*]:before:inset-x-4 [&>*+*]:before:top-0 [&>*+*]:before:h-px [&>*+*]:before:bg-border">
+                  {l.topics.map((t) => (
+                    <label key={t.id} className="flex min-h-11 cursor-pointer items-center gap-3 px-4 py-2 text-sm active:bg-foreground/5">
+                      <input type="checkbox" className="h-[18px] w-[18px] shrink-0 accent-accent" checked={picked.includes(t.id)} onChange={() => toggle(t.id)} />
+                      <span className="min-w-0">{t.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      </div>
+      <div className="flex shrink-0 gap-2 border-t border-border pt-3">
+        <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+          ยกเลิก
+        </Button>
+        <Button type="button" className="flex-1" disabled={save.isPending || createSet.isPending} onClick={() => void submit()}>
+          บันทึก ({picked.length})
+        </Button>
+      </div>
+    </div>
   );
 }
 

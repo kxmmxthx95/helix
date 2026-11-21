@@ -282,19 +282,19 @@ function CreateSessionSheet({
   const [shuffleQuestions, setShuffleQuestions] = useState(true);
   const [shuffleChoices, setShuffleChoices] = useState(true);
   const [syncGradebook, setSyncGradebook] = useState(false);
-  const [targetIds, setTargetIds] = useState<string[]>([]);
   const [topicSetId, setTopicSetId] = useState("");
 
   const { data: mySets = [] } = useMyTopicSets(teacherId);
-  const approvedSets = mySets.filter((s) => s.approval_status === "approved" && s.subject_id === subjectId);
+  const approvedSets = mySets.filter(
+    (s) => s.approval_status === "approved" && !s.no_exam && s.teaching_assignment_id && s.subject_id === subjectId,
+  );
   const { data: setTopics } = useTopicSetsTopics(approvedSets.map((s) => s.id));
   const setLabel = (id: string) => {
     const names = (setTopics?.get(id) ?? []).map((t) => t.topic);
     return names.length === 0 ? "ไม่ระบุหัวข้อ" : `${names.slice(0, 2).join(", ")}${names.length > 2 ? ` +${names.length - 2}` : ""}`;
   };
 
-  const targets = assignments.filter((a) => a.subject_id === subjectId);
-  const classroomIds = [...new Set(targets.map((a) => a.classroom_id))];
+  const classroomIds = [...new Set(assignments.filter((a) => a.subject_id === subjectId).map((a) => a.classroom_id))];
   const { data: classrooms = [] } = useClassroomsByIds(classroomIds);
   const classroomById = new Map(classrooms.map((c) => [c.id, c]));
 
@@ -309,14 +309,15 @@ function CreateSessionSheet({
     setClosesAt("");
     setDuration("");
     setMaxAttempts("1");
-    setTargetIds([]);
     setTopicSetId("");
   }
 
+  // A set belongs to one room, so the session opens for exactly that room.
+  const targetAssignmentId = approvedSets.find((s) => s.id === topicSetId)?.teaching_assignment_id ?? "";
   const canSave =
     subjectId && topicSetId && title.trim() &&
     (noSchedule || (opensAt && closesAt && new Date(closesAt) > new Date(opensAt))) &&
-    targetIds.length > 0;
+    !!targetAssignmentId;
 
   function close() {
     reset();
@@ -341,7 +342,7 @@ function CreateSessionSheet({
         shuffle_choices: shuffleChoices,
         sync_to_gradebook: syncGradebook,
         topic_set_id: topicSetId,
-        teaching_assignment_ids: targetIds,
+        teaching_assignment_ids: [targetAssignmentId],
         questions: [],
       },
       {
@@ -375,22 +376,21 @@ function CreateSessionSheet({
             value={subjectId}
             onChange={(id) => {
               setSubjectId(id);
-              setTargetIds([]);
               setTopicSetId("");
             }}
           />
         </Field>
         {subjectId && (
-          <Field label="ชุดหัวข้อการสอบ" required>
+          <Field label="ห้อง / ชุดหัวข้อการสอบ" required>
             <select
               className="h-10 w-full rounded-lg border border-border bg-background px-2 text-sm"
               value={topicSetId}
               onChange={(e) => setTopicSetId(e.target.value)}
             >
-              <option value="">{approvedSets.length === 0 ? "ยังไม่มีชุดหัวข้อที่อนุมัติ" : "เลือกชุดหัวข้อ"}</option>
+              <option value="">{approvedSets.length === 0 ? "ยังไม่มีชุดหัวข้อที่อนุมัติ" : "เลือกห้อง"}</option>
               {approvedSets.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {setLabel(s.id)}
+                  {classroomById.get(assignments.find((a) => a.id === s.teaching_assignment_id)?.classroom_id ?? "")?.name ?? "—"} · {setLabel(s.id)}
                 </option>
               ))}
             </select>
@@ -430,30 +430,6 @@ function CreateSessionSheet({
           <SwitchRow label="สุ่มลำดับตัวเลือก" checked={shuffleChoices} onChange={setShuffleChoices} />
           <SwitchRow label="บันทึกคะแนนเข้าสมุดคะแนน" checked={syncGradebook} onChange={setSyncGradebook} />
         </FormSection>
-
-        {subjectId && (
-          <Field label="ห้องที่เปิดสอบ" required>
-            <div className="space-y-1.5 rounded-lg border border-border p-2">
-              {targets.length === 0 && <p className="text-xs text-muted-foreground">ยังไม่มีภาระงานสอนวิชานี้</p>}
-              {[...new Set(targets.map((a) => a.id))].map((taId) => {
-                const a = targets.find((t) => t.id === taId)!;
-                const c = classroomById.get(a.classroom_id);
-                return (
-                  <label key={a.id} className="flex items-center gap-2 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={targetIds.includes(a.id)}
-                      onChange={(e) =>
-                        setTargetIds(e.target.checked ? [...targetIds, a.id] : targetIds.filter((id) => id !== a.id))
-                      }
-                    />
-                    {c?.name ?? "—"}
-                  </label>
-                );
-              })}
-            </div>
-          </Field>
-        )}
 
         <p className="text-xs text-muted-foreground">เลือกข้อสอบได้หลังสร้างห้องสอบ ในหน้ารายละเอียดห้องสอบ</p>
       </form>

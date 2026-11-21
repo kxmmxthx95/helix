@@ -77,6 +77,27 @@ export function usePlanOutline(subjectId: string | null) {
   });
 }
 
+/** Lessons (with topics) explicitly linked to a catalog subject in the ผังการเรียน (plan_lesson_subjects). */
+export function useSubjectLinkedLessons(subjectId: string | null) {
+  return useQuery({
+    queryKey: ["plan", "subject_linked", subjectId],
+    enabled: !!subjectId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("plan_lesson_subjects")
+        .select("lesson:plan_lessons(id, name, sort_order, plan_topics(id, name, sort_order))")
+        .eq("subject_id", subjectId!);
+      if (error) throw error;
+      type Row = { lesson: { id: string; name: string; sort_order: number; plan_topics: { id: string; name: string; sort_order: number }[] } | null };
+      return (data as unknown as Row[])
+        .flatMap((r) => (r.lesson ? [r.lesson] : []))
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((l) => ({ id: l.id, name: l.name, topics: [...l.plan_topics].sort((a, b) => a.sort_order - b.sort_order) }))
+        .filter((l) => l.topics.length > 0);
+    },
+  });
+}
+
 function useWrite<V>(fn: (v: V) => PromiseLike<{ error: Error | null }>) {
   const qc = useQueryClient();
   return useMutation({
