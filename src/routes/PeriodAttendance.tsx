@@ -10,7 +10,7 @@ import { useActiveAcademicYear, useActiveTerm } from "@/hooks/useAcademicTerms";
 import { useClassroomRoster, summarizeAttendance } from "@/hooks/useAttendance";
 import { useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
-import { useDepartments } from "@/hooks/useProfiles";
+import { useDepartments, useProfiles } from "@/hooks/useProfiles";
 import { usePeriodAttendanceByEntries } from "@/hooks/usePeriodAttendance";
 import { useDepartmentSchedule, useTeacherSchedule, type ScheduleEntryRow } from "@/hooks/useSchedule";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
@@ -102,17 +102,21 @@ function PeriodCheckInPanel({
     scheduleTerm,
     academic && !!departmentId,
   );
-  const allEntries = useMemo(
-    () => [...ownEntries, ...deptEntries.filter((e) => e.teaching_assignment.teacher_id === null)],
-    [ownEntries, deptEntries],
-  );
   const isLoading = loadingOwn || (academic && !!departmentId && loadingDept);
-  // One card per assignment (subject + classroom), whether or not it meets today. Read-only: check-in lives on the Dashboard.
-  const assignments = useMemo(() => {
+
+  // Teachers see their own assignments. The academic group adds an overview of the whole department (incl. teacherless activities).
+  const [tab, setTab] = useState<"mine" | "all">(isTeacher ? "mine" : "all");
+  const [gradeId, setGradeId] = useState("");
+  const [classroomId, setClassroomId] = useState("");
+  const [filterTeacher, setFilterTeacher] = useState("");
+  const overview = academic && tab === "all";
+  const entries = overview ? deptEntries : ownEntries;
+  const groupByAssignment = (list: ScheduleEntryRow[]) => {
     const m = new Map<string, ScheduleEntryRow[]>();
-    for (const e of allEntries) m.set(e.teaching_assignment_id, [...(m.get(e.teaching_assignment_id) ?? []), e]);
+    for (const e of list) m.set(e.teaching_assignment_id, [...(m.get(e.teaching_assignment_id) ?? []), e]);
     return [...m.values()];
-  }, [allEntries]);
+  };
+  const assignments = useMemo(() => groupByAssignment(entries), [entries]);
 
   const { data: subjects = [] } = useSubjects({
     search: "",
@@ -125,17 +129,35 @@ function PeriodCheckInPanel({
   });
   const { data: classrooms = [] } = useClassroomsByDepartment(departmentId || null);
   const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
+  const { data: profiles = [] } = useProfiles({ search: "", departmentId, role: "", active: "" });
+  const teacherName = (id: string | null) => {
+    if (!id) return "ไม่มีครูประจำ";
+    const t = profiles.find((x) => x.id === id);
+    return t ? `${t.first_name} ${t.last_name}` : "—";
+  };
   const classroomOf = (id: string) => classrooms.find((x) => x.id === id);
   const gradeLevelName = (classroomId: string) => {
     const code = gradeLevels.find((g) => g.id === classroomOf(classroomId)?.grade_level_id)?.code;
     return code ? gradeShortLabel(code) : "—";
   };
 
-  const openGroup = assignments.find((g) => g.some((e) => e.id === openEntryId)) ?? null;
+  // Deep link may point at either list.
+  const openGroup =
+    [...groupByAssignment(ownEntries), ...groupByAssignment(deptEntries)].find((g) => g.some((e) => e.id === openEntryId)) ?? null;
   const cards = useMemo(
     () =>
       assignments
         .map((g) => ({ g, subject: subjects.find((s) => s.id === g[0]!.teaching_assignment.subject_id) }))
+        .filter(({ g }) => {
+          if (!overview) return true;
+          const ta = g[0]!.teaching_assignment;
+          const room = classroomOf(ta.classroom_id);
+          return (
+            (!gradeId || room?.grade_level_id === gradeId) &&
+            (!classroomId || ta.classroom_id === classroomId) &&
+            (!filterTeacher || (filterTeacher === "none" ? ta.teacher_id === null : ta.teacher_id === filterTeacher))
+          );
+        })
         .sort(
           (x, y) =>
             (x.subject?.code ?? "").localeCompare(y.subject?.code ?? "") ||
@@ -143,11 +165,78 @@ function PeriodCheckInPanel({
               classroomOf(y.g[0]!.teaching_assignment.classroom_id)?.name ?? "",
             ),
         ),
-    [assignments, subjects, classrooms],
+    [assignments, subjects, classrooms, overview, gradeId, classroomId, filterTeacher],
   );
+  const teacherOptions = useMemo(() => {
+    const ids = new Set<string>();
+    for (const g of assignments) ids.add(g[0]!.teaching_assignment.teacher_id ?? "none");
+    return [...ids];
+  }, [assignments]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
+      {academic && !openGroup && (
+        <div role="tablist" className={cn("grid border-b border-border", isTeacher ? "grid-cols-2" : "grid-cols-1")}>
+          {(
+            [
+              ...(isTeacher ? ([["mine", "ของฉัน"]] as const) : []),
+              ["all", "ภาพรวม"],
+            ] as const
+          ).map(([k, l]) => (
+            <button
+              key={k}
+              type="button"
+              role="tab"
+              aria-selected={tab === k}
+              onClick={() => setTab(k)}
+              className={cn(
+                "-mb-px h-11 border-b-2 text-sm font-medium",
+                tab === k ? "border-foreground text-foreground" : "border-transparent text-muted-foreground",
+              )}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+      )}
+      {overview && !openGroup && (
+        <div className="toolbar shrink-0 flex-wrap">
+          <Select
+            className="min-w-0 flex-1"
+            value={gradeId}
+            onChange={(e) => {
+              setGradeId(e.target.value);
+              setClassroomId("");
+            }}
+            aria-label="ระดับชั้น"
+          >
+            <option value="">ทุกระดับชั้น</option>
+            {gradeLevels.map((g) => (
+              <option key={g.id} value={g.id}>
+                {gradeShortLabel(g.code)}
+              </option>
+            ))}
+          </Select>
+          <Select className="min-w-0 flex-1" value={classroomId} onChange={(e) => setClassroomId(e.target.value)} aria-label="ห้องเรียน">
+            <option value="">ทุกห้อง</option>
+            {classrooms
+              .filter((c) => !gradeId || c.grade_level_id === gradeId)
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+          </Select>
+          <Select className="min-w-0 flex-1" value={filterTeacher} onChange={(e) => setFilterTeacher(e.target.value)} aria-label="ครูผู้สอน">
+            <option value="">ครูทั้งหมด</option>
+            {teacherOptions.map((id) => (
+              <option key={id} value={id}>
+                {teacherName(id === "none" ? null : id)}
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
       {isLoading ? (
         <div role="status" aria-label="กำลังโหลด" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -156,7 +245,7 @@ function PeriodCheckInPanel({
         </div>
       ) : cards.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ไม่พบข้อมูล" description="ไม่มีรายวิชาที่คุณสอน" />
+          <EmptyState title="ไม่พบข้อมูล" description={overview ? "ไม่พบรายวิชาตามเงื่อนไข" : "ไม่มีรายวิชาที่คุณสอน"} />
         </div>
       ) : openGroup ? (
         <PeriodCheckInGrid
@@ -183,7 +272,9 @@ function PeriodCheckInPanel({
                   <span className="text-sm text-muted-foreground">
                     {gradeLevelName(e.teaching_assignment.classroom_id)} · {classroom?.name ?? "—"}
                   </span>
-                  <span className="text-xs text-muted-foreground">{department?.name ?? "—"}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {overview ? teacherName(e.teaching_assignment.teacher_id) : (department?.name ?? "—")}
+                  </span>
                 </Card>
               </button>
             );
