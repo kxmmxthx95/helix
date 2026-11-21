@@ -161,7 +161,7 @@ export function Dashboard() {
 const SECTION_TITLE = "font-ui text-xs font-medium text-muted-foreground";
 
 /** Shown when a query failed and there is no cached data — never render that as "empty" or zero. */
-function LoadError({ onRetry }: { onRetry: () => void }) {
+export function LoadError({ onRetry }: { onRetry: () => void }) {
   return (
     <div role="alert" className="mt-1 flex items-center justify-between gap-2">
       <p className="text-sm text-destructive">โหลดข้อมูลไม่สำเร็จ</p>
@@ -1087,7 +1087,7 @@ export function AssignmentSummarySection({ student }: { student: Student }) {
 }
 
 /** role="student"/"parent" only — teacher/admin get the full check-in workspace at /attendance instead. */
-const STATUS_CELL: Record<AttendanceStatus, string> = {
+export const STATUS_CELL: Record<AttendanceStatus, string> = {
   present: "bg-green-500 text-white",
   late: "bg-yellow-400 text-black",
   absent: "bg-red-500 text-white",

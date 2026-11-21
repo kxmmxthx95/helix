@@ -10,6 +10,7 @@ import {
   BookIcon,
   BriefcaseIcon,
   CalendarIcon,
+  CheckboxIcon,
   CheckmarkCircleIcon,
   ClipboardIcon,
   DocumentTextIcon,
@@ -36,6 +37,7 @@ import { useMyIslands } from "@/lib/islands";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { SubmitSheet } from "@/routes/Assignments";
+import { StudentPeriodAttendanceSection } from "@/routes/StudentPeriodAttendance";
 import { StudentExitSection } from "@/routes/StudentExitSection";
 import { Timetable } from "@/routes/Timetable";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
@@ -53,10 +55,11 @@ import {
 } from "@/routes/Dashboard";
 
 type Icon = typeof BookIcon;
-type Panel = "attendance" | "behavior" | "leave" | "exit" | "bag" | "subjects" | "timetable";
+type Panel = "attendance" | "period" | "behavior" | "leave" | "exit" | "bag" | "subjects" | "timetable";
 
 const PANEL_TITLE: Record<Panel, string> = {
   attendance: "เช็คชื่อเข้าแถว",
+  period: "เข้าเรียนรายคาบ",
   behavior: "พฤติกรรม",
   leave: "ใบลา",
   exit: "ขอออกนอกโรงเรียน",
@@ -235,6 +238,7 @@ export function GameHud() {
     { label: "ใบลา", icon: AirplaneIcon, color: "linear-gradient(160deg,#6dd5e6,#32ade6)", onClick: () => setPanel("leave") },
     { label: "ออกนอก", icon: LogOut, color: "linear-gradient(160deg,#b4b4bc,#737373)", onClick: () => setPanel("exit") },
     { label: "เช็คชื่อเข้าแถว", icon: CheckmarkCircleIcon, color: "linear-gradient(160deg,#5de0b8,#30b0a0)", onClick: () => setPanel("attendance") },
+    { label: "เข้าเรียน", icon: CheckboxIcon, color: "linear-gradient(160deg,#4fc3f7,#1e88a8)", onClick: () => setPanel("period") },
     { label: "พฤติกรรม", icon: RibbonIcon, color: "linear-gradient(160deg,#ffd45e,#ffcc00)", onClick: () => setPanel("behavior") },
     { label: "บัตรเติมเงิน", icon: PricetagIcon, color: "linear-gradient(160deg,#d58bff,#af52de)", onClick: () => navigate("/card-topup") },
     { label: "กระเป๋า", icon: BriefcaseIcon, color: "linear-gradient(160deg,#b08f6e,#8e6e53)", onClick: () => setPanel("bag") },
@@ -422,6 +426,7 @@ export function GameHud() {
       >
         {panel === "timetable" && <Timetable />}
         {myStudent && profile && panel === "attendance" && <AttendanceSummarySection student={myStudent} />}
+        {myStudent && profile && panel === "period" && <StudentPeriodAttendanceSection student={myStudent} />}
         {myStudent && profile && panel === "behavior" && <BehaviorScoreSection student={myStudent} showName={false} />}
         {myStudent && profile && panel === "leave" && <StudentLeaveSection student={myStudent} submittedBy={profile.id} showName={false} />}
         {myStudent && profile && panel === "exit" && <StudentExitSection student={myStudent} submittedBy={profile.id} />}

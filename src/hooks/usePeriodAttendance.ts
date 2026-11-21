@@ -96,3 +96,21 @@ export function useSavePeriodAttendance() {
     },
   });
 }
+
+/** One student's marks in a date range — feeds the student's own "เข้าเรียน" panel (RLS lets students read their own rows). */
+export function usePeriodAttendanceByStudent(studentId: string | null, startDate: string, endDate: string) {
+  return useQuery({
+    queryKey: ["period_attendance_records", "by_student_range", studentId, startDate, endDate],
+    enabled: !!studentId,
+    queryFn: async (): Promise<PeriodAttendanceRecord[]> => {
+      const { data, error } = await supabase
+        .from("period_attendance_records")
+        .select("*")
+        .eq("student_id", studentId!)
+        .gte("date", startDate)
+        .lte("date", endDate);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
