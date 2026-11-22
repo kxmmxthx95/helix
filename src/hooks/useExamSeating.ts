@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { ExamSeatTemplate, ExamSessionSeat, ExamSessionSeating } from "@/lib/database.types";
+import type { ExamSeatTemplate, ExamSession, ExamSessionSeat, ExamSessionSeating } from "@/lib/database.types";
 
 // ผังห้องสอบ (migration 0199): department seat templates + one session's grid and seats.
 
@@ -107,6 +107,19 @@ export function useSessionsWithSeating(sessionIds: string[]) {
       const { data, error } = await supabase.from("exam_session_seating").select("session_id").in("session_id", key);
       if (error) throw error;
       return new Set(data.map((r) => r.session_id));
+    },
+  });
+}
+
+/** Seats other overlapping sessions hold in this session's room (read-only overlay); needs room and window set. Refetched on focus and after every save here. */
+export function useRoomConflictSeats(session: ExamSession) {
+  return useQuery({
+    queryKey: ["exam_session_seats", session.id, "room_conflicts", session.room_id, session.opens_at, session.closes_at],
+    enabled: !!session.room_id && !!session.opens_at && !!session.closes_at,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("exam_room_conflict_seats", { p_session: session.id });
+      if (error) throw error;
+      return data;
     },
   });
 }

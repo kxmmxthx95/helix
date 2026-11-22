@@ -2057,6 +2057,10 @@ export type Database = {
         Args: { p_room: string; p_opens: string; p_closes: string; p_exclude?: string | null };
         Returns: { session_id: string; title: string; exam_type: string | null; round: number | null; opens_at: string; closes_at: string; teacher_name: string }[];
       };
+      exam_room_conflict_seats: {
+        Args: { p_session: string };
+        Returns: { session_id: string; title: string; opens_at: string; student_name: string; student_code: string; seat_row: number; seat_col: number; seat_rows: number; seat_cols: number }[];
+      };
       attendance_duties: {
         Args: { p_profile: string; p_date: string };
         Returns: { classroom_id: string | null; schedule_entry_id: string | null; label: string; period_no: number | null }[];

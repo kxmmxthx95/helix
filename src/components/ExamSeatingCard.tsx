@@ -7,7 +7,7 @@ import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Button, Field, Input, Select } from "@/components/ui";
-import { useDeleteSeatTemplate, useSaveSeatTemplate, useSeatTemplates, useSessionSeating, useSessionSeats, useSetSessionSeating, useSetSessionSeats } from "@/hooks/useExamSeating";
+import { useDeleteSeatTemplate, useSaveSeatTemplate, useSeatTemplates, useRoomConflictSeats, useSessionSeating, useSessionSeats, useSetSessionSeating, useSetSessionSeats } from "@/hooks/useExamSeating";
 import type { ExamSeatTemplate, ExamSession } from "@/lib/database.types";
 import { ICON, ICON_BTN } from "@/lib/iconButton";
 import { isDeptHead, isOrgWide } from "@/lib/roles";
@@ -48,18 +48,31 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
   const rows = grid?.seat_rows ?? 0;
   const cols = grid?.seat_cols ?? 0;
   const capacity = rows * cols;
-  const missing = Math.max(0, students.length - capacity);
+  // Seats other overlapping sessions hold in this room, keyed "row:col" (query is ordered earliest session first, so it wins a shared cell).
+  const { data: taken = [] } = useRoomConflictSeats(session);
+  const held = new Map<string, (typeof taken)[number]>();
+  for (const t of taken) if (t.seat_row <= rows && t.seat_col <= cols && !held.has(`${t.seat_row}:${t.seat_col}`)) held.set(`${t.seat_row}:${t.seat_col}`, t);
+  const gridDiffers = taken.some((t) => t.seat_rows !== rows || t.seat_cols !== cols);
+  const missing = Math.max(0, students.length - (capacity - held.size));
   const busy = setSeats.isPending || applyTemplate.isPending;
   // Seating needs the exam window first; the room picker (`top`) stays usable so the room can be set beforehand.
   const noTime = !(session.opens_at && session.closes_at);
   const locked = busy || noTime;
 
-  const write = (next: Seat[]) => setSeats.mutate({ sessionId: session.id, seats: next }, { onError: () => toast("บันทึกผังไม่สำเร็จ", "error") });
-  const fill = (order: SeatStudent[]) =>
-    write(order.slice(0, capacity).map((s, i) => ({ student_id: s.student_id, seat_row: Math.floor(i / cols) + 1, seat_col: (i % cols) + 1 })));
+  const write = (next: Seat[]) =>
+    setSeats.mutate(
+      { sessionId: session.id, seats: next },
+      { onError: (e) => toast((e as { message?: string }).message?.includes("ถูกใช้ในรอบสอบอื่น") ? "ที่นั่งนี้ถูกใช้ในรอบสอบอื่นที่เวลาทับกัน" : "บันทึกผังไม่สำเร็จ", "error") },
+    );
+  // Auto-arrange fills row by row and skips seats another session holds.
+  const fill = (order: SeatStudent[]) => {
+    const free = Array.from({ length: capacity }, (_, i) => ({ seat_row: Math.floor(i / cols) + 1, seat_col: (i % cols) + 1 })).filter((c) => !held.has(`${c.seat_row}:${c.seat_col}`));
+    write(order.slice(0, free.length).map((s, i) => ({ student_id: s.student_id, ...free[i]! })));
+  };
 
   function tapSeat(row: number, col: number) {
     const here = at.get(`${row}:${col}`);
+    if (!here && held.has(`${row}:${col}`)) return;
     if (!picked) {
       if (here) setPicked({ kind: "seat", row, col });
       return;
@@ -181,20 +194,33 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
                     const x = at.get(`${row}:${col}`);
                     const st = x ? byId.get(x.student_id) : undefined;
                     const isPicked = picked?.kind === "seat" && picked.row === row && picked.col === col;
+                    const other = held.get(`${row}:${col}`);
                     return (
                       <button
                         key={`${row}:${col}`}
                         type="button"
-                        disabled={locked}
-                        aria-label={st ? `ที่นั่ง ${row}.${col} ${st.name}` : `ที่นั่ง ${row}.${col} ว่าง`}
+                        disabled={locked || (!!other && !x)}
+                        aria-label={
+                          other && !x
+                            ? `ที่นั่ง ${row}.${col} ถูกจองโดยรอบอื่น ${other.student_name}`
+                            : st
+                              ? `ที่นั่ง ${row}.${col} ${st.name}${other ? " ชนกับรอบอื่น" : ""}`
+                              : `ที่นั่ง ${row}.${col} ว่าง`
+                        }
                         onClick={() => tapSeat(row, col)}
                         className={cn(
                           "flex h-14 min-w-0 flex-col items-start justify-center rounded-lg border px-2 text-left text-[11px] leading-tight",
-                          st ? "border-border bg-card" : "border-dashed border-border text-muted-foreground",
+                          other && !x ? "border-border bg-muted text-muted-foreground opacity-70" : st ? "border-border bg-card" : "border-dashed border-border text-muted-foreground",
+                          other && x && "border-destructive ring-1 ring-destructive",
                           isPicked && "ring-2 ring-primary",
                         )}
                       >
-                        {st ? (
+                        {other && !x ? (
+                          <>
+                            <span className="line-clamp-2 w-full break-words font-medium">{other.student_name}</span>
+                            <span className="tabular-nums">{other.student_code}</span>
+                          </>
+                        ) : st ? (
                           <>
                             <span className="line-clamp-2 w-full break-words font-medium text-foreground">{st.name}</span>
                             <span className="tabular-nums text-muted-foreground">{st.code}</span>
@@ -209,6 +235,17 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
                   })}
                 </div>
               </div>
+
+              {held.size > 0 && (
+                <p className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
+                  ช่องสีเทาถูกจองโดยรอบอื่นในห้องเดียวกันที่เวลาทับกัน: {[...new Set([...held.values()].map((t) => t.title))].join(", ")}
+                </p>
+              )}
+              {gridDiffers && (
+                <p role="alert" className="rounded-xl bg-[hsl(var(--warning)/0.12)] px-3 py-2 text-xs text-warning">
+                  ผังขนาดไม่ตรงกับอีกรอบในห้องเดียวกัน ที่นั่งอาจไม่ตรงกับห้องจริง
+                </p>
+              )}
 
               {missing > 0 && (
                 <p role="alert" className="rounded-xl bg-[hsl(var(--warning)/0.12)] px-3 py-2 text-xs text-warning">
