@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ChevronForward, PencilIcon, Plus, TimetableIcon, TrashIcon } from "@/components/icons";
+import { AlertTriangle, ChevronForward, PencilIcon, Plus, TimetableIcon, TrashIcon } from "@/components/icons";
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -27,7 +27,7 @@ const shuffled = <T,>(items: T[]) => {
 };
 
 /** ผังห้องสอบ: pick a department template, then fill the grid automatically and fix it by tapping seats. Teachers only. */
-export function ExamSeatingCard({ session, students }: { session: ExamSession; students: SeatStudent[] }) {
+export function ExamSeatingCard({ session, students, top }: { session: ExamSession; students: SeatStudent[]; /** Rendered first inside the open card (the physical-room picker). */ top?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [managing, setManaging] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -89,13 +89,13 @@ export function ExamSeatingCard({ session, students }: { session: ExamSession; s
         onClick={() => setOpen((v) => !v)}
         className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
-        <span className="flex items-center gap-2 font-medium text-foreground">
+        <span className="flex items-center gap-2 font-semibold text-foreground">
           <IconTile tone="bg-amber-500/15 text-amber-700 dark:text-amber-300">
             <TimetableIcon className="h-4 w-4" />
           </IconTile>
           ผังห้องสอบ
         </span>
-        <span className="flex min-w-0 flex-1 items-center justify-end gap-3 text-foreground/75">
+        <span className="flex min-w-0 flex-1 items-center justify-end gap-3 text-foreground">
           {grid ? (
             <span className="tabular-nums">
               จัดแล้ว {seated.length}/{students.length} · ผัง {rows}×{cols}
@@ -103,16 +103,18 @@ export function ExamSeatingCard({ session, students }: { session: ExamSession; s
           ) : (
             <span>ยังไม่ได้เลือก template</span>
           )}
+          {!grid && <span className="flex shrink-0 text-destructive" role="img" aria-label="ยังไม่ได้ตั้งค่า"><AlertTriangle className="h-4 w-4" /></span>}
         </span>
         <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
       </button>
       <Collapse open={open}>
         <div className="space-y-3 border-t border-border bg-card p-3">
+          {top}
           <div className="flex flex-wrap items-center gap-2">
             <Select
               aria-label="Template ผังที่นั่ง"
               placeholder="เลือก template ผังที่นั่ง"
-              className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:max-w-64 sm:flex-none"
+              className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:w-64 sm:flex-none"
               value={grid?.template_id ?? ""}
               disabled={busy}
               onChange={(e) => {

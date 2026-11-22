@@ -96,3 +96,17 @@ export function useSetSessionSeats() {
     onSettled: (_d, _e, v) => void qc.invalidateQueries({ queryKey: ["exam_session_seats", v.sessionId] }),
   });
 }
+
+/** Ids (of the given sessions) that have a seating template chosen. */
+export function useSessionsWithSeating(sessionIds: string[]) {
+  const key = [...sessionIds].sort();
+  return useQuery({
+    queryKey: ["exam_session_seating", "has", key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<Set<string>> => {
+      const { data, error } = await supabase.from("exam_session_seating").select("session_id").in("session_id", key);
+      if (error) throw error;
+      return new Set(data.map((r) => r.session_id));
+    },
+  });
+}

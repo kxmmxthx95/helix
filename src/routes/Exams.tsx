@@ -7,6 +7,7 @@ import { AlertTriangle, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCir
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ExamSeatingCard } from "@/components/ExamSeatingCard";
+import { useSessionsWithSeating } from "@/hooks/useExamSeating";
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -314,30 +315,33 @@ function ScheduleCard({ session }: { session: ExamSession }) {
       >
         <span className="flex shrink-0 items-center gap-2">
           <IconTile tone="bg-sky-500/15 text-sky-700 dark:text-sky-300"><CalendarIcon className="h-4 w-4" /></IconTile>
-          <span className="font-medium text-foreground">เวลาสอบ</span>
+          <span className="font-semibold text-foreground">เวลาสอบ</span>
         </span>
-        <span className="flex min-w-0 items-center gap-2 text-right text-foreground/75">
+        <span className="flex min-w-0 items-center gap-2 text-right text-foreground">
           <span className="truncate tabular-nums">{session.opens_at && session.closes_at ? windowLabel(session.opens_at, session.closes_at) : "ยังไม่ได้ตั้งเวลา"}</span>
+          {!(session.opens_at && session.closes_at) && <span className="flex shrink-0 text-destructive" role="img" aria-label="ยังไม่ได้ตั้งค่า"><AlertTriangle className="h-4 w-4" /></span>}
           <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
         </span>
       </button>
       <Collapse open={open}>
         <form onSubmit={save} className="space-y-3 border-t border-border bg-muted/40 p-3">
-          <FormSection>
-            <Field label="เปิดสอบ" required>
-              <Input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} />
-            </Field>
-            <Field label="ปิดสอบ" required>
-              <Input type="datetime-local" value={closesAt} min={opensAt} onChange={(e) => setClosesAt(e.target.value)} />
-            </Field>
-          </FormSection>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="block space-y-1 text-xs">
+              <span className="text-muted-foreground">เปิดสอบ<span className="text-destructive" aria-hidden> *</span></span>
+              <Input type="datetime-local" className="ui-control-compact h-8 text-[13px]" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} />
+            </label>
+            <label className="block space-y-1 text-xs">
+              <span className="text-muted-foreground">ปิดสอบ<span className="text-destructive" aria-hidden> *</span></span>
+              <Input type="datetime-local" className="ui-control-compact h-8 text-[13px]" value={closesAt} min={opensAt} onChange={(e) => setClosesAt(e.target.value)} />
+            </label>
+          </div>
           <RoomConflictNotice conflicts={conflicts} />
           <p className="text-xs text-muted-foreground">นักเรียนจะเห็นและเข้าสอบได้เมื่อกำหนดเวลาแล้ว</p>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => setOpen(false)}>
+          <div className="flex justify-end gap-2">
+            <Button type="button" size="sm" variant="outline" className="ui-control-compact h-8" onClick={() => setOpen(false)}>
               ยกเลิก
             </Button>
-            <Button type="submit" className="flex-1" disabled={!valid || update.isPending}>
+            <Button type="submit" size="sm" className="ui-control-compact h-8" disabled={!valid || update.isPending}>
               บันทึก
             </Button>
           </div>
@@ -407,29 +411,6 @@ function ScheduleSheet({ session, onClose }: { session: ExamSession; onClose: ()
   );
 }
 
-/** "ห้องสอบ" select over the department's rooms; hidden when there are none to pick. */
-function RoomPicker({ value, onChange, current }: { value: string; onChange: (v: string) => void; current: string | null }) {
-  const { profile } = useAuth();
-  const { data: rooms = [] } = useRooms(profile?.department_id ?? null);
-  if (rooms.length === 0 && !current) return null;
-  return (
-    <FormSection>
-      <Field label="ห้องสอบ">
-        <Select value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">ไม่ระบุ</option>
-          {rooms
-            .filter((r) => r.is_active || r.id === current)
-            .map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-        </Select>
-      </Field>
-    </FormSection>
-  );
-}
-
 /** Warning (not a block) that other exam sessions use the same room at an overlapping time. */
 function RoomConflictNotice({ conflicts }: { conflicts: { session_id: string; title: string; opens_at: string; closes_at: string; teacher_name: string }[] }) {
   if (conflicts.length === 0) return null;
@@ -487,6 +468,28 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
   };
 
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
+
+  // A room can only be switched on once time, questions and seating are set (switching off is always allowed).
+  const { data: seatedIds } = useSessionsWithSeating(sessions.map((s) => s.id));
+  const missingOf = (s: ExamSession) => [
+    ...(s.opens_at && s.closes_at ? [] : ["เวลาสอบ"]),
+    ...((questionCounts?.get(s.id) ?? 0) > 0 ? [] : ["ข้อสอบ"]),
+    ...(seatedIds?.has(s.id) ? [] : ["ผังห้องสอบ"]),
+  ];
+  const enableSwitch = (s: ExamSession) => {
+    const missing = s.is_enabled ? [] : missingOf(s);
+    return (
+      <span title={missing.length > 0 ? `ยังเปิดไม่ได้ ข้อมูลไม่ครบ: ${missing.join(", ")}` : undefined}>
+        <Switch
+          size="xs"
+          label={`เปิดใช้งานห้องสอบ ${s.title}`}
+          checked={s.is_enabled}
+          disabled={updateSession.isPending || missing.length > 0 || !questionCounts || (sessions.length > 0 && !seatedIds)}
+          onChange={(on) => updateSession.mutate({ id: s.id, is_enabled: on }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
+        />
+      </span>
+    );
+  };
 
   if (selected) {
     // Live row from the list so edits made inside the detail (time, settings) show without reopening.
@@ -591,13 +594,7 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
                       <span className="truncate">{ownerName(owner)}</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <Switch
-                        size="xs"
-                        label={`เปิดใช้งานห้องสอบ ${s.title}`}
-                        checked={s.is_enabled}
-                        disabled={updateSession.isPending}
-                        onChange={(on) => updateSession.mutate({ id: s.id, is_enabled: on }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
-                      />
+                      {enableSwitch(s)}
                       <Button
                         size="icon"
                         variant="outline"
@@ -674,13 +671,7 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
                         </div>
                       </td>
                       <td className="px-4 py-0" onClick={(e) => e.stopPropagation()}>
-                        <Switch
-                          size="xs"
-                          label={`เปิดใช้งานห้องสอบ ${s.title}`}
-                          checked={s.is_enabled}
-                          disabled={updateSession.isPending}
-                          onChange={(on) => updateSession.mutate({ id: s.id, is_enabled: on }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
-                        />
+                        {enableSwitch(s)}
                       </td>
                       <td className="px-4 py-0 text-right">
                         <Button
@@ -1038,13 +1029,13 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         )}
       </div>
 
-      <div className="flex min-h-11 shrink-0 items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-xs">
+      <div className="flex min-h-11 shrink-0 items-center gap-3 rounded-lg border border-border bg-muted/60 px-3 py-2 text-xs">
         <span className="flex items-center gap-2"><LayersIcon className="h-3.5 w-3.5 text-muted-foreground" />{roomCountLabel} ห้องเรียน</span>
         <span className="h-5 w-px bg-border" aria-hidden />
         <span className="flex items-center gap-2"><DocumentTextIcon className="h-3.5 w-3.5 text-muted-foreground" />{sessionQuestions.length} ข้อ</span>
         <span className="h-5 w-px bg-border" aria-hidden />
         <span className="flex items-center gap-2"><StarIcon className="h-3.5 w-3.5 text-muted-foreground" />เต็ม {maxPoints} คะแนน</span>
-        <span className="ml-auto flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium">
+        <span className="ml-auto flex items-center gap-1.5 rounded-full bg-card px-2.5 py-0.5 text-[11px] font-medium">
           <span className={cn("h-1.5 w-1.5 rounded-full", status.dot)} />
           {status.label}
         </span>
@@ -1063,7 +1054,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         onClick={() => setEditingQuestions((v) => !v)}
         className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
-        <span className="flex items-center gap-2 font-medium text-foreground">
+        <span className="flex items-center gap-2 font-semibold text-foreground">
           <IconTile tone="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"><Plus className="h-4 w-4" /></IconTile>
           เพิ่มข้อสอบ
         </span>
@@ -1105,12 +1096,12 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
           >
             <span className="flex shrink-0 items-center gap-2">
               <IconTile tone="bg-violet-500/15 text-violet-700 dark:text-violet-300"><PeopleIcon className="h-4 w-4" /></IconTile>
-              <span className="font-medium text-foreground">นักเรียน {rosterRows.length} คน</span>
+              <span className="font-semibold text-foreground">นักเรียน {rosterRows.length} คน</span>
             </span>
             <span className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-right">
-              <span className="text-foreground/75">ส่งแล้ว {count("submitted")}</span>
-              <span className="text-foreground/75">กำลังทำ {count("in_progress")}</span>
-              <span className="text-foreground/75">ยังไม่เข้าสอบ {count("none")}</span>
+              <span className="text-foreground">ส่งแล้ว {count("submitted")}</span>
+              <span className="text-foreground">กำลังทำ {count("in_progress")}</span>
+              <span className="text-foreground">ยังไม่เข้าสอบ {count("none")}</span>
               {count("locked") > 0 && <span className="text-destructive">ถูกล็อก {count("locked")}</span>}
             </span>
             <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", rosterOpen && "rotate-90")} />
@@ -1147,8 +1138,38 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
           </Collapse>
         </div>
       )}
-      {rosterRows.length > 0 && <ExamSeatingCard session={session} students={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "" }))} />}
+      {rosterRows.length > 0 && <ExamSeatingCard session={session} top={<ExamRoomField session={session} />} students={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "" }))} />}
     </div>
+  );
+}
+
+/** Physical exam room (rooms table) with its time-clash warning; sits at the top of the seating card. */
+function ExamRoomField({ session }: { session: ExamSession }) {
+  const update = useUpdateExamSession();
+  const toast = useToast();
+  const { profile } = useAuth();
+  const { data: rooms = [] } = useRooms(profile?.department_id ?? null);
+  const { data: conflicts = [] } = useRoomConflicts(session.room_id ?? "", session.opens_at ?? "", session.closes_at ?? "", session.id);
+  if (rooms.length === 0 && !session.room_id) return null;
+  return (
+    <>
+      <Select
+        aria-label="ห้องสอบ"
+        className="ui-control-compact h-8 min-w-0 px-2.5 pr-7 text-[13px] sm:w-64"
+        value={session.room_id ?? ""}
+        onChange={(e) => update.mutate({ id: session.id, room_id: e.target.value || null }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
+      >
+        <option value="">ไม่ระบุห้องสอบ</option>
+        {rooms
+          .filter((r) => r.is_active || r.id === session.room_id)
+          .map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+      </Select>
+      <RoomConflictNotice conflicts={conflicts} />
+    </>
   );
 }
 
@@ -1169,22 +1190,22 @@ function SessionTopicsCard({ session }: { session: ExamSession }) {
       >
         <span className="flex items-center gap-2">
           <IconTile tone="bg-amber-500/15 text-amber-700 dark:text-amber-300"><ListIcon className="h-4 w-4" /></IconTile>
-          <span className="font-medium text-foreground">หัวข้อการสอบ</span>
+          <span className="font-semibold text-foreground">หัวข้อการสอบ</span>
           <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-sky-700 dark:text-sky-300">{topics.length} หัวข้อ</span>
         </span>
         <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
       </button>
       <Collapse open={open}>
-        <div className="space-y-3 border-t border-border bg-muted/40 p-3">
+        <div className="space-y-3 border-t border-border bg-card p-3">
           {lessons.length === 0 ? (
             <p className="text-xs text-muted-foreground">ยังไม่มีหัวข้อ</p>
           ) : (
             lessons.map(([lesson, items]) => (
               <section key={lesson}>
-                <h3 className="mb-1.5 px-1 text-[13px] font-semibold">{lesson}</h3>
-                <ul className="overflow-hidden rounded-xl bg-card [&>*+*]:border-t [&>*+*]:border-border">
+                <h3 className="mb-1.5 px-1 text-xs font-semibold">{lesson}</h3>
+                <ul className="overflow-hidden rounded-xl bg-muted [&>*+*]:border-t [&>*+*]:border-border">
                   {items.map((t) => (
-                    <li key={t.topic_id} className="px-4 py-2.5 text-sm">
+                    <li key={t.topic_id} className="px-4 py-2.5 text-xs">
                       {t.topic}
                     </li>
                   ))}
@@ -1205,7 +1226,21 @@ function ExamSettingsCard({ session }: { session: ExamSession }) {
   const toast = useToast();
   const { data: code } = useExamCode(open && session.strict_mode ? session.id : null);
   const onError = () => toast("บันทึกไม่สำเร็จ", "error");
-  const { data: conflicts = [] } = useRoomConflicts(session.room_id ?? "", session.opens_at ?? "", session.closes_at ?? "", session.id);
+  // Numbers are edited as text and saved on blur; an invalid entry snaps back to the saved value.
+  const [duration, setDuration] = useState(session.duration_minutes?.toString() ?? "");
+  const [attempts, setAttempts] = useState(session.max_attempts.toString());
+  useEffect(() => setDuration(session.duration_minutes?.toString() ?? ""), [session.duration_minutes]);
+  useEffect(() => setAttempts(session.max_attempts.toString()), [session.max_attempts]);
+  const saveDuration = () => {
+    const n = duration.trim() === "" ? null : Math.floor(Number(duration));
+    if (n !== null && !(n >= 1)) return setDuration(session.duration_minutes?.toString() ?? "");
+    if (n !== session.duration_minutes) update.mutate({ id: session.id, duration_minutes: n }, { onError });
+  };
+  const saveAttempts = () => {
+    const n = Math.floor(Number(attempts));
+    if (!(n >= 1)) return setAttempts(session.max_attempts.toString());
+    if (n !== session.max_attempts) update.mutate({ id: session.id, max_attempts: n }, { onError });
+  };
   const summary = [session.strict_mode ? "โหมดสอบจริง" : "โหมดปกติ", session.review_released ? "เปิดเฉลย" : null].filter(Boolean).join(" · ");
   return (
     <div className="shrink-0 overflow-hidden rounded-lg border border-border">
@@ -1217,18 +1252,27 @@ function ExamSettingsCard({ session }: { session: ExamSession }) {
       >
         <span className="flex shrink-0 items-center gap-2">
           <IconTile tone="bg-slate-500/15 text-slate-700 dark:text-slate-300"><SettingsIcon className="h-4 w-4" /></IconTile>
-          <span className="font-medium text-foreground">ตั้งค่าห้องสอบ</span>
+          <span className="font-semibold text-foreground">ตั้งค่าห้องสอบ</span>
         </span>
-        <span className="flex min-w-0 items-center gap-2 text-right text-foreground/75">
+        <span className="flex min-w-0 items-center gap-2 text-right text-foreground">
           <span className="truncate">{summary}</span>
           <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
         </span>
       </button>
       <Collapse open={open}>
-        <div className="space-y-3 border-t border-border bg-muted/40 p-3">
-          <RoomPicker value={session.room_id ?? ""} current={session.room_id} onChange={(v) => update.mutate({ id: session.id, room_id: v || null }, { onError })} />
-          <RoomConflictNotice conflicts={conflicts} />
+        <div className="space-y-3 border-t border-border bg-muted/40 p-3 [&_.text-sm]:text-xs [&_input]:!text-xs">
           <FormSection>
+            <Field label="เวลาทำ (นาที)">
+              <Input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} onBlur={saveDuration} placeholder="ไม่จำกัด" />
+            </Field>
+            <Field label="จำนวนครั้งที่สอบได้">
+              <Input type="number" min="1" value={attempts} onChange={(e) => setAttempts(e.target.value)} onBlur={saveAttempts} />
+            </Field>
+          </FormSection>
+          <FormSection>
+            <SwitchRow label="สุ่มลำดับข้อ" checked={session.shuffle_questions} onChange={(v) => update.mutate({ id: session.id, shuffle_questions: v }, { onError })} />
+            <SwitchRow label="สุ่มลำดับตัวเลือก" checked={session.shuffle_choices} onChange={(v) => update.mutate({ id: session.id, shuffle_choices: v }, { onError })} />
+            <SwitchRow label="บันทึกคะแนนเข้าสมุดคะแนน" checked={session.sync_to_gradebook} onChange={(v) => update.mutate({ id: session.id, sync_to_gradebook: v }, { onError })} />
             <SwitchRow label="เปิดเฉลยให้นักเรียนดู" checked={session.review_released} onChange={(v) => update.mutate({ id: session.id, review_released: v }, { onError })} />
             <SwitchRow label="โหมดสอบจริง (รหัสสอบ + ล็อกเครื่องเดียว)" checked={session.strict_mode} onChange={(v) => update.mutate({ id: session.id, strict_mode: v }, { onError })} />
             {session.strict_mode && (
@@ -1377,12 +1421,15 @@ function SessionQuestionList({ session, sessionQuestions }: { session: ExamSessi
   return (
     <div className="shrink-0 overflow-hidden rounded-lg border border-border">
       <button type="button" aria-expanded={open} onPointerEnter={() => setWarm(true)} onFocus={() => setWarm(true)} onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset">
-        <span className="flex items-center gap-2 font-medium text-foreground">
+        <span className="flex items-center gap-2 font-semibold text-foreground">
           <IconTile tone="bg-sky-500/15 text-sky-700 dark:text-sky-300"><DocumentTextIcon className="h-4 w-4" /></IconTile>
           รายการข้อสอบ
           <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-sky-700 dark:text-sky-300">{sessionQuestions.length} ข้อ</span>
         </span>
-        <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", open && "rotate-90")} />
+        <span className="flex shrink-0 items-center gap-2">
+          {sessionQuestions.length === 0 && <span className="flex shrink-0 text-destructive" role="img" aria-label="ยังไม่ได้ตั้งค่า"><AlertTriangle className="h-4 w-4" /></span>}
+          <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", open && "rotate-90")} />
+        </span>
       </button>
       <Collapse open={open}>
         <div className="divide-y divide-border border-t border-border bg-card">
