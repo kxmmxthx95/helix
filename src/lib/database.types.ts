@@ -889,6 +889,11 @@ export type ExamSessionQuestion = {
   points: number;
 };
 
+/** แนวข้อสอบ: practice questions of a room, kept apart from the real ones (migration 0207). */
+export type ExamSessionPracticeQuestion = Omit<ExamSessionQuestion, "points">;
+
+export type PracticeCheckResult = { correct: boolean; correct_answer: string | null; correct_choice_ids: string[] };
+
 export type ExamAttemptStatus = "in_progress" | "submitted";
 
 export type ExamAttempt = {
@@ -1993,6 +1998,7 @@ export type Database = {
       exam_session_seats: Table<ExamSessionSeat, ExamSessionSeat>;
       exam_session_special_seats: Table<ExamSessionSpecialSeat, never>;
       exam_session_questions: Table<ExamSessionQuestion, ExamSessionQuestion>;
+      exam_session_practice_questions: Table<ExamSessionPracticeQuestion, ExamSessionPracticeQuestion>;
       exam_attempts: Table<
         ExamAttempt,
         InsertOf<
@@ -2131,6 +2137,7 @@ export type Database = {
       self_approve_exam_topic_set: { Args: { p_id: string }; Returns: undefined };
       approver_set_no_exam: { Args: { p_id: string; p_no_exam: boolean }; Returns: undefined };
       decide_exam_topic_set: { Args: { p_id: string; p_approve: boolean; p_note?: string | null }; Returns: undefined };
+      practice_check: { Args: { p_session: string; p_question: string; p_choice?: string | null; p_text?: string | null }; Returns: PracticeCheckResult };
       verify_exam_code: { Args: { p_session_id: string; p_code: string }; Returns: "ok" | "wrong" | "locked" };
       unlock_exam_code: { Args: { p_session_id: string; p_student_id: string }; Returns: void };
       claim_exam_attempt: { Args: { p_attempt_id: string }; Returns: ExamClaimStatus };

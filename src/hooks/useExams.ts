@@ -5,6 +5,7 @@ import type {
   ExamAttemptEventType,
   ExamQuestionChoiceForAttempt,
   ExamQuestionForAttempt,
+  PracticeCheckResult,
   ExamClaimStatus,
   ExamCodeState,
   ExamSecurityEvent,
@@ -258,11 +259,18 @@ export function useSetSessionQuestions() {
   });
 }
 
-/** Appends one bank question to a room, keeping the points set on the question. */
+/** Appends one bank question to a room, keeping the points set on the question. `practice` targets แนวข้อสอบ instead (no points). */
 export function useAddSessionQuestion() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ sessionId, questionId }: { sessionId: string; questionId: string }) => {
+    mutationFn: async ({ sessionId, questionId, practice }: { sessionId: string; questionId: string; practice?: boolean }) => {
+      if (practice) {
+        const { count, error: cError } = await supabase.from("exam_session_practice_questions").select("question_id", { count: "exact", head: true }).eq("session_id", sessionId);
+        if (cError) throw cError;
+        const { error } = await supabase.from("exam_session_practice_questions").insert({ session_id: sessionId, question_id: questionId, position: count ?? 0 });
+        if (error) throw error;
+        return;
+      }
       const [{ data: q, error: qError }, { count, error: cError }] = await Promise.all([
         supabase.from("exam_questions").select("points").eq("id", questionId).single(),
         supabase.from("exam_session_questions").select("question_id", { count: "exact", head: true }).eq("session_id", sessionId),
@@ -274,7 +282,7 @@ export function useAddSessionQuestion() {
         .insert({ session_id: sessionId, question_id: questionId, position: count ?? 0, points: q.points });
       if (error) throw error;
     },
-    onSettled: (_d, _e, vars) => void qc.invalidateQueries({ queryKey: ["exam_session_questions", vars.sessionId] }),
+    onSettled: (_d, _e, vars) => void qc.invalidateQueries({ queryKey: [vars.practice ? "exam_session_practice_questions" : "exam_session_questions", vars.sessionId] }),
   });
 }
 
@@ -282,11 +290,54 @@ export function useAddSessionQuestion() {
 export function useRemoveSessionQuestion() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ sessionId, questionId }: { sessionId: string; questionId: string }) => {
-      const { error } = await supabase.from("exam_session_questions").delete().eq("session_id", sessionId).eq("question_id", questionId);
+    mutationFn: async ({ sessionId, questionId, practice }: { sessionId: string; questionId: string; practice?: boolean }) => {
+      const { error } = await supabase.from(practice ? "exam_session_practice_questions" : "exam_session_questions").delete().eq("session_id", sessionId).eq("question_id", questionId);
       if (error) throw error;
     },
-    onSettled: (_d, _e, vars) => void qc.invalidateQueries({ queryKey: ["exam_session_questions", vars.sessionId] }),
+    onSettled: (_d, _e, vars) => void qc.invalidateQueries({ queryKey: [vars.practice ? "exam_session_practice_questions" : "exam_session_questions", vars.sessionId] }),
+  });
+}
+
+/** แนวข้อสอบ of one room, in order (points is always 0 so it fits the real-question row shape). */
+export function usePracticeQuestions(sessionId: string | null) {
+  return useQuery({
+    queryKey: ["exam_session_practice_questions", sessionId],
+    enabled: !!sessionId,
+    queryFn: async (): Promise<ExamSessionQuestionRow[]> => {
+      const { data, error } = await supabase
+        .from("exam_session_practice_questions")
+        .select("question_id, position")
+        .eq("session_id", sessionId!)
+        .order("position", { ascending: true });
+      if (error) throw error;
+      return data.map((r) => ({ question_id: r.question_id, position: r.position, points: 0, prompt: "" }));
+    },
+  });
+}
+
+/** Practice question counts per room, for the student card button. */
+export function usePracticeCounts(sessionIds: string[]) {
+  return useQuery({
+    queryKey: ["exam_session_practice_counts", ...sessionIds],
+    enabled: sessionIds.length > 0,
+    queryFn: async (): Promise<Map<string, number>> => {
+      const { data, error } = await supabase.from("exam_session_practice_questions").select("session_id").in("session_id", sessionIds);
+      if (error) throw error;
+      const map = new Map<string, number>();
+      for (const r of data) map.set(r.session_id, (map.get(r.session_id) ?? 0) + 1);
+      return map;
+    },
+  });
+}
+
+/** Server-side practice check — returns right/wrong plus the key; nothing is stored. */
+export function usePracticeCheck() {
+  return useMutation({
+    mutationFn: async (a: { sessionId: string; questionId: string; choiceId: string | null; text: string | null }): Promise<PracticeCheckResult> => {
+      const { data, error } = await supabase.rpc("practice_check", { p_session: a.sessionId, p_question: a.questionId, p_choice: a.choiceId, p_text: a.text });
+      if (error) throw error;
+      return data as PracticeCheckResult;
+    },
   });
 }
 

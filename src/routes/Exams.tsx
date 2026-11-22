@@ -18,6 +18,9 @@ import { useProfilesByIds } from "@/hooks/usePractice";
 import { useClassroomsByIds, useExamQuestionsOf, useGradeLevelsByIds, useSubjectsByIds, type ExamQuestionWithChoices } from "@/hooks/useExamBank";
 import {
   useAddSessionQuestion,
+  usePracticeCheck,
+  usePracticeCounts,
+  usePracticeQuestions,
   useRemoveSessionQuestion,
   useAttemptAnswers,
   useAttemptQuestions,
@@ -61,7 +64,7 @@ import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { ExamApprovalTab, ExamSubmissionsTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
 import { DIFFICULTY_BADGE_CLASS, DIFFICULTY_LABEL, QuestionForm, QuestionSheet, SubjectPicker, useQuestionForm } from "@/routes/ExamBank";
-import type { ExamAttempt, ExamSecurityEventType, ExamSession, ExamSessionRoom, ExamTopicSet, Student, Subject } from "@/lib/database.types";
+import type { PracticeCheckResult, ExamAttempt, ExamSecurityEventType, ExamSession, ExamSessionRoom, ExamTopicSet, Student, Subject } from "@/lib/database.types";
 import { EXAM_KINDS, examLabel, kindTone, roundTone } from "@/lib/examKinds";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { canApproveExams } from "@/lib/roles";
@@ -925,7 +928,6 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   const { data: attempts = [], isLoading } = useSessionAttempts(session.id);
   const { data: targetIds = [], isLoading: targetsLoading } = useExamSessionTargets(session.id);
   const { data: sessionQuestions = [], isLoading: questionsLoading } = useExamSessionQuestions(session.id);
-  const [editingQuestions, setEditingQuestions] = useState(false);
   const [eventsOpen, setEventsOpen] = useState(false);
   const [rosterOpen, setRosterOpen] = useState(false);
   const eventCount = useSecurityEvents(session.id).data?.length ?? 0;
@@ -1126,22 +1128,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         </>
       )}
 
-      <div className="shrink-0 overflow-hidden rounded-lg border border-border">
-      <button
-        type="button"
-        aria-expanded={editingQuestions}
-        onClick={() => setEditingQuestions((v) => !v)}
-        className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
-      >
-        <span className="flex items-center gap-2 font-semibold text-foreground">
-          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><Plus className="h-4 w-4" /></IconTile>
-          เพิ่มข้อสอบ
-        </span>
-        <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", editingQuestions && "rotate-90")} />
-      </button>
-
-      <AddSessionQuestionPanel session={session} open={editingQuestions} />
-      </div>
+      <PracticeQuestionsCards session={session} />
 
       <SecurityPanel session={session} attempts={attempts} />
       <SecurityEventsSheet sessionId={session.id} open={eventsOpen} onOpenChange={setEventsOpen} />
@@ -1406,8 +1393,9 @@ function QuestionBody({ q, i }: { q: ExamQuestionWithChoices; i: number }) {
 }
 
 /** Collapsible card listing the questions already in the room. */
-function SessionQuestionList({ session, sessionQuestions }: { session: ExamSession; sessionQuestions: ExamSessionQuestionRow[] }) {
+function SessionQuestionList({ session, sessionQuestions, practice }: { session: ExamSession; sessionQuestions: ExamSessionQuestionRow[]; practice?: boolean }) {
   const [open, setOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
   // Start fetching on hover/focus so the data is already there when the card opens.
   const [warm, setWarm] = useState(false);
   const [editingQ, setEditingQ] = useState<ExamQuestionWithChoices | null>(null);
@@ -1433,7 +1421,7 @@ function SessionQuestionList({ session, sessionQuestions }: { session: ExamSessi
       <button type="button" aria-expanded={open} onPointerEnter={() => setWarm(true)} onFocus={() => setWarm(true)} onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset">
         <span className="flex items-center gap-2 font-semibold text-foreground">
           <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><DocumentTextIcon className="h-4 w-4" /></IconTile>
-          รายการข้อสอบ
+          {practice ? "แนวข้อสอบ" : "รายการข้อสอบ"}
         </span>
         <span className="flex shrink-0 items-center gap-2">
           <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success">{sessionQuestions.length} ข้อ</span>
@@ -1443,7 +1431,7 @@ function SessionQuestionList({ session, sessionQuestions }: { session: ExamSessi
       </button>
       <Collapse open={open}>
         <div className="divide-y divide-border border-t border-border bg-card">
-          {sessionQuestions.length === 0 && <p className="p-3 text-xs text-muted-foreground">ยังไม่มีข้อสอบในห้องนี้</p>}
+          {sessionQuestions.length === 0 && <p className="p-3 text-xs text-muted-foreground">{practice ? "ยังไม่มีแนวข้อสอบในห้องนี้" : "ยังไม่มีข้อสอบในห้องนี้"}</p>}
           {chosen.slice(0, mounted).map((q, i) => (
             <div key={q.id} className="flex items-start gap-2 p-3 [contain-intrinsic-size:auto_260px] [content-visibility:auto]">
               <div className="min-w-0 flex-1"><QuestionBody q={q} i={i} /></div>
@@ -1459,7 +1447,7 @@ function SessionQuestionList({ session, sessionQuestions }: { session: ExamSessi
                 title="ลบข้อสอบออกจากห้อง"
                 disabled={remove.isPending}
                 onClick={() => {
-                  if (confirm("ลบข้อสอบข้อนี้ออกจากห้อง?")) remove.mutate({ sessionId: session.id, questionId: q.id }, { onError: () => toast("ลบข้อสอบไม่สำเร็จ", "error") });
+                  if (confirm(practice ? "ลบแนวข้อสอบข้อนี้ออกจากห้อง?" : "ลบข้อสอบข้อนี้ออกจากห้อง?")) remove.mutate({ sessionId: session.id, questionId: q.id, practice }, { onError: () => toast("ลบข้อสอบไม่สำเร็จ", "error") });
                 }}
               >
                 <TrashIcon className={ICON} />
@@ -1469,6 +1457,19 @@ function SessionQuestionList({ session, sessionQuestions }: { session: ExamSessi
           ))}
         </div>
       </Collapse>
+      <button
+        type="button"
+        aria-expanded={adding}
+        onClick={() => setAdding((v) => !v)}
+        className="flex w-full items-center justify-between min-h-11 border-t border-border px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
+      >
+        <span className="flex items-center gap-2 font-semibold text-foreground">
+          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><Plus className="h-4 w-4" /></IconTile>
+          {practice ? "เพิ่มแนวข้อสอบ" : "เพิ่มข้อสอบ"}
+        </span>
+        <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", adding && "rotate-90")} />
+      </button>
+      <AddSessionQuestionPanel session={session} open={adding} practice={practice} />
       {/* Keyed so the form remounts with the picked question; its state is seeded once on mount. */}
       <QuestionSheet
         key={editingQ?.id ?? "new"}
@@ -1481,6 +1482,12 @@ function SessionQuestionList({ session, sessionQuestions }: { session: ExamSessi
       />
     </div>
   );
+}
+
+/** แนวข้อสอบ: practice questions students can try from their exam card (not graded, not stored). */
+function PracticeQuestionsCards({ session }: { session: ExamSession }) {
+  const { data: practiceQuestions = [] } = usePracticeQuestions(session.id);
+  return <SessionQuestionList session={session} sessionQuestions={practiceQuestions} practice />;
 }
 
 /** Anti-impersonation event trail for one room (migration 0132). */
@@ -1506,7 +1513,7 @@ function SecurityEventsSheet({ sessionId, open, onOpenChange }: { sessionId: str
 }
 
 /** "เพิ่มข้อสอบ": a new question written here goes straight into the room. */
-function AddSessionQuestionPanel({ session, open }: { session: ExamSession; open: boolean }) {
+function AddSessionQuestionPanel({ session, open, practice }: { session: ExamSession; open: boolean; practice?: boolean }) {
   const { profile } = useAuth();
   const add = useAddSessionQuestion();
   const toast = useToast();
@@ -1526,7 +1533,7 @@ function AddSessionQuestionPanel({ session, open }: { session: ExamSession; open
     planTopicId: topicId,
     teacherId: profile?.id ?? session.teacher_id,
     question: null,
-    onSaved: (questionId) => add.mutate({ sessionId: session.id, questionId }, { onError: () => toast("เพิ่มข้อสอบเข้าห้องไม่สำเร็จ", "error") }),
+    onSaved: (questionId) => add.mutate({ sessionId: session.id, questionId, practice }, { onError: (e) => toast(e.message || "เพิ่มข้อสอบเข้าห้องไม่สำเร็จ", "error") }),
   });
   return (
     <Collapse open={open}>
@@ -1640,7 +1647,10 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
 
   const { data: mySeats } = useMyExamSeats(student.id, exams.filter((e) => new Date(e.closes_at) >= new Date()).map((e) => e.id));
   const [topicFor, setTopicFor] = useState<AvailableExam | null>(null);
+  const [practiceFor, setPracticeFor] = useState<AvailableExam | null>(null);
+  const { data: practiceCounts } = usePracticeCounts(exams.map((e) => e.id));
 
+  if (practiceFor) return <PracticeRunner session={practiceFor} onExit={() => setPracticeFor(null)} />;
   if (isLoading) return <PageSpinner />;
   if (exams.length === 0) {
     return (
@@ -1698,6 +1708,11 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
                 </div>
               )}
             </button>
+            {(practiceCounts?.get(e.id) ?? 0) > 0 && (
+              <Button size="sm" variant="outline" className="w-full" onClick={() => setPracticeFor(e)}>
+                ฝึกทำแนวข้อสอบ ({practiceCounts?.get(e.id)} ข้อ)
+              </Button>
+            )}
             <Button size="sm" className="w-full" disabled={!isOpen || usedUp} onClick={() => onOpen(e)}>
               {usedUp ? "ทำครบแล้ว" : "เข้าสอบ"}
             </Button>
@@ -1706,6 +1721,70 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
       })}
     </ul>
     </>
+  );
+}
+
+/** Practice mode: answer one question at a time, check it server-side (practice_check), retry freely. Nothing is stored. */
+function PracticeRunner({ session, onExit }: { session: AvailableExam; onExit: () => void }) {
+  const { data: rows = [], isLoading } = usePracticeQuestions(session.id);
+  const { data } = useAttemptQuestions(rows.map((r) => r.question_id));
+  const check = usePracticeCheck();
+  const toast = useToast();
+  const [picked, setPicked] = useState<Map<string, { choiceId: string | null; text: string }>>(new Map());
+  const [results, setResults] = useState<Map<string, PracticeCheckResult>>(new Map());
+  if (isLoading || !data) return <PageSpinner />;
+  const questions = rows.map((r) => data.questions.find((q) => q.id === r.question_id)).filter((q): q is NonNullable<typeof q> => !!q);
+  const pick = (id: string, v: { choiceId: string | null; text: string }) => {
+    setPicked(new Map(picked).set(id, v));
+    setResults((m) => { const n = new Map(m); n.delete(id); return n; });
+  };
+  return (
+    <div className="mx-auto max-w-xl space-y-3 pb-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold">แนวข้อสอบ · {session.title}</p>
+        <Button size="sm" variant="outline" onClick={onExit}>กลับ</Button>
+      </div>
+      {questions.map((q, i) => {
+        const a = picked.get(q.id) ?? { choiceId: null, text: "" };
+        const r = results.get(q.id);
+        const choices = data.choicesByQuestion.get(q.id) ?? [];
+        return (
+          <Card key={q.id} className={cn("space-y-2 text-sm", r && (r.correct ? "border-success/40" : "border-destructive/40"))}>
+            <div className="font-medium">{i + 1}. <QuestionPromptView value={q.prompt_json} /></div>
+            {q.question_type === "short_answer" ? (
+              <Input value={a.text} onChange={(e) => pick(q.id, { choiceId: null, text: e.target.value })} placeholder="พิมพ์คำตอบ" />
+            ) : (
+              <div className="space-y-1.5">
+                {choices.map((c) => (
+                  <label key={c.id} className={cn("flex items-center gap-2 text-xs", r?.correct_choice_ids.includes(c.id) && "font-medium text-success")}>
+                    <input type="radio" name={`p-${q.id}`} checked={a.choiceId === c.id} onChange={() => pick(q.id, { choiceId: c.id, text: "" })} />
+                    <QuestionPromptView value={c.label_json} />
+                  </label>
+                ))}
+              </div>
+            )}
+            {r && (
+              <p className={cn("text-xs", r.correct ? "text-success" : "text-destructive")}>
+                {r.correct ? "ถูกต้อง" : "ไม่ถูกต้อง"}
+                {!r.correct && r.correct_answer && ` · เฉลย: ${r.correct_answer}`}
+              </p>
+            )}
+            <Button
+              size="sm"
+              disabled={check.isPending || (q.question_type === "short_answer" ? !a.text.trim() : !a.choiceId)}
+              onClick={() =>
+                check.mutate(
+                  { sessionId: session.id, questionId: q.id, choiceId: a.choiceId, text: a.text || null },
+                  { onSuccess: (res) => setResults(new Map(results).set(q.id, res)), onError: () => toast("ตรวจคำตอบไม่สำเร็จ", "error") },
+                )
+              }
+            >
+              ตรวจคำตอบ
+            </Button>
+          </Card>
+        );
+      })}
+    </div>
   );
 }
 
