@@ -98,6 +98,47 @@ export function useSubjectLinkedLessons(subjectId: string | null) {
   });
 }
 
+/** subject id → ids of the ผังการเรียน lessons linked to it (plan_lesson_subjects); used to merge subjects that share a plan. */
+export function usePlanLessonLinks(subjectIds: string[]) {
+  const key = [...new Set(subjectIds)].sort();
+  return useQuery({
+    queryKey: ["plan", "lesson_links", key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<Map<string, Set<string>>> => {
+      const { data, error } = await supabase.from("plan_lesson_subjects").select("subject_id, lesson_id").in("subject_id", key);
+      if (error) throw error;
+      const map = new Map<string, Set<string>>();
+      for (const r of data) map.set(r.subject_id, (map.get(r.subject_id) ?? new Set()).add(r.lesson_id));
+      return map;
+    },
+  });
+}
+
+/** Lessons (with topics) linked to any of the subjects, each tagged with the subjects it is linked to. */
+export function useSubjectsLinkedLessons(subjectIds: string[]) {
+  const key = [...new Set(subjectIds)].sort();
+  return useQuery({
+    queryKey: ["plan", "subjects_linked", key],
+    enabled: key.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("plan_lesson_subjects")
+        .select("subject_id, lesson:plan_lessons(id, name, sort_order, plan_topics(id, name, sort_order))")
+        .in("subject_id", key);
+      if (error) throw error;
+      type Lesson = { id: string; name: string; sort_order: number; plan_topics: { id: string; name: string; sort_order: number }[] };
+      const byLesson = new Map<string, { id: string; name: string; sort_order: number; topics: Lesson["plan_topics"]; subjectIds: string[] }>();
+      for (const r of data as unknown as { subject_id: string; lesson: Lesson | null }[]) {
+        if (!r.lesson) continue;
+        const l = byLesson.get(r.lesson.id) ?? { id: r.lesson.id, name: r.lesson.name, sort_order: r.lesson.sort_order, topics: [...r.lesson.plan_topics].sort((a, b) => a.sort_order - b.sort_order), subjectIds: [] };
+        l.subjectIds.push(r.subject_id);
+        byLesson.set(r.lesson.id, l);
+      }
+      return [...byLesson.values()].filter((l) => l.topics.length > 0).sort((a, b) => a.sort_order - b.sort_order);
+    },
+  });
+}
+
 function useWrite<V>(fn: (v: V) => PromiseLike<{ error: Error | null }>) {
   const qc = useQueryClient();
   return useMutation({

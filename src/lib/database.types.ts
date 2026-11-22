@@ -809,6 +809,11 @@ export type ExamSession = {
   /** Both null = created but not on the exam timetable yet (migration 0187); students can't see or start it. */
   opens_at: string | null;
   closes_at: string | null;
+  /** Migration 0188 — shown as table columns; the title is generated from them. */
+  exam_type: string | null;
+  round: number | null;
+  /** Migration 0188 — off hides the room from students (can_read_exam_session). */
+  is_enabled: boolean;
   /** Per-attempt countdown from first open; null = only the opens_at/closes_at window applies. */
   duration_minutes: number | null;
   max_attempts: number;
@@ -827,6 +832,8 @@ export type ExamSession = {
   updated_at: string;
 };
 
+/** Every topic set (and subject) a room covers — several when merged subjects share one room (migration 0193). */
+export type ExamSessionSet = { session_id: string; topic_set_id: string; subject_id: string; gradebook_item_id: string | null };
 export type ExamApprovalStatus = "draft" | "pending" | "approved" | "rejected";
 
 /** ชุดหัวข้อการสอบ: one subject + ผังการเรียน topics, approved before sessions can use it (migration 0183). */
@@ -834,9 +841,12 @@ export type ExamTopicSet = {
   id: string;
   teacher_id: string;
   subject_id: string;
-  /** One set per teaching assignment (subject × room); null only on legacy sets whose teacher has no assignment. */
+  /** Subject × room the set is for (many sets per assignment — one per exam, migration 0192); null only on legacy sets. */
   teaching_assignment_id: string | null;
-  /** "ไม่มีการสอบ" for the room — needs no approval, no session can use it. */
+  /** The exam this submission is for (e.g. สอบกลางภาค, ครั้งที่ 1); null on sets made before 0192. */
+  exam_type: string | null;
+  round: number | null;
+  /** "ไม่มีสอบ" for that exam — goes through approval; no session can use it. */
   no_exam: boolean;
   approval_status: ExamApprovalStatus;
   approval_note: string | null;
@@ -1938,6 +1948,9 @@ export type Database = {
           ExamSession,
           | "opens_at"
           | "closes_at"
+          | "exam_type"
+          | "round"
+          | "is_enabled"
           | "duration_minutes"
           | "max_attempts"
           | "shuffle_questions"
@@ -1950,10 +1963,11 @@ export type Database = {
       >;
       exam_topic_sets: Table<
         ExamTopicSet,
-        InsertOf<ExamTopicSet, "no_exam" | "approval_status" | "approval_note" | "approved_by" | "approved_at">
+        InsertOf<ExamTopicSet, "exam_type" | "round" | "no_exam" | "approval_status" | "approval_note" | "approved_by" | "approved_at">
       >;
       exam_topic_set_topics: Table<ExamTopicSetTopic, ExamTopicSetTopic>;
       exam_session_targets: Table<ExamSessionTarget, ExamSessionTarget>;
+      exam_session_sets: Table<ExamSessionSet, InsertOf<ExamSessionSet, "gradebook_item_id">>;
       exam_session_questions: Table<ExamSessionQuestion, ExamSessionQuestion>;
       exam_attempts: Table<
         ExamAttempt,
@@ -2062,6 +2076,12 @@ export type Database = {
         Returns: void;
       };
       submit_exam_topic_set: { Args: { p_id: string }; Returns: undefined };
+      submit_no_exam_set: { Args: { p_assignment: string; p_exam_type: string; p_round?: number | null }; Returns: string };
+      request_exam_no_exam: { Args: { p_id: string }; Returns: undefined };
+      cancel_exam_no_exam: { Args: { p_id: string }; Returns: undefined };
+      revoke_exam_topic_set_approval: { Args: { p_id: string }; Returns: undefined };
+      self_approve_exam_topic_set: { Args: { p_id: string }; Returns: undefined };
+      approver_set_no_exam: { Args: { p_id: string; p_no_exam: boolean }; Returns: undefined };
       decide_exam_topic_set: { Args: { p_id: string; p_approve: boolean; p_note?: string | null }; Returns: undefined };
       verify_exam_code: { Args: { p_session_id: string; p_code: string }; Returns: "ok" | "wrong" | "locked" };
       unlock_exam_code: { Args: { p_session_id: string; p_student_id: string }; Returns: void };

@@ -9,9 +9,11 @@ import type {
   ExamCodeState,
   ExamSecurityEvent,
   ExamSession,
+  ExamSessionSet,
   ExamTopicSet,
 } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
+import { avatarUrl, studentAvatarUrl } from "@/hooks/useAvatar";
 
 // สอบออนไลน์ — sessions (an "opening" of hand-picked bank questions against
 // the teacher's own classroom(s)) + student attempts. See migration 0047.
@@ -53,6 +55,22 @@ export function useMyExamSessions(teacherId: string | null) {
   });
 }
 
+/** session id → the sets (subjects) each room covers. */
+export function useSessionSets(sessionIds: string[]) {
+  const key = [...sessionIds].sort();
+  return useQuery({
+    queryKey: ["exam_sessions", "sets", key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<Map<string, ExamSessionSet[]>> => {
+      const { data, error } = await supabase.from("exam_session_sets").select("*").in("session_id", key);
+      if (error) throw error;
+      const map = new Map<string, ExamSessionSet[]>();
+      for (const r of data) map.set(r.session_id, [...(map.get(r.session_id) ?? []), r]);
+      return map;
+    },
+  });
+}
+
 export function useExamSession(id: string | null) {
   return useQuery({
     queryKey: ["exam_sessions", id],
@@ -66,6 +84,22 @@ export function useExamSession(id: string | null) {
 }
 
 export type ExamSessionQuestionRow = { question_id: string; position: number; points: number; prompt: string };
+
+/** Question count per session, for list badges. Invalidated with the per-session query (same key prefix). */
+export function useSessionQuestionCounts(sessionIds: string[]) {
+  const key = [...new Set(sessionIds)].sort();
+  return useQuery({
+    queryKey: ["exam_session_questions", "counts", key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<Map<string, number>> => {
+      const { data, error } = await supabase.from("exam_session_questions").select("session_id").in("session_id", key);
+      if (error) throw error;
+      const map = new Map<string, number>();
+      for (const r of data) map.set(r.session_id, (map.get(r.session_id) ?? 0) + 1);
+      return map;
+    },
+  });
+}
 
 export function useExamSessionQuestions(sessionId: string | null) {
   return useQuery({
@@ -112,18 +146,29 @@ export function useCreateExamSession() {
       subject_id: string;
       teacher_id: string;
       title: string;
+      exam_type: string;
+      round: number | null;
       duration_minutes: number | null;
       max_attempts: number;
       shuffle_questions: boolean;
       shuffle_choices: boolean;
       sync_to_gradebook: boolean;
       topic_set_id: string;
+      /** Sets (and their subjects) the room covers, primary included; defaults to the primary set alone. */
+      sets?: { topic_set_id: string; subject_id: string }[];
       teaching_assignment_ids: string[];
       questions: { question_id: string; points: number }[];
     }) => {
-      const { teaching_assignment_ids, questions, ...session } = draft;
-      const { data: inserted, error } = await supabase.from("exam_sessions").insert(session).select().single();
+      const { teaching_assignment_ids, questions, sets, ...session } = draft;
+      // New rooms start off; the teacher switches them on from the ห้องสอบ table.
+      const { data: inserted, error } = await supabase.from("exam_sessions").insert({ ...session, is_enabled: false }).select().single();
       if (error) throw error;
+
+      // before targets: the target trigger checks them against the listed sets
+      const { error: setsError } = await supabase
+        .from("exam_session_sets")
+        .insert((sets ?? [{ topic_set_id: draft.topic_set_id, subject_id: draft.subject_id }]).map((x) => ({ session_id: inserted.id, ...x })));
+      if (setsError) throw setsError;
 
       if (teaching_assignment_ids.length > 0) {
         const { error: targetsError } = await supabase
@@ -152,7 +197,7 @@ export function useUpdateExamSession() {
     mutationFn: async ({ id, ...patch }: { id: string } & Partial<
       Pick<
         ExamSession,
-        "title" | "opens_at" | "closes_at" | "duration_minutes" | "max_attempts" | "shuffle_questions" | "shuffle_choices" | "sync_to_gradebook" | "review_released" | "strict_mode"
+        "title" | "opens_at" | "closes_at" | "is_enabled" | "duration_minutes" | "max_attempts" | "shuffle_questions" | "shuffle_choices" | "sync_to_gradebook" | "review_released" | "strict_mode"
       >
     >) => {
       const { error } = await supabase.from("exam_sessions").update(patch).eq("id", id);
@@ -186,6 +231,38 @@ export function useSetSessionQuestions() {
   });
 }
 
+/** Appends one bank question to a room, keeping the points set on the question. */
+export function useAddSessionQuestion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ sessionId, questionId }: { sessionId: string; questionId: string }) => {
+      const [{ data: q, error: qError }, { count, error: cError }] = await Promise.all([
+        supabase.from("exam_questions").select("points").eq("id", questionId).single(),
+        supabase.from("exam_session_questions").select("question_id", { count: "exact", head: true }).eq("session_id", sessionId),
+      ]);
+      if (qError) throw qError;
+      if (cError) throw cError;
+      const { error } = await supabase
+        .from("exam_session_questions")
+        .insert({ session_id: sessionId, question_id: questionId, position: count ?? 0, points: q.points });
+      if (error) throw error;
+    },
+    onSettled: (_d, _e, vars) => void qc.invalidateQueries({ queryKey: ["exam_session_questions", vars.sessionId] }),
+  });
+}
+
+/** Takes one question out of a room (the bank question itself stays). */
+export function useRemoveSessionQuestion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ sessionId, questionId }: { sessionId: string; questionId: string }) => {
+      const { error } = await supabase.from("exam_session_questions").delete().eq("session_id", sessionId).eq("question_id", questionId);
+      if (error) throw error;
+    },
+    onSettled: (_d, _e, vars) => void qc.invalidateQueries({ queryKey: ["exam_session_questions", vars.sessionId] }),
+  });
+}
+
 export function useDeleteExamSession() {
   const qc = useQueryClient();
   return useMutation({
@@ -193,14 +270,19 @@ export function useDeleteExamSession() {
       const { error } = await supabase.from("exam_sessions").delete().eq("id", id);
       if (error) throw error;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["exam_sessions"] }),
+    // The set is unlocked again (see useTopicSetsInUse), so "สร้างห้องสอบ" comes back.
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["exam_sessions"] });
+      void qc.invalidateQueries({ queryKey: ["exam_topic_sets", "in_use"] });
+    },
   });
 }
 
 // --------------------------------------------------------- student: available exams
 
 /** Students only ever get scheduled rooms (opens_at/closes_at set). */
-export type AvailableExam = ExamSession & { opens_at: string; closes_at: string; my_attempts: number };
+/** subject_ids: every subject the room covers (merged rooms show under each). */
+export type AvailableExam = ExamSession & { opens_at: string; closes_at: string; my_attempts: number; subject_ids: string[] };
 
 /** Sessions targeting the student's current classroom, whole window (not just currently-open) — the UI splits into upcoming/open/closed by opens_at/closes_at itself. */
 export function useAvailableExams(studentId: string | null, classroomId: string | null, academicYear: number | null) {
@@ -217,16 +299,20 @@ export function useAvailableExams(studentId: string | null, classroomId: string 
       const sessionIds = [...new Set((targets as unknown as { session_id: string }[]).map((t) => t.session_id))];
       if (sessionIds.length === 0) return [];
 
-      const [{ data: sessions, error: sessionsError }, { data: attempts, error: attemptsError }] = await Promise.all([
+      const [{ data: sessions, error: sessionsError }, { data: attempts, error: attemptsError }, { data: sets, error: setsError }] = await Promise.all([
         supabase.from("exam_sessions").select("*").in("id", sessionIds).not("opens_at", "is", null).not("closes_at", "is", null).order("opens_at", { ascending: false }),
         supabase.from("exam_attempts").select("session_id").eq("student_id", studentId!).in("session_id", sessionIds),
+        supabase.from("exam_session_sets").select("session_id, subject_id").in("session_id", sessionIds),
       ]);
       if (sessionsError) throw sessionsError;
       if (attemptsError) throw attemptsError;
+      if (setsError) throw setsError;
+      const subjectIdsOf = new Map<string, string[]>();
+      for (const r of sets) subjectIdsOf.set(r.session_id, [...(subjectIdsOf.get(r.session_id) ?? []), r.subject_id]);
 
       const attemptCounts = new Map<string, number>();
       for (const a of attempts) attemptCounts.set(a.session_id, (attemptCounts.get(a.session_id) ?? 0) + 1);
-      return sessions.map((s) => ({ ...s, my_attempts: attemptCounts.get(s.id) ?? 0 }) as AvailableExam);
+      return sessions.map((s) => ({ ...s, my_attempts: attemptCounts.get(s.id) ?? 0, subject_ids: subjectIdsOf.get(s.id) ?? [s.subject_id] }) as AvailableExam);
     },
   });
 }
@@ -518,6 +604,78 @@ export function useStudentNames(ids: string[]) {
   });
 }
 
+/** Photo URL per student: own photo first, then the linked login profile's photo. */
+export function useStudentAvatars(ids: string[]) {
+  const key = [...new Set(ids)].sort();
+  return useQuery({
+    queryKey: ["student_avatars", key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<Map<string, string>> => {
+      const { data, error } = await supabase
+        .from("students")
+        .select("id, avatar_path, updated_at, profile:profiles!profile_id(avatar_path, updated_at)")
+        .in("id", key);
+      if (error) throw error;
+      type Row = {
+        id: string;
+        avatar_path: string | null;
+        updated_at: string;
+        profile: { avatar_path: string | null; updated_at: string } | null;
+      };
+      const map = new Map<string, string>();
+      for (const r of data as unknown as Row[]) {
+        const url = studentAvatarUrl(r) ?? (r.profile ? avatarUrl(r.profile) : null);
+        if (url) map.set(r.id, url);
+      }
+      return map;
+    },
+  });
+}
+
+/** Students placed in the given classroom+year pairs. Placement = latest enrollment row per student and year (migration 0013). */
+export function useSessionRoster(targets: { classroom_id: string; academic_year: number }[]) {
+  const key = targets.map((t) => `${t.classroom_id}:${t.academic_year}`).sort();
+  return useQuery({
+    queryKey: ["session_roster", key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<{ student_id: string; classroom_id: string }[]> => {
+      const years = [...new Set(targets.map((t) => t.academic_year))];
+      const classIds = [...new Set(targets.map((t) => t.classroom_id))];
+      const { data: candidates, error: cError } = await supabase
+        .from("student_classroom_enrollments")
+        .select("student_id")
+        .in("classroom_id", classIds)
+        .in("academic_year", years);
+      if (cError) throw cError;
+      const ids = [...new Set(candidates.map((r) => r.student_id))];
+      if (ids.length === 0) return [];
+      const { data: rows, error } = await supabase
+        .from("student_classroom_enrollments")
+        .select("student_id, classroom_id, academic_year")
+        .in("student_id", ids)
+        .in("academic_year", years)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      const latest = new Map<string, { student_id: string; classroom_id: string; academic_year: number }>();
+      for (const r of rows) {
+        const k = `${r.student_id}:${r.academic_year}`;
+        if (!latest.has(k)) latest.set(k, r);
+      }
+      const wanted = new Set(key);
+      const placed = [...latest.values()].filter((r) => wanted.has(`${r.classroom_id}:${r.academic_year}`));
+      // Only students still studying (transferred/graduated/dropped are not on the roster).
+      const { data: studying, error: sError } = await supabase
+        .from("students")
+        .select("id")
+        .in("id", [...new Set(placed.map((r) => r.student_id))])
+        .eq("status", "studying");
+      if (sError) throw sError;
+      const ok = new Set(studying.map((x) => x.id));
+      return placed.filter((r) => ok.has(r.student_id)).map((r) => ({ student_id: r.student_id, classroom_id: r.classroom_id }));
+    },
+  });
+}
+
 // ------------------------------------------------ ชุดหัวข้อการสอบ (migration 0183)
 
 export type ExamTopicLabel = { topic_id: string; topic: string; lesson: string };
@@ -574,7 +732,7 @@ export function useTopicSetsInUse(setIds: string[]) {
     queryKey: ["exam_topic_sets", "in_use", key],
     enabled: key.length > 0,
     queryFn: async (): Promise<Set<string>> => {
-      const { data, error } = await supabase.from("exam_sessions").select("topic_set_id").in("topic_set_id", key);
+      const { data, error } = await supabase.from("exam_session_sets").select("topic_set_id").in("topic_set_id", key);
       if (error) throw error;
       return new Set(data.map((r) => r.topic_set_id));
     },
@@ -585,7 +743,7 @@ export function useTopicSetsInUse(setIds: string[]) {
 export function useCreateTopicSet() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (row: { teacher_id: string; subject_id: string; teaching_assignment_id: string; no_exam?: boolean }) => {
+    mutationFn: async (row: { teacher_id: string; subject_id: string; teaching_assignment_id: string; exam_type: string; round: number | null }) => {
       const { data, error } = await supabase.from("exam_topic_sets").insert(row).select().single();
       if (error) throw error;
       return data as ExamTopicSet;
@@ -617,11 +775,12 @@ export function useSetTopicSetTopics() {
   });
 }
 
-export function useSetNoExam() {
+/** "ไม่มีสอบ" for one exam: a new no_exam set, pending for approval (heads: approved at once) — migration 0192. */
+export function useSubmitNoExamSet() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, no_exam }: { id: string; no_exam: boolean }) => {
-      const { error } = await supabase.from("exam_topic_sets").update({ no_exam }).eq("id", id);
+    mutationFn: async ({ assignmentId, examType, round }: { assignmentId: string; examType: string; round: number | null }) => {
+      const { error } = await supabase.rpc("submit_no_exam_set", { p_assignment: assignmentId, p_exam_type: examType, p_round: round });
       if (error) throw error;
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["exam_topic_sets"] }),

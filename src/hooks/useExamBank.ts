@@ -77,6 +77,25 @@ export function useExamQuestions(subjectId: string | null) {
   });
 }
 
+/** Bank questions of several subjects (a merged room draws from every subject it covers). */
+export function useExamQuestionsOf(subjectIds: string[]) {
+  const key = [...new Set(subjectIds)].sort();
+  return useQuery({
+    queryKey: ["exam_questions", "of", key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<ExamQuestionWithChoices[]> => {
+      const { data, error } = await supabase
+        .from("exam_questions")
+        .select("*, choices:exam_question_choices(*)")
+        .in("subject_id", key)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      type Row = ExamQuestion & { choices: ExamQuestionChoice[] };
+      return (data as unknown as Row[]).map((row) => ({ ...row, choices: row.choices.sort((a, b) => a.position - b.position) }));
+    },
+  });
+}
+
 export type ChoiceDraft = { label: string; label_json: PlateValue; is_correct: boolean };
 
 /** Creates one question + its choices (multiple_choice/true_false) in one call — short_answer skips the choices insert. */

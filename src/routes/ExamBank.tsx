@@ -47,13 +47,13 @@ function emptyLabelJson(): Value {
   return [{ type: "p", children: [{ text: "" }] }];
 }
 
-const DIFFICULTY_LABEL: Record<ExamQuestionDifficulty, string> = {
+export const DIFFICULTY_LABEL: Record<ExamQuestionDifficulty, string> = {
   easy: "ง่าย",
   medium: "ปานกลาง",
   hard: "ยาก",
 };
 
-const DIFFICULTY_BADGE_CLASS: Record<ExamQuestionDifficulty, string> = {
+export const DIFFICULTY_BADGE_CLASS: Record<ExamQuestionDifficulty, string> = {
   easy: "bg-success/15 text-success",
   medium: "bg-accent/15 text-accent",
   hard: "bg-destructive/15 text-destructive",
@@ -314,7 +314,7 @@ export function ExamBank() {
   );
 }
 
-function useQuestionForm({
+export function useQuestionForm({
   subjectId,
   planTopicId = null,
   teacherId,
@@ -597,7 +597,7 @@ function TagInput({ value, onChange }: { value: string[]; onChange: (tags: strin
   );
 }
 
-function QuestionFormFields(form: ReturnType<typeof useQuestionForm>) {
+function QuestionFormFields(form: ReturnType<typeof useQuestionForm>, hideTopic = false) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
@@ -647,11 +647,13 @@ function QuestionFormFields(form: ReturnType<typeof useQuestionForm>) {
       )}
 
       {form.topicLocked ? (
-        <div className="space-y-1">
-          <span className="font-ui text-xs font-medium">แท็ก</span>
-          <TagInput value={form.tags} onChange={form.setTags} />
-        </div>
-      ) : (
+        hideTopic ? null : (
+          <div className="space-y-1">
+            <span className="font-ui text-xs font-medium">แท็ก</span>
+            <TagInput value={form.tags} onChange={form.setTags} />
+          </div>
+        )
+      ) : hideTopic ? null : (
         <Field label="ชื่อเนื้อหา (ไม่บังคับ)">
           <Input value={form.topic} onChange={(e) => form.setTopic(e.target.value)} placeholder="เช่น สมการเชิงเส้น" />
         </Field>
@@ -661,10 +663,10 @@ function QuestionFormFields(form: ReturnType<typeof useQuestionForm>) {
 }
 
 /** Always-visible "new question" form above the table — no add button, matches ChoiceEditor's inline style. Takes `form` from the parent (rather than building its own) so the header's AI drawer can fill the same instance. */
-function QuestionForm({ form }: { form: ReturnType<typeof useQuestionForm> }) {
+export function QuestionForm({ form, hideTopic }: { form: ReturnType<typeof useQuestionForm>; hideTopic?: boolean }) {
   return (
     <div className="space-y-3">
-      {QuestionFormFields(form)}
+      {QuestionFormFields(form, hideTopic)}
       <Button className="w-full" onClick={form.save} disabled={!form.canSave || form.pending}>
         บันทึก
       </Button>

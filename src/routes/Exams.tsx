@@ -2,16 +2,21 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
-import { ChevronBack, Plus, X } from "@/components/icons";
+import { AlertTriangle, AppsIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, PencilIcon, Plus, StarIcon, TrashIcon, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Card, EmptyState, Field, FormSection, Input, Skeleton, Switch } from "@/components/ui";
+import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, Select, Skeleton, Switch } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
-import { useClassroomsByIds, useExamQuestions, useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
+import { avatarUrl } from "@/hooks/useAvatar";
+import { useProfilesByIds } from "@/hooks/usePractice";
+import { useClassroomsByIds, useExamQuestionsOf, useGradeLevelsByIds, useSubjectsByIds, type ExamQuestionWithChoices } from "@/hooks/useExamBank";
 import {
+  useAddSessionQuestion,
+  useRemoveSessionQuestion,
   useAttemptAnswers,
   useAttemptQuestions,
   useApproveTakeover,
+  useAssignmentClassrooms,
   useAvailableExams,
   useClaimAttempt,
   useCreateExamSession,
@@ -28,22 +33,28 @@ import {
   useSaveAnswer,
   useSecurityEvents,
   useSessionAttempts,
-  useSetSessionQuestions,
+  useSessionQuestionCounts,
+  useSessionRoster,
+  useStudentAvatars,
+  useSessionSets,
   useStartOrResumeAttempt,
   useStudentNames,
   useSubmitAttempt,
+  useTopicSetsInUse,
   useTopicSetsTopics,
-  useTopicSetTopicIds,
   useUnlockExamCode,
   useUpdateExamSession,
   useVerifyExamCode,
   type AvailableExam,
   type ExamSessionQuestionRow,
 } from "@/hooks/useExams";
+import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
-import { ExamApprovalTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
-import { SubjectPicker } from "@/routes/ExamBank";
-import type { ExamAttempt, ExamSecurityEventType, ExamSession, ExamTopicSet, Student } from "@/lib/database.types";
+import { ExamApprovalTab, ExamSubmissionsTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
+import { DIFFICULTY_BADGE_CLASS, DIFFICULTY_LABEL, QuestionForm, QuestionSheet, SubjectPicker, useQuestionForm } from "@/routes/ExamBank";
+import type { ExamAttempt, ExamSecurityEventType, ExamSession, ExamTopicSet, Student, Subject } from "@/lib/database.types";
+import { EXAM_KINDS, examLabel } from "@/lib/examKinds";
+import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { canApproveExams } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
@@ -60,60 +71,82 @@ export function Exams() {
 
 // ============================================================== teacher side
 
-type StaffTab = "rooms" | "schedule" | "topics" | "approve";
+type StaffTab = "rooms" | "schedule" | "topics" | "list" | "approve";
+
+const TAB_ICON = { rooms: ClipboardIcon, schedule: CalendarIcon, topics: ListIcon, list: DocumentTextIcon, approve: CheckmarkCircleIcon } as const;
 
 /** Tabs: ห้องสอบ + หัวข้อการสอบ (teachers), อนุมัติสอบ (approvers) — see migration 0183. */
 function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canApprove: boolean }) {
   const [tab, setTab] = useState<StaffTab>(teacherId ? "rooms" : "approve");
   const pending = useExamApprovalPendingCount(canApprove);
   // Room created from an approved topic set (topics card or approval drawer); the room belongs to the set's teacher.
-  const [roomFor, setRoomFor] = useState<ExamTopicSet | null>(null);
+  const [roomFor, setRoomFor] = useState<ExamTopicSet[] | null>(null);
   const tabs: [StaffTab, string][] = [
-    ...(teacherId ? ([["rooms", "ห้องสอบ"], ["schedule", "ตารางสอบ"], ["topics", "หัวข้อการสอบ"]] as [StaffTab, string][]) : []),
+    ...(teacherId ? ([["rooms", "ห้องสอบ"], ["schedule", "ตารางสอบ"], ["topics", "หัวข้อการสอบ"], ["list", "รายการ"]] as [StaffTab, string][]) : []),
     ...(canApprove ? ([["approve", pending > 0 ? `อนุมัติสอบ (${pending})` : "อนุมัติสอบ"]] as [StaffTab, string][]) : []),
   ];
   return (
     <div className="page-fill">
       {tabs.length > 1 && (
-        <div className="scrollbar-hidden flex shrink-0 overflow-x-auto border-b border-border" role="tablist">
-          {tabs.map(([key, label]) => (
+        <div className="flex w-full shrink-0 flex-wrap border-b border-border" role="tablist">
+          {tabs.map(([key, label]) => {
+            const Icon = TAB_ICON[key];
+            return (
             <button
               key={key}
               type="button"
               role="tab"
               aria-selected={tab === key}
+              aria-label={label}
+              title={label}
               onClick={() => setTab(key)}
               className={cn(
-                "-mb-px h-11 min-w-fit flex-1 whitespace-nowrap border-b-2 px-3 text-sm font-medium transition-colors",
+                "-mb-px flex flex-1 items-center justify-center gap-2 border-b-2 px-3.5 py-2.5 text-xs font-medium",
                 tab === key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
               )}
             >
-              {label}
+              <Icon className="h-4 w-4 shrink-0" />
+              {/* Phones: icon only — the label stays for screen readers. */}
+              <span className="sr-only sm:not-sr-only">{label}</span>
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
       {tab === "rooms" && teacherId && <TeacherExams teacherId={teacherId} />}
       {tab === "schedule" && teacherId && <ExamSchedule teacherId={teacherId} />}
-      {(tab === "topics" || tab === "approve") && (
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      {(tab === "topics" || tab === "list" || tab === "approve") && (
+        <div className="-mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pt-1">
           {tab === "topics" && teacherId && <ExamTopicsTab teacherId={teacherId} />}
+          {tab === "list" && teacherId && <ExamSubmissionsTab teacherId={teacherId} onCreateRoom={setRoomFor} />}
           {tab === "approve" && canApprove && <ExamApprovalTab onCreateRoom={setRoomFor} />}
         </div>
       )}
-      {roomFor && <CreateSessionSheet open onOpenChange={() => setRoomFor(null)} teacherId={roomFor.teacher_id} presetSet={roomFor} />}
+      {roomFor && <CreateSessionSheet open onOpenChange={() => setRoomFor(null)} teacherId={roomFor[0]!.teacher_id} presetSets={roomFor} />}
     </div>
   );
 }
 
-const fmtDateTime = (d: string) => new Date(d).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" });
-
 /** Exam timetable: scheduled rooms by opening day, plus rooms still waiting for a time. Tap a row to set/change its window. */
 function ExamSchedule({ teacherId }: { teacherId: string }) {
   const { data: sessions = [], isLoading } = useMyExamSessions(teacherId);
-  const { data: subjects = [] } = useSubjectsByIds([...new Set(sessions.map((s) => s.subject_id))]);
+  const { data: sessionSets } = useSessionSets(sessions.map((s) => s.id));
+  const { data: subjects = [] } = useSubjectsByIds([...new Set([...sessions.map((s) => s.subject_id), ...[...(sessionSets?.values() ?? [])].flat().map((x) => x.subject_id)])]);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
   const [editing, setEditing] = useState<ExamSession | null>(null);
+  const [view, setView] = useState<"cards" | "table">("cards");
+  const colors = useSubjectColors([]);
+  // subject → room, via the topic set each session subject was created from.
+  const { data: topicSets = [] } = useMyTopicSets(teacherId);
+  const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
+  const { data: classrooms = [] } = useClassroomsByIds([...new Set(assignments.map((a) => a.classroom_id))]);
+  const { data: grades = [] } = useGradeLevelsByIds([...new Set(classrooms.map((c) => c.grade_level_id))]);
+  const roomOfSet = (setId: string) => {
+    const a = assignments.find((x) => x.id === topicSets.find((ts) => ts.id === setId)?.teaching_assignment_id);
+    const c = classrooms.find((x) => x.id === a?.classroom_id);
+    const g = grades.find((x) => x.id === c?.grade_level_id);
+    return c && g ? `${gradeShortLabel(g.code)}/${c.name}` : null;
+  };
   const fmtTime = (d: string) => new Date(d).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
   const unscheduled = sessions.filter((s) => !s.opens_at);
   const byDay = new Map<string, ExamSession[]>();
@@ -130,32 +163,109 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
       </div>
     );
   }
-  const row = (s: ExamSession, time: string) => (
-    <button
-      key={s.id}
-      type="button"
-      onClick={() => setEditing(s)}
-      className="flex w-full items-center gap-4 rounded-xl border border-border bg-card p-3 text-left text-xs hover:bg-muted"
-    >
-      <span className="w-28 shrink-0 font-mono tabular-nums">{time}</span>
-      <span className="font-medium">{s.title}</span>
-      <span className="ml-auto text-muted-foreground">{subjectById.get(s.subject_id)?.name_th ?? "—"}</span>
-    </button>
-  );
+  const subjectsOf = (s: ExamSession) => (sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]).map((id) => subjectById.get(id)?.name_th).filter(Boolean).join(" · ") || "—";
+  const row = (s: ExamSession, time: string) => {
+    const sets = sessionSets?.get(s.id) ?? [{ subject_id: s.subject_id, topic_set_id: "" }];
+    return (
+      <div
+        key={s.id}
+        role="button"
+        tabIndex={0}
+        onClick={() => setEditing(s)}
+        onKeyDown={(e) => e.key === "Enter" && setEditing(s)}
+        className="cursor-pointer rounded-xl border border-border bg-card p-3 text-xs hover:bg-muted active:bg-muted"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 space-y-2">
+            {s.exam_type ? (
+              <p className="flex flex-wrap items-center gap-1">
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{s.exam_type}</span>
+                {s.round && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">ครั้งที่ {s.round}</span>}
+              </p>
+            ) : (
+              <p className="truncate text-muted-foreground">{s.title}</p>
+            )}
+            {sets.map((x) => {
+              const subject = subjectById.get(x.subject_id);
+              const room = roomOfSet(x.topic_set_id);
+              return subject ? (
+                <div key={x.subject_id + x.topic_set_id}>
+                  <p className="truncate text-sm font-medium">{subject.name_th}</p>
+                  <p className="mt-1 flex flex-wrap items-center gap-1">
+                    <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(subject.learning_area_id))}>{subject.code}</span>
+                    {room && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(room))}>{room}</span>}
+                  </p>
+                </div>
+              ) : null;
+            })}
+          </div>
+          <Button size="sm" variant="outline" className="shrink-0 tabular-nums" onClick={(e) => { e.stopPropagation(); setEditing(s); }}>
+            {time}
+          </Button>
+        </div>
+      </div>
+    );
+  };
+  const scheduled = sessions.filter((x) => x.opens_at).sort((a, b) => a.opens_at!.localeCompare(b.opens_at!));
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-      {unscheduled.length > 0 && (
-        <section className="space-y-2">
-          <h3 className="text-xs font-semibold text-muted-foreground">ยังไม่กำหนดเวลา ({unscheduled.length})</h3>
-          {unscheduled.map((s) => row(s, "ตั้งเวลา"))}
-        </section>
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="flex shrink-0 justify-end">
+        <div className="flex rounded-lg bg-muted p-0.5" role="group" aria-label="มุมมอง">
+          {(["cards", "table"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={view === v}
+              aria-label={v === "cards" ? "มุมมองการ์ด" : "มุมมองตาราง"}
+              onClick={() => setView(v)}
+              className={cn("flex h-7 w-8 items-center justify-center rounded-md sm:h-8 sm:w-9", view === v ? "bg-background shadow-sm" : "text-muted-foreground")}
+            >
+              {v === "cards" ? <AppsIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <ListIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+            </button>
+          ))}
+        </div>
+      </div>
+      {view === "table" ? (
+        <div className="table-panel flex rounded-none border-t border-border shadow-none">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[36rem] text-[13px]">
+              <thead className="text-left text-xs">
+                <tr>
+                  <th className="px-4 py-3">วันที่</th>
+                  <th className="px-4 py-3">เวลา</th>
+                  <th className="px-4 py-3">การสอบ</th>
+                  <th className="px-4 py-3">วิชา</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...unscheduled, ...scheduled].map((s) => (
+                  <tr key={s.id} onClick={() => setEditing(s)} className="h-12 cursor-pointer border-t border-border first:border-t-0">
+                    <td className="px-4 py-0">{s.opens_at ? new Date(s.opens_at).toLocaleDateString("th-TH", { dateStyle: "medium" }) : <span className="text-muted-foreground">ยังไม่กำหนด</span>}</td>
+                    <td className="px-4 py-0 font-mono tabular-nums">{s.opens_at ? `${fmtTime(s.opens_at)} – ${fmtTime(s.closes_at!)}` : "ตั้งเวลา"}</td>
+                    <td className="px-4 py-0 font-medium">{s.title}</td>
+                    <td className="px-4 py-0 text-muted-foreground">{subjectsOf(s)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          {unscheduled.length > 0 && (
+            <section className="space-y-2">
+              <h3 className="text-xs font-semibold text-muted-foreground">ยังไม่กำหนดเวลา ({unscheduled.length})</h3>
+              {unscheduled.map((s) => row(s, "ตั้งเวลา"))}
+            </section>
+          )}
+          {[...byDay].map(([day, list]) => (
+            <section key={day} className="space-y-2">
+              <h3 className="text-xs font-semibold text-muted-foreground">{day}</h3>
+              {list.map((s) => row(s, `${fmtTime(s.opens_at!)} – ${fmtTime(s.closes_at!)}`))}
+            </section>
+          ))}
+        </div>
       )}
-      {[...byDay].map(([day, list]) => (
-        <section key={day} className="space-y-2">
-          <h3 className="text-xs font-semibold text-muted-foreground">{day}</h3>
-          {list.map((s) => row(s, `${fmtTime(s.opens_at!)} – ${fmtTime(s.closes_at!)}`))}
-        </section>
-      ))}
       {editing && <ScheduleSheet session={editing} onClose={() => setEditing(null)} />}
     </div>
   );
@@ -188,8 +298,8 @@ function ScheduleSheet({ session, onClose }: { session: ExamSession; onClose: ()
     <Sheet
       open
       onOpenChange={(o) => !o && onClose()}
-      title={session.title}
-      description="จัดเวลาสอบ"
+      title="ตั้งเวลาสอบ"
+      description={session.title}
       footer={
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
@@ -202,17 +312,21 @@ function ScheduleSheet({ session, onClose }: { session: ExamSession; onClose: ()
       }
     >
       <form id="schedule-session" onSubmit={save} className="space-y-3">
-        <Field label="เปิดสอบ" required>
-          <Input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} />
-        </Field>
-        <Field label="ปิดสอบ" required>
-          <Input type="datetime-local" value={closesAt} min={opensAt} onChange={(e) => setClosesAt(e.target.value)} />
-        </Field>
+        <FormSection>
+          <Field label="เปิดสอบ" required>
+            <Input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} />
+          </Field>
+          <Field label="ปิดสอบ" required>
+            <Input type="datetime-local" value={closesAt} min={opensAt} onChange={(e) => setClosesAt(e.target.value)} />
+          </Field>
+        </FormSection>
         <p className="text-xs text-muted-foreground">นักเรียนจะเห็นและเข้าสอบได้เมื่อกำหนดเวลาแล้ว</p>
       </form>
     </Sheet>
   );
 }
+
+const ownerName = (o: { first_name: string; last_name: string } | undefined) => (o ? `${o.first_name} ${o.last_name}` : "—");
 
 function TeacherExams({ teacherId }: { teacherId: string }) {
   const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
@@ -222,8 +336,26 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
   const { data: sessions = [], isLoading } = useMyExamSessions(teacherId);
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<ExamSession | null>(null);
+  const [view, setView] = useState<"cards" | "table">("cards");
+  const colors = useSubjectColors([]);
+  const { data: questionCounts } = useSessionQuestionCounts(sessions.map((s) => s.id));
   const deleteSession = useDeleteExamSession();
+  const updateSession = useUpdateExamSession();
   const toast = useToast();
+  const { data: sessionSets } = useSessionSets(sessions.map((s) => s.id));
+  const { data: owners = [] } = useProfilesByIds([...new Set(sessions.map((s) => s.teacher_id))]);
+  const ownerById = new Map(owners.map((o) => [o.id, o]));
+  // Room of a session = classroom of its topic set's teaching assignment.
+  const { data: mySets = [] } = useMyTopicSets(teacherId);
+  const assignmentOfSet = new Map(mySets.map((t) => [t.id, t.teaching_assignment_id]));
+  const { data: classroomOfAssignment } = useAssignmentClassrooms([...new Set([...assignmentOfSet.values()].filter((id): id is string => !!id))]);
+  const { data: roomClassrooms = [] } = useClassroomsByIds([...new Set(classroomOfAssignment?.values() ?? [])]);
+  const { data: roomGrades = [] } = useGradeLevelsByIds([...new Set(roomClassrooms.map((c) => c.grade_level_id))]);
+  const roomOf = (topicSetId: string) => {
+    const c = roomClassrooms.find((x) => x.id === classroomOfAssignment?.get(assignmentOfSet.get(topicSetId) ?? ""));
+    const g = roomGrades.find((x) => x.id === c?.grade_level_id);
+    return c && g ? `${gradeShortLabel(g.code)}/${c.name}` : null;
+  };
 
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
 
@@ -233,68 +365,116 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
 
   return (
     <div className="page-fill">
-      <div className="flex shrink-0 items-center justify-end">
-        <Button size="sm" onClick={() => setCreating(true)} disabled={assignments.length === 0}>
+      <div className="flex shrink-0 items-center justify-end gap-2">
+        <Button size="sm" className="h-8 gap-1 px-2.5 text-xs sm:h-9 sm:px-3 sm:text-sm" onClick={() => setCreating(true)} disabled={assignments.length === 0}>
           <Plus className="h-3 w-3" /> เปิดสอบใหม่
         </Button>
+        <div className="flex rounded-lg bg-muted p-0.5" role="group" aria-label="มุมมอง">
+          {(["cards", "table"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={view === v}
+              aria-label={v === "cards" ? "มุมมองการ์ด" : "มุมมองตาราง"}
+              onClick={() => setView(v)}
+              className={cn("flex h-7 w-8 items-center justify-center rounded-md sm:h-8 sm:w-9", view === v ? "bg-background shadow-sm" : "text-muted-foreground")}
+            >
+              {v === "cards" ? <AppsIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <ListIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
+            </button>
+          ))}
+        </div>
       </div>
 
       {isLoading ? (
-        <div className="table-panel flex-1" role="status" aria-label="กำลังโหลด">
-          <table className="w-full min-w-[36rem] text-xs">
-            <thead className="bg-muted text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">ชื่อสอบ</th>
-                <th className="px-3 py-2 font-medium">วิชา</th>
-                <th className="px-3 py-2 font-medium">เปิด – ปิด</th>
-                <th className="px-3 py-2 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {[0, 1, 2, 3].map((i) => (
-                <tr key={i} className="border-t border-border">
-                  <td className="px-3 py-2"><Skeleton className="h-3 w-32" /></td>
-                  <td className="px-3 py-2"><Skeleton className="h-3 w-20" /></td>
-                  <td className="px-3 py-2"><Skeleton className="h-3 w-40" /></td>
-                  <td className="px-3 py-2" />
+        <div className="table-panel flex-1 rounded-none border-t border-border shadow-none" role="status" aria-label="กำลังโหลด">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[36rem] text-[13px]">
+              <thead className="text-left text-xs">
+                <tr>
+                  <th className="px-4 py-3">ประเภทห้องสอบ</th>
+                  <th className="px-4 py-3">ครั้งที่</th>
+                  <th className="px-4 py-3">วิชา</th>
+                  <th className="px-4 py-3">ห้อง</th>
+                  <th className="px-4 py-3">ข้อสอบ</th>
+                  <th className="px-4 py-3">ครูผู้สอน</th>
+                  <th className="px-4 py-3">เปิดใช้งาน</th>
+                  <th className="w-14 px-4 py-3" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3].map((i) => (
+                  <tr key={i} className="h-14 border-t border-border first:border-t-0">
+                    <td className="px-4 py-0"><Skeleton className="h-3 w-24" /></td>
+                    <td className="px-4 py-0"><Skeleton className="h-3 w-8" /></td>
+                    <td className="px-4 py-0"><Skeleton className="h-3 w-28" /></td>
+                    <td className="px-4 py-0"><Skeleton className="h-4 w-12 rounded-md" /></td>
+                    <td className="px-4 py-0"><Skeleton className="h-3 w-12" /></td>
+                    <td className="px-4 py-0"><Skeleton className="h-3 w-24" /></td>
+                    <td className="px-4 py-0"><Skeleton className="h-4 w-9 rounded-full" /></td>
+                    <td className="px-4 py-0" />
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : sessions.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="ยังไม่มีการเปิดสอบ" description="กด “เปิดสอบใหม่” เพื่อเลือกข้อสอบจากคลังมาจัดสอบ" />
         </div>
-      ) : (
-        <div className="table-panel flex-1">
-          <div className="table-panel-scroll">
-            <table className="w-full min-w-[36rem] text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">ชื่อสอบ</th>
-                  <th className="px-3 py-2 font-medium">วิชา</th>
-                  <th className="px-3 py-2 font-medium">เปิด – ปิด</th>
-                  <th className="px-3 py-2 font-medium" />
-                </tr>
-              </thead>
-              <tbody>
-                {sessions.map((s) => (
-                  <tr
-                    key={s.id}
-                    onClick={() => setSelected(s)}
-                    className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
-                  >
-                    <td className="px-3 py-2 font-medium">{s.title}</td>
-                    <td className="px-3 py-2">{subjectById.get(s.subject_id)?.name_th ?? "—"}</td>
-                    <td className="px-3 py-2">
-                      {s.opens_at && s.closes_at ? (
-                        `${fmtDateTime(s.opens_at)} – ${fmtDateTime(s.closes_at)}`
-                      ) : (
-                        <span className="text-muted-foreground">ยังไม่กำหนดเวลา</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right">
+      ) : view === "cards" ? (
+        <ul className="-mx-1 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-1 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-1">
+          {sessions.map((s) => {
+            const roomSubjects = (sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]).map((id) => subjectById.get(id)).filter((x): x is Subject => !!x);
+            const owner = ownerById.get(s.teacher_id);
+            const room = roomOf(s.topic_set_id);
+            return (
+              <li key={s.id}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelected(s)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelected(s);
+                    }
+                  }}
+                  className="cursor-pointer rounded-xl border border-border bg-card p-3 text-xs hover:bg-muted active:bg-muted"
+                >
+                  <div className="flex flex-wrap items-center gap-1">
+                    {s.exam_type && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{s.exam_type}</span>}
+                    {s.round && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">ครั้งที่ {s.round}</span>}
+                    {room && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(room))}>{room}</span>}
+                    {(questionCounts?.get(s.id) ?? 0) > 0 ? (
+                      <span className="ml-auto rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">มีข้อสอบ {questionCounts?.get(s.id)} ข้อ</span>
+                    ) : (
+                      <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">ยังไม่มีข้อสอบ</span>
+                    )}
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {roomSubjects.map((x) => (
+                      <div key={x.id} className="min-w-0">
+                        <p className="truncate text-sm font-medium">{x.name_th}</p>
+                        <p className="mt-1">
+                          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(x.learning_area_id))}>{x.code}</span>
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Avatar name={ownerName(owner)} src={owner ? avatarUrl(owner) : null} className="h-6 w-6 text-[9px]" />
+                      <span className="truncate">{ownerName(owner)}</span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Switch
+                        size="xs"
+                        label={`เปิดใช้งานห้องสอบ ${s.title}`}
+                        checked={s.is_enabled}
+                        disabled={updateSession.isPending}
+                        onChange={(on) => updateSession.mutate({ id: s.id, is_enabled: on }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
+                      />
                       <Button
                         size="icon"
                         variant="ghost"
@@ -307,9 +487,95 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
                       >
                         <X className="h-3 w-3" />
                       </Button>
-                    </td>
-                  </tr>
-                ))}
+                    </div>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <div className="table-panel flex-1 rounded-none border-t border-border shadow-none">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[36rem] text-[13px]">
+              <thead className="text-left text-xs">
+                <tr>
+                  <th className="px-4 py-3">ประเภทห้องสอบ</th>
+                  <th className="px-4 py-3">ครั้งที่</th>
+                  <th className="px-4 py-3">วิชา</th>
+                  <th className="px-4 py-3">ห้อง</th>
+                  <th className="px-4 py-3">ข้อสอบ</th>
+                  <th className="px-4 py-3">ครูผู้สอน</th>
+                  <th className="px-4 py-3">เปิดใช้งาน</th>
+                  <th className="w-14 px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((s) => {
+                  const roomSubjects = (sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]).map((id) => subjectById.get(id)).filter((x): x is Subject => !!x);
+                  const owner = ownerById.get(s.teacher_id);
+                  return (
+                    <tr key={s.id} onClick={() => setSelected(s)} className="h-14 cursor-pointer border-t border-border first:border-t-0">
+                      <td className="px-4 py-0 text-sm font-medium">{s.exam_type ?? "—"}</td>
+                      <td className="px-4 py-0 tabular-nums">{s.round ?? "—"}</td>
+                      <td className="px-4 py-2">
+                        {roomSubjects.length === 0 ? (
+                          "—"
+                        ) : (
+                          roomSubjects.map((x) => (
+                            <div key={x.id} className="py-0.5">
+                              <p className="truncate text-sm font-medium">{x.name_th}</p>
+                              <p className="text-xs tabular-nums text-muted-foreground">{x.code}</p>
+                            </div>
+                          ))
+                        )}
+                      </td>
+                      <td className="px-4 py-0">
+                        {roomOf(s.topic_set_id) ? (
+                          <span className={cn("inline-flex rounded-md px-2 py-0.5 text-xs font-medium", levelTone(roomOf(s.topic_set_id)!))}>{roomOf(s.topic_set_id)}</span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="px-4 py-0 tabular-nums">
+                        {(questionCounts?.get(s.id) ?? 0) > 0 ? (
+                          <span className="font-medium text-success">{questionCounts?.get(s.id)} ข้อ</span>
+                        ) : (
+                          <span className="text-muted-foreground">ยังไม่มี</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-0">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Avatar name={ownerName(owner)} src={owner ? avatarUrl(owner) : null} className="h-7 w-7 text-[10px]" />
+                          <span className="truncate">{ownerName(owner)}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-0" onClick={(e) => e.stopPropagation()}>
+                        <Switch
+                          size="xs"
+                          label={`เปิดใช้งานห้องสอบ ${s.title}`}
+                          checked={s.is_enabled}
+                          disabled={updateSession.isPending}
+                          onChange={(on) => updateSession.mutate({ id: s.id, is_enabled: on }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
+                        />
+                      </td>
+                      <td className="px-4 py-0 text-right">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label="ลบ"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!confirm(`ลบการเปิดสอบ "${s.title}"?`)) return;
+                            deleteSession.mutate(s.id, { onError: () => toast("ลบไม่สำเร็จ", "error") });
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -334,14 +600,14 @@ function CreateSessionSheet({
   open,
   onOpenChange,
   teacherId,
-  presetSet,
+  presetSets,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Owner of the room — the set's teacher when a head creates it for them. */
   teacherId: string;
-  /** Approved topic set the room is created for: subject, room and set are fixed. */
-  presetSet?: ExamTopicSet;
+  /** Approved topic sets (one per subject, same room) a room is created for: subject, room and set are fixed. */
+  presetSets?: ExamTopicSet[];
 }) {
   const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
   const subjectIds = [...new Set(assignments.map((a) => a.subject_id))];
@@ -351,82 +617,104 @@ function CreateSessionSheet({
   const gradeLevelById = new Map(gradeLevels.map((g) => [g.id, g]));
 
   const [pickedSubjectId, setSubjectId] = useState("");
-  const subjectId = presetSet?.subject_id ?? pickedSubjectId;
-  const [title, setTitle] = useState("");
+  const subjectId = pickedSubjectId;
+  const [kind, setKind] = useState("");
+  const [round, setRound] = useState("");
   const [duration, setDuration] = useState("");
   const [maxAttempts, setMaxAttempts] = useState("1");
   const [shuffleQuestions, setShuffleQuestions] = useState(true);
   const [shuffleChoices, setShuffleChoices] = useState(true);
   const [syncGradebook, setSyncGradebook] = useState(false);
   const [pickedTopicSetId, setTopicSetId] = useState("");
-  const topicSetId = presetSet?.id ?? pickedTopicSetId;
+  const topicSetId = pickedTopicSetId;
 
   const { data: mySets = [] } = useMyTopicSets(teacherId);
+  const { data: usedSets } = useTopicSetsInUse(mySets.map((s) => s.id));
+  // One room per approved set — sets a room already uses are not offered again.
   const approvedSets = mySets.filter(
-    (s) => s.approval_status === "approved" && !s.no_exam && s.teaching_assignment_id && s.subject_id === subjectId,
+    (s) => s.approval_status === "approved" && !s.no_exam && s.teaching_assignment_id && s.subject_id === subjectId && !!usedSets && !usedSets.has(s.id),
   );
   const { data: setTopics } = useTopicSetsTopics(approvedSets.map((s) => s.id));
-  const setLabel = (id: string) => {
-    const names = (setTopics?.get(id) ?? []).map((t) => t.topic);
-    return names.length === 0 ? "ไม่ระบุหัวข้อ" : `${names.slice(0, 2).join(", ")}${names.length > 2 ? ` +${names.length - 2}` : ""}`;
+  const setLabel = (set: ExamTopicSet) => {
+    const names = (setTopics?.get(set.id) ?? []).map((t) => t.topic);
+    const topics = names.length === 0 ? "ไม่ระบุหัวข้อ" : `${names.slice(0, 2).join(", ")}${names.length > 2 ? ` +${names.length - 2}` : ""}`;
+    return [examLabel(set), topics].filter(Boolean).join(" · ");
   };
 
-  const classroomIds = [...new Set(assignments.filter((a) => a.subject_id === subjectId).map((a) => a.classroom_id))];
+  const classroomIds = [...new Set(assignments.map((a) => a.classroom_id))];
   const { data: classrooms = [] } = useClassroomsByIds(classroomIds);
   const classroomById = new Map(classrooms.map((c) => [c.id, c]));
+  const { data: roomGrades = [] } = useGradeLevelsByIds([...new Set(classrooms.map((c) => c.grade_level_id))]);
 
   const create = useCreateExamSession();
   const toast = useToast();
 
   function reset() {
     setSubjectId("");
-    setTitle("");
+    setKind("");
+    setRound("");
     setDuration("");
     setMaxAttempts("1");
     setTopicSetId("");
   }
 
-  // A set belongs to one room, so the session opens for exactly that room.
-  const targetAssignmentId = (presetSet ?? approvedSets.find((s) => s.id === topicSetId))?.teaching_assignment_id ?? "";
-  const canSave = subjectId && topicSetId && title.trim() && !!targetAssignmentId;
+  // A set belongs to one room, so each session opens for exactly that room.
+  const targets = presetSets ?? approvedSets.filter((x) => x.id === topicSetId);
+  // Same shape for every room — "ประเภท [ครั้งที่ n] รหัสวิชา ชื่อวิชา ห้อง" — so many exams across subjects stay tellable apart.
+  // A set made with its exam (type + round) fixes them; older sets still ask here.
+  const kindOf = (set: ExamTopicSet) => set.exam_type ?? kind;
+  const roundOf = (set: ExamTopicSet) => (set.exam_type ? set.round : round ? Number(round) : null);
+  const askExam = targets.length === 0 || targets.some((t) => !t.exam_type);
+  // One room covers every subject of the merged card; the name lists them all.
+  const titleOf = (sets: ExamTopicSet[]) => {
+    const first = sets[0];
+    if (!first || !kindOf(first)) return "";
+    const named = sets.map((set) => subjects.find((x) => x.id === set.subject_id)).filter((x): x is Subject => !!x);
+    if (named.length !== sets.length) return "";
+    const room = classroomById.get(assignments.find((a) => a.id === first.teaching_assignment_id)?.classroom_id ?? "");
+    const roomGrade = roomGrades.find((g) => g.id === room?.grade_level_id);
+    return [examLabel({ exam_type: kindOf(first), round: roundOf(first) }), named.map((x) => `${x.code} ${x.name_th}`).join(" · "), room && roomGrade ? `${gradeShortLabel(roomGrade.code)}/${room.name}` : ""].filter(Boolean).join(" ");
+  };
+  const canSave = targets.length > 0 && targets.every((x) => !!x.teaching_assignment_id) && !!titleOf(targets);
 
   function close() {
     reset();
     onOpenChange(false);
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSave) return;
-    create.mutate(
-      {
-        subject_id: subjectId,
+    try {
+      const first = targets[0]!;
+      await create.mutateAsync({
+        subject_id: first.subject_id,
         teacher_id: teacherId,
-        title: title.trim(),
+        title: titleOf(targets), // stored as exam_sessions.title, never typed by hand
+        exam_type: kindOf(first),
+        round: roundOf(first),
         duration_minutes: duration ? Number(duration) : null,
         max_attempts: Number(maxAttempts) || 1,
         shuffle_questions: shuffleQuestions,
         shuffle_choices: shuffleChoices,
         sync_to_gradebook: syncGradebook,
-        topic_set_id: topicSetId,
-        teaching_assignment_ids: [targetAssignmentId],
+        topic_set_id: first.id,
+        sets: targets.map((x) => ({ topic_set_id: x.id, subject_id: x.subject_id })),
+        teaching_assignment_ids: [...new Set(targets.map((x) => x.teaching_assignment_id!))],
         questions: [],
-      },
-      {
-        onSuccess: () => {
-          toast("สร้างห้องสอบแล้ว");
-          close();
-        },
-        onError: () => toast("สร้างห้องสอบไม่สำเร็จ", "error"),
-      },
-    );
+      });
+      toast("สร้างห้องสอบแล้ว");
+      close();
+    } catch {
+      toast("สร้างห้องสอบไม่สำเร็จ", "error");
+    }
   }
 
   return (
     <Sheet
       open={open}
       onOpenChange={(next) => !next && close()}
-      title={presetSet ? "สร้างห้องสอบ" : "เปิดสอบใหม่"}
+      title={presetSets ? "สร้างห้องสอบ" : "เปิดสอบใหม่"}
       footer={
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={close}>
@@ -439,7 +727,7 @@ function CreateSessionSheet({
       }
     >
       <form id="create-session" onSubmit={submit} className="space-y-3">
-        {!presetSet && (
+        {!presetSets && (
         <Field label="วิชา" required>
           <SubjectPicker
             subjects={subjects}
@@ -452,7 +740,7 @@ function CreateSessionSheet({
           />
         </Field>
         )}
-        {!presetSet && subjectId && (
+        {!presetSets && subjectId && (
           <Field label="ห้อง / ชุดหัวข้อการสอบ" required>
             <select
               className="h-10 w-full rounded-lg border border-border bg-background px-2 text-sm"
@@ -462,7 +750,7 @@ function CreateSessionSheet({
               <option value="">{approvedSets.length === 0 ? "ยังไม่มีชุดหัวข้อที่อนุมัติ" : "เลือกห้อง"}</option>
               {approvedSets.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {classroomById.get(assignments.find((a) => a.id === s.teaching_assignment_id)?.classroom_id ?? "")?.name ?? "—"} · {setLabel(s.id)}
+                  {classroomById.get(assignments.find((a) => a.id === s.teaching_assignment_id)?.classroom_id ?? "")?.name ?? "—"} · {setLabel(s)}
                 </option>
               ))}
             </select>
@@ -471,11 +759,36 @@ function CreateSessionSheet({
             )}
           </Field>
         )}
+        {askExam && (
         <FormSection>
-          <Field label="ชื่อการสอบ" required>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น สอบกลางภาค" />
+          <Field label="ประเภทการสอบ" required>
+            <Select
+              value={kind}
+              placeholder="เลือกประเภท"
+              onChange={(e) => {
+                setKind(e.target.value);
+                          }}
+            >
+              {EXAM_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="ครั้งที่">
+            <Input
+              type="number"
+              min="1"
+              value={round}
+              onChange={(e) => {
+                setRound(e.target.value);
+                          }}
+              placeholder="เช่น 1 (ไม่ระบุได้)"
+            />
           </Field>
         </FormSection>
+        )}
 
         <FormSection>
           <Field label="เวลาทำ (นาที)">
@@ -500,73 +813,144 @@ function CreateSessionSheet({
 
 function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () => void }) {
   const { data: attempts = [], isLoading } = useSessionAttempts(session.id);
-  const { data: targetIds = [] } = useExamSessionTargets(session.id);
+  const { data: targetIds = [], isLoading: targetsLoading } = useExamSessionTargets(session.id);
   const { data: sessionQuestions = [] } = useExamSessionQuestions(session.id);
-  const update = useUpdateExamSession();
-  const toast = useToast();
   const [editingQuestions, setEditingQuestions] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [eventsOpen, setEventsOpen] = useState(false);
+  const [rosterOpen, setRosterOpen] = useState(true);
+  const eventCount = useSecurityEvents(session.id).data?.length ?? 0;
 
   const maxPoints = sessionQuestions.reduce((s, q) => s + q.points, 0);
   const submitted = attempts.filter((a) => a.status === "submitted");
+  const { data: roomSets } = useSessionSets([session.id]);
+  const sets = roomSets?.get(session.id) ?? [];
+  const { data: subjects = [] } = useSubjectsByIds([...new Set([session.subject_id, ...sets.map((x) => x.subject_id)])]);
+  const subjectById = new Map(subjects.map((s) => [s.id, s]));
+  const subjectList = [...new Set(sets.length > 0 ? sets.map((x) => x.subject_id) : [session.subject_id])]
+    .map((id) => subjectById.get(id))
+    .filter((x): x is NonNullable<typeof x> => !!x);
+  const colors = useSubjectColors([]);
+  const { data: assignments = [], isLoading: assignmentsLoading } = useMyTeachingAssignments(session.teacher_id);
+  const { data: classrooms = [] } = useClassroomsByIds([...new Set(assignments.filter((a) => targetIds.includes(a.id)).map((a) => a.classroom_id))]);
+  const roomCountLabel = targetsLoading || assignmentsLoading ? "—" : new Set(assignments.filter((a) => targetIds.includes(a.id)).map((a) => a.classroom_id)).size;
+  const { data: grades = [] } = useGradeLevelsByIds([...new Set(classrooms.map((c) => c.grade_level_id))]);
+  const roomList = [...new Set(classrooms.flatMap((c) => { const g = grades.find((x) => x.id === c.grade_level_id); return g ? [`${gradeShortLabel(g.code)}/${c.name}`] : []; }))];
+  const targets = assignments.filter((a) => targetIds.includes(a.id)).map((a) => ({ classroom_id: a.classroom_id, academic_year: a.academic_year }));
+  const { data: roster = [], isLoading: rosterLoading } = useSessionRoster(targets);
+  const { data: rosterNames } = useStudentNames(roster.map((r) => r.student_id));
+  const { data: rosterAvatars } = useStudentAvatars(roster.map((r) => r.student_id));
+  const { data: lockedRows = [] } = useLockedCodeStudents(session.id);
+  const roomOfClassroom = new Map(classrooms.map((c) => { const g = grades.find((x) => x.id === c.grade_level_id); return [c.id, g ? `${gradeShortLabel(g.code)}/${c.name}` : c.name]; }));
+  const lockedIds = new Set(lockedRows.map((l) => l.student_id));
+  const rosterRows = roster
+    .map((r) => {
+      const mine = attempts.filter((a) => a.student_id === r.student_id);
+      const latest = mine.reduce<ExamAttempt | null>((best, a) => (!best || a.attempt_no > best.attempt_no ? a : best), null);
+      const best = mine.reduce<number | null>((m, a) => (a.status !== "submitted" || a.score == null ? m : m == null || a.score > m ? a.score : m), null);
+      const status: "locked" | "submitted" | "in_progress" | "none" = lockedIds.has(r.student_id)
+        ? "locked"
+        : !latest
+          ? "none"
+          : latest.status === "submitted"
+            ? "submitted"
+            : "in_progress";
+      const full = rosterNames?.get(r.student_id) ?? "นักเรียน";
+      const [code, ...rest] = full.split(" ");
+      return {
+        student_id: r.student_id,
+        room: roomOfClassroom.get(r.classroom_id) ?? "—",
+        code: rest.length > 0 ? code : "",
+        name: rest.length > 0 ? rest.join(" ") : full,
+        full,
+        status,
+        best,
+      };
+    })
+    .sort((a, b) => a.room.localeCompare(b.room, "th") || a.full.localeCompare(b.full, "th"));
+  const count = (st: string) => rosterRows.filter((r) => r.status === st).length;
+  const STATUS_LABEL = { locked: "ถูกล็อก", submitted: "ส่งแล้ว", in_progress: "กำลังทำ", none: "ยังไม่เข้าสอบ" } as const;
+  const STATUS_CLASS = { locked: "text-destructive", submitted: "text-success", in_progress: "text-foreground", none: "text-muted-foreground" } as const;
+  const STATUS_DOT = { locked: "bg-destructive", submitted: "bg-success", in_progress: "bg-primary", none: "bg-muted-foreground" } as const;
+  const now = new Date();
+  const status = !session.opens_at
+    ? { label: "ฉบับร่าง", dot: "bg-primary" }
+    : now < new Date(session.opens_at)
+      ? { label: "ยังไม่เปิดสอบ", dot: "bg-primary" }
+      : now <= new Date(session.closes_at!)
+        ? { label: "กำลังเปิดสอบ", dot: "bg-success" }
+        : { label: "ปิดสอบแล้ว", dot: "bg-muted-foreground" };
 
   return (
     <div className="page-fill">
       <div className="toolbar shrink-0">
-        <Button size="icon" variant="ghost" onClick={onBack} aria-label="ย้อนกลับ">
+        <Button size="icon" variant="outline" onClick={onBack} aria-label="ย้อนกลับ">
           <ChevronBack className="h-4 w-4" />
         </Button>
         <div className="min-w-0 flex-1">
-          <p className="font-heading truncate text-sm font-semibold">{session.title}</p>
-          <p className="text-xs text-muted-foreground">
-            {targetIds.length} ห้อง · {sessionQuestions.length} ข้อ · เต็ม {maxPoints} คะแนน
+          <p className="font-heading truncate text-base font-semibold">
+            {session.exam_type ? `${session.exam_type}${session.round ? ` ครั้งที่ ${session.round}` : ""}` : session.title}
+          </p>
+          <p className="mt-1 flex flex-wrap items-center gap-1">
+            {subjectList.map((x) => (
+              <span key={x.id} className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(x.learning_area_id))}>{x.code}</span>
+            ))}
+            {roomList.map((r) => (
+              <span key={r} className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(r))}>{r}</span>
+            ))}
           </p>
         </div>
+        {eventCount > 0 && (
+          <Button variant="outline" onClick={() => setEventsOpen(true)} aria-label="เหตุการณ์ผิดปกติ" title="เหตุการณ์ผิดปกติ">
+            <AlertTriangle className="h-4 w-4" />
+            <span className="tabular-nums">{eventCount}</span>
+          </Button>
+        )}
+        <Button variant="outline" size="icon" onClick={() => setSettingsOpen(true)} aria-label="ตั้งค่า" title="ตั้งค่า">
+          <SettingsIcon className="h-4 w-4" />
+        </Button>
       </div>
 
+      <div className="flex min-h-11 shrink-0 items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-xs">
+        <span className="flex items-center gap-2"><LayersIcon className="h-3.5 w-3.5 text-muted-foreground" />{roomCountLabel} ห้องเรียน</span>
+        <span className="h-5 w-px bg-border" aria-hidden />
+        <span className="flex items-center gap-2"><DocumentTextIcon className="h-3.5 w-3.5 text-muted-foreground" />{sessionQuestions.length} ข้อ</span>
+        <span className="h-5 w-px bg-border" aria-hidden />
+        <span className="flex items-center gap-2"><StarIcon className="h-3.5 w-3.5 text-muted-foreground" />เต็ม {maxPoints} คะแนน</span>
+        <span className="ml-auto flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium">
+          <span className={cn("h-1.5 w-1.5 rounded-full", status.dot)} />
+          {status.label}
+        </span>
+      </div>
+
+      <SessionQuestionList session={session} sessionQuestions={sessionQuestions} />
+
+      <div className="shrink-0 overflow-hidden rounded-lg border border-border">
       <button
         type="button"
-        onClick={() => setEditingQuestions(true)}
-        className="flex shrink-0 items-center justify-between rounded-lg border border-border px-3 py-2 text-left text-xs hover:bg-muted"
+        aria-expanded={editingQuestions}
+        onClick={() => setEditingQuestions((v) => !v)}
+        className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
-        จัดการข้อสอบ ({sessionQuestions.length} ข้อ)
-        <span className="text-muted-foreground">แก้ไข</span>
+        เพิ่มข้อสอบ
+        <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", editingQuestions && "rotate-90")} />
       </button>
 
-      <label className="flex shrink-0 items-center justify-between rounded-lg border border-border px-3 py-2 text-xs">
-        เปิดเฉลยให้นักเรียนดู
-        <Switch
-          checked={session.review_released}
-          onChange={(v) =>
-            update.mutate({ id: session.id, review_released: v }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })
-          }
-        />
-      </label>
+      <AddSessionQuestionPanel session={session} open={editingQuestions} />
+      </div>
 
       <SecurityPanel session={session} attempts={attempts} />
+      <SecurityEventsSheet sessionId={session.id} open={eventsOpen} onOpenChange={setEventsOpen} />
+      <ExamSettingsSheet session={session} open={settingsOpen} onOpenChange={setSettingsOpen} />
 
-      <EditSessionQuestionsSheet
-        session={session}
-        sessionQuestions={sessionQuestions}
-        open={editingQuestions}
-        onOpenChange={setEditingQuestions}
-      />
-
-      {isLoading ? (
+      {isLoading || rosterLoading ? (
         <div className="table-panel flex-1" role="status" aria-label="กำลังโหลด">
           <table className="w-full min-w-[28rem] text-xs">
-            <thead className="bg-muted text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">นักเรียน</th>
-                <th className="px-3 py-2 font-medium">ครั้งที่</th>
-                <th className="px-3 py-2 font-medium">สถานะ</th>
-                <th className="px-3 py-2 font-medium">คะแนน</th>
-              </tr>
-            </thead>
             <tbody>
               {[0, 1, 2].map((i) => (
                 <tr key={i} className="border-t border-border">
                   <td className="px-3 py-2"><Skeleton className="h-3 w-24" /></td>
-                  <td className="px-3 py-2"><Skeleton className="h-3 w-6" /></td>
+                  <td className="px-3 py-2"><Skeleton className="h-3 w-10" /></td>
                   <td className="px-3 py-2"><Skeleton className="h-3 w-14" /></td>
                   <td className="px-3 py-2"><Skeleton className="h-3 w-8" /></td>
                 </tr>
@@ -574,42 +958,84 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
             </tbody>
           </table>
         </div>
-      ) : attempts.length === 0 ? (
+      ) : rosterRows.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ยังไม่มีนักเรียนเข้าสอบ" description="" />
+          <EmptyState title="ยังไม่มีนักเรียนในห้องนี้" description="ตรวจสอบการลงทะเบียนนักเรียนของห้องเรียน" />
         </div>
       ) : (
-        <div className="table-panel flex-1">
-          <div className="table-panel-scroll">
-            <table className="w-full min-w-[28rem] text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2 font-medium">นักเรียน</th>
-                  <th className="px-3 py-2 font-medium">ครั้งที่</th>
-                  <th className="px-3 py-2 font-medium">สถานะ</th>
-                  <th className="px-3 py-2 font-medium">คะแนน</th>
-                </tr>
-              </thead>
-              <tbody>
-                {attempts.map((a) => (
-                  <tr key={a.id} className="border-t border-border">
-                    <td className="px-3 py-2">{a.student_id}</td>
-                    <td className="px-3 py-2">{a.attempt_no}</td>
-                    <td className="px-3 py-2">{a.status === "submitted" ? "ส่งแล้ว" : "กำลังทำ"}</td>
-                    <td className="px-3 py-2">{a.score ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {submitted.length > 0 && (
-            <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
-              ค่าเฉลี่ย: {(submitted.reduce((s, a) => s + (a.score ?? 0), 0) / submitted.length).toFixed(1)}/{maxPoints}
-            </p>
-          )}
+        <div className="shrink-0 overflow-hidden rounded-lg border border-border">
+          <button
+            type="button"
+            aria-expanded={rosterOpen}
+            onClick={() => setRosterOpen((v) => !v)}
+            className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
+          >
+            <span className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-right">
+              <span className="font-medium">นักเรียน {rosterRows.length} คน</span>
+              <span className="text-muted-foreground">ส่งแล้ว {count("submitted")}</span>
+              <span className="text-muted-foreground">กำลังทำ {count("in_progress")}</span>
+              <span className="text-muted-foreground">ยังไม่เข้าสอบ {count("none")}</span>
+              {count("locked") > 0 && <span className="text-destructive">ถูกล็อก {count("locked")}</span>}
+            </span>
+            <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", rosterOpen && "rotate-90")} />
+          </button>
+          <Collapse open={rosterOpen}>
+            <ul className="max-h-[60vh] space-y-2 overflow-y-auto border-t border-border bg-muted/40 p-2">
+              {rosterRows.map((r) => (
+                <li key={r.student_id} className="rounded-xl bg-card p-3.5 shadow-card">
+                  <div className="flex items-start gap-3">
+                    <Avatar name={r.name} src={rosterAvatars?.get(r.student_id) ?? null} className="h-11 w-11 text-sm" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="truncate text-sm font-semibold">{r.name}</p>
+                        <span className={cn("mt-0.5 flex shrink-0 items-center gap-1 text-[11px]", STATUS_CLASS[r.status])}>
+                          <span className={cn("size-1.5 rounded-full", STATUS_DOT[r.status])} />
+                          {STATUS_LABEL[r.status]}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                        {r.code && <span className="text-xs tabular-nums text-muted-foreground">{r.code}</span>}
+                        {r.room !== "—" && <span className={cn("inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium", levelTone(r.room))}>{r.room}</span>}
+                        <span className="ml-auto text-xs tabular-nums text-muted-foreground">{r.best != null ? `${r.best}/${maxPoints}` : "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {submitted.length > 0 && (
+              <p className="border-t border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+                ค่าเฉลี่ย: {(submitted.reduce((s, a) => s + (a.score ?? 0), 0) / submitted.length).toFixed(1)}/{maxPoints}
+              </p>
+            )}
+          </Collapse>
         </div>
       )}
     </div>
+  );
+}
+
+/** Room settings drawer: answer review + strict mode (migration 0132) with its exam code. */
+function ExamSettingsSheet({ session, open, onOpenChange }: { session: ExamSession; open: boolean; onOpenChange: (o: boolean) => void }) {
+  const update = useUpdateExamSession();
+  const toast = useToast();
+  const { data: code } = useExamCode(open && session.strict_mode ? session.id : null);
+  const onError = () => toast("บันทึกไม่สำเร็จ", "error");
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange} title="ตั้งค่าห้องสอบ" description={session.title}>
+      <div className="space-y-3">
+        <FormSection>
+          <SwitchRow label="เปิดเฉลยให้นักเรียนดู" checked={session.review_released} onChange={(v) => update.mutate({ id: session.id, review_released: v }, { onError })} />
+          <SwitchRow label="โหมดสอบจริง (รหัสสอบ + ล็อกเครื่องเดียว)" checked={session.strict_mode} onChange={(v) => update.mutate({ id: session.id, strict_mode: v }, { onError })} />
+          {session.strict_mode && (
+            <div className="flex min-h-[3.25rem] items-center justify-between gap-4 text-sm leading-5">
+              <span>รหัสสอบ (แจ้งในห้องสอบเท่านั้น)</span>
+              <span className="font-mono text-base font-semibold tracking-widest">{code ?? "······"}</span>
+            </div>
+          )}
+        </FormSection>
+      </div>
+    </Sheet>
   );
 }
 
@@ -626,37 +1052,22 @@ const SECURITY_EVENT_LABEL: Record<ExamSecurityEventType, string> = {
 
 /** Teacher view of the anti-impersonation controls (migration 0132): code, single-device takeovers, locked students, event trail. */
 function SecurityPanel({ session, attempts }: { session: ExamSession; attempts: ExamAttempt[] }) {
-  const update = useUpdateExamSession();
   const approve = useApproveTakeover();
   const unlock = useUnlockExamCode();
   const toast = useToast();
-  const { data: code } = useExamCode(session.strict_mode ? session.id : null);
   const { data: locked = [] } = useLockedCodeStudents(session.id);
-  const { data: events = [] } = useSecurityEvents(session.id);
 
   const pending = attempts.filter((a) => a.status === "in_progress" && a.takeover_session);
   const names = useStudentNames([
     ...pending.map((a) => a.student_id),
     ...locked.map((l) => l.student_id),
-    ...events.flatMap((e) => (e.student_id ? [e.student_id] : [])),
   ]).data;
   const nameOf = (id: string | null) => (id ? (names?.get(id) ?? "นักเรียน") : "—");
   const onError = () => toast("ทำรายการไม่สำเร็จ", "error");
 
+  if (pending.length + locked.length === 0) return null;
   return (
     <div className="shrink-0 space-y-2 rounded-lg border border-border px-3 py-2 text-xs">
-      <label className="flex items-center justify-between">
-        โหมดสอบจริง (รหัสสอบ + ล็อกเครื่องเดียว)
-        <Switch checked={session.strict_mode} onChange={(v) => update.mutate({ id: session.id, strict_mode: v }, { onError })} />
-      </label>
-
-      {session.strict_mode && (
-        <p className="flex items-center justify-between">
-          รหัสสอบ (แจ้งในห้องสอบเท่านั้น)
-          <span className="font-mono text-base font-semibold tracking-widest">{code ?? "······"}</span>
-        </p>
-      )}
-
       {pending.map((a) => (
         <div key={a.id} className="flex items-center justify-between gap-2 rounded-md bg-muted px-2 py-1.5">
           <span>{nameOf(a.student_id)} ขอเปลี่ยนเครื่อง</span>
@@ -674,97 +1085,184 @@ function SecurityPanel({ session, attempts }: { session: ExamSession; attempts: 
           </Button>
         </div>
       ))}
-
-      {events.length > 0 && (
-        <details>
-          <summary className="cursor-pointer text-muted-foreground">เหตุการณ์ผิดปกติ ({events.length})</summary>
-          <ul className="mt-1 space-y-1">
-            {events.map((e) => (
-              <li key={e.id} className="text-muted-foreground">
-                {new Date(e.at).toLocaleString("th-TH")} · {nameOf(e.student_id)} · {SECURITY_EVENT_LABEL[e.event_type]}
-                {e.device && <span className="block truncate">{e.device}{e.ip ? ` · ${e.ip}` : ""}</span>}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
     </div>
   );
 }
 
-function EditSessionQuestionsSheet({
-  session,
-  sessionQuestions,
-  open,
-  onOpenChange,
-}: {
-  session: ExamSession;
-  sessionQuestions: ExamSessionQuestionRow[];
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { data: bank = [] } = useExamQuestions(open ? session.subject_id : null);
-  const setTopicIds = useTopicSetTopicIds(open ? session.topic_set_id : null);
-  // Legacy sessions migrated from before topic sets may have a set with no topics: offer the whole bank.
-  const questions = setTopicIds.length === 0 ? bank : bank.filter((q) => q.plan_topic_id && setTopicIds.includes(q.plan_topic_id));
-  const setQuestions = useSetSessionQuestions();
-  const toast = useToast();
-  const [questionIds, setQuestionIds] = useState<string[]>([]);
+/** One bank question as in คลังข้อสอบ: number, prompt, badges, choices with the correct ones ticked. */
+const CHOICE_LETTERS = ["ก", "ข", "ค", "ง", "จ", "ฉ"];
 
-  useEffect(() => {
-    if (open) setQuestionIds(sessionQuestions.map((q) => q.question_id));
-  }, [open, sessionQuestions]);
-
-  const totalPoints = questions.filter((q) => questionIds.includes(q.id)).reduce((s, q) => s + q.points, 0);
-
-  function save() {
-    setQuestions.mutate(
-      {
-        sessionId: session.id,
-        questions: questionIds.map((question_id) => ({
-          question_id,
-          points: questions.find((q) => q.id === question_id)?.points ?? 1,
-        })),
-      },
-      {
-        onSuccess: () => onOpenChange(false),
-        onError: () => toast("บันทึกข้อสอบไม่สำเร็จ", "error"),
-      },
-    );
-  }
-
+function QuestionBody({ q, i }: { q: ExamQuestionWithChoices; i: number }) {
   return (
-    <Sheet
-      open={open}
-      onOpenChange={onOpenChange}
-      title="จัดการข้อสอบ"
-      footer={
-        <Button className="w-full" onClick={save} disabled={questionIds.length === 0 || setQuestions.isPending}>
-          บันทึก
-        </Button>
-      }
-    >
-      <Field label={`ข้อสอบ (เลือกแล้ว ${questionIds.length} ข้อ, รวม ${totalPoints} คะแนน)`} required>
-        <div className="max-h-96 space-y-1.5 overflow-y-auto rounded-lg border border-border p-2">
-          {questions.length === 0 && <p className="text-xs text-muted-foreground">ไม่มีข้อสอบในหัวข้อของชุดที่อนุมัติ (เพิ่มในคลังข้อสอบโดยระบุหัวข้อ)</p>}
-          {questions.map((q) => (
-            <label key={q.id} className="flex items-start gap-2 text-xs">
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={questionIds.includes(q.id)}
-                onChange={(e) =>
-                  setQuestionIds(e.target.checked ? [...questionIds, q.id] : questionIds.filter((id) => id !== q.id))
-                }
-              />
-              <span>
-                {q.prompt} <span className="text-muted-foreground">({q.points} คะแนน)</span>
-              </span>
-            </label>
+    <div className="flex min-w-0 gap-3">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-medium tabular-nums text-muted-foreground">{i + 1}</span>
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="text-sm font-semibold text-foreground [&_*]:font-semibold">
+          <QuestionPromptView value={q.prompt_json} />
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span className={cn("rounded-full px-2 py-0.5 font-medium", DIFFICULTY_BADGE_CLASS[q.difficulty])}>{DIFFICULTY_LABEL[q.difficulty]}</span>
+          {q.topic && <span className="rounded-full bg-muted px-2 py-0.5 font-medium">{q.topic}</span>}
+          <span className="tabular-nums">{q.points} คะแนน</span>
+        </div>
+        {q.question_type === "short_answer" ? (
+          <p className="rounded-md bg-[hsl(var(--success)/0.15)] px-2.5 py-1.5 text-xs">
+            <span className="text-muted-foreground">เฉลย </span>
+            <span className="font-medium text-success">{q.correct_answer}</span>
+          </p>
+        ) : (
+          <ul className="space-y-1">
+            {q.choices.map((c, ci) => (
+              <li key={c.id} className={cn("flex items-center gap-2 rounded-md bg-muted px-2.5 py-1.5 text-xs text-foreground", c.is_correct && "bg-[hsl(var(--success)/0.15)] font-medium text-success")}>
+                <span className="w-4 shrink-0 text-center text-muted-foreground">{CHOICE_LETTERS[ci] ?? ci + 1}</span>
+                <span className="min-w-0 flex-1"><QuestionPromptView value={c.label_json} /></span>
+                {c.is_correct && <CheckmarkCircleIcon className="h-4 w-4 shrink-0" aria-label="คำตอบที่ถูก" />}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Collapsible card listing the questions already in the room. */
+function SessionQuestionList({ session, sessionQuestions }: { session: ExamSession; sessionQuestions: ExamSessionQuestionRow[] }) {
+  const [open, setOpen] = useState(false);
+  const [editingQ, setEditingQ] = useState<ExamQuestionWithChoices | null>(null);
+  const { profile } = useAuth();
+  const remove = useRemoveSessionQuestion();
+  const toast = useToast();
+  const { data: roomSets } = useSessionSets(open ? [session.id] : []);
+  const subjectIds = (roomSets?.get(session.id) ?? []).map((x) => x.subject_id);
+  const { data: bank = [] } = useExamQuestionsOf(open ? (subjectIds.length > 0 ? subjectIds : [session.subject_id]) : []);
+  const byId = new Map(bank.map((q) => [q.id, q]));
+  const chosen = sessionQuestions.map((r) => byId.get(r.question_id)).filter((q): q is ExamQuestionWithChoices => !!q);
+  return (
+    <div className="shrink-0 overflow-hidden rounded-lg border border-border">
+      <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset">
+        รายการข้อสอบ ({sessionQuestions.length} ข้อ)
+        <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", open && "rotate-90")} />
+      </button>
+      <Collapse open={open}>
+        <div className="divide-y divide-border border-t border-border bg-card">
+          {chosen.length === 0 && <p className="p-3 text-xs text-muted-foreground">ยังไม่มีข้อสอบในห้องนี้</p>}
+          {chosen.map((q, i) => (
+            <div key={q.id} className="flex items-start gap-2 p-3">
+              <div className="min-w-0 flex-1"><QuestionBody q={q} i={i} /></div>
+              <div className="flex shrink-0 items-center">
+              <Button size="icon" variant="ghost" aria-label="แก้ไขข้อสอบ" title="แก้ไขข้อสอบ" onClick={() => setEditingQ(q)}>
+                <PencilIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="ลบข้อสอบออกจากห้อง"
+                title="ลบข้อสอบออกจากห้อง"
+                disabled={remove.isPending}
+                onClick={() => {
+                  if (confirm("ลบข้อสอบข้อนี้ออกจากห้อง?")) remove.mutate({ sessionId: session.id, questionId: q.id }, { onError: () => toast("ลบข้อสอบไม่สำเร็จ", "error") });
+                }}
+              >
+                <TrashIcon className="h-4 w-4" />
+              </Button>
+              </div>
+            </div>
           ))}
         </div>
-      </Field>
+      </Collapse>
+      {/* Keyed so the form remounts with the picked question; its state is seeded once on mount. */}
+      <QuestionSheet
+        key={editingQ?.id ?? "new"}
+        open={!!editingQ}
+        onOpenChange={(v) => !v && setEditingQ(null)}
+        subjectId={editingQ?.subject_id ?? null}
+        planTopicId={editingQ?.plan_topic_id ?? null}
+        teacherId={profile?.id ?? session.teacher_id}
+        question={editingQ}
+      />
+    </div>
+  );
+}
+
+/** Anti-impersonation event trail for one room (migration 0132). */
+function SecurityEventsSheet({ sessionId, open, onOpenChange }: { sessionId: string; open: boolean; onOpenChange: (o: boolean) => void }) {
+  const { data: events = [] } = useSecurityEvents(sessionId);
+  const names = useStudentNames(events.flatMap((e) => (e.student_id ? [e.student_id] : []))).data;
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange} title="เหตุการณ์ผิดปกติ" description={`${events.length} รายการ`}>
+      <ul className="space-y-3 text-sm">
+        {events.map((e) => (
+          <li key={e.id}>
+            <p>{e.student_id ? (names?.get(e.student_id) ?? "นักเรียน") : "—"} · {SECURITY_EVENT_LABEL[e.event_type]}</p>
+            <p className="text-xs text-muted-foreground">
+              {new Date(e.at).toLocaleString("th-TH")}
+              {e.device && ` · ${e.device}`}
+              {e.ip && ` · ${e.ip}`}
+            </p>
+          </li>
+        ))}
+      </ul>
     </Sheet>
+  );
+}
+
+/** "เพิ่มข้อสอบ": a new question written here goes straight into the room. */
+function AddSessionQuestionPanel({ session, open }: { session: ExamSession; open: boolean }) {
+  const { profile } = useAuth();
+  const add = useAddSessionQuestion();
+  const toast = useToast();
+  // The DB only accepts room questions tagged with a topic of the room's sets (check_exam_session_question_topic).
+  const { data: roomSets } = useSessionSets([session.id]);
+  const { data: topicsBySet } = useTopicSetsTopics((roomSets?.get(session.id) ?? []).map((x) => x.topic_set_id));
+  const topics = [...new Map([...(topicsBySet?.values() ?? [])].flat().map((t) => [t.topic_id, t])).values()];
+  const [pickedLesson, setPickedLesson] = useState("");
+  const [picked, setPicked] = useState("");
+  const lessons = [...new Set(topics.map((t) => t.lesson))];
+  const lesson = lessons.includes(pickedLesson) ? pickedLesson : "";
+  const lessonTopics = topics.filter((t) => t.lesson === lesson);
+  // Nothing is preselected when there is a choice; a lone topic is used as is.
+  const topicId = lessonTopics.some((t) => t.topic_id === picked) ? picked : topics.length === 1 ? (topics[0]?.topic_id ?? null) : null;
+  const form = useQuestionForm({
+    subjectId: session.subject_id,
+    planTopicId: topicId,
+    teacherId: profile?.id ?? session.teacher_id,
+    question: null,
+    onSaved: (questionId) => add.mutate({ sessionId: session.id, questionId }, { onError: () => toast("เพิ่มข้อสอบเข้าห้องไม่สำเร็จ", "error") }),
+  });
+  return (
+    <Collapse open={open}>
+      <div className="border-t border-border bg-card p-3">
+        {topics.length > 1 && (
+          <div className="mb-3 grid gap-3 sm:grid-cols-2">
+            <Field label="บทเรียน">
+              <Select value={lesson} placeholder="เลือกบทเรียน" onChange={(e) => setPickedLesson(e.target.value)}>
+                {lessons.map((l) => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="หัวข้อ">
+              <Select value={topicId ?? ""} placeholder="เลือกหัวข้อ" disabled={!lesson} onChange={(e) => setPicked(e.target.value)}>
+                {lessonTopics.map((t) => (
+                  <option key={t.topic_id} value={t.topic_id}>{t.topic}</option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        )}
+        {topicId ? <QuestionForm form={form} hideTopic /> : <p className="text-xs text-muted-foreground">เลือกบทเรียนและหัวข้อก่อนเพิ่มข้อสอบ</p>}
+      </div>
+    </Collapse>
+  );
+}
+
+/** Height-animated disclosure: grid 0fr→1fr, no measuring. Closed content is inert. */
+function Collapse({ open, children }: { open: boolean; children: React.ReactNode }) {
+  return (
+    <div className={cn("grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
+      <div className="min-h-0 overflow-hidden" inert={!open}>{children}</div>
+    </div>
   );
 }
 
@@ -825,7 +1323,7 @@ export function isExamOpen(e: AvailableExam, now = new Date()) {
 export function useOpenExamSubjectIds(studentId: string | null) {
   const { data: classroom } = useMyCurrentClassroom(studentId);
   const { data: exams = [] } = useAvailableExams(studentId, classroom?.classroomId ?? null, classroom?.academicYear ?? null);
-  return useMemo(() => new Set(exams.filter((e) => isExamOpen(e)).map((e) => e.subject_id)), [exams]);
+  return useMemo(() => new Set(exams.filter((e) => isExamOpen(e)).flatMap((e) => e.subject_ids)), [exams]);
 }
 
 function ExamList({ student, onOpen }: { student: Student; onOpen: (s: AvailableExam) => void }) {
@@ -837,9 +1335,9 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
   );
   const [params, setParams] = useSearchParams();
   const subjectCode = params.get("subject");
-  const { data: subjects = [] } = useSubjectsByIds(subjectCode ? [...new Set(allExams.map((e) => e.subject_id))] : []);
+  const { data: subjects = [] } = useSubjectsByIds(subjectCode ? [...new Set(allExams.flatMap((e) => e.subject_ids))] : []);
   const subjectId = subjects.find((s) => s.code === subjectCode)?.id;
-  const exams = subjectCode ? allExams.filter((e) => e.subject_id === subjectId) : allExams;
+  const exams = subjectCode ? allExams.filter((e) => !!subjectId && e.subject_ids.includes(subjectId)) : allExams;
   const clearFilter = subjectCode && (
     <button type="button" onClick={() => setParams({})} className="tappable mb-2 rounded-full bg-foreground/10 px-3 py-1.5 text-xs font-medium">
       {subjectCode} ✕ ดูทั้งหมด

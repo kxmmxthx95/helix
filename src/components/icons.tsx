@@ -1,3 +1,5 @@
+import LayersOutline from "react-ionicons/lib/LayersOutline";
+import StarOutline from "react-ionicons/lib/StarOutline";
 import SwapHorizontalOutline from "react-ionicons/lib/SwapHorizontalOutline";
 import FlaskOutline from "react-ionicons/lib/FlaskOutline";
 import GlobeOutline from "react-ionicons/lib/GlobeOutline";
@@ -210,6 +212,8 @@ export const ClipboardIcon = wrap(ClipboardOutline);
 export const TimetableIcon = wrap(GridOutline);
 export const RibbonIcon = wrap(RibbonOutline);
 export const DocumentTextIcon = wrap(DocumentTextOutline);
+export const LayersIcon = wrap(LayersOutline);
+export const StarIcon = wrap(StarOutline);
 export const X = wrap(Close);
 export const ListIcon = wrap(ListOutline);
 export const ImageIcon = wrap(ImageOutline);
