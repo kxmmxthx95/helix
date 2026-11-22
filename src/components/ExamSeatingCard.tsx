@@ -1,0 +1,342 @@
+import { useState } from "react";
+import { useAuth } from "@/auth/AuthProvider";
+import { Collapse } from "@/components/Collapse";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ChevronForward, PencilIcon, Plus, TimetableIcon, TrashIcon } from "@/components/icons";
+import { IconTile } from "@/components/IconTile";
+import { Sheet } from "@/components/Sheet";
+import { useToast } from "@/components/Toast";
+import { Button, Field, Input, Select } from "@/components/ui";
+import { useDeleteSeatTemplate, useSaveSeatTemplate, useSeatTemplates, useSessionSeating, useSessionSeats, useSetSessionSeating, useSetSessionSeats } from "@/hooks/useExamSeating";
+import type { ExamSeatTemplate, ExamSession } from "@/lib/database.types";
+import { ICON, ICON_BTN } from "@/lib/iconButton";
+import { isDeptHead, isOrgWide } from "@/lib/roles";
+import { cn } from "@/lib/utils";
+
+type SeatStudent = { student_id: string; name: string; code: string };
+type Seat = { student_id: string; seat_row: number; seat_col: number };
+type Picked = { kind: "seat"; row: number; col: number } | { kind: "student"; id: string } | null;
+
+const shuffled = <T,>(items: T[]) => {
+  const a = [...items];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j]!, a[i]!];
+  }
+  return a;
+};
+
+/** ผังห้องสอบ: pick a department template, then fill the grid automatically and fix it by tapping seats. Teachers only. */
+export function ExamSeatingCard({ session, students }: { session: ExamSession; students: SeatStudent[] }) {
+  const [open, setOpen] = useState(false);
+  const [managing, setManaging] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [picked, setPicked] = useState<Picked>(null);
+  const toast = useToast();
+  const { data: templates = [] } = useSeatTemplates();
+  const { data: grid } = useSessionSeating(session.id);
+  const { data: seats = [] } = useSessionSeats(session.id);
+  const applyTemplate = useSetSessionSeating();
+  const setSeats = useSetSessionSeats();
+
+  const byId = new Map(students.map((s) => [s.student_id, s]));
+  // A seat held by someone who is no longer on the roster is ignored and dropped on the next change.
+  const seated: Seat[] = seats.filter((x) => byId.has(x.student_id)).map(({ student_id, seat_row, seat_col }) => ({ student_id, seat_row, seat_col }));
+  const at = new Map(seated.map((x) => [`${x.seat_row}:${x.seat_col}`, x]));
+  const seatedIds = new Set(seated.map((x) => x.student_id));
+  const unseated = students.filter((s) => !seatedIds.has(s.student_id));
+  const rows = grid?.seat_rows ?? 0;
+  const cols = grid?.seat_cols ?? 0;
+  const capacity = rows * cols;
+  const missing = Math.max(0, students.length - capacity);
+  const busy = setSeats.isPending || applyTemplate.isPending;
+
+  const write = (next: Seat[]) => setSeats.mutate({ sessionId: session.id, seats: next }, { onError: () => toast("บันทึกผังไม่สำเร็จ", "error") });
+  const fill = (order: SeatStudent[]) =>
+    write(order.slice(0, capacity).map((s, i) => ({ student_id: s.student_id, seat_row: Math.floor(i / cols) + 1, seat_col: (i % cols) + 1 })));
+
+  function tapSeat(row: number, col: number) {
+    const here = at.get(`${row}:${col}`);
+    if (!picked) {
+      if (here) setPicked({ kind: "seat", row, col });
+      return;
+    }
+    if (picked.kind === "student") {
+      // Place the unseated student; whoever was there becomes unseated.
+      write([...seated.filter((x) => !(x.seat_row === row && x.seat_col === col)), { student_id: picked.id, seat_row: row, seat_col: col }]);
+    } else if (picked.row !== row || picked.col !== col) {
+      const from = at.get(`${picked.row}:${picked.col}`);
+      if (from) {
+        write(
+          seated.map((x) => {
+            if (x.student_id === from.student_id) return { ...x, seat_row: row, seat_col: col };
+            if (here && x.student_id === here.student_id) return { ...x, seat_row: picked.row, seat_col: picked.col };
+            return x;
+          }),
+        );
+      }
+    }
+    setPicked(null);
+  }
+
+  const pickedStudent = picked ? (picked.kind === "student" ? byId.get(picked.id) : byId.get(at.get(`${picked.row}:${picked.col}`)?.student_id ?? "")) : undefined;
+
+  return (
+    <div className="shrink-0 overflow-hidden rounded-lg border border-border">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
+      >
+        <span className="flex items-center gap-2 font-medium text-foreground">
+          <IconTile tone="bg-amber-500/15 text-amber-700 dark:text-amber-300">
+            <TimetableIcon className="h-4 w-4" />
+          </IconTile>
+          ผังห้องสอบ
+        </span>
+        <span className="flex min-w-0 flex-1 items-center justify-end gap-3 text-foreground/75">
+          {grid ? (
+            <span className="tabular-nums">
+              จัดแล้ว {seated.length}/{students.length} · ผัง {rows}×{cols}
+            </span>
+          ) : (
+            <span>ยังไม่ได้เลือก template</span>
+          )}
+        </span>
+        <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
+      </button>
+      <Collapse open={open}>
+        <div className="space-y-3 border-t border-border bg-card p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              aria-label="Template ผังที่นั่ง"
+              placeholder="เลือก template ผังที่นั่ง"
+              className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:max-w-64 sm:flex-none"
+              value={grid?.template_id ?? ""}
+              disabled={busy}
+              onChange={(e) => {
+                const t = templates.find((x) => x.id === e.target.value);
+                if (t) applyTemplate.mutate({ sessionId: session.id, template: t }, { onError: () => toast("เลือก template ไม่สำเร็จ", "error") });
+              }}
+            >
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.seat_rows}×{t.seat_cols})
+                </option>
+              ))}
+            </Select>
+            <Button size="sm" variant="outline" className="ui-control-compact h-8" onClick={() => setManaging(true)}>
+              จัดการ template
+            </Button>
+          </div>
+
+          {!grid ? (
+            <p className="text-xs text-muted-foreground">{templates.length > 0 ? "เลือก template เพื่อเริ่มจัดผังที่นั่ง" : "ยังไม่มี template สร้างจาก \"จัดการ template\" ก่อน"}</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={busy || students.length === 0} onClick={() => fill(students)}>
+                  เรียงตามลำดับ
+                </Button>
+                <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={busy || students.length === 0} onClick={() => fill(shuffled(students))}>
+                  สุ่ม
+                </Button>
+                <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={busy || seated.length === 0} onClick={() => setClearing(true)}>
+                  ล้างผัง
+                </Button>
+              </div>
+
+              {pickedStudent && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted px-3 py-2 text-xs">
+                  <span className="min-w-0 flex-1">
+                    เลือก <span className="font-medium">{pickedStudent.name}</span> แตะที่นั่งเพื่อย้ายหรือสลับ
+                  </span>
+                  {picked?.kind === "seat" && (
+                    <Button size="sm" variant="outline" className="ui-control-compact h-7" onClick={() => { write(seated.filter((x) => x.student_id !== pickedStudent.student_id)); setPicked(null); }}>
+                      นำออกจากที่นั่ง
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" className="ui-control-compact h-7" onClick={() => setPicked(null)}>
+                    ยกเลิก
+                  </Button>
+                </div>
+              )}
+
+              <div className="overflow-x-auto pb-1">
+                <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(5.5rem, 1fr))` }}>
+                  {Array.from({ length: capacity }, (_, i) => {
+                    const row = Math.floor(i / cols) + 1;
+                    const col = (i % cols) + 1;
+                    const x = at.get(`${row}:${col}`);
+                    const st = x ? byId.get(x.student_id) : undefined;
+                    const isPicked = picked?.kind === "seat" && picked.row === row && picked.col === col;
+                    return (
+                      <button
+                        key={`${row}:${col}`}
+                        type="button"
+                        disabled={busy}
+                        aria-label={st ? `ที่นั่ง ${row}.${col} ${st.name}` : `ที่นั่ง ${row}.${col} ว่าง`}
+                        onClick={() => tapSeat(row, col)}
+                        className={cn(
+                          "flex h-14 min-w-0 flex-col items-start justify-center rounded-lg border px-2 text-left text-[11px] leading-tight",
+                          st ? "border-border bg-card" : "border-dashed border-border text-muted-foreground",
+                          isPicked && "ring-2 ring-primary",
+                        )}
+                      >
+                        {st ? (
+                          <>
+                            <span className="line-clamp-2 w-full break-words font-medium text-foreground">{st.name}</span>
+                            <span className="tabular-nums text-muted-foreground">{st.code}</span>
+                          </>
+                        ) : (
+                          <span className="tabular-nums">
+                            {row}.{col}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {missing > 0 && (
+                <p role="alert" className="rounded-xl bg-[hsl(var(--warning)/0.12)] px-3 py-2 text-xs text-warning">
+                  ที่นั่งไม่พอ ขาดอีก {missing} ที่ เลือก template ที่ใหญ่ขึ้น หรือจัดนักเรียนที่เหลือเอง
+                </p>
+              )}
+
+              {unseated.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-foreground">ยังไม่มีที่นั่ง ({unseated.length})</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {unseated.map((s) => (
+                      <button
+                        key={s.student_id}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setPicked(picked?.kind === "student" && picked.id === s.student_id ? null : { kind: "student", id: s.student_id })}
+                        className={cn("rounded-full border border-border bg-card px-2.5 py-1 text-xs", picked?.kind === "student" && picked.id === s.student_id && "ring-2 ring-primary")}
+                      >
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </Collapse>
+
+      <ConfirmDialog
+        open={clearing}
+        title="ล้างผังที่นั่ง?"
+        description="นักเรียนทุกคนจะกลับไปอยู่ในรายการ ยังไม่มีที่นั่ง ผังขนาดเดิมยังอยู่"
+        confirmLabel="ล้างผัง"
+        pending={setSeats.isPending}
+        onCancel={() => setClearing(false)}
+        onConfirm={() => {
+          write([]);
+          setClearing(false);
+          setPicked(null);
+        }}
+      />
+      {managing && <SeatTemplatesSheet onClose={() => setManaging(false)} />}
+    </div>
+  );
+}
+
+/** Create, edit and delete the department's seat templates. Everyone in the department can use them; only the creator or a head edits. */
+function SeatTemplatesSheet({ onClose }: { onClose: () => void }) {
+  const { profile } = useAuth();
+  const toast = useToast();
+  const { data: templates = [] } = useSeatTemplates();
+  const save = useSaveSeatTemplate();
+  const remove = useDeleteSeatTemplate();
+  const [form, setForm] = useState<{ id?: string; name: string; rows: string; cols: string } | null>(null);
+  const [deleting, setDeleting] = useState<ExamSeatTemplate | null>(null);
+  const roles = profile?.roles ?? [];
+  const canEdit = (t: ExamSeatTemplate) => t.created_by === profile?.id || isOrgWide(roles) || isDeptHead(roles);
+
+  const rowsN = Number(form?.rows);
+  const colsN = Number(form?.cols);
+  const valid = !!form && form.name.trim().length > 0 && Number.isInteger(rowsN) && Number.isInteger(colsN) && rowsN >= 1 && rowsN <= 30 && colsN >= 1 && colsN <= 30;
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form || !valid || !profile?.department_id) return;
+    save.mutate(
+      { id: form.id, department_id: profile.department_id, name: form.name.trim(), seat_rows: rowsN, seat_cols: colsN },
+      { onSuccess: () => setForm(null), onError: () => toast("บันทึก template ไม่สำเร็จ", "error") },
+    );
+  }
+
+  return (
+    <Sheet open onOpenChange={(o) => !o && onClose()} title="Template ผังที่นั่ง" description="ใช้ร่วมกันทั้งฝ่าย ใช้กับห้องสอบไหนก็ได้">
+      <div className="space-y-3">
+        {form ? (
+          <form onSubmit={submit} className="space-y-3">
+            <Field label="ชื่อ template" required>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="เช่น ห้องประชุม 6 แถว" maxLength={60} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="จำนวนแถว" required>
+                <Input type="number" min="1" max="30" value={form.rows} onChange={(e) => setForm({ ...form, rows: e.target.value })} />
+              </Field>
+              <Field label="จำนวนคอลัมน์" required>
+                <Input type="number" min="1" max="30" value={form.cols} onChange={(e) => setForm({ ...form, cols: e.target.value })} />
+              </Field>
+            </div>
+            {valid && <p className="text-xs text-muted-foreground">{rowsN * colsN} ที่นั่ง</p>}
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setForm(null)}>
+                ยกเลิก
+              </Button>
+              <Button type="submit" className="flex-1" disabled={!valid || save.isPending}>
+                บันทึก
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <Button size="sm" onClick={() => setForm({ name: "", rows: "5", cols: "6" })}>
+              <Plus className="h-3 w-3" /> สร้าง template
+            </Button>
+            {templates.length === 0 && <p className="text-xs text-muted-foreground">ยังไม่มี template</p>}
+            <ul className="space-y-2">
+              {templates.map((t) => (
+                <li key={t.id} className="flex items-center justify-between gap-2 rounded-xl border border-border bg-card p-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{t.name}</p>
+                    <p className="text-xs tabular-nums text-muted-foreground">
+                      {t.seat_rows} แถว × {t.seat_cols} คอลัมน์ · {t.seat_rows * t.seat_cols} ที่นั่ง
+                    </p>
+                  </div>
+                  {canEdit(t) && (
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <Button size="icon" variant="outline" className={ICON_BTN} aria-label="แก้ไข template" title="แก้ไข template" onClick={() => setForm({ id: t.id, name: t.name, rows: String(t.seat_rows), cols: String(t.seat_cols) })}>
+                        <PencilIcon className={ICON} />
+                      </Button>
+                      <Button size="icon" variant="outline" className={ICON_BTN} aria-label="ลบ template" title="ลบ template" onClick={() => setDeleting(t)}>
+                        <TrashIcon className={ICON} />
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+      <ConfirmDialog
+        open={!!deleting}
+        title="ลบ template?"
+        description={deleting ? `ลบ "${deleting.name}" ผังที่จัดไปแล้วในรอบสอบยังอยู่ แต่ครูในฝ่ายจะเลือก template นี้ไม่ได้อีก` : undefined}
+        pending={remove.isPending}
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => deleting && remove.mutate(deleting.id, { onSuccess: () => setDeleting(null), onError: () => toast("ลบ template ไม่สำเร็จ", "error") })}
+      />
+    </Sheet>
+  );
+}

@@ -4,7 +4,10 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { AlertTriangle, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
+import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ExamSeatingCard } from "@/components/ExamSeatingCard";
+import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, Select, Skeleton, Switch } from "@/components/ui";
@@ -1100,6 +1103,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
           </Collapse>
         </div>
       )}
+      {rosterRows.length > 0 && <ExamSeatingCard session={session} students={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "" }))} />}
     </div>
   );
 }
@@ -1197,11 +1201,6 @@ function QuestionSkeleton() {
       </div>
     </div>
   );
-}
-
-/** Tinted square behind a card-header icon. */
-function IconTile({ tone, children }: { tone: string; children: React.ReactNode }) {
-  return <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", tone)}>{children}</span>;
 }
 
 const CHOICE_LETTERS = ["ก", "ข", "ค", "ง", "จ", "ฉ"];
@@ -1388,15 +1387,6 @@ function AddSessionQuestionPanel({ session, open }: { session: ExamSession; open
         {topicId ? <QuestionForm form={form} hideTopic /> : <p className="text-xs text-muted-foreground">เลือกบทเรียนและหัวข้อก่อนเพิ่มข้อสอบ</p>}
       </div>
     </Collapse>
-  );
-}
-
-/** Height-animated disclosure: grid 0fr→1fr, no measuring. Closed content is inert. */
-function Collapse({ open, children }: { open: boolean; children: React.ReactNode }) {
-  return (
-    <div className={cn("grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
-      <div className="min-h-0 overflow-hidden" inert={!open}>{children}</div>
-    </div>
   );
 }
 

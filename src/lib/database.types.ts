@@ -836,6 +836,19 @@ export type ExamSession = {
 
 /** Every topic set (and subject) a room covers — several when merged subjects share one room (migration 0193). */
 export type ExamSessionSet = { session_id: string; topic_set_id: string; subject_id: string; gradebook_item_id: string | null };
+/** ผังห้องสอบ (migration 0199): department-wide seat layout template. */
+export type ExamSeatTemplate = {
+  id: string;
+  department_id: string;
+  name: string;
+  seat_rows: number;
+  seat_cols: number;
+  created_by: string;
+  created_at: string;
+};
+/** Grid size of one session's seating, copied from a template so later template edits don't move a laid-out chart. */
+export type ExamSessionSeating = { session_id: string; seat_rows: number; seat_cols: number; template_id: string | null; updated_at: string };
+export type ExamSessionSeat = { session_id: string; student_id: string; seat_row: number; seat_col: number };
 export type ExamApprovalStatus = "draft" | "pending" | "approved" | "rejected";
 
 /** ชุดหัวข้อการสอบ: one subject + ผังการเรียน topics, approved before sessions can use it (migration 0183). */
@@ -1971,6 +1984,9 @@ export type Database = {
       exam_topic_set_topics: Table<ExamTopicSetTopic, ExamTopicSetTopic>;
       exam_session_targets: Table<ExamSessionTarget, ExamSessionTarget>;
       exam_session_sets: Table<ExamSessionSet, InsertOf<ExamSessionSet, "gradebook_item_id">>;
+      exam_seat_templates: Table<ExamSeatTemplate, InsertOf<ExamSeatTemplate, "created_by">>;
+      exam_session_seating: Table<ExamSessionSeating, InsertOf<ExamSessionSeating, "template_id" | "updated_at">>;
+      exam_session_seats: Table<ExamSessionSeat, ExamSessionSeat>;
       exam_session_questions: Table<ExamSessionQuestion, ExamSessionQuestion>;
       exam_attempts: Table<
         ExamAttempt,
@@ -2032,6 +2048,10 @@ export type Database = {
       set_plan_link: {
         Args: { p_assignment: string; p_mates: string[] };
         Returns: { copied: number; skipped: number }[];
+      };
+      set_exam_session_seats: {
+        Args: { p_session: string; p_seats: { student_id: string; seat_row: number; seat_col: number }[] };
+        Returns: void;
       };
       exam_room_conflicts: {
         Args: { p_room: string; p_opens: string; p_closes: string; p_exclude?: string | null };
