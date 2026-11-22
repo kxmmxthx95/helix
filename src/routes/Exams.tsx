@@ -100,7 +100,7 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
   return (
     <div className="page-fill gap-2">
       {tabs.length > 1 && (
-        <div className="sticky top-0 lg:top-12 z-10 flex w-full shrink-0 flex-wrap border-b border-border bg-background/95 backdrop-blur" role="tablist">
+        <div className="flex w-full shrink-0 flex-wrap border-b border-border" role="tablist">
           {tabs.map(([key, label]) => {
             const Icon = TAB_ICON[key];
             return (
@@ -124,7 +124,11 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
           })}
         </div>
       )}
-      {tab === "rooms" && <TeacherExams teacherId={teacherId} canSeeAll={canApprove} />}
+      {tab === "rooms" && (
+        <div className="-mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pt-1">
+          <TeacherExams teacherId={teacherId} canSeeAll={canApprove} />
+        </div>
+      )}
       {tab === "schedule" && teacherId && <ExamSchedule teacherId={teacherId} />}
       {(tab === "topics" || tab === "list" || tab === "approve") && (
         <div className="-mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pt-1">
