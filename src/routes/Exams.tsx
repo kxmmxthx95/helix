@@ -330,6 +330,10 @@ const toLocalInput = (iso: string | null) => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 };
 
+/** Close time when the exam has a duration: opens + เวลาทำ (local input string in, local input string out). */
+const closeAfter = (opensLocal: string, minutes: number | null) =>
+  minutes && opensLocal ? toLocalInput(new Date(new Date(opensLocal).getTime() + minutes * 60_000).toISOString()) : null;
+
 /** เวลาสอบ card on the room page: same layout as ExamSettingsCard; the window saves on blur once both ends are valid. */
 function ScheduleCard({ session }: { session: ExamSession }) {
   const [open, setOpen] = useState(false);
@@ -341,6 +345,8 @@ function ScheduleCard({ session }: { session: ExamSession }) {
   useEffect(() => setClosesAt(toLocalInput(session.closes_at)), [session.closes_at]);
   const valid = !!opensAt && !!closesAt && new Date(closesAt) > new Date(opensAt);
   const { data: conflicts = [] } = useRoomConflicts(session.room_id ?? "", opensAt, closesAt, session.id);
+  // With เวลาทำ set, the close time follows the open time and is not typed by hand.
+  const autoClose = !!session.duration_minutes;
 
   function save() {
     if (!valid || (opensAt === toLocalInput(session.opens_at) && closesAt === toLocalInput(session.closes_at))) return;
@@ -372,10 +378,20 @@ function ScheduleCard({ session }: { session: ExamSession }) {
         <div className="space-y-3 border-t border-border bg-muted/40 p-3 [&_.text-sm]:text-xs [&_input]:!h-6 [&_input]:!text-xs">
           <FormSection>
             <Field label="เปิดสอบ" required>
-              <Input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} onBlur={save} />
+              <Input
+                type="datetime-local"
+                value={opensAt}
+                onChange={(e) => {
+                  setOpensAt(e.target.value);
+                  const end = autoClose ? closeAfter(e.target.value, session.duration_minutes) : null;
+                  if (end) setClosesAt(end);
+                }}
+                onBlur={save}
+              />
             </Field>
             <Field label="ปิดสอบ" required error={opensAt && closesAt && !valid ? "ต้องหลังเวลาเปิดสอบ" : undefined}>
-              <Input type="datetime-local" value={closesAt} min={opensAt} onChange={(e) => setClosesAt(e.target.value)} onBlur={save} />
+              <Input type="datetime-local" value={closesAt} min={opensAt} disabled={autoClose} onChange={(e) => setClosesAt(e.target.value)} onBlur={save} />
+              {autoClose && <p className="text-xs text-muted-foreground">คำนวณจากเวลาทำ {session.duration_minutes} นาที</p>}
             </Field>
           </FormSection>
           <RoomConflictNotice conflicts={conflicts} />
@@ -433,10 +449,19 @@ function ScheduleSheet({ session, onClose }: { session: ExamSession; onClose: ()
       <form id="schedule-session" onSubmit={save} className="space-y-3">
         <FormSection>
           <Field label="เปิดสอบ" required>
-            <Input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} />
+            <Input
+              type="datetime-local"
+              value={opensAt}
+              onChange={(e) => {
+                setOpensAt(e.target.value);
+                const end = session.duration_minutes ? closeAfter(e.target.value, session.duration_minutes) : null;
+                if (end) setClosesAt(end);
+              }}
+            />
           </Field>
           <Field label="ปิดสอบ" required>
-            <Input type="datetime-local" value={closesAt} min={opensAt} onChange={(e) => setClosesAt(e.target.value)} />
+            <Input type="datetime-local" value={closesAt} min={opensAt} disabled={!!session.duration_minutes} onChange={(e) => setClosesAt(e.target.value)} />
+            {session.duration_minutes && <p className="text-xs text-muted-foreground">คำนวณจากเวลาทำ {session.duration_minutes} นาที</p>}
           </Field>
         </FormSection>
         <RoomConflictNotice conflicts={conflicts} />
