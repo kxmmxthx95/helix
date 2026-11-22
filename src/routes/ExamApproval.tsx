@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { ViewToggle } from "@/components/ViewToggle";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
-import { AppsIcon, ChevronBack, ListIcon, TrashIcon } from "@/components/icons";
+import { ChevronBack, TrashIcon } from "@/components/icons";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, EmptyState, Field, Input, Select, Skeleton } from "@/components/ui";
 import { useClassroomsByIds, useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
@@ -29,6 +30,7 @@ import { useAllTeachingAssignments, useMyTeachingAssignments } from "@/hooks/use
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { isDeptHead } from "@/lib/roles";
 import type { ExamApprovalStatus, ExamTopicSet, Subject, TeachingAssignment } from "@/lib/database.types";
+import { ICON, ICON_BTN } from "@/lib/iconButton";
 import { cn } from "@/lib/utils";
 
 // ชุดหัวข้อการสอบ (migrations 0183, 0192): every "ส่งหัวข้อ" / "ไม่มีสอบ" is a NEW set for subject × room and
@@ -66,12 +68,19 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
   const isLoading = all ? allLoading : mineLoading;
   const { data: teachers = [] } = useProfilesByIds(all ? [...new Set(everyone.map((a) => a.teacher_id).filter((x): x is string => !!x))] : []);
   const teacherNameById = new Map(teachers.map((t) => [t.id, `${t.first_name} ${t.last_name}`]));
+  const [view, setView] = useState<"cards" | "table">("cards");
   const scopeSelect = canSeeAll ? (
-    <Select value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")} className="w-full sm:w-64">
+    <Select value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")} className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:w-64 sm:pr-8">
       <option value="mine">วิชาของฉัน</option>
       <option value="all">ทุกวิชา</option>
     </Select>
   ) : null;
+  const header = (
+    <div className="mb-1 flex shrink-0 items-center gap-2">
+      {scopeSelect}
+      <ViewToggle value={view} onChange={setView} className="ml-auto" />
+    </div>
+  );
   const { data: subjects = [] } = useSubjectsByIds([...new Set(assignments.map((a) => a.subject_id))]);
   const { data: classrooms = [] } = useClassroomsByIds([...new Set(assignments.map((a) => a.classroom_id))]);
   const { data: lessonLinks } = usePlanLessonLinks(assignments.map((a) => a.subject_id));
@@ -109,14 +118,14 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
   if (isLoading)
     return (
       <div className="flex flex-1 flex-col gap-2">
-        {scopeSelect}
+        {header}
         <Skeleton className="h-40 w-full rounded-2xl" />
       </div>
     );
   if (cards.length === 0) {
     return (
       <div className="flex flex-1 flex-col gap-2">
-        {scopeSelect}
+        {header}
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="ยังไม่มีวิชาที่ได้รับมอบหมาย" description="เมื่อได้รับมอบหมายวิชาสอนแล้ว จะเลือกหัวข้อการสอบได้ที่นี่" />
         </div>
@@ -138,8 +147,64 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
 
   return (
     <div className="flex flex-1 flex-col gap-2">
-      {scopeSelect}
-      {[...groups].map(([key, members]) => {
+      {header}
+      {view === "table" && (
+        <div className="table-panel flex-1 rounded-none border-t border-border shadow-none">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[28rem] text-[13px]">
+              <thead className="text-left text-xs">
+                <tr>
+                  <th className="px-4 py-3">วิชา</th>
+                  <th className="px-4 py-3">ห้อง</th>
+                  {all && <th className="px-4 py-3">ครูผู้สอน</th>}
+                  <th className="w-28 px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {[...groups].map(([key, members]) => {
+                  const room = roomLabelOf(members[0]!);
+                  const teacherName = all ? teacherNameById.get(members[0]?.teacher_id ?? "") : undefined;
+                  return (
+                    <tr
+                      key={key}
+                      onClick={() => !all && setPicking(key)}
+                      className={cn("h-14 border-t border-border first:border-t-0", !all && "cursor-pointer hover:bg-muted")}
+                    >
+                      <td className="px-4 py-2">
+                        {subjectsOf(members).map((x) => (
+                          <div key={x.id} className="py-0.5">
+                            <p className="truncate text-sm font-medium">{x.name_th}</p>
+                            <p className="text-xs tabular-nums text-muted-foreground">{x.code}</p>
+                          </div>
+                        ))}
+                      </td>
+                      <td className="px-4 py-0">
+                        <span className={cn("inline-flex rounded-md px-2 py-0.5 text-xs font-medium", levelTone(room))}>{room}</span>
+                      </td>
+                      {all && <td className="px-4 py-0">{teacherName}</td>}
+                      <td className="px-4 py-0 text-right">
+                        {!all && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNoExamFor(key);
+                            }}
+                          >
+                            ไม่มีสอบ
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {view === "cards" && [...groups].map(([key, members]) => {
         const memberSubjects = subjectsOf(members);
         const teacherName = all ? teacherNameById.get(members[0]?.teacher_id ?? "") : undefined;
         return (
@@ -307,8 +372,8 @@ function TopicPickerPage({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 items-center gap-2">
-        <Button size="icon" variant="ghost" onClick={onClose} aria-label="ย้อนกลับ">
-          <ChevronBack className="h-4 w-4" />
+        <Button size="icon" variant="outline" className={ICON_BTN} onClick={onClose} aria-label="ย้อนกลับ">
+          <ChevronBack className={ICON} />
         </Button>
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold">เลือกหัวข้อการสอบ</h2>
@@ -461,7 +526,8 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
             {withdrawable.length > 0 && (
               <Button
                 size="icon"
-                variant="ghost"
+                variant="outline"
+                className={ICON_BTN}
                 aria-label="ลบชุดหัวข้อ"
                 title="ลบชุดหัวข้อ"
                 disabled={deleteSet.isPending}
@@ -470,7 +536,7 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
                   void withdraw(withdrawable);
                 }}
               >
-                <TrashIcon className="h-4 w-4" />
+                <TrashIcon className={ICON} />
               </Button>
             )}
             {createable.length > 0 && (
@@ -491,8 +557,8 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
 
   return (
     <div className="flex flex-1 flex-col gap-3">
-      <div className="flex shrink-0 items-center justify-end gap-2">
-        <Select className="w-40 shrink-0 sm:w-48" aria-label="สถานะ" value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
+      <div className="flex shrink-0 items-center gap-2">
+        <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:w-64 sm:pr-8" aria-label="สถานะ" value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
           {FILTERS.map((f) => (
             <option key={f} value={f}>
               {STATUS_LABEL[f]} ({count(f)})
@@ -500,20 +566,7 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
           ))}
         </Select>
 
-        <div className="ml-auto flex shrink-0 rounded-lg bg-muted p-0.5" role="group" aria-label="มุมมอง">
-          {(["cards", "table"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              aria-pressed={view === v}
-              aria-label={v === "cards" ? "มุมมองการ์ด" : "มุมมองตาราง"}
-              onClick={() => setView(v)}
-              className={cn("flex h-8 w-9 items-center justify-center rounded-md", view === v ? "bg-background shadow-sm" : "text-muted-foreground")}
-            >
-              {v === "cards" ? <AppsIcon className="h-4 w-4" /> : <ListIcon className="h-4 w-4" />}
-            </button>
-          ))}
-        </div>
+        <ViewToggle value={view} onChange={setView} className="ml-auto" />
       </div>
 
       {isLoading ? (
@@ -522,7 +575,15 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
             title={filter === "pending" ? "ไม่มีชุดหัวข้อที่รออนุมัติ" : "ไม่มีรายการ"}
-            description={mineOf ? "ชุดหัวข้อที่ส่งขออนุมัติจะแสดงที่นี่" : undefined}
+            description={
+              mineOf
+                ? "ชุดหัวข้อที่ส่งขออนุมัติจะแสดงที่นี่"
+                : filter === "pending"
+                  ? "เมื่อครูส่งชุดหัวข้อขออนุมัติ จะแสดงที่นี่ให้ตรวจและอนุมัติ"
+                  : filter === "approved"
+                    ? "ชุดหัวข้อที่อนุมัติแล้วจะแสดงที่นี่"
+                    : "ชุดหัวข้อที่ไม่อนุมัติจะแสดงที่นี่"
+            }
           />
         </div>
       ) : view === "table" ? (

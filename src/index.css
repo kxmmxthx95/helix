@@ -374,13 +374,18 @@
   /* Touch-sized controls on phones/tablets (iOS 44pt target, 40px here); desktop keeps the dense 32px.
      Call sites that ask for a tiny control (h-6/h-7) keep it. */
   @media (max-width: 767px) {
-    .ui-control:not([class*="h-6"]):not([class*="h-7"]) {
+    .ui-control:not([class*="h-6"]):not([class*="h-7"]):not(.ui-control-compact) {
       min-height: 2.5rem;
     }
-    .ui-control-icon:not([class*="h-6"]):not([class*="h-7"]) {
+    .ui-control-icon:not([class*="h-6"]):not([class*="h-7"]):not(.ui-control-compact) {
       min-height: 2.5rem;
       min-width: 2.5rem;
     }
+  }
+
+  /* Opt out of the phone touch height for a dense toolbar button; pair with h-7 (or h-6) and sm:h-9 for desktop. */
+  .ui-control-compact {
+    min-height: 0;
   }
 
   /* POS (tablet, cashiers 40–60): set on <html> while the POS is open, so its modals get it too.

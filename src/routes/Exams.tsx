@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { ViewToggle } from "@/components/ViewToggle";
 import { useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
-import { AlertTriangle, AppsIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, PencilIcon, Plus, StarIcon, TrashIcon, X } from "@/components/icons";
+import { AlertTriangle, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, Select, Skeleton, Switch } from "@/components/ui";
@@ -56,6 +57,7 @@ import type { ExamAttempt, ExamSecurityEventType, ExamSession, ExamTopicSet, Stu
 import { EXAM_KINDS, examLabel } from "@/lib/examKinds";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { canApproveExams } from "@/lib/roles";
+import { ICON, ICON_BTN } from "@/lib/iconButton";
 import { cn } from "@/lib/utils";
 
 /** Both teacher (create/manage sessions) and student/parent (take exams) render from here — role-branched, same as Assignments.tsx/ScoreRecording.tsx. See migration 0047. */
@@ -86,7 +88,7 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
     ...(canApprove ? ([["approve", pending > 0 ? `อนุมัติสอบ (${pending})` : "อนุมัติสอบ"]] as [StaffTab, string][]) : []),
   ];
   return (
-    <div className="page-fill">
+    <div className="page-fill gap-2">
       {tabs.length > 1 && (
         <div className="flex w-full shrink-0 flex-wrap border-b border-border" role="tablist">
           {tabs.map(([key, label]) => {
@@ -208,22 +210,9 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
   };
   const scheduled = sessions.filter((x) => x.opens_at).sort((a, b) => a.opens_at!.localeCompare(b.opens_at!));
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 pt-1">
       <div className="flex shrink-0 justify-end">
-        <div className="flex rounded-lg bg-muted p-0.5" role="group" aria-label="มุมมอง">
-          {(["cards", "table"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              aria-pressed={view === v}
-              aria-label={v === "cards" ? "มุมมองการ์ด" : "มุมมองตาราง"}
-              onClick={() => setView(v)}
-              className={cn("flex h-7 w-8 items-center justify-center rounded-md sm:h-8 sm:w-9", view === v ? "bg-background shadow-sm" : "text-muted-foreground")}
-            >
-              {v === "cards" ? <AppsIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <ListIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
-            </button>
-          ))}
-        </div>
+        <ViewToggle value={view} onChange={setView} />
       </div>
       {view === "table" ? (
         <div className="table-panel flex rounded-none border-t border-border shadow-none">
@@ -364,25 +353,12 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
   }
 
   return (
-    <div className="page-fill">
+    <div className="page-fill gap-3 pt-1">
       <div className="flex shrink-0 items-center justify-end gap-2">
-        <Button size="sm" className="h-8 gap-1 px-2.5 text-xs sm:h-9 sm:px-3 sm:text-sm" onClick={() => setCreating(true)} disabled={assignments.length === 0}>
+        <Button size="sm" className="ui-control-compact h-8 gap-1 px-2.5 text-xs sm:px-3 sm:text-sm" onClick={() => setCreating(true)} disabled={assignments.length === 0}>
           <Plus className="h-3 w-3" /> เปิดสอบใหม่
         </Button>
-        <div className="flex rounded-lg bg-muted p-0.5" role="group" aria-label="มุมมอง">
-          {(["cards", "table"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              aria-pressed={view === v}
-              aria-label={v === "cards" ? "มุมมองการ์ด" : "มุมมองตาราง"}
-              onClick={() => setView(v)}
-              className={cn("flex h-7 w-8 items-center justify-center rounded-md sm:h-8 sm:w-9", view === v ? "bg-background shadow-sm" : "text-muted-foreground")}
-            >
-              {v === "cards" ? <AppsIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <ListIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
-            </button>
-          ))}
-        </div>
+        <ViewToggle value={view} onChange={setView} />
       </div>
 
       {isLoading ? (
@@ -423,7 +399,7 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
           <EmptyState title="ยังไม่มีการเปิดสอบ" description="กด “เปิดสอบใหม่” เพื่อเลือกข้อสอบจากคลังมาจัดสอบ" />
         </div>
       ) : view === "cards" ? (
-        <ul className="-mx-1 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-1 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-1">
+        <ul className="-mx-1 -mt-1 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-1 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-1">
           {sessions.map((s) => {
             const roomSubjects = (sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]).map((id) => subjectById.get(id)).filter((x): x is Subject => !!x);
             const owner = ownerById.get(s.teacher_id);
@@ -477,7 +453,8 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
                       />
                       <Button
                         size="icon"
-                        variant="ghost"
+                        variant="outline"
+                        className={ICON_BTN}
                         aria-label="ลบ"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -485,7 +462,7 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
                           deleteSession.mutate(s.id, { onError: () => toast("ลบไม่สำเร็จ", "error") });
                         }}
                       >
-                        <X className="h-3 w-3" />
+                        <X className={ICON} />
                       </Button>
                     </div>
                   </div>
@@ -562,7 +539,8 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
                       <td className="px-4 py-0 text-right">
                         <Button
                           size="icon"
-                          variant="ghost"
+                          variant="outline"
+                          className={ICON_BTN}
                           aria-label="ลบ"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -570,7 +548,7 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
                             deleteSession.mutate(s.id, { onError: () => toast("ลบไม่สำเร็จ", "error") });
                           }}
                         >
-                          <X className="h-3 w-3" />
+                          <X className={ICON} />
                         </Button>
                       </td>
                     </tr>
@@ -882,10 +860,10 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         : { label: "ปิดสอบแล้ว", dot: "bg-muted-foreground" };
 
   return (
-    <div className="page-fill">
+    <div className="page-fill gap-3 pt-1">
       <div className="toolbar shrink-0">
-        <Button size="icon" variant="outline" onClick={onBack} aria-label="ย้อนกลับ">
-          <ChevronBack className="h-4 w-4" />
+        <Button size="icon" variant="outline" className={ICON_BTN} onClick={onBack} aria-label="ย้อนกลับ">
+          <ChevronBack className={ICON} />
         </Button>
         <div className="min-w-0 flex-1">
           <p className="font-heading truncate text-base font-semibold">
@@ -901,13 +879,13 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
           </p>
         </div>
         {eventCount > 0 && (
-          <Button variant="outline" onClick={() => setEventsOpen(true)} aria-label="เหตุการณ์ผิดปกติ" title="เหตุการณ์ผิดปกติ">
-            <AlertTriangle className="h-4 w-4" />
+          <Button variant="outline" className="ui-control-compact h-7 sm:h-8" onClick={() => setEventsOpen(true)} aria-label="เหตุการณ์ผิดปกติ" title="เหตุการณ์ผิดปกติ">
+            <AlertTriangle className={ICON} />
             <span className="tabular-nums">{eventCount}</span>
           </Button>
         )}
-        <Button variant="outline" size="icon" onClick={() => setSettingsOpen(true)} aria-label="ตั้งค่า" title="ตั้งค่า">
-          <SettingsIcon className="h-4 w-4" />
+        <Button variant="outline" size="icon" className={ICON_BTN} onClick={() => setSettingsOpen(true)} aria-label="ตั้งค่า" title="ตั้งค่า">
+          <SettingsIcon className={ICON} />
         </Button>
       </div>
 
@@ -932,7 +910,10 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         onClick={() => setEditingQuestions((v) => !v)}
         className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
-        เพิ่มข้อสอบ
+        <span className="flex items-center gap-2 font-medium text-foreground">
+          <IconTile tone="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"><Plus className="h-4 w-4" /></IconTile>
+          เพิ่มข้อสอบ
+        </span>
         <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", editingQuestions && "rotate-90")} />
       </button>
 
@@ -970,11 +951,14 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
             onClick={() => setRosterOpen((v) => !v)}
             className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
           >
-            <span className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-right">
-              <span className="font-medium">นักเรียน {rosterRows.length} คน</span>
-              <span className="text-muted-foreground">ส่งแล้ว {count("submitted")}</span>
-              <span className="text-muted-foreground">กำลังทำ {count("in_progress")}</span>
-              <span className="text-muted-foreground">ยังไม่เข้าสอบ {count("none")}</span>
+            <span className="flex shrink-0 items-center gap-2">
+              <IconTile tone="bg-violet-500/15 text-violet-700 dark:text-violet-300"><PeopleIcon className="h-4 w-4" /></IconTile>
+              <span className="font-medium text-foreground">นักเรียน {rosterRows.length} คน</span>
+            </span>
+            <span className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-right">
+              <span className="text-foreground/75">ส่งแล้ว {count("submitted")}</span>
+              <span className="text-foreground/75">กำลังทำ {count("in_progress")}</span>
+              <span className="text-foreground/75">ยังไม่เข้าสอบ {count("none")}</span>
               {count("locked") > 0 && <span className="text-destructive">ถูกล็อก {count("locked")}</span>}
             </span>
             <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", rosterOpen && "rotate-90")} />
@@ -1090,6 +1074,31 @@ function SecurityPanel({ session, attempts }: { session: ExamSession; attempts: 
 }
 
 /** One bank question as in คลังข้อสอบ: number, prompt, badges, choices with the correct ones ticked. */
+/** Placeholder with the same shape as a question row (number, prompt, badges, four choices). */
+function QuestionSkeleton() {
+  return (
+    <div className="flex gap-3 p-3" role="status" aria-label="กำลังโหลด">
+      <Skeleton className="h-6 w-6 shrink-0 rounded-md" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <Skeleton className="h-4 w-3/4" />
+        <div className="flex gap-1.5">
+          <Skeleton className="h-4 w-12 rounded-full" />
+          <Skeleton className="h-4 w-20 rounded-full" />
+          <Skeleton className="h-4 w-14" />
+        </div>
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-8 w-full rounded-md" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Tinted square behind a card-header icon. */
+function IconTile({ tone, children }: { tone: string; children: React.ReactNode }) {
+  return <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", tone)}>{children}</span>;
+}
+
 const CHOICE_LETTERS = ["ก", "ข", "ค", "ง", "จ", "ฉ"];
 
 function QuestionBody({ q, i }: { q: ExamQuestionWithChoices; i: number }) {
@@ -1129,34 +1138,50 @@ function QuestionBody({ q, i }: { q: ExamQuestionWithChoices; i: number }) {
 /** Collapsible card listing the questions already in the room. */
 function SessionQuestionList({ session, sessionQuestions }: { session: ExamSession; sessionQuestions: ExamSessionQuestionRow[] }) {
   const [open, setOpen] = useState(false);
+  // Start fetching on hover/focus so the data is already there when the card opens.
+  const [warm, setWarm] = useState(false);
   const [editingQ, setEditingQ] = useState<ExamQuestionWithChoices | null>(null);
   const { profile } = useAuth();
   const remove = useRemoveSessionQuestion();
   const toast = useToast();
-  const { data: roomSets } = useSessionSets(open ? [session.id] : []);
+  const fetchBank = warm || open;
+  const { data: roomSets } = useSessionSets(fetchBank ? [session.id] : []);
   const subjectIds = (roomSets?.get(session.id) ?? []).map((x) => x.subject_id);
-  const { data: bank = [] } = useExamQuestionsOf(open ? (subjectIds.length > 0 ? subjectIds : [session.subject_id]) : []);
+  const { data: bank = [], isLoading: bankLoading } = useExamQuestionsOf(fetchBank ? (subjectIds.length > 0 ? subjectIds : [session.subject_id]) : []);
   const byId = new Map(bank.map((q) => [q.id, q]));
   const chosen = sessionQuestions.map((r) => byId.get(r.question_id)).filter((q): q is ExamQuestionWithChoices => !!q);
+  // Every row is a stack of rich-text/math editors; mounting 20 at once stalls the opening animation. Mount a few
+  // after the card starts opening, then the rest in small batches. Once mounted they stay, so reopening is instant.
+  const [mounted, setMounted] = useState(0);
+  useEffect(() => {
+    if (!open || mounted >= chosen.length) return;
+    const t = setTimeout(() => setMounted((n) => Math.min(chosen.length, n + (n === 0 ? 3 : 5))), mounted === 0 ? 150 : 40);
+    return () => clearTimeout(t);
+  }, [open, mounted, chosen.length]);
   return (
     <div className="shrink-0 overflow-hidden rounded-lg border border-border">
-      <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset">
-        รายการข้อสอบ ({sessionQuestions.length} ข้อ)
+      <button type="button" aria-expanded={open} onPointerEnter={() => setWarm(true)} onFocus={() => setWarm(true)} onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset">
+        <span className="flex items-center gap-2 font-medium text-foreground">
+          <IconTile tone="bg-sky-500/15 text-sky-700 dark:text-sky-300"><DocumentTextIcon className="h-4 w-4" /></IconTile>
+          รายการข้อสอบ
+          <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-sky-700 dark:text-sky-300">{sessionQuestions.length} ข้อ</span>
+        </span>
         <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", open && "rotate-90")} />
       </button>
       <Collapse open={open}>
         <div className="divide-y divide-border border-t border-border bg-card">
-          {chosen.length === 0 && <p className="p-3 text-xs text-muted-foreground">ยังไม่มีข้อสอบในห้องนี้</p>}
-          {chosen.map((q, i) => (
-            <div key={q.id} className="flex items-start gap-2 p-3">
+          {sessionQuestions.length === 0 && <p className="p-3 text-xs text-muted-foreground">ยังไม่มีข้อสอบในห้องนี้</p>}
+          {chosen.slice(0, mounted).map((q, i) => (
+            <div key={q.id} className="flex items-start gap-2 p-3 [contain-intrinsic-size:auto_260px] [content-visibility:auto]">
               <div className="min-w-0 flex-1"><QuestionBody q={q} i={i} /></div>
-              <div className="flex shrink-0 items-center">
-              <Button size="icon" variant="ghost" aria-label="แก้ไขข้อสอบ" title="แก้ไขข้อสอบ" onClick={() => setEditingQ(q)}>
-                <PencilIcon className="h-4 w-4" />
+              <div className="flex shrink-0 items-center gap-1.5">
+              <Button size="icon" variant="outline" className={ICON_BTN} aria-label="แก้ไขข้อสอบ" title="แก้ไขข้อสอบ" onClick={() => setEditingQ(q)}>
+                <PencilIcon className={ICON} />
               </Button>
               <Button
                 size="icon"
-                variant="ghost"
+                variant="outline"
+                className={ICON_BTN}
                 aria-label="ลบข้อสอบออกจากห้อง"
                 title="ลบข้อสอบออกจากห้อง"
                 disabled={remove.isPending}
@@ -1164,11 +1189,15 @@ function SessionQuestionList({ session, sessionQuestions }: { session: ExamSessi
                   if (confirm("ลบข้อสอบข้อนี้ออกจากห้อง?")) remove.mutate({ sessionId: session.id, questionId: q.id }, { onError: () => toast("ลบข้อสอบไม่สำเร็จ", "error") });
                 }}
               >
-                <TrashIcon className="h-4 w-4" />
+                <TrashIcon className={ICON} />
               </Button>
               </div>
             </div>
           ))}
+          {open &&
+            Array.from({ length: bankLoading ? Math.min(3, sessionQuestions.length) : Math.min(2, Math.max(0, chosen.length - mounted)) }, (_, i) => (
+              <QuestionSkeleton key={`sk${i}`} />
+            ))}
         </div>
       </Collapse>
       {/* Keyed so the form remounts with the picked question; its state is seeded once on mount. */}
