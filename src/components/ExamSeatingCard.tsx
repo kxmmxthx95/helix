@@ -37,7 +37,7 @@ type Picked = { kind: "seat"; room: string; row: number; col: number } | { kind:
 type TakenSeat = { title: string; student_name: string; student_code: string; seat_row: number; seat_col: number; seat_rows: number; seat_cols: number };
 
 /** Seat badge tint per column, cycling, so columns read apart at a glance. */
-const COL_TONES = [
+export const COL_TONES = [
   "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   "bg-violet-500/15 text-violet-700 dark:text-violet-300",
   "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",

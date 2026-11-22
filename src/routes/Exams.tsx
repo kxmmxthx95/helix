@@ -6,7 +6,7 @@ import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { AlertTriangle, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ExamSeatingCard, seatLabel } from "@/components/ExamSeatingCard";
+import { COL_TONES, ExamSeatingCard, seatLabel } from "@/components/ExamSeatingCard";
 import { useMyExamSeats, useSeatTemplates, useSessionRoomIds, useSessionRooms, useSessionSeats, useSessionsWithSeating, useSetRoomPhysical, useSpecialSeats } from "@/hooks/useExamSeating";
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
@@ -1624,7 +1624,12 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
   );
   const [params, setParams] = useSearchParams();
   const subjectCode = params.get("subject");
-  const { data: subjects = [] } = useSubjectsByIds(subjectCode ? [...new Set(allExams.flatMap((e) => e.subject_ids))] : []);
+  const { data: subjects = [] } = useSubjectsByIds([...new Set(allExams.flatMap((e) => e.subject_ids))]);
+  const colors = useSubjectColors([]);
+  const { data: rooms = [] } = useClassroomsByIds(classroom ? [classroom.classroomId] : []);
+  const { data: roomGrades = [] } = useGradeLevelsByIds(rooms.map((c) => c.grade_level_id));
+  const roomGrade = roomGrades.find((g) => g.id === rooms[0]?.grade_level_id);
+  const roomLabel = rooms[0] && roomGrade ? `${gradeShortLabel(roomGrade.code)}/${rooms[0].name}` : null;
   const subjectId = subjects.find((s) => s.code === subjectCode)?.id;
   const exams = subjectCode ? allExams.filter((e) => !!subjectId && e.subject_ids.includes(subjectId)) : allExams;
   const clearFilter = subjectCode && (
@@ -1657,24 +1662,41 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
         const isOpen = now >= opens && now <= closes;
         const usedUp = e.my_attempts >= e.max_attempts;
         return (
-          <Card key={e.id} className="flex items-center justify-between gap-2 text-xs">
-            <div className="min-w-0 flex-1">
-              <p className="font-medium">{e.title}</p>
-              <p className="text-muted-foreground">
-                {isOpen ? "กำลังเปิดสอบ" : now < opens ? "ยังไม่เปิดสอบ" : "ปิดสอบแล้ว"} · ทำแล้ว {e.my_attempts}/{e.max_attempts} ครั้ง
-              </p>
+          <Card key={e.id} className="flex flex-col gap-3 text-xs">
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <p className="min-w-0 text-sm font-semibold">{e.subject_ids.map((id) => subjects.find((x) => x.id === id)?.name_th).filter(Boolean).join(" / ") || e.title}</p>
+                <span className="shrink-0 text-muted-foreground">ทำแล้ว {e.my_attempts}/{e.max_attempts} ครั้ง</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {e.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(e.round))}>ครั้งที่ {e.round}</span>}
+                {e.subject_ids.map((id) => subjects.find((x) => x.id === id)).filter((x) => !!x).map((sub) => (
+                  <span key={sub.id} className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", colors.shade(sub.learning_area_id))}>{sub.code}</span>
+                ))}
+                {roomLabel && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabel))}>{roomLabel}</span>}
+              </div>
+              {now >= opens && <p className="text-muted-foreground">{isOpen ? "กำลังเปิดสอบ" : "ปิดสอบแล้ว"}</p>}
               {seat && now <= closes && (
-                <div className="mt-2 rounded-lg bg-muted/60 px-2.5 py-2">
-                  <p className="font-medium">
-                    {opens.toLocaleDateString("th-TH", { dateStyle: "medium" })} {opens.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}–{closes.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}
-                  </p>
-                  <p className="text-muted-foreground">
-                    {seat.room ? `ห้อง ${seat.room}` : "ยังไม่กำหนดห้อง"} · {seat.seat ? `ที่นั่ง ${seatLabel(seat.seat.row, seat.seat.col)}` : "ยังไม่กำหนดที่นั่ง"}
-                  </p>
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/60 px-2.5 py-2.5">
+                  <div className="min-w-0 space-y-1">
+                    <p className="font-medium">{opens.toLocaleDateString("th-TH", { dateStyle: "medium" })}</p>
+                    <p className="font-medium">
+                      {opens.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}–{closes.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.
+                    </p>
+                    <p className="font-medium">{seat.room ? `ห้อง ${seat.room}` : "ยังไม่กำหนดห้อง"}</p>
+                  </div>
+                  {seat.seat ? (
+                    <div className={cn("flex shrink-0 flex-col items-center justify-center rounded-xl px-4 py-2", COL_TONES[(seat.seat.col - 1) % COL_TONES.length])}>
+                      <span className="text-[10px] font-medium opacity-80">ที่นั่ง</span>
+                      <span className="text-2xl font-bold leading-none tabular-nums">{seatLabel(seat.seat.row, seat.seat.col)}</span>
+                    </div>
+                  ) : (
+                    <span className="shrink-0 text-muted-foreground">ยังไม่กำหนดที่นั่ง</span>
+                  )}
                 </div>
               )}
             </div>
-            <Button size="sm" disabled={!isOpen || usedUp} onClick={() => onOpen(e)}>
+            <Button size="sm" className="w-full" disabled={!isOpen || usedUp} onClick={() => onOpen(e)}>
               {usedUp ? "ทำครบแล้ว" : "เข้าสอบ"}
             </Button>
           </Card>
