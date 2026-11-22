@@ -109,8 +109,8 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
       </button>
       <Collapse open={open}>
         <div className="space-y-3 border-t border-border bg-card p-3">
-          {top}
           <div className="flex flex-wrap items-center gap-2">
+            {top}
             <Select
               aria-label="Template ผังที่นั่ง"
               placeholder="เลือก template ผังที่นั่ง"
