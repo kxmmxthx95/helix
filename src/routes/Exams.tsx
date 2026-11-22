@@ -364,7 +364,7 @@ function ScheduleCard({ session }: { session: ExamSession }) {
         className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
         <span className="flex shrink-0 items-center gap-2">
-          <IconTile tone="bg-muted text-foreground"><CalendarIcon className="h-4 w-4" /></IconTile>
+          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><CalendarIcon className="h-4 w-4" /></IconTile>
           <span className="font-semibold text-foreground">เวลาสอบ</span>
         </span>
         <span className="flex min-w-0 items-center gap-2 text-right text-foreground">
@@ -1164,7 +1164,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
             className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
           >
             <span className="flex shrink-0 items-center gap-2">
-              <IconTile tone="bg-muted text-foreground"><PeopleIcon className="h-4 w-4" /></IconTile>
+              <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><PeopleIcon className="h-4 w-4" /></IconTile>
               <span className="font-semibold text-foreground">นักเรียน {rosterRows.length} คน</span>
             </span>
             <span className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-right">
@@ -1221,7 +1221,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
         <span className="flex items-center gap-2 font-semibold text-foreground">
-          <IconTile tone="bg-muted text-foreground"><Plus className="h-4 w-4" /></IconTile>
+          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><Plus className="h-4 w-4" /></IconTile>
           เพิ่มข้อสอบ
         </span>
         <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", editingQuestions && "rotate-90")} />
@@ -1281,7 +1281,7 @@ function SessionTopicsCard({ session }: { session: ExamSession }) {
         className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
         <span className="flex items-center gap-2">
-          <IconTile tone="bg-muted text-foreground"><ListIcon className="h-4 w-4" /></IconTile>
+          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><ListIcon className="h-4 w-4" /></IconTile>
           <span className="font-semibold text-foreground">หัวข้อการสอบ</span>
         </span>
         <span className="ml-auto rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success">{topics.length} หัวข้อ</span>
@@ -1356,7 +1356,7 @@ function ExamSettingsCard({ session }: { session: ExamSession }) {
         className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
         <span className="flex shrink-0 items-center gap-2">
-          <IconTile tone="bg-muted text-foreground"><SettingsIcon className="h-4 w-4" /></IconTile>
+          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><SettingsIcon className="h-4 w-4" /></IconTile>
           <span className="font-semibold text-foreground">ตั้งค่าห้องสอบ</span>
         </span>
         <span className="flex min-w-0 items-center gap-2 text-right text-foreground">
@@ -1539,7 +1539,7 @@ function SessionQuestionList({ session, sessionQuestions }: { session: ExamSessi
     <div className="shrink-0 overflow-hidden rounded-lg border border-border">
       <button type="button" aria-expanded={open} onPointerEnter={() => setWarm(true)} onFocus={() => setWarm(true)} onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset">
         <span className="flex items-center gap-2 font-semibold text-foreground">
-          <IconTile tone="bg-muted text-foreground"><DocumentTextIcon className="h-4 w-4" /></IconTile>
+          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><DocumentTextIcon className="h-4 w-4" /></IconTile>
           รายการข้อสอบ
         </span>
         <span className="flex shrink-0 items-center gap-2">

@@ -1,8 +1,8 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { ExamSeatTemplate, ExamSession, ExamSessionRoom, ExamSessionSeat } from "@/lib/database.types";
+import type { ExamSeatTemplate, ExamSession, ExamSessionRoom, ExamSessionSeat, ExamSessionSpecialSeat } from "@/lib/database.types";
 
-// ผังห้องสอบ (migrations 0199, 0203): department seat templates + a session's rooms (each with its own grid) and seats.
+// ผังห้องสอบ (migrations 0199, 0203, 0204 special seats): department seat templates + a session's rooms (each with its own grid) and seats.
 
 export function useSeatTemplates() {
   return useQuery({
@@ -84,6 +84,7 @@ export function useSessionSeats(sessionId: string | null) {
 const refreshRooms = (qc: ReturnType<typeof useQueryClient>, sessionId: string) => {
   void qc.invalidateQueries({ queryKey: ["exam_session_rooms"] });
   void qc.invalidateQueries({ queryKey: ["exam_session_seats", sessionId] });
+  void qc.invalidateQueries({ queryKey: ["exam_session_special_seats", sessionId] }); // removing a room drops its special seats
   void qc.invalidateQueries({ queryKey: ["exam_sessions"] }); // room 1 mirrors exam_sessions.room_id
 };
 
@@ -142,7 +143,10 @@ export function useSetSessionSeats() {
       const { error } = await supabase.rpc("set_exam_session_seats", { p_session: sessionId, p_seats: seats });
       if (error) throw error;
     },
-    onSettled: (_d, _e, v) => void qc.invalidateQueries({ queryKey: ["exam_session_seats", v.sessionId] }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: ["exam_session_seats", v.sessionId] });
+      void qc.invalidateQueries({ queryKey: ["exam_session_special_seats", v.sessionId] }); // a student placed in the grid leaves their special seat
+    },
   });
 }
 
@@ -174,4 +178,56 @@ export function useRoomsConflictSeats(session: ExamSession, rooms: ExamSessionRo
     })),
   });
   return new Map(rooms.map((r, i) => [r.id, results[i]?.data ?? []]));
+}
+
+/** Special seats (ที่นั่งพิเศษ) of a session, outside the template grid. */
+export function useSpecialSeats(sessionId: string | null) {
+  return useQuery({
+    queryKey: ["exam_session_special_seats", sessionId],
+    enabled: !!sessionId,
+    queryFn: async (): Promise<ExamSessionSpecialSeat[]> => {
+      const { data, error } = await supabase.from("exam_session_special_seats").select("*").eq("session_id", sessionId!).order("special_no");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** Adds the next free special seat to a room row; the database picks the number. */
+export function useAddSpecialSeat() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ roomRowId }: { sessionId: string; roomRowId: string }) => {
+      const { error } = await supabase.rpc("add_exam_special_seat", { p_room_row: roomRowId });
+      if (error) throw error;
+    },
+    onSettled: (_d, _e, v) => void qc.invalidateQueries({ queryKey: ["exam_session_special_seats", v.sessionId] }),
+  });
+}
+
+/** Seats a student in a special seat (null empties it). The student leaves their grid seat; a displaced occupant becomes unseated. */
+export function useSetSpecialSeat() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ seatId, studentId }: { sessionId: string; seatId: string; studentId: string | null }) => {
+      const { error } = await supabase.rpc("set_exam_special_seat", { p_seat: seatId, p_student: studentId });
+      if (error) throw error;
+    },
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: ["exam_session_special_seats", v.sessionId] });
+      void qc.invalidateQueries({ queryKey: ["exam_session_seats", v.sessionId] });
+    },
+  });
+}
+
+/** Deletes a special seat; whoever sat there becomes unseated. */
+export function useDeleteSpecialSeat() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ seatId }: { sessionId: string; seatId: string }) => {
+      const { error } = await supabase.from("exam_session_special_seats").delete().eq("id", seatId);
+      if (error) throw error;
+    },
+    onSettled: (_d, _e, v) => void qc.invalidateQueries({ queryKey: ["exam_session_special_seats", v.sessionId] }),
+  });
 }

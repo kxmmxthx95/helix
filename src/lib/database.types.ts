@@ -850,6 +850,7 @@ export type ExamSeatTemplate = {
 export type ExamSessionSeating = { session_id: string; seat_rows: number; seat_cols: number; template_id: string | null; updated_at: string };
 /** One room of an exam session (migration 0203): the physical room, and its grid copied from a seat template (null until one is picked). Position 1 is the first room. */
 export type ExamSessionRoom = { id: string; session_id: string; position: number; room_id: string | null; seat_rows: number | null; seat_cols: number | null; template_id: string | null };
+export type ExamSessionSpecialSeat = { id: string; session_id: string; session_room_id: string; special_no: number; student_id: string | null };
 export type ExamSessionSeat = { session_id: string; session_room_id: string; student_id: string; seat_row: number; seat_col: number };
 export type ExamApprovalStatus = "draft" | "pending" | "approved" | "rejected";
 
@@ -1990,6 +1991,7 @@ export type Database = {
       exam_session_seating: Table<ExamSessionSeating, InsertOf<ExamSessionSeating, "template_id" | "updated_at">>;
       exam_session_rooms: Table<ExamSessionRoom, InsertOf<ExamSessionRoom, "id" | "room_id" | "seat_rows" | "seat_cols" | "template_id">>;
       exam_session_seats: Table<ExamSessionSeat, ExamSessionSeat>;
+      exam_session_special_seats: Table<ExamSessionSpecialSeat, never>;
       exam_session_questions: Table<ExamSessionQuestion, ExamSessionQuestion>;
       exam_attempts: Table<
         ExamAttempt,
@@ -2059,6 +2061,14 @@ export type Database = {
       add_exam_session_room: {
         Args: { p_session: string };
         Returns: string;
+      };
+      add_exam_special_seat: {
+        Args: { p_room_row: string };
+        Returns: string;
+      };
+      set_exam_special_seat: {
+        Args: { p_seat: string; p_student: string | null };
+        Returns: void;
       };
       exam_room_conflicts: {
         Args: { p_room: string; p_opens: string; p_closes: string; p_exclude?: string | null };
