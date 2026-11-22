@@ -72,14 +72,17 @@ export function ExamSeatingCard({
   session,
   students,
   roomPicker,
+  defaultOpen = false,
 }: {
+  defaultOpen?: boolean;
   session: ExamSession;
   students: SeatStudent[];
   /** Physical-room picker of one room row (`usedRoomIds`: physical rooms already used by the session). */
   roomPicker?: (room: ExamSessionRoom, usedRoomIds: string[]) => React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [managing, setManaging] = useState(false);
+  const [roomTab, setRoomTab] = useState(0);
   const [clearing, setClearing] = useState<string | null>(null);
   const [removing, setRemoving] = useState<ExamSessionRoom | null>(null);
   const [removingSpecial, setRemovingSpecial] = useState<ExamSessionSpecialSeat | null>(null);
@@ -125,6 +128,7 @@ export function ExamSeatingCard({
     const held = heldOf(r);
     return Array.from({ length: rows * cols }, (_, i) => ({ room: r.id, seat_row: Math.floor(i / cols) + 1, seat_col: (i % cols) + 1 })).filter((c) => !held.has(`${c.seat_row}:${c.seat_col}`));
   };
+  const tabIdx = Math.min(roomTab, Math.max(0, rooms.length - 1));
   const anyGrid = rooms.some((r) => r.seat_rows != null);
   const missing = Math.max(0, students.length - rooms.reduce((n, r) => n + freeCells(r).length, 0));
   const busy = setSeats.isPending || applyTemplate.isPending || addRoom.isPending || removeRoom.isPending || addSpecial.isPending || setSpecial.isPending || deleteSpecial.isPending;
@@ -467,7 +471,26 @@ export function ExamSeatingCard({
             </div>
           )}
 
-          {rooms.map(renderRoom)}
+          {rooms.length > 1 && (
+            <div className="flex w-full border-b border-border" role="tablist">
+              {rooms.map((r, i) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tabIdx === i}
+                  onClick={() => setRoomTab(i)}
+                  className={cn(
+                    "-mb-px flex-1 border-b-2 px-2 py-2 text-xs font-medium whitespace-nowrap",
+                    tabIdx === i ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  ห้องที่ {i + 1}
+                </button>
+              ))}
+            </div>
+          )}
+          {rooms.length > 1 ? renderRoom(rooms[tabIdx]!, tabIdx) : rooms.map(renderRoom)}
 
           {anyGrid && missing > 0 && (
             <div role="alert" className="flex flex-wrap items-center gap-2 rounded-xl bg-[hsl(var(--warning)/0.12)] px-3 py-2 text-xs text-warning">

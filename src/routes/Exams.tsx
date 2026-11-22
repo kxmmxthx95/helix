@@ -333,7 +333,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
           ))}
         </div>
       )}
-      {editing && <ScheduleSheet session={editing} onClose={() => setEditing(null)} />}
+      {editing && <SeatingSheet session={editing} onClose={() => setEditing(null)} />}
     </div>
   );
 }
@@ -439,60 +439,24 @@ function windowParts(opens: string, closes: string) {
     : { date: `${day(o)} – ${day(c)}`, time: `${time(o)} – ${time(c)}` };
 }
 
-function ScheduleSheet({ session, onClose }: { session: ExamSession; onClose: () => void }) {
-  const [opensAt, setOpensAt] = useState(toLocalInput(session.opens_at));
-  const [closesAt, setClosesAt] = useState(toLocalInput(session.closes_at));
-  const update = useUpdateExamSession();
-  const toast = useToast();
-  const valid = !!opensAt && !!closesAt && new Date(closesAt) > new Date(opensAt);
-  // The room is set from its own button; changing the time still warns if the room is already taken then.
-
-  function save(e: React.FormEvent) {
-    e.preventDefault();
-    if (!valid) return;
-    update.mutate(
-      { id: session.id, opens_at: new Date(opensAt).toISOString(), closes_at: new Date(closesAt).toISOString() },
-      { onSuccess: onClose, onError: () => toast("บันทึกไม่สำเร็จ", "error") },
-    );
-  }
-
+/** Seating chart of one exam room from the timetable (time itself is edited in the room detail). */
+function SeatingSheet({ session, onClose }: { session: ExamSession; onClose: () => void }) {
+  const { data: targetIds = [] } = useExamSessionTargets(session.id);
+  const { data: assignments = [] } = useMyTeachingAssignments(session.teacher_id);
+  const targets = assignments.filter((a) => targetIds.includes(a.id)).map((a) => ({ classroom_id: a.classroom_id, academic_year: a.academic_year }));
+  const { data: roster = [], isLoading } = useSessionRoster(targets);
+  const { data: names } = useStudentNames(roster.map((r) => r.student_id));
+  const { data: avatars } = useStudentAvatars(roster.map((r) => r.student_id));
+  const students = roster
+    .map((r) => {
+      const full = names?.get(r.student_id) ?? "นักเรียน";
+      const [code, ...rest] = full.split(" ");
+      return { student_id: r.student_id, name: rest.length > 0 ? rest.join(" ") : full, code: rest.length > 0 ? code! : "", avatar: avatars?.get(r.student_id) ?? null };
+    })
+    .sort((a, b) => a.code.localeCompare(b.code, "th") || a.name.localeCompare(b.name, "th"));
   return (
-    <Sheet
-      open
-      onOpenChange={(o) => !o && onClose()}
-      title="ตั้งเวลาสอบ"
-      description={session.title}
-      footer={
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
-            ยกเลิก
-          </Button>
-          <Button type="submit" form="schedule-session" className="flex-1" disabled={!valid || update.isPending}>
-            บันทึก
-          </Button>
-        </div>
-      }
-    >
-      <form id="schedule-session" onSubmit={save} className="space-y-3">
-        <FormSection>
-          <Field label="เปิดสอบ" required>
-            <Input
-              type="datetime-local"
-              value={opensAt}
-              onChange={(e) => {
-                setOpensAt(e.target.value);
-                const end = session.duration_minutes ? closeAfter(e.target.value, session.duration_minutes) : null;
-                if (end) setClosesAt(end);
-              }}
-            />
-          </Field>
-          <Field label="ปิดสอบ" required>
-            <Input type="datetime-local" value={closesAt} min={opensAt} disabled={!!session.duration_minutes} onChange={(e) => setClosesAt(e.target.value)} />
-            {session.duration_minutes && <p className="text-xs text-muted-foreground">คำนวณจากเวลาทำ {session.duration_minutes} นาที</p>}
-          </Field>
-        </FormSection>
-        <p className="text-xs text-muted-foreground">นักเรียนจะเห็นและเข้าสอบได้เมื่อกำหนดเวลาแล้ว</p>
-      </form>
+    <Sheet open onOpenChange={(o) => !o && onClose()} title="ผังที่นั่ง" description={session.title}>
+      {isLoading ? <LoadingSpinner /> : <ExamSeatingCard defaultOpen session={session} roomPicker={(room, usedRoomIds) => <ExamRoomField session={session} room={room} usedRoomIds={usedRoomIds} />} students={students} />}
     </Sheet>
   );
 }
