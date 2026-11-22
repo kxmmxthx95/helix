@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ViewToggle } from "@/components/ViewToggle";
+import { ViewToggle, defaultView } from "@/components/ViewToggle";
 import { useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
@@ -165,7 +165,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
   const { data: owners = [] } = useProfilesByIds([...new Set(sessions.map((s) => s.teacher_id))]);
   const ownerById = new Map(owners.map((o) => [o.id, o]));
   const [editing, setEditing] = useState<ExamSession | null>(null);
-  const [view, setView] = useState<"cards" | "table">("cards");
+  const [view, setView] = useState<"cards" | "table">(defaultView);
   const [when, setWhen] = useState<"active" | "past" | "all">("active");
   const colors = useSubjectColors([]);
   // Physical rooms where each exam is sat (exam_session_rooms → rooms), first room first.
@@ -472,7 +472,7 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
   const { data: sessions = [], isLoading } = scope === "all" && canSeeAll ? all : mine;
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<ExamSession | null>(null);
-  const [view, setView] = useState<"cards" | "table">("cards");
+  const [view, setView] = useState<"cards" | "table">(defaultView);
   const [deleting, setDeleting] = useState<ExamSession | null>(null);
   const colors = useSubjectColors([]);
   const { data: questionCounts } = useSessionQuestionCounts(sessions.map((s) => s.id));

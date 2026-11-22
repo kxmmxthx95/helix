@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ViewToggle } from "@/components/ViewToggle";
+import { ViewToggle, defaultView } from "@/components/ViewToggle";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { ChevronBack, TrashIcon } from "@/components/icons";
@@ -68,7 +68,7 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
   const isLoading = all ? allLoading : mineLoading;
   const { data: teachers = [] } = useProfilesByIds(all ? [...new Set(everyone.map((a) => a.teacher_id).filter((x): x is string => !!x))] : []);
   const teacherNameById = new Map(teachers.map((t) => [t.id, `${t.first_name} ${t.last_name}`]));
-  const [view, setView] = useState<"cards" | "table">("cards");
+  const [view, setView] = useState<"cards" | "table">(defaultView);
   const scopeSelect = canSeeAll ? (
     <Select value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")} className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:w-64 sm:pr-8">
       <option value="mine">วิชาของฉัน</option>
@@ -477,7 +477,7 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
   const queue = mineOf ? mySets.filter((x) => x.approval_status !== "draft") : queueData;
   const isLoading = mineOf ? loadingMine : loadingQueue;
   const [filter, setFilter] = useState<Filter>("pending");
-  const [view, setView] = useState<"cards" | "table">("cards");
+  const [view, setView] = useState<"cards" | "table">(defaultView);
   const [selectedIds, setSelectedIds] = useState<string[] | null>(null);
   // "ยกเลิก" on a card opens the review sheet straight at the reason box (a rejection needs one).
   const [rejectFirst, setRejectFirst] = useState(false);

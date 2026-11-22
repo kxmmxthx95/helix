@@ -20,3 +20,6 @@ export function ViewToggle({ value, onChange, className }: { value: "cards" | "t
     </div>
   );
 }
+
+/** Initial view of a staff tab: table on desktop (same 1024px breakpoint as AppShell), cards on mobile. */
+export const defaultView = (): "cards" | "table" => (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches ? "table" : "cards");
