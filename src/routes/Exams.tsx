@@ -3,7 +3,8 @@ import { ViewToggle } from "@/components/ViewToggle";
 import { useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
-import { AlertTriangle, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon, X } from "@/components/icons";
+import { AlertTriangle, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, Select, Skeleton, Switch } from "@/components/ui";
@@ -426,6 +427,7 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<ExamSession | null>(null);
   const [view, setView] = useState<"cards" | "table">("cards");
+  const [deleting, setDeleting] = useState<ExamSession | null>(null);
   const colors = useSubjectColors([]);
   const { data: questionCounts } = useSessionQuestionCounts(sessions.map((s) => s.id));
   const deleteSession = useDeleteExamSession();
@@ -558,11 +560,10 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
                         aria-label="ลบ"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (!confirm(`ลบการเปิดสอบ "${s.title}"?`)) return;
-                          deleteSession.mutate(s.id, { onError: () => toast("ลบไม่สำเร็จ", "error") });
+                          setDeleting(s);
                         }}
                       >
-                        <X className={ICON} />
+                        <TrashIcon className={ICON} />
                       </Button>
                     </div>
                   </div>
@@ -644,11 +645,10 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
                           aria-label="ลบ"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (!confirm(`ลบการเปิดสอบ "${s.title}"?`)) return;
-                            deleteSession.mutate(s.id, { onError: () => toast("ลบไม่สำเร็จ", "error") });
+                            setDeleting(s);
                           }}
                         >
-                          <X className={ICON} />
+                          <TrashIcon className={ICON} />
                         </Button>
                       </td>
                     </tr>
@@ -661,6 +661,14 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
       )}
 
       <CreateSessionSheet open={creating} onOpenChange={setCreating} teacherId={teacherId} />
+      <ConfirmDialog
+        open={!!deleting}
+        title="ลบห้องสอบ?"
+        description={deleting ? `ลบการเปิดสอบ "${deleting.title}" ข้อสอบที่เลือกไว้และผลสอบของรอบนี้จะถูกลบด้วย และกู้คืนไม่ได้` : undefined}
+        pending={deleteSession.isPending}
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => deleting && deleteSession.mutate(deleting.id, { onSuccess: () => setDeleting(null), onError: () => toast("ลบไม่สำเร็จ", "error") })}
+      />
     </div>
   );
 }
