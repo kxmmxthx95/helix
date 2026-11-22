@@ -4,7 +4,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
 import { ChevronBack, TrashIcon } from "@/components/icons";
 import { useToast } from "@/components/Toast";
-import { Avatar, Button, EmptyState, Field, Input, Select, Skeleton, TableSkeleton } from "@/components/ui";
+import { Avatar, Button, EmptyState, Field, Input, PageSpinner, Select } from "@/components/ui";
 import { useClassroomsByIds, useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
 import {
   useAssignmentClassrooms,
@@ -119,25 +119,7 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
     return (
       <div className="flex flex-1 flex-col gap-2">
         {header}
-        {view === "table" ? (
-          <TableSkeleton headers={["วิชา", "ห้อง", ...(all ? ["ครูผู้สอน"] : []), ""]} />
-        ) : (
-          <div className="space-y-2" role="status" aria-label="กำลังโหลด">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-40" />
-                  <div className="flex gap-1">
-                    <Skeleton className="h-5 w-14 rounded-full" />
-                    <Skeleton className="h-5 w-12 rounded-full" />
-                  </div>
-                  {all && <Skeleton className="h-3 w-28" />}
-                </div>
-                {!all && <Skeleton className="h-8 w-16 rounded-md" />}
-              </div>
-            ))}
-          </div>
-        )}
+        <PageSpinner />
       </div>
     );
   if (cards.length === 0) {
@@ -403,7 +385,7 @@ function TopicPickerPage({
       <div className="scrollbar-hidden -mx-1 min-h-0 flex-1 overflow-y-auto px-1 pt-1">
         <div className="space-y-4">
           <ExamFields kind={kind} round={round} onKind={setKind} onRound={setRound} />
-          {isLoading && <Skeleton className="h-24 w-full" />}
+          {isLoading && <PageSpinner />}
           {!isLoading && lessons.length === 0 && (
             <p className="text-xs text-muted-foreground">ยังไม่มีบทเรียนที่ผูกกับวิชานี้ในผังการเรียน</p>
           )}
@@ -629,41 +611,7 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
         <ViewToggle value={view} onChange={setView} className="ml-auto" />
       </div>
 
-      {isLoading ? (
-        view === "table" ? (
-          <TableSkeleton headers={[...(mineOf ? [] : ["ครู"]), "วิชา", "การสอบ", "ห้อง", "สถานะ", "วันที่อนุมัติ", ""]} />
-        ) : (
-          <div className="space-y-3" role="status" aria-label="กำลังโหลด">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="space-y-2 rounded-xl border border-border bg-card p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-2">
-                    <div className="flex gap-1">
-                      <Skeleton className="h-5 w-20 rounded-full" />
-                      <Skeleton className="h-5 w-16 rounded-full" />
-                    </div>
-                    <Skeleton className="h-4 w-40" />
-                    <div className="flex gap-1">
-                      <Skeleton className="h-5 w-14 rounded-full" />
-                      <Skeleton className="h-5 w-12 rounded-full" />
-                    </div>
-                  </div>
-                  <Skeleton className="h-5 w-28 rounded-full" />
-                </div>
-                {!mineOf && (
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <Skeleton className="h-6 w-6 rounded-full" />
-                      <Skeleton className="h-3 w-28" />
-                    </span>
-                    <Skeleton className="h-8 w-24 rounded-md" />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )
-      ) : shown.length === 0 ? (
+      {isLoading ? <PageSpinner /> : shown.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
             title={filter === "pending" ? "ไม่มีชุดหัวข้อที่รออนุมัติ" : "ไม่มีรายการ"}

@@ -7,11 +7,11 @@ import { AlertTriangle, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCir
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ExamSeatingCard } from "@/components/ExamSeatingCard";
-import { useSessionRoomIds, useSessionsWithSeating, useSetRoomPhysical } from "@/hooks/useExamSeating";
+import { useSeatTemplates, useSessionRoomIds, useSessionRooms, useSessionSeats, useSessionsWithSeating, useSetRoomPhysical, useSpecialSeats } from "@/hooks/useExamSeating";
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, Select, Spinner, Switch } from "@/components/ui";
+import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, PageSpinner, Select, Switch } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useProfilesByIds } from "@/hooks/usePractice";
@@ -77,14 +77,6 @@ export function Exams() {
   if (isTeacher || canApproveExams(me?.roles ?? [])) return <StaffExams teacherId={isTeacher ? me!.id : null} canApprove={canApproveExams(me?.roles ?? [])} />;
   if (myStudent || isParent) return <StudentExams />;
   return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
-}
-
-function LoadingSpinner() {
-  return (
-    <div className="flex flex-1 items-center justify-center py-8">
-      <Spinner className="h-5 w-5 text-muted-foreground" />
-    </div>
-  );
 }
 
 // ============================================================== teacher side
@@ -272,7 +264,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
         </Select>
         <ViewToggle value={view} onChange={setView} />
       </div>
-      {isLoading ? <LoadingSpinner /> : shown.length === 0 ? (
+      {isLoading ? <PageSpinner /> : shown.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
             title={when === "past" ? "ยังไม่มีการสอบที่ผ่านไปแล้ว" : "ไม่มีการสอบที่ยังไม่สิ้นสุด"}
@@ -456,7 +448,7 @@ function SeatingSheet({ session, onClose }: { session: ExamSession; onClose: () 
     .sort((a, b) => a.code.localeCompare(b.code, "th") || a.name.localeCompare(b.name, "th"));
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()} title="ผังที่นั่ง" description={session.title}>
-      {isLoading ? <LoadingSpinner /> : <ExamSeatingCard defaultOpen session={session} roomPicker={(room, usedRoomIds) => <ExamRoomField session={session} room={room} usedRoomIds={usedRoomIds} />} students={students} />}
+      {isLoading ? <PageSpinner /> : <ExamSeatingCard defaultOpen session={session} roomPicker={(room, usedRoomIds) => <ExamRoomField session={session} room={room} usedRoomIds={usedRoomIds} />} students={students} />}
     </Sheet>
   );
 }
@@ -540,7 +532,7 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
         <ViewToggle value={view} onChange={setView} />
       </div>
 
-      {isLoading ? <LoadingSpinner /> : sessions.length === 0 ? (
+      {isLoading ? <PageSpinner /> : sessions.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="ยังไม่มีการเปิดสอบ" description="กด “เปิดสอบใหม่” เพื่อเลือกข้อสอบจากคลังมาจัดสอบ" />
         </div>
@@ -932,7 +924,7 @@ function CreateSessionSheet({
 function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () => void }) {
   const { data: attempts = [], isLoading } = useSessionAttempts(session.id);
   const { data: targetIds = [], isLoading: targetsLoading } = useExamSessionTargets(session.id);
-  const { data: sessionQuestions = [] } = useExamSessionQuestions(session.id);
+  const { data: sessionQuestions = [], isLoading: questionsLoading } = useExamSessionQuestions(session.id);
   const [editingQuestions, setEditingQuestions] = useState(false);
   const [eventsOpen, setEventsOpen] = useState(false);
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -947,6 +939,14 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   const submitted = attempts.filter((a) => a.status === "submitted");
   const { data: roomSets } = useSessionSets([session.id]);
   const sets = roomSets?.get(session.id) ?? [];
+  // Warm the queries of the cards below (shared cache) so every card appears at once instead of one by one.
+  const warm = [
+    useTopicSetsTopics(sets.map((x) => x.topic_set_id)).isLoading,
+    useSeatTemplates().isLoading,
+    useSessionRooms(session.id).isLoading,
+    useSessionSeats(session.id).isLoading,
+    useSpecialSeats(session.id).isLoading,
+  ].some(Boolean);
   const { data: subjects = [] } = useSubjectsByIds([...new Set([session.subject_id, ...sets.map((x) => x.subject_id)])]);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
   const subjectList = [...new Set(sets.length > 0 ? sets.map((x) => x.subject_id) : [session.subject_id])]
@@ -963,6 +963,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   const { data: rosterNames } = useStudentNames(roster.map((r) => r.student_id));
   const { data: rosterAvatars } = useStudentAvatars(roster.map((r) => r.student_id));
   const { data: lockedRows = [] } = useLockedCodeStudents(session.id);
+  const ready = !(isLoading || targetsLoading || assignmentsLoading || rosterLoading || questionsLoading || warm || !roomSets || !seatedIds || !rosterNames && roster.length > 0);
   const roomOfClassroom = new Map(classrooms.map((c) => { const g = grades.find((x) => x.id === c.grade_level_id); return [c.id, g ? `${gradeShortLabel(g.code)}/${c.name}` : c.name]; }));
   const lockedIds = new Set(lockedRows.map((l) => l.student_id));
   const rosterRows = roster
@@ -1032,6 +1033,10 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         )}
       </div>
 
+      {!ready ? (
+        <PageSpinner />
+      ) : (
+        <>
       <div className="flex min-h-11 shrink-0 items-center gap-3 rounded-lg border border-border bg-muted/60 px-3 py-2 text-xs">
         <span className="flex items-center gap-2"><LayersIcon className="h-3.5 w-3.5 text-muted-foreground" />{roomCountLabel} ห้องเรียน</span>
         <span className="h-5 w-px bg-border" aria-hidden />
@@ -1057,7 +1062,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
 
       <SessionTopicsCard session={session} />
 
-      {isLoading || rosterLoading ? <LoadingSpinner /> : rosterRows.length === 0 ? (
+      {rosterRows.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="ยังไม่มีนักเรียนในห้องนี้" description="ตรวจสอบการลงทะเบียนนักเรียนของห้องเรียน" />
         </div>
@@ -1118,6 +1123,8 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
       {rosterRows.length > 0 && <ExamSeatingCard session={session} roomPicker={(room, usedRoomIds) => <ExamRoomField session={session} room={room} usedRoomIds={usedRoomIds} />} students={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "", avatar: rosterAvatars?.get(r.student_id) ?? null }))} />}
 
       <SessionQuestionList session={session} sessionQuestions={sessionQuestions} />
+        </>
+      )}
 
       <div className="shrink-0 overflow-hidden rounded-lg border border-border">
       <button
@@ -1441,12 +1448,12 @@ function SessionQuestionList({ session, sessionQuestions }: { session: ExamSessi
             <div key={q.id} className="flex items-start gap-2 p-3 [contain-intrinsic-size:auto_260px] [content-visibility:auto]">
               <div className="min-w-0 flex-1"><QuestionBody q={q} i={i} /></div>
               <div className="flex shrink-0 items-center gap-1.5">
-              <Button size="icon" variant="outline" className={ICON_BTN} aria-label="แก้ไขข้อสอบ" title="แก้ไขข้อสอบ" onClick={() => setEditingQ(q)}>
+              <Button size="icon" variant="ghost" className={ICON_BTN} aria-label="แก้ไขข้อสอบ" title="แก้ไขข้อสอบ" onClick={() => setEditingQ(q)}>
                 <PencilIcon className={ICON} />
               </Button>
               <Button
                 size="icon"
-                variant="outline"
+                variant="ghost"
                 className={ICON_BTN}
                 aria-label="ลบข้อสอบออกจากห้อง"
                 title="ลบข้อสอบออกจากห้อง"
@@ -1626,7 +1633,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
     </button>
   );
 
-  if (isLoading) return <LoadingSpinner />;
+  if (isLoading) return <PageSpinner />;
   if (exams.length === 0) {
     return (
       <>
@@ -1692,7 +1699,7 @@ function TakeExam({ student, session, onExit }: { student: Student; session: Ava
 
   if (needsCode) return <ExamCodeForm sessionId={session.id} onPassed={() => setCodeOk(true)} onExit={onExit} />;
 
-  if (!attempt) return <LoadingSpinner />;
+  if (!attempt) return <PageSpinner />;
 
   if (attempt.status === "submitted") {
     return <AttemptResult attempt={attempt} session={session} onExit={onExit} />;
@@ -1753,7 +1760,7 @@ function AttemptGuard({ attemptId, onExit, children }: { attemptId: string; onEx
 
   if (status === "ok") return <>{children}</>;
   if (!status && !isError) {
-    return <LoadingSpinner />;
+    return <PageSpinner />;
   }
   const message =
     status === "blocked"
@@ -1833,7 +1840,7 @@ function AttemptRunner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remainingMs <= 0]);
 
-  if (!data) return <LoadingSpinner />;
+  if (!data) return <PageSpinner />;
 
   const orderedQuestions = attempt.question_order
     .map((id) => data.questions.find((q) => q.id === id))

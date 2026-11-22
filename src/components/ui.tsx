@@ -410,6 +410,15 @@ export function Spinner({ className }: { className?: string }) {
   );
 }
 
+/** Centered spinner for a page or tab body while its data loads. */
+export function PageSpinner({ inline = false }: { inline?: boolean }) {
+  return (
+    <div className={cn("flex items-center justify-center py-8", !inline && "flex-1")}>
+      <Spinner className="h-5 w-5 text-muted-foreground" />
+    </div>
+  );
+}
+
 /** Decorative loading placeholder block — compose per-page to mirror real content shape. Wrap the group in `role="status" aria-label="กำลังโหลด"`. */
 export function Skeleton({ className }: { className?: string }) {
   return (
