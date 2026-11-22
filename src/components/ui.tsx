@@ -641,3 +641,31 @@ export function FormSection({
     </section>
   );
 }
+
+/** Loading placeholder for table views: real header labels, shimmer cells. Empty header = actions column. */
+export function TableSkeleton({ headers, rows = 4 }: { headers: string[]; rows?: number }) {
+  return (
+    <div className="table-panel flex-1 rounded-none border-t border-border shadow-none" role="status" aria-label="กำลังโหลด">
+      <div className="table-panel-scroll scrollbar-hidden">
+        <table className="w-full min-w-[28rem] text-[13px]">
+          <thead className="text-left text-xs">
+            <tr>
+              {headers.map((h, i) => (
+                <th key={i} className="px-4 py-3">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: rows }, (_, r) => (
+              <tr key={r} className="h-14 border-t border-border first:border-t-0">
+                {headers.map((h, c) => (
+                  <td key={c} className="px-4 py-0">{h && <Skeleton className={c % 2 ? "h-4 w-12 rounded-md" : "h-3 w-24"} />}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

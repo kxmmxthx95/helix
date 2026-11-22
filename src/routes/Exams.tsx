@@ -11,7 +11,7 @@ import { useSessionsWithSeating } from "@/hooks/useExamSeating";
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, Select, Skeleton, Switch } from "@/components/ui";
+import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, Select, Skeleton, Switch, TableSkeleton } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useProfilesByIds } from "@/hooks/usePractice";
@@ -182,7 +182,6 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
     byDay.set(day, [...(byDay.get(day) ?? []), s]);
   }
 
-  if (isLoading) return <Skeleton className="h-40 w-full rounded-2xl" />;
   if (sessions.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -242,7 +241,33 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
         </Select>
         <ViewToggle value={view} onChange={setView} />
       </div>
-      {shown.length === 0 ? (
+      {isLoading ? (
+        view === "table" ? (
+          <TableSkeleton headers={["วันที่", "เวลา", "ห้องสอบ", "การสอบ", "วิชา"]} />
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden" role="status" aria-label="กำลังโหลด">
+            {[2, 2].map((n, d) => (
+              <section key={d} className="space-y-2">
+                <Skeleton className="h-3 w-28" />
+                {Array.from({ length: n }, (_, i) => (
+                  <div key={i} className="space-y-2 rounded-xl border border-border bg-card p-3">
+                    <div className="flex gap-1">
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                      <Skeleton className="h-5 w-14 rounded-full" />
+                      <Skeleton className="h-5 w-24 rounded-full" />
+                    </div>
+                    <Skeleton className="h-4 w-40" />
+                    <div className="flex gap-1">
+                      <Skeleton className="h-5 w-14 rounded-full" />
+                      <Skeleton className="h-5 w-12 rounded-full" />
+                    </div>
+                  </div>
+                ))}
+              </section>
+            ))}
+          </div>
+        )
+      ) : shown.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
             title={when === "past" ? "ยังไม่มีการสอบที่ผ่านไปแล้ว" : "ไม่มีการสอบที่ยังไม่สิ้นสุด"}
@@ -301,31 +326,23 @@ const toLocalInput = (iso: string | null) => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 };
 
-/** เวลาสอบ card on the room page: the open/close window edited in place (the schedule tab uses ScheduleSheet). */
+/** เวลาสอบ card on the room page: same layout as ExamSettingsCard; the window saves on blur once both ends are valid. */
 function ScheduleCard({ session }: { session: ExamSession }) {
   const [open, setOpen] = useState(false);
   const [opensAt, setOpensAt] = useState(toLocalInput(session.opens_at));
   const [closesAt, setClosesAt] = useState(toLocalInput(session.closes_at));
   const update = useUpdateExamSession();
   const toast = useToast();
+  useEffect(() => setOpensAt(toLocalInput(session.opens_at)), [session.opens_at]);
+  useEffect(() => setClosesAt(toLocalInput(session.closes_at)), [session.closes_at]);
   const valid = !!opensAt && !!closesAt && new Date(closesAt) > new Date(opensAt);
   const { data: conflicts = [] } = useRoomConflicts(session.room_id ?? "", opensAt, closesAt, session.id);
 
-  function toggle() {
-    // Reopening starts from what is saved, not from an abandoned edit.
-    if (!open) {
-      setOpensAt(toLocalInput(session.opens_at));
-      setClosesAt(toLocalInput(session.closes_at));
-    }
-    setOpen((v) => !v);
-  }
-
-  function save(e: React.FormEvent) {
-    e.preventDefault();
-    if (!valid) return;
+  function save() {
+    if (!valid || (opensAt === toLocalInput(session.opens_at) && closesAt === toLocalInput(session.closes_at))) return;
     update.mutate(
       { id: session.id, opens_at: new Date(opensAt).toISOString(), closes_at: new Date(closesAt).toISOString() },
-      { onSuccess: () => setOpen(false), onError: () => toast("บันทึกไม่สำเร็จ", "error") },
+      { onError: () => toast("บันทึกไม่สำเร็จ", "error") },
     );
   }
 
@@ -334,7 +351,7 @@ function ScheduleCard({ session }: { session: ExamSession }) {
       <button
         type="button"
         aria-expanded={open}
-        onClick={toggle}
+        onClick={() => setOpen((v) => !v)}
         className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
         <span className="flex shrink-0 items-center gap-2">
@@ -348,28 +365,18 @@ function ScheduleCard({ session }: { session: ExamSession }) {
         </span>
       </button>
       <Collapse open={open}>
-        <form onSubmit={save} className="space-y-3 border-t border-border bg-muted/40 p-3">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="block space-y-1 text-xs">
-              <span className="text-muted-foreground">เปิดสอบ<span className="text-destructive" aria-hidden> *</span></span>
-              <Input type="datetime-local" className="ui-control-compact h-8 text-[13px]" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} />
-            </label>
-            <label className="block space-y-1 text-xs">
-              <span className="text-muted-foreground">ปิดสอบ<span className="text-destructive" aria-hidden> *</span></span>
-              <Input type="datetime-local" className="ui-control-compact h-8 text-[13px]" value={closesAt} min={opensAt} onChange={(e) => setClosesAt(e.target.value)} />
-            </label>
-          </div>
+        <div className="space-y-3 border-t border-border bg-muted/40 p-3 [&_.text-sm]:text-xs [&_input]:!h-6 [&_input]:!text-xs">
+          <FormSection>
+            <Field label="เปิดสอบ" required>
+              <Input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} onBlur={save} />
+            </Field>
+            <Field label="ปิดสอบ" required error={opensAt && closesAt && !valid ? "ต้องหลังเวลาเปิดสอบ" : undefined}>
+              <Input type="datetime-local" value={closesAt} min={opensAt} onChange={(e) => setClosesAt(e.target.value)} onBlur={save} />
+            </Field>
+          </FormSection>
           <RoomConflictNotice conflicts={conflicts} />
           <p className="text-xs text-muted-foreground">นักเรียนจะเห็นและเข้าสอบได้เมื่อกำหนดเวลาแล้ว</p>
-          <div className="flex justify-end gap-2">
-            <Button type="button" size="sm" variant="outline" className="ui-control-compact h-8" onClick={() => setOpen(false)}>
-              ยกเลิก
-            </Button>
-            <Button type="submit" size="sm" className="ui-control-compact h-8" disabled={!valid || update.isPending}>
-              บันทึก
-            </Button>
-          </div>
-        </form>
+        </div>
       </Collapse>
     </div>
   );
@@ -535,7 +542,32 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
         <ViewToggle value={view} onChange={setView} />
       </div>
 
-      {isLoading ? (
+      {isLoading && view === "cards" ? (
+        <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden" role="status" aria-label="กำลังโหลด">
+          {[0, 1, 2, 3].map((i) => (
+            <li key={i} className="rounded-xl border border-border bg-card p-3">
+              <div className="flex items-center gap-1">
+                <Skeleton className="h-5 w-20 rounded-full" />
+                <Skeleton className="h-5 w-14 rounded-full" />
+                <Skeleton className="h-5 w-12 rounded-full" />
+                <Skeleton className="ml-auto h-5 w-24 rounded-full" />
+              </div>
+              <Skeleton className="mt-3 h-4 w-40" />
+              <Skeleton className="mt-2 h-5 w-14 rounded-full" />
+              <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-6 w-6 rounded-full" />
+                  <Skeleton className="h-3 w-28" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <Skeleton className="h-5 w-9 rounded-full" />
+                  <Skeleton className="h-8 w-8 rounded-lg" />
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : isLoading ? (
         <div className="table-panel flex-1 rounded-none border-t border-border shadow-none" role="status" aria-label="กำลังโหลด">
           <div className="table-panel-scroll scrollbar-hidden">
             <table className="w-full min-w-[36rem] text-[13px]">
