@@ -828,6 +828,8 @@ export type ExamSession = {
   strict_mode: boolean;
   /** Migration 0183 — students only see/start a session whose topic set is 'approved'. */
   topic_set_id: string;
+  /** Migration 0197 — physical room (rooms) where the exam is sat; null = not set. */
+  room_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1948,6 +1950,7 @@ export type Database = {
           ExamSession,
           | "opens_at"
           | "closes_at"
+          | "room_id"
           | "exam_type"
           | "round"
           | "is_enabled"
@@ -2029,6 +2032,10 @@ export type Database = {
       set_plan_link: {
         Args: { p_assignment: string; p_mates: string[] };
         Returns: { copied: number; skipped: number }[];
+      };
+      exam_room_conflicts: {
+        Args: { p_room: string; p_opens: string; p_closes: string; p_exclude?: string | null };
+        Returns: { session_id: string; title: string; exam_type: string | null; round: number | null; opens_at: string; closes_at: string; teacher_name: string }[];
       };
       attendance_duties: {
         Args: { p_profile: string; p_date: string };

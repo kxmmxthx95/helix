@@ -191,13 +191,32 @@ export function useCreateExamSession() {
   });
 }
 
+/** Sessions of any teacher that use the same room at an overlapping time (warning only). */
+export function useRoomConflicts(roomId: string, opensAt: string, closesAt: string, excludeId: string) {
+  const enabled = !!roomId && !!opensAt && !!closesAt && new Date(closesAt) > new Date(opensAt);
+  return useQuery({
+    queryKey: ["exam_sessions", "room_conflicts", roomId, opensAt, closesAt, excludeId],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("exam_room_conflicts", {
+        p_room: roomId,
+        p_opens: new Date(opensAt).toISOString(),
+        p_closes: new Date(closesAt).toISOString(),
+        p_exclude: excludeId,
+      });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useUpdateExamSession() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...patch }: { id: string } & Partial<
       Pick<
         ExamSession,
-        "title" | "opens_at" | "closes_at" | "is_enabled" | "duration_minutes" | "max_attempts" | "shuffle_questions" | "shuffle_choices" | "sync_to_gradebook" | "review_released" | "strict_mode"
+        "title" | "opens_at" | "closes_at" | "room_id" | "is_enabled" | "duration_minutes" | "max_attempts" | "shuffle_questions" | "shuffle_choices" | "sync_to_gradebook" | "review_released" | "strict_mode"
       >
     >) => {
       const { error } = await supabase.from("exam_sessions").update(patch).eq("id", id);

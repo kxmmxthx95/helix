@@ -14,6 +14,7 @@ import { useClassroomsByIds, useExamQuestionsOf, useGradeLevelsByIds, useSubject
 import {
   useAddSessionQuestion,
   useRemoveSessionQuestion,
+  useRoomConflicts,
   useAttemptAnswers,
   useAttemptQuestions,
   useApproveTakeover,
@@ -49,6 +50,7 @@ import {
   type AvailableExam,
   type ExamSessionQuestionRow,
 } from "@/hooks/useExams";
+import { useRooms } from "@/hooks/useSchedule";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { ExamApprovalTab, ExamSubmissionsTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
@@ -136,8 +138,13 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
   const { data: subjects = [] } = useSubjectsByIds([...new Set([...sessions.map((s) => s.subject_id), ...[...(sessionSets?.values() ?? [])].flat().map((x) => x.subject_id)])]);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
   const [editing, setEditing] = useState<ExamSession | null>(null);
+  const [roomEditing, setRoomEditing] = useState<ExamSession | null>(null);
   const [view, setView] = useState<"cards" | "table">("cards");
   const colors = useSubjectColors([]);
+  // Physical room where each exam is sat (exam_sessions.room_id → rooms).
+  const { profile: scheduleMe } = useAuth();
+  const { data: venues = [] } = useRooms(scheduleMe?.department_id ?? null);
+  const venueOf = (s: ExamSession) => venues.find((v) => v.id === s.room_id)?.name;
   // subject → room, via the topic set each session subject was created from.
   const { data: topicSets = [] } = useMyTopicSets(teacherId);
   const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
@@ -183,6 +190,7 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
               <p className="flex flex-wrap items-center gap-1">
                 <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{s.exam_type}</span>
                 {s.round && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">ครั้งที่ {s.round}</span>}
+                {venueOf(s) && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">ห้องสอบ {venueOf(s)}</span>}
               </p>
             ) : (
               <p className="truncate text-muted-foreground">{s.title}</p>
@@ -201,9 +209,14 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
               ) : null;
             })}
           </div>
-          <Button size="sm" variant="outline" className="shrink-0 tabular-nums" onClick={(e) => { e.stopPropagation(); setEditing(s); }}>
-            {time}
-          </Button>
+          <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
+            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setRoomEditing(s); }}>
+              ตั้งค่าห้องสอบ
+            </Button>
+            <Button size="sm" variant="outline" className="tabular-nums" onClick={(e) => { e.stopPropagation(); setEditing(s); }}>
+              {time}
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -222,6 +235,7 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
                 <tr>
                   <th className="px-4 py-3">วันที่</th>
                   <th className="px-4 py-3">เวลา</th>
+                  <th className="px-4 py-3">ห้องสอบ</th>
                   <th className="px-4 py-3">การสอบ</th>
                   <th className="px-4 py-3">วิชา</th>
                 </tr>
@@ -231,6 +245,7 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
                   <tr key={s.id} onClick={() => setEditing(s)} className="h-12 cursor-pointer border-t border-border first:border-t-0">
                     <td className="px-4 py-0">{s.opens_at ? new Date(s.opens_at).toLocaleDateString("th-TH", { dateStyle: "medium" }) : <span className="text-muted-foreground">ยังไม่กำหนด</span>}</td>
                     <td className="px-4 py-0 font-mono tabular-nums">{s.opens_at ? `${fmtTime(s.opens_at)} – ${fmtTime(s.closes_at!)}` : "ตั้งเวลา"}</td>
+                    <td className="px-4 py-0">{venueOf(s) ?? <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-4 py-0 font-medium">{s.title}</td>
                     <td className="px-4 py-0 text-muted-foreground">{subjectsOf(s)}</td>
                   </tr>
@@ -256,6 +271,7 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
         </div>
       )}
       {editing && <ScheduleSheet session={editing} onClose={() => setEditing(null)} />}
+      {roomEditing && <RoomSheet session={roomEditing} onClose={() => setRoomEditing(null)} />}
     </div>
   );
 }
@@ -273,6 +289,8 @@ function ScheduleSheet({ session, onClose }: { session: ExamSession; onClose: ()
   const update = useUpdateExamSession();
   const toast = useToast();
   const valid = !!opensAt && !!closesAt && new Date(closesAt) > new Date(opensAt);
+  // The room is set from its own button; changing the time still warns if the room is already taken then.
+  const { data: conflicts = [] } = useRoomConflicts(session.room_id ?? "", opensAt, closesAt, session.id);
 
   function save(e: React.FormEvent) {
     e.preventDefault();
@@ -309,8 +327,90 @@ function ScheduleSheet({ session, onClose }: { session: ExamSession; onClose: ()
             <Input type="datetime-local" value={closesAt} min={opensAt} onChange={(e) => setClosesAt(e.target.value)} />
           </Field>
         </FormSection>
+        <RoomConflictNotice conflicts={conflicts} />
         <p className="text-xs text-muted-foreground">นักเรียนจะเห็นและเข้าสอบได้เมื่อกำหนดเวลาแล้ว</p>
       </form>
+    </Sheet>
+  );
+}
+
+/** "ห้องสอบ" select over the department's rooms; hidden when there are none to pick. */
+function RoomPicker({ value, onChange, current }: { value: string; onChange: (v: string) => void; current: string | null }) {
+  const { profile } = useAuth();
+  const { data: rooms = [] } = useRooms(profile?.department_id ?? null);
+  if (rooms.length === 0 && !current) return null;
+  return (
+    <FormSection>
+      <Field label="ห้องสอบ">
+        <Select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">ไม่ระบุ</option>
+          {rooms
+            .filter((r) => r.is_active || r.id === current)
+            .map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+        </Select>
+      </Field>
+    </FormSection>
+  );
+}
+
+/** Warning (not a block) that other exam sessions use the same room at an overlapping time. */
+function RoomConflictNotice({ conflicts }: { conflicts: { session_id: string; title: string; opens_at: string; closes_at: string; teacher_name: string }[] }) {
+  if (conflicts.length === 0) return null;
+  return (
+    <div role="alert" className="space-y-1 rounded-xl bg-[hsl(var(--warning)/0.12)] px-3 py-2 text-xs text-warning">
+      <p className="font-medium">ห้องนี้ถูกใช้ในช่วงเวลาที่ทับกัน ({conflicts.length} รอบ)</p>
+      <ul className="space-y-0.5">
+        {conflicts.map((c) => (
+          <li key={c.session_id}>
+            {c.title}
+            {c.teacher_name && ` · ${c.teacher_name}`} ·{" "}
+            {new Date(c.opens_at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })} –{" "}
+            {new Date(c.closes_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}
+          </li>
+        ))}
+      </ul>
+      <p>บันทึกได้ แต่ควรตรวจสอบก่อน</p>
+    </div>
+  );
+}
+
+/** Room-only drawer: works on rooms that have no time yet (the schedule drawer needs both times). */
+function RoomSheet({ session, onClose }: { session: ExamSession; onClose: () => void }) {
+  const [roomId, setRoomId] = useState(session.room_id ?? "");
+  const update = useUpdateExamSession();
+  const toast = useToast();
+  const { data: conflicts = [] } = useRoomConflicts(roomId, session.opens_at ?? "", session.closes_at ?? "", session.id);
+
+  return (
+    <Sheet
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title="ตั้งค่าห้องสอบ"
+      description={session.title}
+      footer={
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+            ยกเลิก
+          </Button>
+          <Button
+            className="flex-1"
+            disabled={update.isPending}
+            onClick={() => update.mutate({ id: session.id, room_id: roomId || null }, { onSuccess: onClose, onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
+          >
+            บันทึก
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3">
+        <RoomPicker value={roomId} onChange={setRoomId} current={session.room_id} />
+        <RoomConflictNotice conflicts={conflicts} />
+        {!session.opens_at && <p className="text-xs text-muted-foreground">ตั้งเวลาสอบแล้วระบบจะตรวจว่าห้องนี้ถูกใช้ซ้อนกับรอบอื่นหรือไม่</p>}
+      </div>
     </Sheet>
   );
 }
