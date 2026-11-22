@@ -355,7 +355,7 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
   return (
     <div className="page-fill gap-3 pt-1">
       <div className="flex shrink-0 items-center justify-end gap-2">
-        <Button size="sm" className="ui-control-compact h-8 gap-1 px-2.5 text-xs sm:px-3 sm:text-sm" onClick={() => setCreating(true)} disabled={assignments.length === 0}>
+        <Button size="sm" className="ui-control-compact h-8 gap-1 px-2.5 sm:px-3" onClick={() => setCreating(true)} disabled={assignments.length === 0}>
           <Plus className="h-3 w-3" /> เปิดสอบใหม่
         </Button>
         <ViewToggle value={view} onChange={setView} />

@@ -386,6 +386,7 @@
   /* Opt out of the phone touch height for a dense toolbar button; pair with h-7 (or h-6) and sm:h-9 for desktop. */
   .ui-control-compact {
     min-height: 0;
+    font-size: 0.8125rem; /* 13px, same as Select and the default Button */
   }
 
   /* POS (tablet, cashiers 40–60): set on <html> while the POS is open, so its modals get it too.
