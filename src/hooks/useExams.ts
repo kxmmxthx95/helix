@@ -112,8 +112,6 @@ export function useCreateExamSession() {
       subject_id: string;
       teacher_id: string;
       title: string;
-      opens_at: string;
-      closes_at: string;
       duration_minutes: number | null;
       max_attempts: number;
       shuffle_questions: boolean;
@@ -141,7 +139,10 @@ export function useCreateExamSession() {
       }
       return inserted as ExamSession;
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["exam_sessions"] }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["exam_sessions"] });
+      void qc.invalidateQueries({ queryKey: ["exam_topic_sets", "in_use"] });
+    },
   });
 }
 
@@ -198,7 +199,8 @@ export function useDeleteExamSession() {
 
 // --------------------------------------------------------- student: available exams
 
-export type AvailableExam = ExamSession & { my_attempts: number };
+/** Students only ever get scheduled rooms (opens_at/closes_at set). */
+export type AvailableExam = ExamSession & { opens_at: string; closes_at: string; my_attempts: number };
 
 /** Sessions targeting the student's current classroom, whole window (not just currently-open) — the UI splits into upcoming/open/closed by opens_at/closes_at itself. */
 export function useAvailableExams(studentId: string | null, classroomId: string | null, academicYear: number | null) {
@@ -216,7 +218,7 @@ export function useAvailableExams(studentId: string | null, classroomId: string 
       if (sessionIds.length === 0) return [];
 
       const [{ data: sessions, error: sessionsError }, { data: attempts, error: attemptsError }] = await Promise.all([
-        supabase.from("exam_sessions").select("*").in("id", sessionIds).order("opens_at", { ascending: false }),
+        supabase.from("exam_sessions").select("*").in("id", sessionIds).not("opens_at", "is", null).not("closes_at", "is", null).order("opens_at", { ascending: false }),
         supabase.from("exam_attempts").select("session_id").eq("student_id", studentId!).in("session_id", sessionIds),
       ]);
       if (sessionsError) throw sessionsError;
@@ -224,7 +226,7 @@ export function useAvailableExams(studentId: string | null, classroomId: string 
 
       const attemptCounts = new Map<string, number>();
       for (const a of attempts) attemptCounts.set(a.session_id, (attemptCounts.get(a.session_id) ?? 0) + 1);
-      return sessions.map((s) => ({ ...s, my_attempts: attemptCounts.get(s.id) ?? 0 }));
+      return sessions.map((s) => ({ ...s, my_attempts: attemptCounts.get(s.id) ?? 0 }) as AvailableExam);
     },
   });
 }
@@ -648,7 +650,7 @@ export function useSubmitTopicSet() {
   });
 }
 
-/** Sets the caller can decide on (never their own) — pending, approved and rejected; RLS limits it to their department. */
+/** Sets the caller can see in the queue, own included (heads' own are born approved; decide_exam_topic_set refuses self-decisions) — pending, approved and rejected; RLS limits it to their department. */
 export function useTopicSetQueue(enabled: boolean, ownId: string | null) {
   return useQuery({
     queryKey: ["exam_topic_sets", "queue", ownId],
@@ -657,11 +659,23 @@ export function useTopicSetQueue(enabled: boolean, ownId: string | null) {
       const { data, error } = await supabase
         .from("exam_topic_sets")
         .select("*")
-        .neq("teacher_id", ownId!)
         .neq("approval_status", "draft")
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return data;
+    },
+  });
+}
+
+/** assignment id → classroom id, to label queue cards with their room. */
+export function useAssignmentClassrooms(ids: string[]) {
+  return useQuery({
+    queryKey: ["teaching_assignments", "classrooms", ids],
+    enabled: ids.length > 0,
+    queryFn: async (): Promise<Map<string, string>> => {
+      const { data, error } = await supabase.from("teaching_assignments").select("id, classroom_id").in("id", ids);
+      if (error) throw error;
+      return new Map(data.map((a) => [a.id, a.classroom_id]));
     },
   });
 }

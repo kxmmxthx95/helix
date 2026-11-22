@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
-import { ChevronBack } from "@/components/icons";
+import { AppsIcon, ChevronBack, ListIcon } from "@/components/icons";
 import { useToast } from "@/components/Toast";
-import { Button, EmptyState, Select, Skeleton, Switch } from "@/components/ui";
+import { Avatar, Button, EmptyState, Select, Skeleton, Switch } from "@/components/ui";
 import { useClassroomsByIds, useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
 import {
+  useAssignmentClassrooms,
   useCreateTopicSet,
   useDecideTopicSet,
   useMyTopicSets,
@@ -17,6 +18,7 @@ import {
   useTopicSetsTopics,
   type ExamTopicLabel,
 } from "@/hooks/useExams";
+import { avatarUrl } from "@/hooks/useAvatar";
 import { useSubjectLinkedLessons } from "@/hooks/usePlan";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useProfilesByIds } from "@/hooks/usePractice";
@@ -50,24 +52,11 @@ export function ApprovalBadge({ status }: { status: ExamApprovalStatus }) {
   );
 }
 
-function TopicChips({ topics }: { topics: ExamTopicLabel[] | undefined }) {
-  if (!topics || topics.length === 0) return <span className="text-muted-foreground">ยังไม่เลือกหัวข้อ</span>;
-  return (
-    <div className="flex flex-wrap gap-1">
-      {topics.map((t) => (
-        <span key={t.topic_id} className="rounded-md bg-muted px-1.5 py-0.5 text-[11px]">
-          {t.lesson} › {t.topic}
-        </span>
-      ))}
-    </div>
-  );
-}
+const thDate = (iso: string) => new Date(iso).toLocaleDateString("th-TH", { dateStyle: "medium" });
 
 // ============================================================ teacher: หัวข้อการสอบ
 
 export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
-  const { profile } = useAuth();
-  const selfApprove = isDeptHead(profile?.roles ?? []);
   const { data: assignments = [], isLoading: loadingA } = useMyTeachingAssignments(teacherId);
   const { data: sets = [], isLoading: loadingS } = useMyTopicSets(teacherId);
   const { data: subjects = [] } = useSubjectsByIds([...new Set(assignments.map((a) => a.subject_id))]);
@@ -76,7 +65,6 @@ export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
   const { data: inUse } = useTopicSetsInUse(sets.map((s) => s.id));
   const colors = useSubjectColors([]); // hue from กลุ่มสาระ only, like the period attendance views
   const [picking, setPicking] = useState<string | null>(null);
-  const submit = useSubmitTopicSet();
   const createSet = useCreateTopicSet();
   const setNoExam = useSetNoExam();
   const toast = useToast();
@@ -132,11 +120,9 @@ export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
       {cards.map((a) => {
         const subject = subjectById.get(a.subject_id)!;
         const set = setByAssignment.get(a.id);
-        const topics = set ? topicsBySet?.get(set.id) : undefined;
         const noExam = !!set?.no_exam;
         const locked = !!set && !!inUse?.has(set.id);
         const editable = !noExam && !locked && set?.approval_status !== "pending";
-        const submittable = !selfApprove && !noExam && !!set && (set.approval_status === "draft" || set.approval_status === "rejected") && (topics?.length ?? 0) > 0;
         const classroom = classroomById.get(a.classroom_id);
         const grade = classroom ? gradeById.get(classroom.grade_level_id) : undefined;
         const roomLabel = grade ? `${gradeShortLabel(grade.code)}/${classroom?.name}` : (classroom?.name ?? "—");
@@ -158,7 +144,6 @@ export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
                 <p className="mt-1 flex flex-wrap items-center gap-1">
                   <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(subject.learning_area_id))}>{subject.code}</span>
                   <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabel))}>{roomLabel}</span>
-                  {set && !noExam && <ApprovalBadge status={set.approval_status} />}
                 </p>
               </div>
               <label
@@ -176,27 +161,9 @@ export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
                 />
               </label>
             </div>
-            {!noExam && ((topics?.length ?? 0) > 0 || submittable || (set?.approval_status === "rejected" && set.approval_note)) && (
+            {!noExam && set?.approval_status === "rejected" && set.approval_note && (
               <div className="mt-2 space-y-2">
-                <TopicChips topics={topics} />
-                {set?.approval_status === "rejected" && set.approval_note && (
-                  <p className="rounded-lg bg-destructive/10 px-2 py-1.5 text-destructive">เหตุผลที่ไม่อนุมัติ: {set.approval_note}</p>
-                )}
-                {submittable && (
-                  <Button
-                    size="sm"
-                    disabled={submit.isPending}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      submit.mutate(set!.id, {
-                        onSuccess: () => toast("ส่งขออนุมัติแล้ว"),
-                        onError: (err) => toast(err instanceof Error ? err.message : "ส่งไม่สำเร็จ", "error"),
-                      });
-                    }}
-                  >
-                    ส่งขออนุมัติ
-                  </Button>
-                )}
+                <p className="rounded-lg bg-destructive/10 px-2 py-1.5 text-destructive">เหตุผลที่ไม่อนุมัติ: {set.approval_note}</p>
               </div>
             )}
           </div>
@@ -225,9 +192,11 @@ function TopicPickerPage({
   const { profile } = useAuth();
   const selfApprove = isDeptHead(profile?.roles ?? []);
   const { data: lessons = [], isLoading } = useSubjectLinkedLessons(subject?.id ?? null);
-  const [picked, setPicked] = useState<string[]>(current);
+  // Saving replaces the set with this pick, like submitting — so it starts empty, previous topics are not pre-checked.
+  const [picked, setPicked] = useState<string[]>([]);
   const save = useSetTopicSetTopics();
   const createSet = useCreateTopicSet();
+  const submitSet = useSubmitTopicSet();
   const toast = useToast();
 
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
@@ -236,7 +205,12 @@ function TopicPickerPage({
     try {
       const setId = set?.id ?? (await createSet.mutateAsync({ teacher_id: teacherId, subject_id: assignment.subject_id, teaching_assignment_id: assignment.id })).id;
       await save.mutateAsync({ setId, current, next: picked });
-      toast("บันทึกหัวข้อแล้ว");
+      const changed = picked.length !== current.length || picked.some((id) => !current.includes(id));
+      // Saving sends it to อนุมัติสอบ: draft/rejected always, approved only if topics changed (DB trigger resets it to draft).
+      if (!selfApprove && picked.length > 0 && (set?.approval_status !== "approved" || changed)) {
+        await submitSet.mutateAsync(setId);
+        toast("ส่งขออนุมัติแล้ว");
+      } else toast("ส่งหัวข้อแล้ว");
       onClose();
     } catch (e) {
       toast(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ", "error");
@@ -259,7 +233,7 @@ function TopicPickerPage({
       <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto">
         <div className="space-y-4">
           {set?.approval_status === "approved" && !selfApprove && (
-            <p className="rounded-lg bg-warning/15 px-2 py-1.5 text-xs">การแก้หัวข้อหลังอนุมัติ จะกลับเป็นร่าง ต้องส่งขออนุมัติใหม่</p>
+            <p className="rounded-lg bg-warning/15 px-2 py-1.5 text-xs">การแก้หัวข้อหลังอนุมัติ จะส่งขออนุมัติใหม่อัตโนมัติ</p>
           )}
           {isLoading && <Skeleton className="h-24 w-full" />}
           {!isLoading && lessons.length === 0 && (
@@ -298,8 +272,8 @@ function TopicPickerPage({
         <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
           ยกเลิก
         </Button>
-        <Button type="button" className="flex-1" disabled={save.isPending || createSet.isPending} onClick={() => void submit()}>
-          บันทึก ({picked.length})
+        <Button type="button" className="flex-1" disabled={picked.length === 0 || save.isPending || createSet.isPending || submitSet.isPending} onClick={() => void submit()}>
+          ส่งหัวข้อ ({picked.length})
         </Button>
       </div>
     </div>
@@ -317,28 +291,68 @@ export function useExamApprovalPendingCount(enabled: boolean) {
   return data.filter((s) => s.approval_status === "pending").length;
 }
 
-export function ExamApprovalTab() {
+export function ExamApprovalTab({ onCreateRoom }: { onCreateRoom: (set: ExamTopicSet) => void }) {
   const { profile } = useAuth();
   const { data: queue = [], isLoading } = useTopicSetQueue(true, profile?.id ?? null);
   const [filter, setFilter] = useState<Filter>("pending");
+  const [view, setView] = useState<"cards" | "table">("cards");
   const [selected, setSelected] = useState<ExamTopicSet | null>(null);
   const { data: subjects = [] } = useSubjectsByIds([...new Set(queue.map((s) => s.subject_id))]);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
   const { data: teachers = [] } = useProfilesByIds([...new Set(queue.map((s) => s.teacher_id))]);
-  const teacherById = new Map(teachers.map((t) => [t.id, `${t.first_name} ${t.last_name}`]));
+  const teacherById = new Map(teachers.map((t) => [t.id, t]));
+  const colors = useSubjectColors([]);
+  const { data: roomOfAssignment } = useAssignmentClassrooms(queue.flatMap((s) => (s.teaching_assignment_id ? [s.teaching_assignment_id] : [])));
+  const { data: classrooms = [] } = useClassroomsByIds([...new Set(roomOfAssignment?.values() ?? [])]);
+  const { data: grades = [] } = useGradeLevelsByIds([...new Set(classrooms.map((c) => c.grade_level_id))]);
+  const roomLabel = (s: ExamTopicSet) => {
+    const c = classrooms.find((x) => x.id === roomOfAssignment?.get(s.teaching_assignment_id ?? ""));
+    const g = grades.find((x) => x.id === c?.grade_level_id);
+    return c && g ? `${gradeShortLabel(g.code)}/${c.name}` : null;
+  };
   const { data: topicsBySet } = useTopicSetsTopics(queue.map((s) => s.id));
+  const { data: inUse } = useTopicSetsInUse(queue.map((s) => s.id));
   const shown = queue.filter((s) => s.approval_status === filter);
+  const canCreateRoom = (s: ExamTopicSet) => s.approval_status === "approved" && !s.no_exam && !!inUse && !inUse.has(s.id);
+  const createRoomButton = (s: ExamTopicSet) => (
+    <Button
+      size="sm"
+      onClick={(e) => {
+        e.stopPropagation();
+        onCreateRoom(s);
+      }}
+    >
+      สร้างห้องสอบ
+    </Button>
+  );
   const count = (f: Filter) => queue.filter((s) => s.approval_status === f).length;
 
   return (
     <div className="flex flex-1 flex-col gap-3">
-      <Select className="w-full shrink-0 sm:w-48" aria-label="สถานะ" value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
-        {FILTERS.map((f) => (
-          <option key={f} value={f}>
-            {STATUS_LABEL[f]} ({count(f)})
-          </option>
-        ))}
-      </Select>
+      <div className="flex shrink-0 items-center justify-end gap-2">
+        <Select className="w-40 shrink-0 sm:w-48" aria-label="สถานะ" value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
+          {FILTERS.map((f) => (
+            <option key={f} value={f}>
+              {STATUS_LABEL[f]} ({count(f)})
+            </option>
+          ))}
+        </Select>
+
+        <div className="ml-auto flex shrink-0 rounded-lg bg-muted p-0.5" role="group" aria-label="มุมมอง">
+          {(["cards", "table"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={view === v}
+              aria-label={v === "cards" ? "มุมมองการ์ด" : "มุมมองตาราง"}
+              onClick={() => setView(v)}
+              className={cn("flex h-8 w-9 items-center justify-center rounded-md", view === v ? "bg-background shadow-sm" : "text-muted-foreground")}
+            >
+              {v === "cards" ? <AppsIcon className="h-4 w-4" /> : <ListIcon className="h-4 w-4" />}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {isLoading ? (
         <Skeleton className="h-40 w-full rounded-2xl" />
@@ -346,22 +360,87 @@ export function ExamApprovalTab() {
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title={filter === "pending" ? "ไม่มีชุดหัวข้อที่รออนุมัติ" : "ไม่มีรายการ"} />
         </div>
+      ) : view === "table" ? (
+        <div className="table-panel flex">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[40rem] text-[13px]">
+              <thead className="text-left text-xs">
+                <tr>
+                  <th className="px-4 py-3">ครู</th>
+                  <th className="px-4 py-3">วิชา</th>
+                  <th className="px-4 py-3">ห้อง</th>
+                  <th className="px-4 py-3">สถานะ</th>
+                  <th className="px-4 py-3">วันที่อนุมัติ</th>
+                  <th className="w-32 px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((s) => {
+                  const subject = subjectById.get(s.subject_id);
+                  const teacher = teacherById.get(s.teacher_id);
+                  const teacherName = teacher ? `${teacher.first_name} ${teacher.last_name}` : "—";
+                  const room = roomLabel(s);
+                  return (
+                    <tr key={s.id} onClick={() => setSelected(s)} className="h-14 cursor-pointer border-t border-border first:border-t-0">
+                      <td className="px-4 py-0">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <Avatar name={teacherName} src={teacher ? avatarUrl(teacher) : null} className="h-9 w-9 text-xs" />
+                          <p className="truncate text-sm font-medium">{teacherName}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-0">
+                        <p className="truncate text-sm font-medium">{subject?.name_th ?? "—"}</p>
+                        <p className="font-mono text-xs tabular-nums text-muted-foreground">{subject?.code ?? "—"}</p>
+                      </td>
+                      <td className="px-4 py-0">
+                        {room ? <span className={cn("inline-flex rounded-md px-2 py-0.5 text-xs font-medium", levelTone(room))}>{room}</span> : "—"}
+                      </td>
+                      <td className="px-4 py-0">
+                        <ApprovalBadge status={s.approval_status} />
+                      </td>
+                      <td className="px-4 py-0 text-muted-foreground">{s.approved_at ? thDate(s.approved_at) : "—"}</td>
+                      <td className="px-4 py-0 text-right">{canCreateRoom(s) && createRoomButton(s)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       ) : (
-        shown.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => setSelected(s)}
-            className="block w-full space-y-1.5 rounded-xl border border-border bg-card p-3 text-left text-xs hover:bg-muted"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-sm font-medium">{subjectById.get(s.subject_id)?.name_th ?? "—"}</p>
-              <ApprovalBadge status={s.approval_status} />
-            </div>
-            <p className="text-muted-foreground">ครู {teacherById.get(s.teacher_id) ?? "—"}</p>
-            <TopicChips topics={topicsBySet?.get(s.id)} />
-          </button>
-        ))
+        shown.map((s) => {
+          const subject = subjectById.get(s.subject_id);
+          const teacher = teacherById.get(s.teacher_id);
+          const teacherName = teacher ? `${teacher.first_name} ${teacher.last_name}` : "—";
+          const room = roomLabel(s);
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setSelected(s)}
+              className="block w-full space-y-2 rounded-xl border border-border bg-card p-3 text-left text-xs hover:bg-muted"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{subject?.name_th ?? "—"}</p>
+                  <p className="mt-1 flex flex-wrap items-center gap-1">
+                    {subject && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(subject.learning_area_id))}>{subject.code}</span>}
+                    {room && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(room))}>{room}</span>}
+                    <ApprovalBadge status={s.approval_status} />
+                  </p>
+                </div>
+                {s.approved_at && <span className="shrink-0 text-muted-foreground">อนุมัติ {thDate(s.approved_at)}</span>}
+              </div>
+              <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Avatar name={teacherName} src={teacher ? avatarUrl(teacher) : null} className="h-6 w-6 text-[10px]" />
+                  <span className="truncate">{teacherName}</span>
+                </span>
+                {canCreateRoom(s) && createRoomButton(s)}
+              </div>
+            </button>
+          );
+        })
       )}
 
       {selected && (
@@ -369,9 +448,17 @@ export function ExamApprovalTab() {
           // Re-pick from the live queue so the sheet reflects the decision just made.
           set={queue.find((s) => s.id === selected.id) ?? selected}
           subject={subjectById.get(selected.subject_id)}
-          teacher={teacherById.get(selected.teacher_id)}
+          teacher={(() => { const t = teacherById.get(selected.teacher_id); return t ? `${t.first_name} ${t.last_name}` : undefined; })()}
           topics={topicsBySet?.get(selected.id)}
           onClose={() => setSelected(null)}
+          onCreateRoom={
+            canCreateRoom(selected)
+              ? (set) => {
+                  setSelected(null);
+                  onCreateRoom(set);
+                }
+              : undefined
+          }
         />
       )}
     </div>
@@ -384,7 +471,9 @@ function ReviewSheet({
   teacher,
   topics,
   onClose,
+  onCreateRoom,
 }: {
+  onCreateRoom?: (set: ExamTopicSet) => void;
   set: ExamTopicSet;
   subject: Subject | undefined;
   teacher: string | undefined;
@@ -396,6 +485,7 @@ function ReviewSheet({
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
   const pending = set.approval_status === "pending";
+  const lessons = [...Map.groupBy(topics ?? [], (t) => t.lesson)];
 
   function run(approve: boolean) {
     decide.mutate(
@@ -416,6 +506,7 @@ function ReviewSheet({
       onOpenChange={(o) => !o && onClose()}
       title={subject?.name_th ?? "ชุดหัวข้อการสอบ"}
       description={`ครู ${teacher ?? "—"}`}
+      headerEnd={<ApprovalBadge status={set.approval_status} />}
       footer={
         pending ? (
           rejecting ? (
@@ -446,18 +537,34 @@ function ReviewSheet({
               </Button>
             </div>
           )
+        ) : set.approval_status === "approved" && !set.no_exam && onCreateRoom ? (
+          <Button type="button" className="w-full" onClick={() => onCreateRoom(set)}>
+            สร้างห้องสอบ
+          </Button>
         ) : undefined
       }
     >
-      <div className="space-y-3 text-xs">
-        <div className="flex items-center gap-2">
-          <ApprovalBadge status={set.approval_status} />
-          {set.approval_note && <span className="text-muted-foreground">{set.approval_note}</span>}
-        </div>
-        <div>
-          <p className="mb-1 font-medium">หัวข้อการสอบ</p>
-          <TopicChips topics={topics} />
-        </div>
+      <div className="space-y-4">
+        {set.approval_note && <p className="text-sm text-muted-foreground">{set.approval_note}</p>}
+        {lessons.length === 0 ? (
+          <p className="text-sm text-muted-foreground">ยังไม่เลือกหัวข้อ</p>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground">หัวข้อการสอบ {topics?.length} หัวข้อ</p>
+            {lessons.map(([lesson, items]) => (
+              <section key={lesson}>
+                <h3 className="mb-1.5 px-1 text-[13px] font-semibold">{lesson}</h3>
+                <ul className="overflow-hidden rounded-xl bg-muted [&>*+*]:border-t [&>*+*]:border-border">
+                  {items.map((t) => (
+                    <li key={t.topic_id} className="px-4 py-2.5 text-sm">
+                      {t.topic}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </>
+        )}
       </div>
     </Sheet>
   );

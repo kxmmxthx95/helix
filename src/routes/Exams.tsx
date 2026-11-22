@@ -43,7 +43,7 @@ import {
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { ExamApprovalTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
 import { SubjectPicker } from "@/routes/ExamBank";
-import type { ExamAttempt, ExamSecurityEventType, ExamSession, Student } from "@/lib/database.types";
+import type { ExamAttempt, ExamSecurityEventType, ExamSession, ExamTopicSet, Student } from "@/lib/database.types";
 import { canApproveExams } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +66,8 @@ type StaffTab = "rooms" | "schedule" | "topics" | "approve";
 function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canApprove: boolean }) {
   const [tab, setTab] = useState<StaffTab>(teacherId ? "rooms" : "approve");
   const pending = useExamApprovalPendingCount(canApprove);
+  // Room created from an approved topic set (topics card or approval drawer); the room belongs to the set's teacher.
+  const [roomFor, setRoomFor] = useState<ExamTopicSet | null>(null);
   const tabs: [StaffTab, string][] = [
     ...(teacherId ? ([["rooms", "ห้องสอบ"], ["schedule", "ตารางสอบ"], ["topics", "หัวข้อการสอบ"]] as [StaffTab, string][]) : []),
     ...(canApprove ? ([["approve", pending > 0 ? `อนุมัติสอบ (${pending})` : "อนุมัติสอบ"]] as [StaffTab, string][]) : []),
@@ -96,22 +98,27 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
       {(tab === "topics" || tab === "approve") && (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {tab === "topics" && teacherId && <ExamTopicsTab teacherId={teacherId} />}
-          {tab === "approve" && canApprove && <ExamApprovalTab />}
+          {tab === "approve" && canApprove && <ExamApprovalTab onCreateRoom={setRoomFor} />}
         </div>
       )}
+      {roomFor && <CreateSessionSheet open onOpenChange={() => setRoomFor(null)} teacherId={roomFor.teacher_id} presetSet={roomFor} />}
     </div>
   );
 }
 
-/** Agenda of the teacher's exam sessions, grouped by opening day. */
+const fmtDateTime = (d: string) => new Date(d).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" });
+
+/** Exam timetable: scheduled rooms by opening day, plus rooms still waiting for a time. Tap a row to set/change its window. */
 function ExamSchedule({ teacherId }: { teacherId: string }) {
   const { data: sessions = [], isLoading } = useMyExamSessions(teacherId);
   const { data: subjects = [] } = useSubjectsByIds([...new Set(sessions.map((s) => s.subject_id))]);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
+  const [editing, setEditing] = useState<ExamSession | null>(null);
   const fmtTime = (d: string) => new Date(d).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+  const unscheduled = sessions.filter((s) => !s.opens_at);
   const byDay = new Map<string, ExamSession[]>();
-  for (const s of [...sessions].sort((a, b) => a.opens_at.localeCompare(b.opens_at))) {
-    const day = new Date(s.opens_at).toLocaleDateString("th-TH", { dateStyle: "full" });
+  for (const s of sessions.filter((x) => x.opens_at).sort((a, b) => a.opens_at!.localeCompare(b.opens_at!))) {
+    const day = new Date(s.opens_at!).toLocaleDateString("th-TH", { dateStyle: "full" });
     byDay.set(day, [...(byDay.get(day) ?? []), s]);
   }
 
@@ -119,27 +126,91 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
   if (sessions.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <EmptyState title="ยังไม่มีตารางสอบ" description="ตารางจะแสดงเมื่อมีการเปิดสอบในแท็บ “ห้องสอบ”" />
+        <EmptyState title="ยังไม่มีตารางสอบ" description="สร้างห้องสอบจากชุดหัวข้อที่อนุมัติแล้ว แล้วมาจัดเวลาที่นี่" />
       </div>
     );
   }
+  const row = (s: ExamSession, time: string) => (
+    <button
+      key={s.id}
+      type="button"
+      onClick={() => setEditing(s)}
+      className="flex w-full items-center gap-4 rounded-xl border border-border bg-card p-3 text-left text-xs hover:bg-muted"
+    >
+      <span className="w-28 shrink-0 font-mono tabular-nums">{time}</span>
+      <span className="font-medium">{s.title}</span>
+      <span className="ml-auto text-muted-foreground">{subjectById.get(s.subject_id)?.name_th ?? "—"}</span>
+    </button>
+  );
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+      {unscheduled.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-xs font-semibold text-muted-foreground">ยังไม่กำหนดเวลา ({unscheduled.length})</h3>
+          {unscheduled.map((s) => row(s, "ตั้งเวลา"))}
+        </section>
+      )}
       {[...byDay].map(([day, list]) => (
         <section key={day} className="space-y-2">
           <h3 className="text-xs font-semibold text-muted-foreground">{day}</h3>
-          {list.map((s) => (
-            <div key={s.id} className="flex items-center gap-4 rounded-xl border border-border bg-card p-3 text-xs">
-              <span className="w-28 shrink-0 font-mono tabular-nums">
-                {fmtTime(s.opens_at)} – {fmtTime(s.closes_at)}
-              </span>
-              <span className="font-medium">{s.title}</span>
-              <span className="ml-auto text-muted-foreground">{subjectById.get(s.subject_id)?.name_th ?? "—"}</span>
-            </div>
-          ))}
+          {list.map((s) => row(s, `${fmtTime(s.opens_at!)} – ${fmtTime(s.closes_at!)}`))}
         </section>
       ))}
+      {editing && <ScheduleSheet session={editing} onClose={() => setEditing(null)} />}
     </div>
+  );
+}
+
+/** `datetime-local` wants local "YYYY-MM-DDTHH:mm". */
+const toLocalInput = (iso: string | null) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+};
+
+function ScheduleSheet({ session, onClose }: { session: ExamSession; onClose: () => void }) {
+  const [opensAt, setOpensAt] = useState(toLocalInput(session.opens_at));
+  const [closesAt, setClosesAt] = useState(toLocalInput(session.closes_at));
+  const update = useUpdateExamSession();
+  const toast = useToast();
+  const valid = !!opensAt && !!closesAt && new Date(closesAt) > new Date(opensAt);
+
+  function save(e: React.FormEvent) {
+    e.preventDefault();
+    if (!valid) return;
+    update.mutate(
+      { id: session.id, opens_at: new Date(opensAt).toISOString(), closes_at: new Date(closesAt).toISOString() },
+      { onSuccess: onClose, onError: () => toast("บันทึกไม่สำเร็จ", "error") },
+    );
+  }
+
+  return (
+    <Sheet
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={session.title}
+      description="จัดเวลาสอบ"
+      footer={
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+            ยกเลิก
+          </Button>
+          <Button type="submit" form="schedule-session" className="flex-1" disabled={!valid || update.isPending}>
+            บันทึก
+          </Button>
+        </div>
+      }
+    >
+      <form id="schedule-session" onSubmit={save} className="space-y-3">
+        <Field label="เปิดสอบ" required>
+          <Input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} />
+        </Field>
+        <Field label="ปิดสอบ" required>
+          <Input type="datetime-local" value={closesAt} min={opensAt} onChange={(e) => setClosesAt(e.target.value)} />
+        </Field>
+        <p className="text-xs text-muted-foreground">นักเรียนจะเห็นและเข้าสอบได้เมื่อกำหนดเวลาแล้ว</p>
+      </form>
+    </Sheet>
   );
 }
 
@@ -217,8 +288,11 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
                     <td className="px-3 py-2 font-medium">{s.title}</td>
                     <td className="px-3 py-2">{subjectById.get(s.subject_id)?.name_th ?? "—"}</td>
                     <td className="px-3 py-2">
-                      {new Date(s.opens_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })} –{" "}
-                      {new Date(s.closes_at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}
+                      {s.opens_at && s.closes_at ? (
+                        `${fmtDateTime(s.opens_at)} – ${fmtDateTime(s.closes_at)}`
+                      ) : (
+                        <span className="text-muted-foreground">ยังไม่กำหนดเวลา</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right">
                       <Button
@@ -260,10 +334,14 @@ function CreateSessionSheet({
   open,
   onOpenChange,
   teacherId,
+  presetSet,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Owner of the room — the set's teacher when a head creates it for them. */
   teacherId: string;
+  /** Approved topic set the room is created for: subject, room and set are fixed. */
+  presetSet?: ExamTopicSet;
 }) {
   const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
   const subjectIds = [...new Set(assignments.map((a) => a.subject_id))];
@@ -272,17 +350,16 @@ function CreateSessionSheet({
   const { data: gradeLevels = [] } = useGradeLevelsByIds(gradeLevelIds);
   const gradeLevelById = new Map(gradeLevels.map((g) => [g.id, g]));
 
-  const [subjectId, setSubjectId] = useState("");
+  const [pickedSubjectId, setSubjectId] = useState("");
+  const subjectId = presetSet?.subject_id ?? pickedSubjectId;
   const [title, setTitle] = useState("");
-  const [noSchedule, setNoSchedule] = useState(false);
-  const [opensAt, setOpensAt] = useState("");
-  const [closesAt, setClosesAt] = useState("");
   const [duration, setDuration] = useState("");
   const [maxAttempts, setMaxAttempts] = useState("1");
   const [shuffleQuestions, setShuffleQuestions] = useState(true);
   const [shuffleChoices, setShuffleChoices] = useState(true);
   const [syncGradebook, setSyncGradebook] = useState(false);
-  const [topicSetId, setTopicSetId] = useState("");
+  const [pickedTopicSetId, setTopicSetId] = useState("");
+  const topicSetId = presetSet?.id ?? pickedTopicSetId;
 
   const { data: mySets = [] } = useMyTopicSets(teacherId);
   const approvedSets = mySets.filter(
@@ -304,20 +381,14 @@ function CreateSessionSheet({
   function reset() {
     setSubjectId("");
     setTitle("");
-    setNoSchedule(false);
-    setOpensAt("");
-    setClosesAt("");
     setDuration("");
     setMaxAttempts("1");
     setTopicSetId("");
   }
 
   // A set belongs to one room, so the session opens for exactly that room.
-  const targetAssignmentId = approvedSets.find((s) => s.id === topicSetId)?.teaching_assignment_id ?? "";
-  const canSave =
-    subjectId && topicSetId && title.trim() &&
-    (noSchedule || (opensAt && closesAt && new Date(closesAt) > new Date(opensAt))) &&
-    !!targetAssignmentId;
+  const targetAssignmentId = (presetSet ?? approvedSets.find((s) => s.id === topicSetId))?.teaching_assignment_id ?? "";
+  const canSave = subjectId && topicSetId && title.trim() && !!targetAssignmentId;
 
   function close() {
     reset();
@@ -332,10 +403,6 @@ function CreateSessionSheet({
         subject_id: subjectId,
         teacher_id: teacherId,
         title: title.trim(),
-        opens_at: noSchedule ? new Date().toISOString() : new Date(opensAt).toISOString(),
-        closes_at: noSchedule
-          ? new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000).toISOString()
-          : new Date(closesAt).toISOString(),
         duration_minutes: duration ? Number(duration) : null,
         max_attempts: Number(maxAttempts) || 1,
         shuffle_questions: shuffleQuestions,
@@ -346,8 +413,11 @@ function CreateSessionSheet({
         questions: [],
       },
       {
-        onSuccess: () => close(),
-        onError: () => toast("เปิดสอบไม่สำเร็จ", "error"),
+        onSuccess: () => {
+          toast("สร้างห้องสอบแล้ว");
+          close();
+        },
+        onError: () => toast("สร้างห้องสอบไม่สำเร็จ", "error"),
       },
     );
   }
@@ -356,19 +426,20 @@ function CreateSessionSheet({
     <Sheet
       open={open}
       onOpenChange={(next) => !next && close()}
-      title="เปิดสอบใหม่"
+      title={presetSet ? "สร้างห้องสอบ" : "เปิดสอบใหม่"}
       footer={
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={close}>
             ยกเลิก
           </Button>
           <Button type="submit" form="create-session" className="flex-1" disabled={!canSave || create.isPending}>
-            เปิดสอบ
+            สร้างห้องสอบ
           </Button>
         </div>
       }
     >
       <form id="create-session" onSubmit={submit} className="space-y-3">
+        {!presetSet && (
         <Field label="วิชา" required>
           <SubjectPicker
             subjects={subjects}
@@ -380,7 +451,8 @@ function CreateSessionSheet({
             }}
           />
         </Field>
-        {subjectId && (
+        )}
+        {!presetSet && subjectId && (
           <Field label="ห้อง / ชุดหัวข้อการสอบ" required>
             <select
               className="h-10 w-full rounded-lg border border-border bg-background px-2 text-sm"
@@ -403,17 +475,6 @@ function CreateSessionSheet({
           <Field label="ชื่อการสอบ" required>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="เช่น สอบกลางภาค" />
           </Field>
-          <SwitchRow label="ไม่กำหนดวันและเวลาเปิด-ปิดสอบ" checked={noSchedule} onChange={setNoSchedule} />
-          {!noSchedule && (
-            <>
-              <Field label="เปิดสอบ" required>
-                <Input type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} />
-              </Field>
-              <Field label="ปิดสอบ" required>
-                <Input type="datetime-local" value={closesAt} min={opensAt} onChange={(e) => setClosesAt(e.target.value)} />
-              </Field>
-            </>
-          )}
         </FormSection>
 
         <FormSection>

@@ -806,8 +806,9 @@ export type ExamSession = {
   subject_id: string;
   teacher_id: string;
   title: string;
-  opens_at: string;
-  closes_at: string;
+  /** Both null = created but not on the exam timetable yet (migration 0187); students can't see or start it. */
+  opens_at: string | null;
+  closes_at: string | null;
   /** Per-attempt countdown from first open; null = only the opens_at/closes_at window applies. */
   duration_minutes: number | null;
   max_attempts: number;
@@ -1935,6 +1936,8 @@ export type Database = {
         ExamSession,
         InsertOf<
           ExamSession,
+          | "opens_at"
+          | "closes_at"
           | "duration_minutes"
           | "max_attempts"
           | "shuffle_questions"
