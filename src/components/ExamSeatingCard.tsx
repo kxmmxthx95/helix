@@ -33,6 +33,12 @@ type TakenSeat = { title: string; student_name: string; student_code: string; se
 
 const PREFIX_SHORT: Record<string, string> = { เด็กชาย: "ด.ช.", เด็กหญิง: "ด.ญ.", นางสาว: "น.ส." };
 /** Seat cells are narrow: "เด็กหญิงสมใจ ใจดี" → "ด.ญ.สมใจ ใจดี" (นาย/นาง stay as they are). */
+/** Seat label: column as letters (1→A … 26→Z, 27→AA), then row number, e.g. "C2". */
+const seatLabel = (row: number, col: number) => {
+  let letters = "";
+  for (let n = col; n > 0; n = Math.floor((n - 1) / 26)) letters = String.fromCharCode(65 + ((n - 1) % 26)) + letters;
+  return `${letters}${row}`;
+};
 const shortName = (name: string) => name.replace(/^(เด็กชาย|เด็กหญิง|นางสาว)/, (p) => PREFIX_SHORT[p]!);
 
 const shuffled = <T,>(items: T[]) => {
@@ -225,10 +231,10 @@ export function ExamSeatingCard({
                       disabled={locked || (!!other && !x)}
                       aria-label={
                         other && !x
-                          ? `ที่นั่ง ${row}.${col} ถูกจองโดยรอบอื่น ${other.student_name}`
+                          ? `ที่นั่ง ${seatLabel(row, col)} ถูกจองโดยรอบอื่น ${other.student_name}`
                           : st
-                            ? `ที่นั่ง ${row}.${col} ${st.name}${other ? " ชนกับรอบอื่น" : ""}`
-                            : `ที่นั่ง ${row}.${col} ว่าง`
+                            ? `ที่นั่ง ${seatLabel(row, col)} ${st.name}${other ? " ชนกับรอบอื่น" : ""}`
+                            : `ที่นั่ง ${seatLabel(row, col)} ว่าง`
                       }
                       onClick={() => tapSeat(r.id, row, col)}
                       className={cn(
@@ -253,7 +259,7 @@ export function ExamSeatingCard({
                         </>
                       ) : (
                         <span className="tabular-nums">
-                          {row}.{col}
+                          {seatLabel(row, col)}
                         </span>
                       )}
                     </button>
