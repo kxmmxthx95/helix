@@ -6,8 +6,8 @@ import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { AlertTriangle, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ExamSeatingCard } from "@/components/ExamSeatingCard";
-import { useSeatTemplates, useSessionRoomIds, useSessionRooms, useSessionSeats, useSessionsWithSeating, useSetRoomPhysical, useSpecialSeats } from "@/hooks/useExamSeating";
+import { ExamSeatingCard, seatLabel } from "@/components/ExamSeatingCard";
+import { useMyExamSeats, useSeatTemplates, useSessionRoomIds, useSessionRooms, useSessionSeats, useSessionsWithSeating, useSetRoomPhysical, useSpecialSeats } from "@/hooks/useExamSeating";
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -1633,6 +1633,8 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
     </button>
   );
 
+  const { data: mySeats } = useMyExamSeats(student.id, exams.filter((e) => new Date(e.closes_at) >= new Date()).map((e) => e.id));
+
   if (isLoading) return <PageSpinner />;
   if (exams.length === 0) {
     return (
@@ -1649,6 +1651,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
       {clearFilter}
       <ul className="space-y-2">
       {exams.map((e) => {
+        const seat = mySeats?.get(e.id);
         const opens = new Date(e.opens_at);
         const closes = new Date(e.closes_at);
         const isOpen = now >= opens && now <= closes;
@@ -1660,6 +1663,16 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
               <p className="text-muted-foreground">
                 {isOpen ? "กำลังเปิดสอบ" : now < opens ? "ยังไม่เปิดสอบ" : "ปิดสอบแล้ว"} · ทำแล้ว {e.my_attempts}/{e.max_attempts} ครั้ง
               </p>
+              {seat && now <= closes && (
+                <div className="mt-2 rounded-lg bg-muted/60 px-2.5 py-2">
+                  <p className="font-medium">
+                    {opens.toLocaleDateString("th-TH", { dateStyle: "medium" })} {opens.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}–{closes.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {seat.room ? `ห้อง ${seat.room}` : "ยังไม่กำหนดห้อง"} · {seat.seat ? `ที่นั่ง ${seatLabel(seat.seat.row, seat.seat.col)}` : "ยังไม่กำหนดที่นั่ง"}
+                  </p>
+                </div>
+              )}
             </div>
             <Button size="sm" disabled={!isOpen || usedUp} onClick={() => onOpen(e)}>
               {usedUp ? "ทำครบแล้ว" : "เข้าสอบ"}

@@ -46,7 +46,7 @@ const COL_TONES = [
   "bg-teal-500/15 text-teal-700 dark:text-teal-300",
 ];
 /** Seat label: column as letters (1→A … 26→Z, 27→AA), then row number, e.g. "C2". */
-const seatLabel = (row: number, col: number) => {
+export const seatLabel = (row: number, col: number) => {
   let letters = "";
   for (let n = col; n > 0; n = Math.floor((n - 1) / 26)) letters = String.fromCharCode(65 + ((n - 1) % 26)) + letters;
   return `${letters}${row}`;
