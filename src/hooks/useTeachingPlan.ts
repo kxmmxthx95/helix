@@ -5,6 +5,19 @@ import { supabase } from "@/lib/supabase";
 // A teacher's own assigned subjects — reused from teaching_assignments (0017).
 // The plan itself is teaching_plan_slots (see useTeachingPlanSlots).
 
+/** Every teaching assignment RLS lets this user read (heads: their department). Used for the "ทุกวิชา" scope. */
+export function useAllTeachingAssignments(enabled: boolean) {
+  return useQuery({
+    queryKey: ["teaching_assignments", "all"],
+    enabled,
+    queryFn: async (): Promise<TeachingAssignment[]> => {
+      const { data, error } = await supabase.from("teaching_assignments").select("*").order("academic_year", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 export function useMyTeachingAssignments(teacherId: string | null) {
   return useQuery({
     queryKey: ["teaching_assignments", "by_teacher", teacherId],

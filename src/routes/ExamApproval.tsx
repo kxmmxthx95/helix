@@ -25,7 +25,7 @@ import { EXAM_KINDS, examLabel } from "@/lib/examKinds";
 import { groupBySharedLessons } from "@/lib/examGroups";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useProfilesByIds } from "@/hooks/usePractice";
-import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
+import { useAllTeachingAssignments, useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { isDeptHead } from "@/lib/roles";
 import type { ExamApprovalStatus, ExamTopicSet, Subject, TeachingAssignment } from "@/lib/database.types";
@@ -56,8 +56,22 @@ const thDate = (iso: string) => new Date(iso).toLocaleDateString("th-TH", { date
 
 // ============================================================ teacher: หัวข้อการสอบ
 
-export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
-  const { data: assignments = [], isLoading } = useMyTeachingAssignments(teacherId);
+export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: string; canSeeAll?: boolean }) {
+  // Heads can also browse every subject read-only; "ไม่มีสอบ" and picking stay on own subjects.
+  const [scope, setScope] = useState<"mine" | "all">("mine");
+  const all = canSeeAll && scope === "all";
+  const { data: mine = [], isLoading: mineLoading } = useMyTeachingAssignments(teacherId);
+  const { data: everyone = [], isLoading: allLoading } = useAllTeachingAssignments(all);
+  const assignments = all ? everyone : mine;
+  const isLoading = all ? allLoading : mineLoading;
+  const { data: teachers = [] } = useProfilesByIds(all ? [...new Set(everyone.map((a) => a.teacher_id).filter((x): x is string => !!x))] : []);
+  const teacherNameById = new Map(teachers.map((t) => [t.id, `${t.first_name} ${t.last_name}`]));
+  const scopeSelect = canSeeAll ? (
+    <Select value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")} className="w-full sm:w-64">
+      <option value="mine">วิชาของฉัน</option>
+      <option value="all">ทุกวิชา</option>
+    </Select>
+  ) : null;
   const { data: subjects = [] } = useSubjectsByIds([...new Set(assignments.map((a) => a.subject_id))]);
   const { data: classrooms = [] } = useClassroomsByIds([...new Set(assignments.map((a) => a.classroom_id))]);
   const { data: lessonLinks } = usePlanLessonLinks(assignments.map((a) => a.subject_id));
@@ -86,17 +100,26 @@ export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
   };
   // Subjects of one room that share a ผังการเรียน lesson are one card (key = first assignment id).
   const groups = new Map(
-    groupBySharedLessons(cards, (a) => `${a.classroom_id}:${a.academic_year}`, (a) => a.subject_id, (id) => lessonLinks?.get(id)).map((g) => [g[0]!.id, g] as const),
+    groupBySharedLessons(cards, (a) => `${a.classroom_id}:${a.academic_year}:${all ? (a.teacher_id ?? "") : ""}`, (a) => a.subject_id, (id) => lessonLinks?.get(id)).map((g) => [g[0]!.id, g] as const),
   );
   const subjectsOf = (members: TeachingAssignment[]) => members.map((a) => subjectById.get(a.subject_id)).filter((x): x is Subject => !!x);
   const pickingGroup = picking ? (groups.get(picking) ?? null) : null;
   const noExamGroup = noExamFor ? (groups.get(noExamFor) ?? null) : null;
 
-  if (isLoading) return <Skeleton className="h-40 w-full rounded-2xl" />;
+  if (isLoading)
+    return (
+      <div className="flex flex-1 flex-col gap-2">
+        {scopeSelect}
+        <Skeleton className="h-40 w-full rounded-2xl" />
+      </div>
+    );
   if (cards.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <EmptyState title="ยังไม่มีวิชาที่ได้รับมอบหมาย" description="เมื่อได้รับมอบหมายวิชาสอนแล้ว จะเลือกหัวข้อการสอบได้ที่นี่" />
+      <div className="flex flex-1 flex-col gap-2">
+        {scopeSelect}
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="ยังไม่มีวิชาที่ได้รับมอบหมาย" description="เมื่อได้รับมอบหมายวิชาสอนแล้ว จะเลือกหัวข้อการสอบได้ที่นี่" />
+        </div>
       </div>
     );
   }
@@ -115,16 +138,22 @@ export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
 
   return (
     <div className="flex flex-1 flex-col gap-2">
+      {scopeSelect}
       {[...groups].map(([key, members]) => {
         const memberSubjects = subjectsOf(members);
+        const teacherName = all ? teacherNameById.get(members[0]?.teacher_id ?? "") : undefined;
         return (
           <div
             key={key}
-            role="button"
-            tabIndex={0}
-            onClick={() => setPicking(key)}
-            onKeyDown={(e) => e.key === "Enter" && setPicking(key)}
-            className="cursor-pointer rounded-xl border border-border bg-card p-3 text-xs hover:bg-muted active:bg-muted"
+            {...(all
+              ? {}
+              : {
+                  role: "button",
+                  tabIndex: 0,
+                  onClick: () => setPicking(key),
+                  onKeyDown: (e: React.KeyboardEvent) => e.key === "Enter" && setPicking(key),
+                })}
+            className={cn("rounded-xl border border-border bg-card p-3 text-xs", !all && "cursor-pointer hover:bg-muted active:bg-muted")}
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 space-y-2">
@@ -137,18 +166,21 @@ export function ExamTopicsTab({ teacherId }: { teacherId: string }) {
                     </p>
                   </div>
                 ))}
+                {teacherName && <p className="text-xs text-muted-foreground">{teacherName}</p>}
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="shrink-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setNoExamFor(key);
-                }}
-              >
-                ไม่มีสอบ
-              </Button>
+              {!all && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setNoExamFor(key);
+                  }}
+                >
+                  ไม่มีสอบ
+                </Button>
+              )}
             </div>
           </div>
         );

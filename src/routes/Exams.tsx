@@ -117,7 +117,7 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
       {tab === "schedule" && teacherId && <ExamSchedule teacherId={teacherId} />}
       {(tab === "topics" || tab === "list" || tab === "approve") && (
         <div className="-mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pt-1">
-          {tab === "topics" && teacherId && <ExamTopicsTab teacherId={teacherId} />}
+          {tab === "topics" && teacherId && <ExamTopicsTab teacherId={teacherId} canSeeAll={canApprove} />}
           {tab === "list" && teacherId && <ExamSubmissionsTab teacherId={teacherId} onCreateRoom={setRoomFor} />}
           {tab === "approve" && canApprove && <ExamApprovalTab onCreateRoom={setRoomFor} />}
         </div>
