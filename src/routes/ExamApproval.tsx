@@ -461,6 +461,9 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
   const [filter, setFilter] = useState<Filter>("pending");
   const [view, setView] = useState<"cards" | "table">("cards");
   const [selectedIds, setSelectedIds] = useState<string[] | null>(null);
+  // "ยกเลิก" on a card opens the review sheet straight at the reason box (a rejection needs one).
+  const [rejectFirst, setRejectFirst] = useState(false);
+  const decide = useDecideTopicSet();
   const { data: subjects = [] } = useSubjectsByIds([...new Set(queue.map((s) => s.subject_id))]);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
   const { data: teachers = [] } = useProfilesByIds([...new Set(queue.map((s) => s.teacher_id))]);
@@ -502,6 +505,14 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
       toast(e instanceof Error ? e.message : "ลบไม่สำเร็จ", "error");
     }
   }
+  async function approve(sets: ExamTopicSet[]) {
+    try {
+      await Promise.all(sets.map((s) => decide.mutateAsync({ id: s.id, approve: true })));
+      toast("อนุมัติแล้ว");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "ไม่สำเร็จ", "error");
+    }
+  }
   const count = (f: Filter) => queue.filter((s) => s.approval_status === f).length;
   const selected = selectedIds ? queue.filter((s) => selectedIds.includes(s.id)) : [];
 
@@ -511,6 +522,8 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
     const members = group.map((s) => subjectById.get(s.subject_id)).filter((x): x is Subject => !!x);
     const createable = group.filter(canCreateRoom);
     const withdrawable = group.filter(canWithdraw);
+    // Own sets can't be decided by their author (decide_exam_topic_set refuses self-decisions).
+    const reviewable = mineOf ? [] : group.filter((s) => s.approval_status === "pending" && s.teacher_id !== profile?.id);
     return {
       first,
       teacher,
@@ -519,10 +532,39 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
       names: members.map((x) => x.name_th).join(" · ") || "—",
       room: roomLabel(first),
       exam: examLabel(first),
-      open: () => setSelectedIds(group.map((s) => s.id)),
+      open: () => {
+        setRejectFirst(false);
+        setSelectedIds(group.map((s) => s.id));
+      },
       actions:
-        createable.length > 0 || withdrawable.length > 0 ? (
+        createable.length > 0 || withdrawable.length > 0 || reviewable.length > 0 ? (
           <div className="flex items-center gap-2">
+            {reviewable.length > 0 && (
+              <>
+                <Button
+                  size="sm"
+                  className="bg-destructive text-destructive-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRejectFirst(true);
+                    setSelectedIds(group.map((s) => s.id));
+                  }}
+                >
+                  ยกเลิก
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-success text-white"
+                  disabled={decide.isPending}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void approve(reviewable);
+                  }}
+                >
+                  อนุมัติ
+                </Button>
+              </>
+            )}
             {withdrawable.length > 0 && (
               <Button
                 size="icon"
@@ -703,6 +745,7 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
           teacher={(() => { const t = teacherById.get(selected[0]!.teacher_id); return t ? `${t.first_name} ${t.last_name}` : undefined; })()}
           topicsBySet={topicsBySet}
           onClose={() => setSelectedIds(null)}
+          startRejecting={rejectFirst}
           readOnly={!!mineOf}
           onCreateRoom={
             onCreateRoom && selected.some(canCreateRoom)
@@ -727,8 +770,10 @@ function ReviewSheet({
   onClose,
   onCreateRoom,
   readOnly,
+  startRejecting,
 }: {
   readOnly?: boolean;
+  startRejecting?: boolean;
   /** One topic set per subject of the card (same teacher, room and exam). */
   sets: ExamTopicSet[];
   subjectById: Map<string, Subject>;
@@ -739,7 +784,7 @@ function ReviewSheet({
 }) {
   const decide = useDecideTopicSet();
   const toast = useToast();
-  const [rejecting, setRejecting] = useState(false);
+  const [rejecting, setRejecting] = useState(!!startRejecting);
   const [note, setNote] = useState("");
   const first = sets[0]!;
   const pending = sets.filter((s) => s.approval_status === "pending");
