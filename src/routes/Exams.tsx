@@ -7,7 +7,7 @@ import { AlertTriangle, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCir
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ExamSeatingCard } from "@/components/ExamSeatingCard";
-import { useSessionRoomIds, useSessionRooms, useSessionsWithSeating, useSetRoomPhysical } from "@/hooks/useExamSeating";
+import { useSessionRoomIds, useSessionsWithSeating, useSetRoomPhysical } from "@/hooks/useExamSeating";
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -19,7 +19,6 @@ import { useClassroomsByIds, useExamQuestionsOf, useGradeLevelsByIds, useSubject
 import {
   useAddSessionQuestion,
   useRemoveSessionQuestion,
-  useRoomConflicts,
   useAttemptAnswers,
   useAttemptQuestions,
   useApproveTakeover,
@@ -345,8 +344,6 @@ function ScheduleCard({ session }: { session: ExamSession }) {
   useEffect(() => setOpensAt(toLocalInput(session.opens_at)), [session.opens_at]);
   useEffect(() => setClosesAt(toLocalInput(session.closes_at)), [session.closes_at]);
   const valid = !!opensAt && !!closesAt && new Date(closesAt) > new Date(opensAt);
-  const { data: sessionRooms = [] } = useSessionRooms(session.id);
-  const { data: conflicts = [] } = useRoomConflicts(sessionRooms.flatMap((r) => r.room_id ?? []), opensAt, closesAt, session.id);
   // With เวลาทำ set, the close time follows the open time and is not typed by hand.
   const autoClose = !!session.duration_minutes;
 
@@ -367,11 +364,23 @@ function ScheduleCard({ session }: { session: ExamSession }) {
         className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
         <span className="flex shrink-0 items-center gap-2">
-          <IconTile tone="bg-sky-500/15 text-sky-700 dark:text-sky-300"><CalendarIcon className="h-4 w-4" /></IconTile>
+          <IconTile tone="bg-muted text-foreground"><CalendarIcon className="h-4 w-4" /></IconTile>
           <span className="font-semibold text-foreground">เวลาสอบ</span>
         </span>
         <span className="flex min-w-0 items-center gap-2 text-right text-foreground">
-          <span className="truncate tabular-nums">{session.opens_at && session.closes_at ? windowLabel(session.opens_at, session.closes_at) : "ยังไม่ได้ตั้งเวลา"}</span>
+          {session.opens_at && session.closes_at ? (
+            (() => {
+              const w = windowParts(session.opens_at, session.closes_at);
+              return (
+                <>
+                  <span className="shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">{w.date}</span>
+                  <span className="shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success">{w.time}</span>
+                </>
+              );
+            })()
+          ) : (
+            <span className="truncate rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-semibold text-destructive">ยังไม่ได้ตั้งเวลา</span>
+          )}
           {!(session.opens_at && session.closes_at) && <span className="flex shrink-0 text-destructive" role="img" aria-label="ยังไม่ได้ตั้งค่า"><AlertTriangle className="h-4 w-4" /></span>}
           <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
         </span>
@@ -396,8 +405,7 @@ function ScheduleCard({ session }: { session: ExamSession }) {
               {autoClose && <p className="text-xs text-muted-foreground">คำนวณจากเวลาทำ {session.duration_minutes} นาที</p>}
             </Field>
           </FormSection>
-          <RoomConflictNotice conflicts={conflicts} />
-          <p className="text-xs text-muted-foreground">นักเรียนจะเห็นและเข้าสอบได้เมื่อกำหนดเวลาแล้ว</p>
+            <p className="text-xs text-muted-foreground">นักเรียนจะเห็นและเข้าสอบได้เมื่อกำหนดเวลาแล้ว</p>
         </div>
       </Collapse>
     </div>
@@ -405,12 +413,15 @@ function ScheduleCard({ session }: { session: ExamSession }) {
 }
 
 /** "17 พ.ย. 09:00 – 10:30", or both dates when the window spans days. */
-function windowLabel(opens: string, closes: string) {
+/** Date and time of an exam window as two labels (date: "26 พ.ย. 2569", time: "08:30 – 09:30"). */
+function windowParts(opens: string, closes: string) {
   const o = new Date(opens);
   const c = new Date(closes);
-  const day = (d: Date) => d.toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+  const day = (d: Date) => d.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
   const time = (d: Date) => d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
-  return o.toDateString() === c.toDateString() ? `${day(o)} ${time(o)} – ${time(c)}` : `${day(o)} ${time(o)} – ${day(c)} ${time(c)}`;
+  return o.toDateString() === c.toDateString()
+    ? { date: day(o), time: `${time(o)} – ${time(c)}` }
+    : { date: `${day(o)} – ${day(c)}`, time: `${time(o)} – ${time(c)}` };
 }
 
 function ScheduleSheet({ session, onClose }: { session: ExamSession; onClose: () => void }) {
@@ -420,8 +431,6 @@ function ScheduleSheet({ session, onClose }: { session: ExamSession; onClose: ()
   const toast = useToast();
   const valid = !!opensAt && !!closesAt && new Date(closesAt) > new Date(opensAt);
   // The room is set from its own button; changing the time still warns if the room is already taken then.
-  const { data: sessionRooms = [] } = useSessionRooms(session.id);
-  const { data: conflicts = [] } = useRoomConflicts(sessionRooms.flatMap((r) => r.room_id ?? []), opensAt, closesAt, session.id);
 
   function save(e: React.FormEvent) {
     e.preventDefault();
@@ -467,31 +476,9 @@ function ScheduleSheet({ session, onClose }: { session: ExamSession; onClose: ()
             {session.duration_minutes && <p className="text-xs text-muted-foreground">คำนวณจากเวลาทำ {session.duration_minutes} นาที</p>}
           </Field>
         </FormSection>
-        <RoomConflictNotice conflicts={conflicts} />
         <p className="text-xs text-muted-foreground">นักเรียนจะเห็นและเข้าสอบได้เมื่อกำหนดเวลาแล้ว</p>
       </form>
     </Sheet>
-  );
-}
-
-/** Warning (not a block) that other exam sessions use the same room at an overlapping time. */
-function RoomConflictNotice({ conflicts }: { conflicts: { session_id: string; title: string; opens_at: string; closes_at: string; teacher_name: string }[] }) {
-  if (conflicts.length === 0) return null;
-  return (
-    <div role="alert" className="space-y-1 rounded-xl bg-[hsl(var(--warning)/0.12)] px-3 py-2 text-xs text-warning">
-      <p className="font-medium">ห้องนี้ถูกใช้ในช่วงเวลาที่ทับกัน ({conflicts.length} รอบ)</p>
-      <ul className="space-y-0.5">
-        {conflicts.map((c) => (
-          <li key={c.session_id}>
-            {c.title}
-            {c.teacher_name && ` · ${c.teacher_name}`} ·{" "}
-            {new Date(c.opens_at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })} –{" "}
-            {new Date(c.closes_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}
-          </li>
-        ))}
-      </ul>
-      <p>บันทึกได้ แต่ควรตรวจสอบก่อน</p>
-    </div>
   );
 }
 
@@ -1177,14 +1164,14 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
             className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
           >
             <span className="flex shrink-0 items-center gap-2">
-              <IconTile tone="bg-violet-500/15 text-violet-700 dark:text-violet-300"><PeopleIcon className="h-4 w-4" /></IconTile>
+              <IconTile tone="bg-muted text-foreground"><PeopleIcon className="h-4 w-4" /></IconTile>
               <span className="font-semibold text-foreground">นักเรียน {rosterRows.length} คน</span>
             </span>
             <span className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-right">
-              <span className="text-foreground">ส่งแล้ว {count("submitted")}</span>
-              <span className="text-foreground">กำลังทำ {count("in_progress")}</span>
-              <span className="text-foreground">ยังไม่เข้าสอบ {count("none")}</span>
-              {count("locked") > 0 && <span className="text-destructive">ถูกล็อก {count("locked")}</span>}
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-success/15 text-success">ส่งแล้ว {count("submitted")}</span>
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-warning/15 text-warning">กำลังทำ {count("in_progress")}</span>
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-muted text-muted-foreground">ยังไม่เข้าสอบ {count("none")}</span>
+              {count("locked") > 0 && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-destructive/15 text-destructive">ถูกล็อก {count("locked")}</span>}
             </span>
             <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", rosterOpen && "rotate-90")} />
           </button>
@@ -1234,7 +1221,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
         <span className="flex items-center gap-2 font-semibold text-foreground">
-          <IconTile tone="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"><Plus className="h-4 w-4" /></IconTile>
+          <IconTile tone="bg-muted text-foreground"><Plus className="h-4 w-4" /></IconTile>
           เพิ่มข้อสอบ
         </span>
         <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", editingQuestions && "rotate-90")} />
@@ -1255,7 +1242,6 @@ function ExamRoomField({ session, room, usedRoomIds }: { session: ExamSession; r
   const toast = useToast();
   const { profile } = useAuth();
   const { data: rooms = [] } = useRooms(profile?.department_id ?? null);
-  const { data: conflicts = [] } = useRoomConflicts(room.room_id ? [room.room_id] : [], session.opens_at ?? "", session.closes_at ?? "", session.id);
   if (rooms.length === 0 && !room.room_id) return null;
   return (
     <>
@@ -1275,7 +1261,6 @@ function ExamRoomField({ session, room, usedRoomIds }: { session: ExamSession; r
             </option>
           ))}
       </Select>
-      <RoomConflictNotice conflicts={conflicts} />
     </>
   );
 }
@@ -1296,10 +1281,10 @@ function SessionTopicsCard({ session }: { session: ExamSession }) {
         className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
         <span className="flex items-center gap-2">
-          <IconTile tone="bg-amber-500/15 text-amber-700 dark:text-amber-300"><ListIcon className="h-4 w-4" /></IconTile>
+          <IconTile tone="bg-muted text-foreground"><ListIcon className="h-4 w-4" /></IconTile>
           <span className="font-semibold text-foreground">หัวข้อการสอบ</span>
-          <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-sky-700 dark:text-sky-300">{topics.length} หัวข้อ</span>
         </span>
+        <span className="ml-auto rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success">{topics.length} หัวข้อ</span>
         <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
       </button>
       <Collapse open={open}>
@@ -1371,11 +1356,11 @@ function ExamSettingsCard({ session }: { session: ExamSession }) {
         className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
         <span className="flex shrink-0 items-center gap-2">
-          <IconTile tone="bg-slate-500/15 text-slate-700 dark:text-slate-300"><SettingsIcon className="h-4 w-4" /></IconTile>
+          <IconTile tone="bg-muted text-foreground"><SettingsIcon className="h-4 w-4" /></IconTile>
           <span className="font-semibold text-foreground">ตั้งค่าห้องสอบ</span>
         </span>
         <span className="flex min-w-0 items-center gap-2 text-right text-foreground">
-          <span className="truncate">{summary}</span>
+          <span className="truncate rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">{summary}</span>
           <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
         </span>
       </button>
@@ -1554,11 +1539,11 @@ function SessionQuestionList({ session, sessionQuestions }: { session: ExamSessi
     <div className="shrink-0 overflow-hidden rounded-lg border border-border">
       <button type="button" aria-expanded={open} onPointerEnter={() => setWarm(true)} onFocus={() => setWarm(true)} onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset">
         <span className="flex items-center gap-2 font-semibold text-foreground">
-          <IconTile tone="bg-sky-500/15 text-sky-700 dark:text-sky-300"><DocumentTextIcon className="h-4 w-4" /></IconTile>
+          <IconTile tone="bg-muted text-foreground"><DocumentTextIcon className="h-4 w-4" /></IconTile>
           รายการข้อสอบ
-          <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-sky-700 dark:text-sky-300">{sessionQuestions.length} ข้อ</span>
         </span>
         <span className="flex shrink-0 items-center gap-2">
+          <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success">{sessionQuestions.length} ข้อ</span>
           {sessionQuestions.length === 0 && <span className="flex shrink-0 text-destructive" role="img" aria-label="ยังไม่ได้ตั้งค่า"><AlertTriangle className="h-4 w-4" /></span>}
           <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", open && "rotate-90")} />
         </span>

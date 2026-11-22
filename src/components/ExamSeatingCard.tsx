@@ -6,7 +6,7 @@ import { AlertTriangle, ChevronForward, PencilIcon, Plus, TimetableIcon, TrashIc
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Avatar, Button, Field, Input, Select } from "@/components/ui";
+import { Avatar, Button, Field, FormSection, Input, Select } from "@/components/ui";
 import {
   useAddSessionRoom,
   useDeleteSeatTemplate,
@@ -184,7 +184,7 @@ export function ExamSeatingCard({
           >
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name} ({t.seat_rows}×{t.seat_cols})
+                {t.name} ({t.seat_cols}×{t.seat_rows})
               </option>
             ))}
           </Select>
@@ -209,7 +209,7 @@ export function ExamSeatingCard({
               </Button>
             </div>
 
-            <div className="overflow-x-auto pb-1">
+            <div className="-mx-1 overflow-x-auto px-1 py-1">
               <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(8rem, 1fr))` }}>
                 {Array.from({ length: rows * cols }, (_, i) => {
                   const row = Math.floor(i / cols) + 1;
@@ -287,18 +287,18 @@ export function ExamSeatingCard({
         className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
       >
         <span className="flex items-center gap-2 font-semibold text-foreground">
-          <IconTile tone="bg-amber-500/15 text-amber-700 dark:text-amber-300">
+          <IconTile tone="bg-muted text-foreground">
             <TimetableIcon className="h-4 w-4" />
           </IconTile>
           ผังห้องสอบ
         </span>
         <span className="flex min-w-0 flex-1 items-center justify-end gap-3 text-foreground">
           {anyGrid ? (
-            <span className="tabular-nums">
-              จัดแล้ว {seated.length}/{students.length} · {rooms.length > 1 ? `${rooms.length} ห้อง` : `ผัง ${first?.seat_rows}×${first?.seat_cols}`}
+            <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", students.length > 0 && seated.length >= students.length ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive")}>
+              จัดแล้ว {seated.length}/{students.length} · {rooms.length > 1 ? `${rooms.length} ห้อง` : `ผัง ${first?.seat_cols}×${first?.seat_rows}`}
             </span>
           ) : (
-            <span>ยังไม่ได้เลือก template</span>
+            <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-semibold text-destructive">ยังไม่ได้เลือก template</span>
           )}
           {!anyGrid && <span className="flex shrink-0 text-destructive" role="img" aria-label="ยังไม่ได้ตั้งค่า"><AlertTriangle className="h-4 w-4" /></span>}
         </span>
@@ -441,17 +441,21 @@ function SeatTemplatesSheet({ onClose }: { onClose: () => void }) {
       <div className="space-y-3">
         {form ? (
           <form onSubmit={submit} className="space-y-3">
-            <Field label="ชื่อ template" required>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="เช่น ห้องประชุม 6 แถว" maxLength={60} />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="จำนวนแถว" required>
-                <Input type="number" min="1" max="30" value={form.rows} onChange={(e) => setForm({ ...form, rows: e.target.value })} />
+            <FormSection>
+              <Field label="ชื่อ template" required>
+                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="เช่น ห้องประชุม 6 แถว" maxLength={60} />
               </Field>
-              <Field label="จำนวนคอลัมน์" required>
-                <Input type="number" min="1" max="30" value={form.cols} onChange={(e) => setForm({ ...form, cols: e.target.value })} />
-              </Field>
-            </div>
+            </FormSection>
+            <FormSection>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="จำนวนคอลัมน์" required>
+                  <Input type="number" min="1" max="30" value={form.cols} onChange={(e) => setForm({ ...form, cols: e.target.value })} />
+                </Field>
+                <Field label="จำนวนแถว" required>
+                  <Input type="number" min="1" max="30" value={form.rows} onChange={(e) => setForm({ ...form, rows: e.target.value })} />
+                </Field>
+              </div>
+            </FormSection>
             {valid && <p className="text-xs text-muted-foreground">{rowsN * colsN} ที่นั่ง</p>}
             <div className="flex gap-2">
               <Button type="button" variant="outline" className="flex-1" onClick={() => setForm(null)}>
@@ -474,7 +478,7 @@ function SeatTemplatesSheet({ onClose }: { onClose: () => void }) {
                   <div className="min-w-0">
                     <p className="truncate font-medium">{t.name}</p>
                     <p className="text-xs tabular-nums text-muted-foreground">
-                      {t.seat_rows} แถว × {t.seat_cols} คอลัมน์ · {t.seat_rows * t.seat_cols} ที่นั่ง
+                      {t.seat_cols} คอลัมน์ × {t.seat_rows} แถว · {t.seat_rows * t.seat_cols} ที่นั่ง
                     </p>
                   </div>
                   {canEdit(t) && (
