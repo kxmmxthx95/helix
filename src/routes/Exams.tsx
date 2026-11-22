@@ -709,9 +709,9 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
   );
 }
 
-function SwitchRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+function SwitchRow({ label, checked, onChange, compact }: { label: string; checked: boolean; onChange: (v: boolean) => void; compact?: boolean }) {
   return (
-    <div className="flex min-h-[3.25rem] items-center justify-between gap-4 text-sm leading-5">
+    <div className={cn("flex items-center justify-between gap-4 text-sm leading-5", compact ? "min-h-9" : "min-h-[3.25rem]")}>
       <span>{label}</span>
       <Switch size="xs" label={label} checked={checked} onChange={onChange} />
     </div>
@@ -1260,7 +1260,7 @@ function ExamSettingsCard({ session }: { session: ExamSession }) {
         </span>
       </button>
       <Collapse open={open}>
-        <div className="space-y-3 border-t border-border bg-muted/40 p-3 [&_.text-sm]:text-xs [&_input]:!text-xs">
+        <div className="space-y-3 border-t border-border bg-muted/40 p-3 [&_.text-sm]:text-xs [&_input]:!h-6 [&_input]:!text-xs">
           <FormSection>
             <Field label="เวลาทำ (นาที)">
               <Input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} onBlur={saveDuration} placeholder="ไม่จำกัด" />
@@ -1270,13 +1270,13 @@ function ExamSettingsCard({ session }: { session: ExamSession }) {
             </Field>
           </FormSection>
           <FormSection>
-            <SwitchRow label="สุ่มลำดับข้อ" checked={session.shuffle_questions} onChange={(v) => update.mutate({ id: session.id, shuffle_questions: v }, { onError })} />
-            <SwitchRow label="สุ่มลำดับตัวเลือก" checked={session.shuffle_choices} onChange={(v) => update.mutate({ id: session.id, shuffle_choices: v }, { onError })} />
-            <SwitchRow label="บันทึกคะแนนเข้าสมุดคะแนน" checked={session.sync_to_gradebook} onChange={(v) => update.mutate({ id: session.id, sync_to_gradebook: v }, { onError })} />
-            <SwitchRow label="เปิดเฉลยให้นักเรียนดู" checked={session.review_released} onChange={(v) => update.mutate({ id: session.id, review_released: v }, { onError })} />
-            <SwitchRow label="โหมดสอบจริง (รหัสสอบ + ล็อกเครื่องเดียว)" checked={session.strict_mode} onChange={(v) => update.mutate({ id: session.id, strict_mode: v }, { onError })} />
+            <SwitchRow compact label="สุ่มลำดับข้อ" checked={session.shuffle_questions} onChange={(v) => update.mutate({ id: session.id, shuffle_questions: v }, { onError })} />
+            <SwitchRow compact label="สุ่มลำดับตัวเลือก" checked={session.shuffle_choices} onChange={(v) => update.mutate({ id: session.id, shuffle_choices: v }, { onError })} />
+            <SwitchRow compact label="บันทึกคะแนนเข้าสมุดคะแนน" checked={session.sync_to_gradebook} onChange={(v) => update.mutate({ id: session.id, sync_to_gradebook: v }, { onError })} />
+            <SwitchRow compact label="เปิดเฉลยให้นักเรียนดู" checked={session.review_released} onChange={(v) => update.mutate({ id: session.id, review_released: v }, { onError })} />
+            <SwitchRow compact label="โหมดสอบจริง (รหัสสอบ + ล็อกเครื่องเดียว)" checked={session.strict_mode} onChange={(v) => update.mutate({ id: session.id, strict_mode: v }, { onError })} />
             {session.strict_mode && (
-              <div className="flex min-h-[3.25rem] items-center justify-between gap-4 text-sm leading-5">
+              <div className="flex min-h-9 items-center justify-between gap-4 text-sm leading-5">
                 <span>รหัสสอบ (แจ้งในห้องสอบเท่านั้น)</span>
                 <span className="font-mono text-base font-semibold tracking-widest">{code ?? "······"}</span>
               </div>
