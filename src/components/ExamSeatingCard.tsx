@@ -6,7 +6,7 @@ import { AlertTriangle, ChevronForward, PencilIcon, Plus, TimetableIcon, TrashIc
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Avatar, Button, Field, FormSection, Input, Select } from "@/components/ui";
+import { Button, Field, FormSection, Input, Select } from "@/components/ui";
 import {
   useAddSessionRoom,
   useAddSpecialSeat,
@@ -36,8 +36,6 @@ type Picked = { kind: "seat"; room: string; row: number; col: number } | { kind:
 /** A seat another overlapping session holds in the same physical room. */
 type TakenSeat = { title: string; student_name: string; student_code: string; seat_row: number; seat_col: number; seat_rows: number; seat_cols: number };
 
-const PREFIX_SHORT: Record<string, string> = { เด็กชาย: "ด.ช.", เด็กหญิง: "ด.ญ.", นางสาว: "น.ส." };
-/** Seat cells are narrow: "เด็กหญิงสมใจ ใจดี" → "ด.ญ.สมใจ ใจดี" (นาย/นาง stay as they are). */
 /** Seat badge tint per column, cycling, so columns read apart at a glance. */
 const COL_TONES = [
   "bg-sky-500/15 text-sky-700 dark:text-sky-300",
@@ -53,7 +51,6 @@ const seatLabel = (row: number, col: number) => {
   for (let n = col; n > 0; n = Math.floor((n - 1) / 26)) letters = String.fromCharCode(65 + ((n - 1) % 26)) + letters;
   return `${letters}${row}`;
 };
-const shortName = (name: string) => name.replace(/^(เด็กชาย|เด็กหญิง|นางสาว)/, (p) => PREFIX_SHORT[p]!);
 
 const shuffled = <T,>(items: T[]) => {
   const a = [...items];
@@ -83,6 +80,7 @@ export function ExamSeatingCard({
   const [open, setOpen] = useState(defaultOpen);
   const [managing, setManaging] = useState(false);
   const [roomTab, setRoomTab] = useState(0);
+  const [setupOpen, setSetupOpen] = useState(false);
   const [clearing, setClearing] = useState<string | null>(null);
   const [removing, setRemoving] = useState<ExamSessionRoom | null>(null);
   const [removingSpecial, setRemovingSpecial] = useState<ExamSessionSpecialSeat | null>(null);
@@ -129,6 +127,7 @@ export function ExamSeatingCard({
     return Array.from({ length: rows * cols }, (_, i) => ({ room: r.id, seat_row: Math.floor(i / cols) + 1, seat_col: (i % cols) + 1 })).filter((c) => !held.has(`${c.seat_row}:${c.seat_col}`));
   };
   const tabIdx = Math.min(roomTab, Math.max(0, rooms.length - 1));
+  const setupShown = setupOpen || !rooms.some((r) => r.seat_rows != null);
   const anyGrid = rooms.some((r) => r.seat_rows != null);
   const missing = Math.max(0, students.length - rooms.reduce((n, r) => n + freeCells(r).length, 0));
   const busy = setSeats.isPending || applyTemplate.isPending || addRoom.isPending || removeRoom.isPending || addSpecial.isPending || setSpecial.isPending || deleteSpecial.isPending;
@@ -223,12 +222,17 @@ export function ExamSeatingCard({
             )}
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* One button folds the room / template / fill controls (a sheet is narrow at any viewport size); open until a template is picked. */}
+        <Button size="sm" variant="outline" className="ui-control-compact h-8 w-full justify-between" aria-expanded={setupShown} onClick={() => setSetupOpen(!setupShown)}>
+          ตั้งค่าและจัดผังที่นั่ง
+          <ChevronForward className={cn("h-3 w-3 transition-transform", setupShown ? "-rotate-90" : "rotate-90")} />
+        </Button>
+        <div className={cn("flex-col gap-2", setupShown ? "flex" : "hidden")}>
           {roomPicker?.(r, usedRoomIds)}
           <Select
             aria-label="Template ผังที่นั่ง"
             placeholder="เลือก template ผังที่นั่ง"
-            className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:w-64 sm:flex-none"
+            className="ui-control-compact h-8 min-w-0 px-2.5 pr-7 text-[13px]"
             value={r.template_id ?? ""}
             disabled={locked}
             onChange={(e) => {
@@ -251,20 +255,20 @@ export function ExamSeatingCard({
           <p className="text-xs text-muted-foreground">{templates.length > 0 ? "เลือก template เพื่อเริ่มจัดผังที่นั่ง" : "ยังไม่มี template สร้างจาก \"จัดการ template\" ก่อน"}</p>
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || students.length === 0} onClick={() => fillRoom(r, (l) => l)}>
+            <div className={cn("flex-wrap items-center gap-2", setupShown ? "flex" : "hidden")}>
+              <Button size="sm" variant="outline" className="ui-control-compact h-8 flex-1" disabled={locked || students.length === 0} onClick={() => fillRoom(r, (l) => l)}>
                 เรียงตามลำดับ
               </Button>
-              <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || students.length === 0} onClick={() => fillRoom(r, shuffled)}>
+              <Button size="sm" variant="outline" className="ui-control-compact h-8 flex-1" disabled={locked || students.length === 0} onClick={() => fillRoom(r, shuffled)}>
                 สุ่ม
               </Button>
-              <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || !hasSeats} onClick={() => setClearing(r.id)}>
+              <Button size="sm" variant="outline" className="ui-control-compact h-8 flex-1" disabled={locked || !hasSeats} onClick={() => setClearing(r.id)}>
                 ล้างผัง
               </Button>
             </div>
 
             <div className="-mx-1 overflow-x-auto px-1 py-1">
-              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(8rem, 1fr))` }}>
+              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(6.5rem, 1fr))` }}>
                 {Array.from({ length: rows * cols }, (_, i) => {
                   const row = Math.floor(i / cols) + 1;
                   const col = (i % cols) + 1;
@@ -293,17 +297,10 @@ export function ExamSeatingCard({
                       )}
                     >
                       {other && !x ? (
-                        <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="line-clamp-2 break-words font-medium">{shortName(other.student_name)}</span>
-                          <span className="tabular-nums">{other.student_code}</span>
-                        </span>
+                        <span className="min-w-0 flex-1 font-medium tabular-nums">{other.student_code}</span>
                       ) : st ? (
                         <>
-                          <Avatar name={st.name} src={st.avatar ?? null} className="h-8 w-8 shrink-0 text-[10px] ring-2 ring-border ring-offset-1 ring-offset-card" />
-                          <span className="flex min-w-0 flex-1 flex-col">
-                            <span className="line-clamp-2 break-words font-medium text-foreground">{shortName(st.name)}</span>
-                            <span className="tabular-nums text-muted-foreground">{st.code}</span>
-                          </span>
+                          <span className="min-w-0 flex-1 font-medium tabular-nums text-foreground">{st.code}</span>
                           <span className={cn("absolute right-1 top-1 rounded-full px-1.5 py-px text-[10px] font-semibold tabular-nums", COL_TONES[(col - 1) % COL_TONES.length])}>{seatLabel(row, col)}</span>
                         </>
                       ) : (
@@ -337,7 +334,7 @@ export function ExamSeatingCard({
               </div>
               {roomSpecials.length > 0 && (
                 <div className="-mx-1 overflow-x-auto px-1 py-1">
-                  <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.max(cols, 1)}, minmax(8rem, 1fr))` }}>
+                  <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.max(cols, 1)}, minmax(6.5rem, 1fr))` }}>
                     {roomSpecials.map((x) => {
                       const st = x.student_id ? byId.get(x.student_id) : undefined;
                       const isPicked = picked?.kind === "special" && picked.id === x.id;
@@ -356,11 +353,7 @@ export function ExamSeatingCard({
                           >
                             {st ? (
                               <>
-                                <Avatar name={st.name} src={st.avatar ?? null} className="h-8 w-8 shrink-0 text-[10px] ring-2 ring-border ring-offset-1 ring-offset-card" />
-                                <span className="flex min-w-0 flex-1 flex-col">
-                                  <span className="line-clamp-2 break-words font-medium text-foreground">{shortName(st.name)}</span>
-                                  <span className="tabular-nums text-muted-foreground">{st.code}</span>
-                                </span>
+                                <span className="min-w-0 flex-1 font-medium tabular-nums text-foreground">{st.code}</span>
                               </>
                             ) : (
                               <span className="tabular-nums">พิเศษ {x.special_no}</span>

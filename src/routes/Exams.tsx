@@ -1153,7 +1153,7 @@ function ExamRoomField({ session, room, usedRoomIds }: { session: ExamSession; r
     <>
       <Select
         aria-label="ห้องสอบ"
-        className="ui-control-compact h-8 min-w-0 px-2.5 pr-7 text-[13px] sm:w-64"
+        className="ui-control-compact h-8 min-w-0 px-2.5 pr-7 text-[13px]"
         value={room.room_id ?? ""}
         onChange={(e) => setRoom.mutate({ sessionId: session.id, roomRowId: room.id, roomId: e.target.value || null }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
       >
