@@ -176,16 +176,16 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
     return c && g ? `${gradeShortLabel(g.code)}/${c.name}` : null;
   };
   const fmtTime = (d: string) => new Date(d).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
-  // Unscheduled rooms are pending work: shown in "active" and "all", hidden in "past".
+  // Rooms without an exam time are not listed here; set the time from the room settings.
   const now = Date.now();
   const shown = sessions.filter((s) => {
+    if (!s.opens_at) return false;
     if (when === "all") return true;
     const ended = !!s.closes_at && new Date(s.closes_at).getTime() < now;
     return when === "past" ? ended : !ended;
   });
-  const unscheduled = shown.filter((s) => !s.opens_at);
   const byDay = new Map<string, ExamSession[]>();
-  for (const s of shown.filter((x) => x.opens_at).sort((a, b) => a.opens_at!.localeCompare(b.opens_at!))) {
+  for (const s of shown.slice().sort((a, b) => a.opens_at!.localeCompare(b.opens_at!))) {
     const day = new Date(s.opens_at!).toLocaleDateString("th-TH", { dateStyle: "full" });
     byDay.set(day, [...(byDay.get(day) ?? []), s]);
   }
@@ -238,7 +238,7 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
       </div>
     );
   };
-  const scheduled = shown.filter((x) => x.opens_at).sort((a, b) => a.opens_at!.localeCompare(b.opens_at!));
+  const scheduled = shown.slice().sort((a, b) => a.opens_at!.localeCompare(b.opens_at!));
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 pt-1">
       <div className="flex shrink-0 items-center justify-end gap-2">
@@ -296,7 +296,7 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {[...unscheduled, ...scheduled].map((s) => (
+                {scheduled.map((s) => (
                   <tr key={s.id} onClick={() => setEditing(s)} className="h-12 cursor-pointer border-t border-border first:border-t-0">
                     <td className="px-4 py-0">{s.opens_at ? new Date(s.opens_at).toLocaleDateString("th-TH", { dateStyle: "medium" }) : <span className="text-muted-foreground">ยังไม่กำหนด</span>}</td>
                     <td className="px-4 py-0 font-mono tabular-nums">{s.opens_at ? `${fmtTime(s.opens_at)} – ${fmtTime(s.closes_at!)}` : "ตั้งเวลา"}</td>
@@ -311,9 +311,6 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-          {unscheduled.length > 0 && (
-            <section className="space-y-2">{unscheduled.map((s) => row(s))}</section>
-          )}
           {[...byDay].map(([day, list]) => (
             <section key={day} className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground">{day}</h3>
@@ -1032,6 +1029,11 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   const [eventsOpen, setEventsOpen] = useState(false);
   const [rosterOpen, setRosterOpen] = useState(false);
   const eventCount = useSecurityEvents(session.id).data?.length ?? 0;
+  const toast = useToast();
+  const updateSession = useUpdateExamSession();
+  const { data: seatedIds } = useSessionsWithSeating([session.id]);
+  // Toggle appears once time, questions and seating are all set (or while on, so it can be switched off).
+  const canEnable = session.is_enabled || (!!session.opens_at && !!session.closes_at && sessionQuestions.length > 0 && !!seatedIds?.has(session.id));
 
   const maxPoints = sessionQuestions.reduce((s, q) => s + q.points, 0);
   const submitted = attempts.filter((a) => a.status === "submitted");
@@ -1087,7 +1089,9 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   const now = new Date();
   const status = !session.opens_at
     ? { label: "ฉบับร่าง", dot: "bg-primary" }
-    : now < new Date(session.opens_at)
+    : !session.is_enabled
+      ? { label: "ยังไม่เปิดห้องสอบ", dot: "bg-muted-foreground" }
+      : now < new Date(session.opens_at)
       ? { label: "ยังไม่เปิดสอบ", dot: "bg-primary" }
       : now <= new Date(session.closes_at!)
         ? { label: "กำลังเปิดสอบ", dot: "bg-success" }
@@ -1126,9 +1130,20 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         <span className="flex items-center gap-2"><DocumentTextIcon className="h-3.5 w-3.5 text-muted-foreground" />{sessionQuestions.length} ข้อ</span>
         <span className="h-5 w-px bg-border" aria-hidden />
         <span className="flex items-center gap-2"><StarIcon className="h-3.5 w-3.5 text-muted-foreground" />เต็ม {maxPoints} คะแนน</span>
-        <span className="ml-auto flex items-center gap-1.5 rounded-full bg-card px-2.5 py-0.5 text-[11px] font-medium">
-          <span className={cn("h-1.5 w-1.5 rounded-full", status.dot)} />
-          {status.label}
+        <span className="ml-auto flex items-center gap-3">
+          {canEnable && (
+            <Switch
+              size="xs"
+              label="เปิดห้องสอบ"
+              checked={session.is_enabled}
+              disabled={updateSession.isPending}
+              onChange={(on) => updateSession.mutate({ id: session.id, is_enabled: on }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
+            />
+          )}
+          <span className="flex items-center gap-1.5 rounded-full bg-card px-2.5 py-0.5 text-[11px] font-medium">
+            <span className={cn("h-1.5 w-1.5 rounded-full", status.dot)} />
+            {status.label}
+          </span>
         </span>
       </div>
 
