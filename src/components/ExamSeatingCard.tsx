@@ -50,6 +50,9 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
   const capacity = rows * cols;
   const missing = Math.max(0, students.length - capacity);
   const busy = setSeats.isPending || applyTemplate.isPending;
+  // Seating needs the exam window first; the room picker (`top`) stays usable so the room can be set beforehand.
+  const noTime = !(session.opens_at && session.closes_at);
+  const locked = busy || noTime;
 
   const write = (next: Seat[]) => setSeats.mutate({ sessionId: session.id, seats: next }, { onError: () => toast("บันทึกผังไม่สำเร็จ", "error") });
   const fill = (order: SeatStudent[]) =>
@@ -109,6 +112,11 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
       </button>
       <Collapse open={open}>
         <div className="space-y-3 border-t border-border bg-card p-3">
+          {noTime && (
+            <p role="alert" className="rounded-xl bg-[hsl(var(--warning)/0.12)] px-3 py-2 text-xs text-warning">
+              ตั้งเวลาสอบก่อน จึงจะจัดผังห้องสอบได้
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             {top}
             <Select
@@ -116,7 +124,7 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
               placeholder="เลือก template ผังที่นั่ง"
               className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:w-64 sm:flex-none"
               value={grid?.template_id ?? ""}
-              disabled={busy}
+              disabled={locked}
               onChange={(e) => {
                 const t = templates.find((x) => x.id === e.target.value);
                 if (t) applyTemplate.mutate({ sessionId: session.id, template: t }, { onError: () => toast("เลือก template ไม่สำเร็จ", "error") });
@@ -138,13 +146,13 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={busy || students.length === 0} onClick={() => fill(students)}>
+                <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || students.length === 0} onClick={() => fill(students)}>
                   เรียงตามลำดับ
                 </Button>
-                <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={busy || students.length === 0} onClick={() => fill(shuffled(students))}>
+                <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || students.length === 0} onClick={() => fill(shuffled(students))}>
                   สุ่ม
                 </Button>
-                <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={busy || seated.length === 0} onClick={() => setClearing(true)}>
+                <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || seated.length === 0} onClick={() => setClearing(true)}>
                   ล้างผัง
                 </Button>
               </div>
@@ -177,7 +185,7 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
                       <button
                         key={`${row}:${col}`}
                         type="button"
-                        disabled={busy}
+                        disabled={locked}
                         aria-label={st ? `ที่นั่ง ${row}.${col} ${st.name}` : `ที่นั่ง ${row}.${col} ว่าง`}
                         onClick={() => tapSeat(row, col)}
                         className={cn(
@@ -216,7 +224,7 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
                       <button
                         key={s.student_id}
                         type="button"
-                        disabled={busy}
+                        disabled={locked}
                         onClick={() => setPicked(picked?.kind === "student" && picked.id === s.student_id ? null : { kind: "student", id: s.student_id })}
                         className={cn("rounded-full border border-border bg-card px-2.5 py-1 text-xs", picked?.kind === "student" && picked.id === s.student_id && "ring-2 ring-primary")}
                       >
