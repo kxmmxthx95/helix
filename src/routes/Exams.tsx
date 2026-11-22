@@ -3,7 +3,7 @@ import { ViewToggle, defaultView } from "@/components/ViewToggle";
 import { useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
-import { AlertTriangle, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
+import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { COL_TONES, ExamSeatingCard, seatLabel } from "@/components/ExamSeatingCard";
@@ -1639,6 +1639,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
   );
 
   const { data: mySeats } = useMyExamSeats(student.id, exams.filter((e) => new Date(e.closes_at) >= new Date()).map((e) => e.id));
+  const [topicFor, setTopicFor] = useState<AvailableExam | null>(null);
 
   if (isLoading) return <PageSpinner />;
   if (exams.length === 0) {
@@ -1654,6 +1655,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
   return (
     <>
       {clearFilter}
+      {topicFor && <StudentTopicsSheet session={topicFor} onClose={() => setTopicFor(null)} />}
       <ul className="space-y-2">
       {exams.map((e) => {
         const seat = mySeats?.get(e.id);
@@ -1663,10 +1665,10 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
         const usedUp = e.my_attempts >= e.max_attempts;
         return (
           <Card key={e.id} className="flex flex-col gap-3 text-xs">
-            <div className="min-w-0 flex-1 space-y-2">
+            <button type="button" onClick={() => setTopicFor(e)} className="min-w-0 flex-1 space-y-2 text-left">
               <div className="flex items-start justify-between gap-2">
                 <p className="min-w-0 text-sm font-semibold">{e.subject_ids.map((id) => subjects.find((x) => x.id === id)?.name_th).filter(Boolean).join(" / ") || e.title}</p>
-                <span className="shrink-0 text-muted-foreground">ทำแล้ว {e.my_attempts}/{e.max_attempts} ครั้ง</span>
+                <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", e.my_attempts > 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive")}>{e.my_attempts}/{e.max_attempts}</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {e.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(e.round))}>ครั้งที่ {e.round}</span>}
@@ -1695,7 +1697,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
                   )}
                 </div>
               )}
-            </div>
+            </button>
             <Button size="sm" className="w-full" disabled={!isOpen || usedUp} onClick={() => onOpen(e)}>
               {usedUp ? "ทำครบแล้ว" : "เข้าสอบ"}
             </Button>
@@ -1704,6 +1706,41 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
       })}
     </ul>
     </>
+  );
+}
+
+/** Tap a student exam card → drawer with the approved topics this room covers, grouped by lesson. */
+function StudentTopicsSheet({ session, onClose }: { session: AvailableExam; onClose: () => void }) {
+  const { data: roomSets } = useSessionSets([session.id]);
+  const { data: topicsBySet, isLoading } = useTopicSetsTopics((roomSets?.get(session.id) ?? []).map((x) => x.topic_set_id));
+  const topics = [...new Map([...(topicsBySet?.values() ?? [])].flat().map((t) => [t.topic_id, t] as const)).values()];
+  const lessons = [...Map.groupBy(topics, (t) => t.lesson)];
+  return (
+    <Sheet open onOpenChange={(o) => !o && onClose()} title="หัวข้อการสอบ" description={session.title}>
+      {isLoading ? (
+        <PageSpinner />
+      ) : lessons.length === 0 ? (
+        <p className="text-sm text-muted-foreground">ยังไม่มีหัวข้อ</p>
+      ) : (
+        <div className="space-y-3">
+          {lessons.map(([lesson, items]) => (
+            <section key={lesson}>
+              <h3 className="mb-2 flex items-center gap-2 px-1 text-base font-semibold">
+                <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><BookIcon className="h-4 w-4" /></IconTile>
+                {lesson}
+              </h3>
+              <ul className="overflow-hidden rounded-xl bg-muted [&>*+*]:border-t [&>*+*]:border-border">
+                {items.map((t) => (
+                  <li key={t.topic_id} className="px-4 py-3 text-base">
+                    {t.topic}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+    </Sheet>
   );
 }
 
