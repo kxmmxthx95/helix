@@ -150,6 +150,7 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
   const [editing, setEditing] = useState<ExamSession | null>(null);
   const [view, setView] = useState<"cards" | "table">("cards");
+  const [when, setWhen] = useState<"active" | "past" | "all">("active");
   const colors = useSubjectColors([]);
   // Physical room where each exam is sat (exam_sessions.room_id → rooms).
   const { profile: scheduleMe } = useAuth();
@@ -167,9 +168,16 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
     return c && g ? `${gradeShortLabel(g.code)}/${c.name}` : null;
   };
   const fmtTime = (d: string) => new Date(d).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
-  const unscheduled = sessions.filter((s) => !s.opens_at);
+  // Unscheduled rooms are pending work: shown in "active" and "all", hidden in "past".
+  const now = Date.now();
+  const shown = sessions.filter((s) => {
+    if (when === "all") return true;
+    const ended = !!s.closes_at && new Date(s.closes_at).getTime() < now;
+    return when === "past" ? ended : !ended;
+  });
+  const unscheduled = shown.filter((s) => !s.opens_at);
   const byDay = new Map<string, ExamSession[]>();
-  for (const s of sessions.filter((x) => x.opens_at).sort((a, b) => a.opens_at!.localeCompare(b.opens_at!))) {
+  for (const s of shown.filter((x) => x.opens_at).sort((a, b) => a.opens_at!.localeCompare(b.opens_at!))) {
     const day = new Date(s.opens_at!).toLocaleDateString("th-TH", { dateStyle: "full" });
     byDay.set(day, [...(byDay.get(day) ?? []), s]);
   }
@@ -223,13 +231,25 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
       </div>
     );
   };
-  const scheduled = sessions.filter((x) => x.opens_at).sort((a, b) => a.opens_at!.localeCompare(b.opens_at!));
+  const scheduled = shown.filter((x) => x.opens_at).sort((a, b) => a.opens_at!.localeCompare(b.opens_at!));
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 pt-1">
-      <div className="flex shrink-0 justify-end">
+      <div className="flex shrink-0 items-center justify-end gap-2">
+        <Select className="ui-control-compact mr-auto h-8 px-2.5 pr-7 text-[13px] sm:w-64 sm:pr-8" aria-label="ช่วงเวลาสอบ" value={when} onChange={(e) => setWhen(e.target.value as typeof when)}>
+          <option value="active">ยังไม่สิ้นสุด</option>
+          <option value="past">ผ่านไปแล้ว</option>
+          <option value="all">ทั้งหมด</option>
+        </Select>
         <ViewToggle value={view} onChange={setView} />
       </div>
-      {view === "table" ? (
+      {shown.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState
+            title={when === "past" ? "ยังไม่มีการสอบที่ผ่านไปแล้ว" : "ไม่มีการสอบที่ยังไม่สิ้นสุด"}
+            description={when === "past" ? "เลือก 'ทั้งหมด' เพื่อดูทุกการสอบ" : "เลือก 'ทั้งหมด' เพื่อดูการสอบที่ผ่านไปแล้ว"}
+          />
+        </div>
+      ) : view === "table" ? (
         <div className="table-panel flex rounded-none border-t border-border shadow-none">
           <div className="table-panel-scroll scrollbar-hidden">
             <table className="w-full min-w-[36rem] text-[13px]">
