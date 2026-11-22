@@ -100,7 +100,7 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
   return (
     <div className="page-fill gap-2">
       {tabs.length > 1 && (
-        <div className="flex w-full shrink-0 flex-wrap border-b border-border" role="tablist">
+        <div className="sticky top-0 lg:top-12 z-10 flex w-full shrink-0 flex-wrap border-b border-border bg-background/95 backdrop-blur" role="tablist">
           {tabs.map(([key, label]) => {
             const Icon = TAB_ICON[key];
             return (
@@ -1041,31 +1041,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         </span>
       </div>
 
-      <ScheduleCard session={session} />
-      <ExamSettingsCard session={session} />
       <SessionTopicsCard session={session} />
-
-      <SessionQuestionList session={session} sessionQuestions={sessionQuestions} />
-
-      <div className="shrink-0 overflow-hidden rounded-lg border border-border">
-      <button
-        type="button"
-        aria-expanded={editingQuestions}
-        onClick={() => setEditingQuestions((v) => !v)}
-        className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
-      >
-        <span className="flex items-center gap-2 font-semibold text-foreground">
-          <IconTile tone="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"><Plus className="h-4 w-4" /></IconTile>
-          เพิ่มข้อสอบ
-        </span>
-        <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", editingQuestions && "rotate-90")} />
-      </button>
-
-      <AddSessionQuestionPanel session={session} open={editingQuestions} />
-      </div>
-
-      <SecurityPanel session={session} attempts={attempts} />
-      <SecurityEventsSheet sessionId={session.id} open={eventsOpen} onOpenChange={setEventsOpen} />
 
       {isLoading || rosterLoading ? (
         <div className="table-panel flex-1" role="status" aria-label="กำลังโหลด">
@@ -1138,7 +1114,31 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
           </Collapse>
         </div>
       )}
+      <ScheduleCard session={session} />
+      <ExamSettingsCard session={session} />
       {rosterRows.length > 0 && <ExamSeatingCard session={session} top={<ExamRoomField session={session} />} students={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "" }))} />}
+
+      <SessionQuestionList session={session} sessionQuestions={sessionQuestions} />
+
+      <div className="shrink-0 overflow-hidden rounded-lg border border-border">
+      <button
+        type="button"
+        aria-expanded={editingQuestions}
+        onClick={() => setEditingQuestions((v) => !v)}
+        className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
+      >
+        <span className="flex items-center gap-2 font-semibold text-foreground">
+          <IconTile tone="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"><Plus className="h-4 w-4" /></IconTile>
+          เพิ่มข้อสอบ
+        </span>
+        <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", editingQuestions && "rotate-90")} />
+      </button>
+
+      <AddSessionQuestionPanel session={session} open={editingQuestions} />
+      </div>
+
+      <SecurityPanel session={session} attempts={attempts} />
+      <SecurityEventsSheet sessionId={session.id} open={eventsOpen} onOpenChange={setEventsOpen} />
     </div>
   );
 }
