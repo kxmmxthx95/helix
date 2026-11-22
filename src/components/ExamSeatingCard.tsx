@@ -6,16 +6,34 @@ import { AlertTriangle, ChevronForward, PencilIcon, Plus, TimetableIcon, TrashIc
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Field, Input, Select } from "@/components/ui";
-import { useDeleteSeatTemplate, useSaveSeatTemplate, useSeatTemplates, useRoomConflictSeats, useSessionSeating, useSessionSeats, useSetSessionSeating, useSetSessionSeats } from "@/hooks/useExamSeating";
-import type { ExamSeatTemplate, ExamSession } from "@/lib/database.types";
+import { Avatar, Button, Field, Input, Select } from "@/components/ui";
+import {
+  useAddSessionRoom,
+  useDeleteSeatTemplate,
+  useRemoveSessionRoom,
+  useRoomsConflictSeats,
+  useSaveSeatTemplate,
+  useSeatTemplates,
+  useSessionRooms,
+  useSessionSeats,
+  useSetRoomSeating,
+  useSetSessionSeats,
+} from "@/hooks/useExamSeating";
+import type { ExamSeatTemplate, ExamSession, ExamSessionRoom } from "@/lib/database.types";
 import { ICON, ICON_BTN } from "@/lib/iconButton";
 import { isDeptHead, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
-type SeatStudent = { student_id: string; name: string; code: string };
-type Seat = { student_id: string; seat_row: number; seat_col: number };
-type Picked = { kind: "seat"; row: number; col: number } | { kind: "student"; id: string } | null;
+type SeatStudent = { student_id: string; name: string; code: string; avatar?: string | null };
+/** `room` is the exam_session_rooms row the seat is in. */
+type Seat = { student_id: string; room: string; seat_row: number; seat_col: number };
+type Picked = { kind: "seat"; room: string; row: number; col: number } | { kind: "student"; id: string } | null;
+/** A seat another overlapping session holds in the same physical room. */
+type TakenSeat = { title: string; student_name: string; student_code: string; seat_row: number; seat_col: number; seat_rows: number; seat_cols: number };
+
+const PREFIX_SHORT: Record<string, string> = { เด็กชาย: "ด.ช.", เด็กหญิง: "ด.ญ.", นางสาว: "น.ส." };
+/** Seat cells are narrow: "เด็กหญิงสมใจ ใจดี" → "ด.ญ.สมใจ ใจดี" (นาย/นาง stay as they are). */
+const shortName = (name: string) => name.replace(/^(เด็กชาย|เด็กหญิง|นางสาว)/, (p) => PREFIX_SHORT[p]!);
 
 const shuffled = <T,>(items: T[]) => {
   const a = [...items];
@@ -26,36 +44,62 @@ const shuffled = <T,>(items: T[]) => {
   return a;
 };
 
-/** ผังห้องสอบ: pick a department template, then fill the grid automatically and fix it by tapping seats. Teachers only. */
-export function ExamSeatingCard({ session, students, top }: { session: ExamSession; students: SeatStudent[]; /** Rendered first inside the open card (the physical-room picker). */ top?: React.ReactNode }) {
+/**
+ * ผังห้องสอบ: one or more rooms, each with a department template; fill automatically (per room or all rooms) and fix by tapping seats.
+ * A room can be added when the seats of all rooms together are too few. Teachers only.
+ */
+export function ExamSeatingCard({
+  session,
+  students,
+  roomPicker,
+}: {
+  session: ExamSession;
+  students: SeatStudent[];
+  /** Physical-room picker of one room row (`usedRoomIds`: physical rooms already used by the session). */
+  roomPicker?: (room: ExamSessionRoom, usedRoomIds: string[]) => React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const [managing, setManaging] = useState(false);
-  const [clearing, setClearing] = useState(false);
+  const [clearing, setClearing] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<ExamSessionRoom | null>(null);
   const [picked, setPicked] = useState<Picked>(null);
   const toast = useToast();
   const { data: templates = [] } = useSeatTemplates();
-  const { data: grid } = useSessionSeating(session.id);
+  const { data: rooms = [] } = useSessionRooms(session.id);
   const { data: seats = [] } = useSessionSeats(session.id);
-  const applyTemplate = useSetSessionSeating();
+  const applyTemplate = useSetRoomSeating();
   const setSeats = useSetSessionSeats();
+  const addRoom = useAddSessionRoom();
+  const removeRoom = useRemoveSessionRoom();
+  const takenByRoom = useRoomsConflictSeats(session, rooms);
 
   const byId = new Map(students.map((s) => [s.student_id, s]));
+  const roomRowIds = new Set(rooms.map((r) => r.id));
   // A seat held by someone who is no longer on the roster is ignored and dropped on the next change.
-  const seated: Seat[] = seats.filter((x) => byId.has(x.student_id)).map(({ student_id, seat_row, seat_col }) => ({ student_id, seat_row, seat_col }));
-  const at = new Map(seated.map((x) => [`${x.seat_row}:${x.seat_col}`, x]));
+  const seated: Seat[] = seats
+    .filter((x) => byId.has(x.student_id) && roomRowIds.has(x.session_room_id))
+    .map(({ student_id, session_room_id, seat_row, seat_col }) => ({ student_id, room: session_room_id, seat_row, seat_col }));
+  const at = new Map(seated.map((x) => [`${x.room}:${x.seat_row}:${x.seat_col}`, x]));
   const seatedIds = new Set(seated.map((x) => x.student_id));
   const unseated = students.filter((s) => !seatedIds.has(s.student_id));
-  const rows = grid?.seat_rows ?? 0;
-  const cols = grid?.seat_cols ?? 0;
-  const capacity = rows * cols;
-  // Seats other overlapping sessions hold in this room, keyed "row:col" (query is ordered earliest session first, so it wins a shared cell).
-  const { data: taken = [] } = useRoomConflictSeats(session);
-  const held = new Map<string, (typeof taken)[number]>();
-  for (const t of taken) if (t.seat_row <= rows && t.seat_col <= cols && !held.has(`${t.seat_row}:${t.seat_col}`)) held.set(`${t.seat_row}:${t.seat_col}`, t);
-  const gridDiffers = taken.some((t) => t.seat_rows !== rows || t.seat_cols !== cols);
-  const missing = Math.max(0, students.length - (capacity - held.size));
-  const busy = setSeats.isPending || applyTemplate.isPending;
-  // Seating needs the exam window first; the room picker (`top`) stays usable so the room can be set beforehand.
+
+  // Seats other sessions hold in a room, keyed "row:col" (earliest session first, so it wins a shared cell); only cells inside this room's grid.
+  const heldOf = (r: ExamSessionRoom) => {
+    const m = new Map<string, TakenSeat>();
+    for (const t of takenByRoom.get(r.id) ?? []) if (t.seat_row <= (r.seat_rows ?? 0) && t.seat_col <= (r.seat_cols ?? 0) && !m.has(`${t.seat_row}:${t.seat_col}`)) m.set(`${t.seat_row}:${t.seat_col}`, t);
+    return m;
+  };
+  /** Seats of a room in reading order that no other session holds. */
+  const freeCells = (r: ExamSessionRoom) => {
+    const rows = r.seat_rows ?? 0;
+    const cols = r.seat_cols ?? 0;
+    const held = heldOf(r);
+    return Array.from({ length: rows * cols }, (_, i) => ({ room: r.id, seat_row: Math.floor(i / cols) + 1, seat_col: (i % cols) + 1 })).filter((c) => !held.has(`${c.seat_row}:${c.seat_col}`));
+  };
+  const anyGrid = rooms.some((r) => r.seat_rows != null);
+  const missing = Math.max(0, students.length - rooms.reduce((n, r) => n + freeCells(r).length, 0));
+  const busy = setSeats.isPending || applyTemplate.isPending || addRoom.isPending || removeRoom.isPending;
+  // Seating needs the exam window first; the room pickers stay usable so rooms can be set beforehand.
   const noTime = !(session.opens_at && session.closes_at);
   const locked = busy || noTime;
 
@@ -64,29 +108,37 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
       { sessionId: session.id, seats: next },
       { onError: (e) => toast((e as { message?: string }).message?.includes("ถูกใช้ในรอบสอบอื่น") ? "ที่นั่งนี้ถูกใช้ในรอบสอบอื่นที่เวลาทับกัน" : "บันทึกผังไม่สำเร็จ", "error") },
     );
-  // Auto-arrange fills row by row and skips seats another session holds.
-  const fill = (order: SeatStudent[]) => {
-    const free = Array.from({ length: capacity }, (_, i) => ({ seat_row: Math.floor(i / cols) + 1, seat_col: (i % cols) + 1 })).filter((c) => !held.has(`${c.seat_row}:${c.seat_col}`));
-    write(order.slice(0, free.length).map((s, i) => ({ student_id: s.student_id, ...free[i]! })));
+  // One room: clear it, then fill it row by row from the students without a seat plus its own students. Skips seats another session holds.
+  const fillRoom = (r: ExamSessionRoom, order: (list: SeatStudent[]) => SeatStudent[]) => {
+    const mine = new Set(seated.filter((x) => x.room === r.id).map((x) => x.student_id));
+    const free = freeCells(r);
+    const pool = order(students.filter((s) => !seatedIds.has(s.student_id) || mine.has(s.student_id)));
+    write([...seated.filter((x) => x.room !== r.id), ...pool.slice(0, free.length).map((s, i) => ({ student_id: s.student_id, ...free[i]! }))]);
+  };
+  // All rooms: everyone in order, room 1 first, spilling into the next room.
+  const fillAll = (order: SeatStudent[]) => {
+    const cells = rooms.flatMap(freeCells);
+    write(order.slice(0, cells.length).map((s, i) => ({ student_id: s.student_id, ...cells[i]! })));
   };
 
-  function tapSeat(row: number, col: number) {
-    const here = at.get(`${row}:${col}`);
-    if (!here && held.has(`${row}:${col}`)) return;
+  function tapSeat(room: string, row: number, col: number) {
+    const here = at.get(`${room}:${row}:${col}`);
+    const r = rooms.find((x) => x.id === room);
+    if (!here && r && heldOf(r).has(`${row}:${col}`)) return;
     if (!picked) {
-      if (here) setPicked({ kind: "seat", row, col });
+      if (here) setPicked({ kind: "seat", room, row, col });
       return;
     }
     if (picked.kind === "student") {
       // Place the unseated student; whoever was there becomes unseated.
-      write([...seated.filter((x) => !(x.seat_row === row && x.seat_col === col)), { student_id: picked.id, seat_row: row, seat_col: col }]);
-    } else if (picked.row !== row || picked.col !== col) {
-      const from = at.get(`${picked.row}:${picked.col}`);
+      write([...seated.filter((x) => !(x.room === room && x.seat_row === row && x.seat_col === col)), { student_id: picked.id, room, seat_row: row, seat_col: col }]);
+    } else if (picked.room !== room || picked.row !== row || picked.col !== col) {
+      const from = at.get(`${picked.room}:${picked.row}:${picked.col}`);
       if (from) {
         write(
           seated.map((x) => {
-            if (x.student_id === from.student_id) return { ...x, seat_row: row, seat_col: col };
-            if (here && x.student_id === here.student_id) return { ...x, seat_row: picked.row, seat_col: picked.col };
+            if (x.student_id === from.student_id) return { ...x, room, seat_row: row, seat_col: col };
+            if (here && x.student_id === here.student_id) return { ...x, room: picked.room, seat_row: picked.row, seat_col: picked.col };
             return x;
           }),
         );
@@ -95,7 +147,136 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
     setPicked(null);
   }
 
-  const pickedStudent = picked ? (picked.kind === "student" ? byId.get(picked.id) : byId.get(at.get(`${picked.row}:${picked.col}`)?.student_id ?? "")) : undefined;
+  const pickedStudent = picked ? (picked.kind === "student" ? byId.get(picked.id) : byId.get(at.get(`${picked.room}:${picked.row}:${picked.col}`)?.student_id ?? "")) : undefined;
+  const usedRoomIds = rooms.flatMap((r) => (r.room_id ? [r.room_id] : []));
+  const first = rooms[0];
+
+  const renderRoom = (r: ExamSessionRoom, index: number) => {
+    const rows = r.seat_rows ?? 0;
+    const cols = r.seat_cols ?? 0;
+    const held = heldOf(r);
+    const gridDiffers = (takenByRoom.get(r.id) ?? []).some((t) => t.seat_rows !== rows || t.seat_cols !== cols);
+    const hasSeats = seated.some((x) => x.room === r.id);
+    return (
+      <section key={r.id} className={cn("space-y-3", rooms.length > 1 && "rounded-lg border border-border p-3")}>
+        {rooms.length > 1 && (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-foreground">ห้องที่ {index + 1}</span>
+            {r.position > 1 && (
+              <Button size="icon" variant="outline" className={ICON_BTN} aria-label="ลบห้องนี้" disabled={busy} onClick={() => setRemoving(r)}>
+                <TrashIcon className={ICON} />
+              </Button>
+            )}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {roomPicker?.(r, usedRoomIds)}
+          <Select
+            aria-label="Template ผังที่นั่ง"
+            placeholder="เลือก template ผังที่นั่ง"
+            className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:w-64 sm:flex-none"
+            value={r.template_id ?? ""}
+            disabled={locked}
+            onChange={(e) => {
+              const t = templates.find((x) => x.id === e.target.value);
+              if (t) applyTemplate.mutate({ sessionId: session.id, roomRowId: r.id, template: t }, { onError: () => toast("เลือก template ไม่สำเร็จ", "error") });
+            }}
+          >
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({t.seat_rows}×{t.seat_cols})
+              </option>
+            ))}
+          </Select>
+          <Button size="sm" variant="outline" className="ui-control-compact h-8" onClick={() => setManaging(true)}>
+            จัดการ template
+          </Button>
+        </div>
+
+        {r.seat_rows == null ? (
+          <p className="text-xs text-muted-foreground">{templates.length > 0 ? "เลือก template เพื่อเริ่มจัดผังที่นั่ง" : "ยังไม่มี template สร้างจาก \"จัดการ template\" ก่อน"}</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || students.length === 0} onClick={() => fillRoom(r, (l) => l)}>
+                เรียงตามลำดับ
+              </Button>
+              <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || students.length === 0} onClick={() => fillRoom(r, shuffled)}>
+                สุ่ม
+              </Button>
+              <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || !hasSeats} onClick={() => setClearing(r.id)}>
+                ล้างผัง
+              </Button>
+            </div>
+
+            <div className="overflow-x-auto pb-1">
+              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(8rem, 1fr))` }}>
+                {Array.from({ length: rows * cols }, (_, i) => {
+                  const row = Math.floor(i / cols) + 1;
+                  const col = (i % cols) + 1;
+                  const x = at.get(`${r.id}:${row}:${col}`);
+                  const st = x ? byId.get(x.student_id) : undefined;
+                  const isPicked = picked?.kind === "seat" && picked.room === r.id && picked.row === row && picked.col === col;
+                  const other = held.get(`${row}:${col}`);
+                  return (
+                    <button
+                      key={`${row}:${col}`}
+                      type="button"
+                      disabled={locked || (!!other && !x)}
+                      aria-label={
+                        other && !x
+                          ? `ที่นั่ง ${row}.${col} ถูกจองโดยรอบอื่น ${other.student_name}`
+                          : st
+                            ? `ที่นั่ง ${row}.${col} ${st.name}${other ? " ชนกับรอบอื่น" : ""}`
+                            : `ที่นั่ง ${row}.${col} ว่าง`
+                      }
+                      onClick={() => tapSeat(r.id, row, col)}
+                      className={cn(
+                        "flex h-14 min-w-0 items-center gap-2 rounded-lg border px-2 text-left text-[11px] leading-tight",
+                        other && !x ? "border-border bg-muted text-muted-foreground opacity-70" : st ? "border-border bg-card" : "border-dashed border-border text-muted-foreground",
+                        other && x && "border-destructive ring-1 ring-destructive",
+                        isPicked && "ring-2 ring-primary",
+                      )}
+                    >
+                      {other && !x ? (
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="line-clamp-2 break-words font-medium">{shortName(other.student_name)}</span>
+                          <span className="tabular-nums">{other.student_code}</span>
+                        </span>
+                      ) : st ? (
+                        <>
+                          <Avatar name={st.name} src={st.avatar ?? null} className="h-8 w-8 shrink-0 text-[10px]" />
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="line-clamp-2 break-words font-medium text-foreground">{shortName(st.name)}</span>
+                            <span className="tabular-nums text-muted-foreground">{st.code}</span>
+                          </span>
+                        </>
+                      ) : (
+                        <span className="tabular-nums">
+                          {row}.{col}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {held.size > 0 && (
+              <p className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
+                ช่องสีเทาถูกจองโดยรอบอื่นในห้องเดียวกันที่เวลาทับกัน: {[...new Set([...held.values()].map((t) => t.title))].join(", ")}
+              </p>
+            )}
+            {gridDiffers && (
+              <p role="alert" className="rounded-xl bg-[hsl(var(--warning)/0.12)] px-3 py-2 text-xs text-warning">
+                ผังขนาดไม่ตรงกับอีกรอบในห้องเดียวกัน ที่นั่งอาจไม่ตรงกับห้องจริง
+              </p>
+            )}
+          </>
+        )}
+      </section>
+    );
+  };
 
   return (
     <div className="shrink-0 overflow-hidden rounded-lg border border-border">
@@ -112,14 +293,14 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
           ผังห้องสอบ
         </span>
         <span className="flex min-w-0 flex-1 items-center justify-end gap-3 text-foreground">
-          {grid ? (
+          {anyGrid ? (
             <span className="tabular-nums">
-              จัดแล้ว {seated.length}/{students.length} · ผัง {rows}×{cols}
+              จัดแล้ว {seated.length}/{students.length} · {rooms.length > 1 ? `${rooms.length} ห้อง` : `ผัง ${first?.seat_rows}×${first?.seat_cols}`}
             </span>
           ) : (
             <span>ยังไม่ได้เลือก template</span>
           )}
-          {!grid && <span className="flex shrink-0 text-destructive" role="img" aria-label="ยังไม่ได้ตั้งค่า"><AlertTriangle className="h-4 w-4" /></span>}
+          {!anyGrid && <span className="flex shrink-0 text-destructive" role="img" aria-label="ยังไม่ได้ตั้งค่า"><AlertTriangle className="h-4 w-4" /></span>}
         </span>
         <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
       </button>
@@ -130,162 +311,98 @@ export function ExamSeatingCard({ session, students, top }: { session: ExamSessi
               ตั้งเวลาสอบก่อน จึงจะจัดผังห้องสอบได้
             </p>
           )}
-          <div className="flex flex-wrap items-center gap-2">
-            {top}
-            <Select
-              aria-label="Template ผังที่นั่ง"
-              placeholder="เลือก template ผังที่นั่ง"
-              className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:w-64 sm:flex-none"
-              value={grid?.template_id ?? ""}
-              disabled={locked}
-              onChange={(e) => {
-                const t = templates.find((x) => x.id === e.target.value);
-                if (t) applyTemplate.mutate({ sessionId: session.id, template: t }, { onError: () => toast("เลือก template ไม่สำเร็จ", "error") });
-              }}
-            >
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.seat_rows}×{t.seat_cols})
-                </option>
-              ))}
-            </Select>
-            <Button size="sm" variant="outline" className="ui-control-compact h-8" onClick={() => setManaging(true)}>
-              จัดการ template
-            </Button>
-          </div>
 
-          {!grid ? (
-            <p className="text-xs text-muted-foreground">{templates.length > 0 ? "เลือก template เพื่อเริ่มจัดผังที่นั่ง" : "ยังไม่มี template สร้างจาก \"จัดการ template\" ก่อน"}</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || students.length === 0} onClick={() => fill(students)}>
-                  เรียงตามลำดับ
+          {rooms.length > 1 && anyGrid && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-muted-foreground">จัดทุกห้อง</span>
+              <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || students.length === 0} onClick={() => fillAll(students)}>
+                เรียงตามลำดับ
+              </Button>
+              <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || students.length === 0} onClick={() => fillAll(shuffled(students))}>
+                สุ่ม
+              </Button>
+            </div>
+          )}
+
+          {pickedStudent && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted px-3 py-2 text-xs">
+              <span className="min-w-0 flex-1">
+                เลือก <span className="font-medium">{pickedStudent.name}</span> แตะที่นั่งเพื่อย้ายหรือสลับ
+              </span>
+              {picked?.kind === "seat" && (
+                <Button size="sm" variant="outline" className="ui-control-compact h-7" onClick={() => { write(seated.filter((x) => x.student_id !== pickedStudent.student_id)); setPicked(null); }}>
+                  นำออกจากที่นั่ง
                 </Button>
-                <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || students.length === 0} onClick={() => fill(shuffled(students))}>
-                  สุ่ม
+              )}
+              <Button size="sm" variant="outline" className="ui-control-compact h-7" onClick={() => setPicked(null)}>
+                ยกเลิก
+              </Button>
+            </div>
+          )}
+
+          {rooms.map(renderRoom)}
+
+          {anyGrid && missing > 0 && (
+            <div role="alert" className="flex flex-wrap items-center gap-2 rounded-xl bg-[hsl(var(--warning)/0.12)] px-3 py-2 text-xs text-warning">
+              <span className="min-w-0 flex-1">ที่นั่งไม่พอ ขาดอีก {missing} ที่ เลือก template ที่ใหญ่ขึ้น เพิ่มห้อง หรือจัดนักเรียนที่เหลือเอง</span>
+              {rooms.every((r) => r.seat_rows != null) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="ui-control-compact h-7 shrink-0"
+                  disabled={locked}
+                  onClick={() => addRoom.mutate(session.id, { onError: () => toast("เพิ่มห้องไม่สำเร็จ", "error") })}
+                >
+                  <Plus className="h-3 w-3" /> เพิ่มห้อง
                 </Button>
-                <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || seated.length === 0} onClick={() => setClearing(true)}>
-                  ล้างผัง
-                </Button>
+              )}
+            </div>
+          )}
+
+          {anyGrid && unseated.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-foreground">ยังไม่มีที่นั่ง ({unseated.length})</p>
+              <div className="flex flex-wrap gap-1.5">
+                {unseated.map((s) => (
+                  <button
+                    key={s.student_id}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => setPicked(picked?.kind === "student" && picked.id === s.student_id ? null : { kind: "student", id: s.student_id })}
+                    className={cn("rounded-full border border-border bg-card px-2.5 py-1 text-xs", picked?.kind === "student" && picked.id === s.student_id && "ring-2 ring-primary")}
+                  >
+                    {s.name}
+                  </button>
+                ))}
               </div>
-
-              {pickedStudent && (
-                <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted px-3 py-2 text-xs">
-                  <span className="min-w-0 flex-1">
-                    เลือก <span className="font-medium">{pickedStudent.name}</span> แตะที่นั่งเพื่อย้ายหรือสลับ
-                  </span>
-                  {picked?.kind === "seat" && (
-                    <Button size="sm" variant="outline" className="ui-control-compact h-7" onClick={() => { write(seated.filter((x) => x.student_id !== pickedStudent.student_id)); setPicked(null); }}>
-                      นำออกจากที่นั่ง
-                    </Button>
-                  )}
-                  <Button size="sm" variant="outline" className="ui-control-compact h-7" onClick={() => setPicked(null)}>
-                    ยกเลิก
-                  </Button>
-                </div>
-              )}
-
-              <div className="overflow-x-auto pb-1">
-                <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(5.5rem, 1fr))` }}>
-                  {Array.from({ length: capacity }, (_, i) => {
-                    const row = Math.floor(i / cols) + 1;
-                    const col = (i % cols) + 1;
-                    const x = at.get(`${row}:${col}`);
-                    const st = x ? byId.get(x.student_id) : undefined;
-                    const isPicked = picked?.kind === "seat" && picked.row === row && picked.col === col;
-                    const other = held.get(`${row}:${col}`);
-                    return (
-                      <button
-                        key={`${row}:${col}`}
-                        type="button"
-                        disabled={locked || (!!other && !x)}
-                        aria-label={
-                          other && !x
-                            ? `ที่นั่ง ${row}.${col} ถูกจองโดยรอบอื่น ${other.student_name}`
-                            : st
-                              ? `ที่นั่ง ${row}.${col} ${st.name}${other ? " ชนกับรอบอื่น" : ""}`
-                              : `ที่นั่ง ${row}.${col} ว่าง`
-                        }
-                        onClick={() => tapSeat(row, col)}
-                        className={cn(
-                          "flex h-14 min-w-0 flex-col items-start justify-center rounded-lg border px-2 text-left text-[11px] leading-tight",
-                          other && !x ? "border-border bg-muted text-muted-foreground opacity-70" : st ? "border-border bg-card" : "border-dashed border-border text-muted-foreground",
-                          other && x && "border-destructive ring-1 ring-destructive",
-                          isPicked && "ring-2 ring-primary",
-                        )}
-                      >
-                        {other && !x ? (
-                          <>
-                            <span className="line-clamp-2 w-full break-words font-medium">{other.student_name}</span>
-                            <span className="tabular-nums">{other.student_code}</span>
-                          </>
-                        ) : st ? (
-                          <>
-                            <span className="line-clamp-2 w-full break-words font-medium text-foreground">{st.name}</span>
-                            <span className="tabular-nums text-muted-foreground">{st.code}</span>
-                          </>
-                        ) : (
-                          <span className="tabular-nums">
-                            {row}.{col}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {held.size > 0 && (
-                <p className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
-                  ช่องสีเทาถูกจองโดยรอบอื่นในห้องเดียวกันที่เวลาทับกัน: {[...new Set([...held.values()].map((t) => t.title))].join(", ")}
-                </p>
-              )}
-              {gridDiffers && (
-                <p role="alert" className="rounded-xl bg-[hsl(var(--warning)/0.12)] px-3 py-2 text-xs text-warning">
-                  ผังขนาดไม่ตรงกับอีกรอบในห้องเดียวกัน ที่นั่งอาจไม่ตรงกับห้องจริง
-                </p>
-              )}
-
-              {missing > 0 && (
-                <p role="alert" className="rounded-xl bg-[hsl(var(--warning)/0.12)] px-3 py-2 text-xs text-warning">
-                  ที่นั่งไม่พอ ขาดอีก {missing} ที่ เลือก template ที่ใหญ่ขึ้น หรือจัดนักเรียนที่เหลือเอง
-                </p>
-              )}
-
-              {unseated.length > 0 && (
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-foreground">ยังไม่มีที่นั่ง ({unseated.length})</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {unseated.map((s) => (
-                      <button
-                        key={s.student_id}
-                        type="button"
-                        disabled={locked}
-                        onClick={() => setPicked(picked?.kind === "student" && picked.id === s.student_id ? null : { kind: "student", id: s.student_id })}
-                        className={cn("rounded-full border border-border bg-card px-2.5 py-1 text-xs", picked?.kind === "student" && picked.id === s.student_id && "ring-2 ring-primary")}
-                      >
-                        {s.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </>
+            </div>
           )}
         </div>
       </Collapse>
 
       <ConfirmDialog
-        open={clearing}
+        open={clearing !== null}
         title="ล้างผังที่นั่ง?"
-        description="นักเรียนทุกคนจะกลับไปอยู่ในรายการ ยังไม่มีที่นั่ง ผังขนาดเดิมยังอยู่"
+        description="นักเรียนในห้องนี้จะกลับไปอยู่ในรายการ ยังไม่มีที่นั่ง ผังขนาดเดิมยังอยู่"
         confirmLabel="ล้างผัง"
         pending={setSeats.isPending}
-        onCancel={() => setClearing(false)}
+        onCancel={() => setClearing(null)}
         onConfirm={() => {
-          write([]);
-          setClearing(false);
+          write(seated.filter((x) => x.room !== clearing));
+          setClearing(null);
+          setPicked(null);
+        }}
+      />
+      <ConfirmDialog
+        open={removing !== null}
+        title="ลบห้องนี้?"
+        description="นักเรียนที่นั่งในห้องนี้จะกลับไปอยู่ในรายการ ยังไม่มีที่นั่ง"
+        confirmLabel="ลบห้อง"
+        pending={removeRoom.isPending}
+        onCancel={() => setRemoving(null)}
+        onConfirm={() => {
+          if (removing) removeRoom.mutate({ sessionId: session.id, roomRowId: removing.id }, { onError: () => toast("ลบห้องไม่สำเร็จ", "error") });
+          setRemoving(null);
           setPicked(null);
         }}
       />

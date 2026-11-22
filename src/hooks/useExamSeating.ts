@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { ExamSeatTemplate, ExamSession, ExamSessionSeat, ExamSessionSeating } from "@/lib/database.types";
+import type { ExamSeatTemplate, ExamSession, ExamSessionRoom, ExamSessionSeat } from "@/lib/database.types";
 
-// ผังห้องสอบ (migration 0199): department seat templates + one session's grid and seats.
+// ผังห้องสอบ (migrations 0199, 0203): department seat templates + a session's rooms (each with its own grid) and seats.
 
 export function useSeatTemplates() {
   return useQuery({
@@ -40,15 +40,31 @@ export function useDeleteSeatTemplate() {
   });
 }
 
-/** Grid size of the session's chart, or null before a template is picked. */
-export function useSessionSeating(sessionId: string | null) {
+/** The rooms of a session, first room first. Every session has at least one (created with it). */
+export function useSessionRooms(sessionId: string | null) {
   return useQuery({
-    queryKey: ["exam_session_seating", sessionId],
+    queryKey: ["exam_session_rooms", sessionId],
     enabled: !!sessionId,
-    queryFn: async (): Promise<ExamSessionSeating | null> => {
-      const { data, error } = await supabase.from("exam_session_seating").select("*").eq("session_id", sessionId!).maybeSingle();
+    queryFn: async (): Promise<ExamSessionRoom[]> => {
+      const { data, error } = await supabase.from("exam_session_rooms").select("*").eq("session_id", sessionId!).order("position");
       if (error) throw error;
       return data;
+    },
+  });
+}
+
+/** Physical room ids per session, first room first (for lists that show where each exam is sat). */
+export function useSessionRoomIds(sessionIds: string[]) {
+  const key = [...sessionIds].sort();
+  return useQuery({
+    queryKey: ["exam_session_rooms", "ids", key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<Map<string, string[]>> => {
+      const { data, error } = await supabase.from("exam_session_rooms").select("session_id, room_id").in("session_id", key).not("room_id", "is", null).order("position");
+      if (error) throw error;
+      const out = new Map<string, string[]>();
+      for (const r of data) out.set(r.session_id, [...(out.get(r.session_id) ?? []), r.room_id!]);
+      return out;
     },
   });
 }
@@ -65,31 +81,64 @@ export function useSessionSeats(sessionId: string | null) {
   });
 }
 
-/** Copies a template's size onto the session; seats that no longer fit are dropped by the database. */
-export function useSetSessionSeating() {
+const refreshRooms = (qc: ReturnType<typeof useQueryClient>, sessionId: string) => {
+  void qc.invalidateQueries({ queryKey: ["exam_session_rooms"] });
+  void qc.invalidateQueries({ queryKey: ["exam_session_seats", sessionId] });
+  void qc.invalidateQueries({ queryKey: ["exam_sessions"] }); // room 1 mirrors exam_sessions.room_id
+};
+
+/** Copies a template's size onto a room; seats that no longer fit are dropped by the database. */
+export function useSetRoomSeating() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ sessionId, template }: { sessionId: string; template: ExamSeatTemplate }) => {
-      const { error } = await supabase
-        .from("exam_session_seating")
-        .upsert(
-          { session_id: sessionId, seat_rows: template.seat_rows, seat_cols: template.seat_cols, template_id: template.id, updated_at: new Date().toISOString() },
-          { onConflict: "session_id" },
-        );
+    mutationFn: async ({ roomRowId, template }: { sessionId: string; roomRowId: string; template: ExamSeatTemplate }) => {
+      const { error } = await supabase.from("exam_session_rooms").update({ seat_rows: template.seat_rows, seat_cols: template.seat_cols, template_id: template.id }).eq("id", roomRowId);
       if (error) throw error;
     },
-    onSettled: (_d, _e, v) => {
-      void qc.invalidateQueries({ queryKey: ["exam_session_seating", v.sessionId] });
-      void qc.invalidateQueries({ queryKey: ["exam_session_seats", v.sessionId] });
-    },
+    onSettled: (_d, _e, v) => refreshRooms(qc, v.sessionId),
   });
 }
 
-/** Replaces the whole seat list at once (auto-arrange, swap, move, clear). */
+/** Picks (or clears) the physical room of one room row. */
+export function useSetRoomPhysical() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ roomRowId, roomId }: { sessionId: string; roomRowId: string; roomId: string | null }) => {
+      const { error } = await supabase.from("exam_session_rooms").update({ room_id: roomId }).eq("id", roomRowId);
+      if (error) throw error;
+    },
+    onSettled: (_d, _e, v) => refreshRooms(qc, v.sessionId),
+  });
+}
+
+export function useAddSessionRoom() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (sessionId: string) => {
+      const { error } = await supabase.rpc("add_exam_session_room", { p_session: sessionId });
+      if (error) throw error;
+    },
+    onSettled: (_d, _e, sessionId) => refreshRooms(qc, sessionId),
+  });
+}
+
+/** Removes a room after the first; its seats go with it, so those students become unseated. */
+export function useRemoveSessionRoom() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ roomRowId }: { sessionId: string; roomRowId: string }) => {
+      const { error } = await supabase.from("exam_session_rooms").delete().eq("id", roomRowId);
+      if (error) throw error;
+    },
+    onSettled: (_d, _e, v) => refreshRooms(qc, v.sessionId),
+  });
+}
+
+/** Replaces the whole seat list of the session at once (auto-arrange, swap, move, clear); each seat names its room row. */
 export function useSetSessionSeats() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ sessionId, seats }: { sessionId: string; seats: { student_id: string; seat_row: number; seat_col: number }[] }) => {
+    mutationFn: async ({ sessionId, seats }: { sessionId: string; seats: { student_id: string; room: string; seat_row: number; seat_col: number }[] }) => {
       const { error } = await supabase.rpc("set_exam_session_seats", { p_session: sessionId, p_seats: seats });
       if (error) throw error;
     },
@@ -97,29 +146,32 @@ export function useSetSessionSeats() {
   });
 }
 
-/** Ids (of the given sessions) that have a seating template chosen. */
+/** Ids (of the given sessions) with at least one room that has a seating template chosen. */
 export function useSessionsWithSeating(sessionIds: string[]) {
   const key = [...sessionIds].sort();
   return useQuery({
-    queryKey: ["exam_session_seating", "has", key],
+    queryKey: ["exam_session_rooms", "has", key],
     enabled: key.length > 0,
     queryFn: async (): Promise<Set<string>> => {
-      const { data, error } = await supabase.from("exam_session_seating").select("session_id").in("session_id", key);
+      const { data, error } = await supabase.from("exam_session_rooms").select("session_id").in("session_id", key).not("seat_rows", "is", null);
       if (error) throw error;
       return new Set(data.map((r) => r.session_id));
     },
   });
 }
 
-/** Seats other overlapping sessions hold in this session's room (read-only overlay); needs room and window set. Refetched on focus and after every save here. */
-export function useRoomConflictSeats(session: ExamSession) {
-  return useQuery({
-    queryKey: ["exam_session_seats", session.id, "room_conflicts", session.room_id, session.opens_at, session.closes_at],
-    enabled: !!session.room_id && !!session.opens_at && !!session.closes_at,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("exam_room_conflict_seats", { p_session: session.id });
-      if (error) throw error;
-      return data;
-    },
+/** Seats other overlapping sessions hold in each room of this session (read-only overlay), by room row id. Needs the room and the window set. */
+export function useRoomsConflictSeats(session: ExamSession, rooms: ExamSessionRoom[]) {
+  const results = useQueries({
+    queries: rooms.map((r) => ({
+      queryKey: ["exam_session_seats", session.id, "room_conflicts", r.room_id, session.opens_at, session.closes_at],
+      enabled: !!r.room_id && !!session.opens_at && !!session.closes_at,
+      queryFn: async () => {
+        const { data, error } = await supabase.rpc("exam_room_conflict_seats", { p_session: session.id, p_room: r.room_id! });
+        if (error) throw error;
+        return data;
+      },
+    })),
   });
+  return new Map(rooms.map((r, i) => [r.id, results[i]?.data ?? []]));
 }

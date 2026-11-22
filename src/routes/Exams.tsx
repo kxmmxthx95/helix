@@ -7,7 +7,7 @@ import { AlertTriangle, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCir
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ExamSeatingCard } from "@/components/ExamSeatingCard";
-import { useSessionsWithSeating } from "@/hooks/useExamSeating";
+import { useSessionRoomIds, useSessionRooms, useSessionsWithSeating, useSetRoomPhysical } from "@/hooks/useExamSeating";
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -62,7 +62,7 @@ import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { ExamApprovalTab, ExamSubmissionsTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
 import { DIFFICULTY_BADGE_CLASS, DIFFICULTY_LABEL, QuestionForm, QuestionSheet, SubjectPicker, useQuestionForm } from "@/routes/ExamBank";
-import type { ExamAttempt, ExamSecurityEventType, ExamSession, ExamTopicSet, Student, Subject } from "@/lib/database.types";
+import type { ExamAttempt, ExamSecurityEventType, ExamSession, ExamSessionRoom, ExamTopicSet, Student, Subject } from "@/lib/database.types";
 import { EXAM_KINDS, examLabel } from "@/lib/examKinds";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { canApproveExams } from "@/lib/roles";
@@ -156,10 +156,14 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
   const [view, setView] = useState<"cards" | "table">("cards");
   const [when, setWhen] = useState<"active" | "past" | "all">("active");
   const colors = useSubjectColors([]);
-  // Physical room where each exam is sat (exam_sessions.room_id → rooms).
+  // Physical rooms where each exam is sat (exam_session_rooms → rooms), first room first.
   const { profile: scheduleMe } = useAuth();
   const { data: venues = [] } = useRooms(scheduleMe?.department_id ?? null);
-  const venueOf = (s: ExamSession) => venues.find((v) => v.id === s.room_id)?.name;
+  const { data: roomIdsOf } = useSessionRoomIds(sessions.map((s) => s.id));
+  const venueOf = (s: ExamSession) => {
+    const names = (roomIdsOf?.get(s.id) ?? []).flatMap((id) => venues.find((v) => v.id === id)?.name ?? []);
+    return names.length > 0 ? names.join(", ") : undefined;
+  };
   // subject → room, via the topic set each session subject was created from.
   const { data: topicSets = [] } = useMyTopicSets(teacherId);
   const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
@@ -344,7 +348,8 @@ function ScheduleCard({ session }: { session: ExamSession }) {
   useEffect(() => setOpensAt(toLocalInput(session.opens_at)), [session.opens_at]);
   useEffect(() => setClosesAt(toLocalInput(session.closes_at)), [session.closes_at]);
   const valid = !!opensAt && !!closesAt && new Date(closesAt) > new Date(opensAt);
-  const { data: conflicts = [] } = useRoomConflicts(session.room_id ?? "", opensAt, closesAt, session.id);
+  const { data: sessionRooms = [] } = useSessionRooms(session.id);
+  const { data: conflicts = [] } = useRoomConflicts(sessionRooms.flatMap((r) => r.room_id ?? []), opensAt, closesAt, session.id);
   // With เวลาทำ set, the close time follows the open time and is not typed by hand.
   const autoClose = !!session.duration_minutes;
 
@@ -418,7 +423,8 @@ function ScheduleSheet({ session, onClose }: { session: ExamSession; onClose: ()
   const toast = useToast();
   const valid = !!opensAt && !!closesAt && new Date(closesAt) > new Date(opensAt);
   // The room is set from its own button; changing the time still warns if the room is already taken then.
-  const { data: conflicts = [] } = useRoomConflicts(session.room_id ?? "", opensAt, closesAt, session.id);
+  const { data: sessionRooms = [] } = useSessionRooms(session.id);
+  const { data: conflicts = [] } = useRoomConflicts(sessionRooms.flatMap((r) => r.room_id ?? []), opensAt, closesAt, session.id);
 
   function save(e: React.FormEvent) {
     e.preventDefault();
@@ -1201,7 +1207,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
       )}
       <ScheduleCard session={session} />
       <ExamSettingsCard session={session} />
-      {rosterRows.length > 0 && <ExamSeatingCard session={session} top={<ExamRoomField session={session} />} students={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "" }))} />}
+      {rosterRows.length > 0 && <ExamSeatingCard session={session} roomPicker={(room, usedRoomIds) => <ExamRoomField session={session} room={room} usedRoomIds={usedRoomIds} />} students={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "", avatar: rosterAvatars?.get(r.student_id) ?? null }))} />}
 
       <SessionQuestionList session={session} sessionQuestions={sessionQuestions} />
 
@@ -1228,25 +1234,26 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   );
 }
 
-/** Physical exam room (rooms table) with its time-clash warning; sits at the top of the seating card. */
-function ExamRoomField({ session }: { session: ExamSession }) {
-  const update = useUpdateExamSession();
+/** Physical exam room (rooms table) of one room row, with its time-clash warning; sits at the top of that room's section in the seating card. */
+function ExamRoomField({ session, room, usedRoomIds }: { session: ExamSession; room: ExamSessionRoom; usedRoomIds: string[] }) {
+  const setRoom = useSetRoomPhysical();
   const toast = useToast();
   const { profile } = useAuth();
   const { data: rooms = [] } = useRooms(profile?.department_id ?? null);
-  const { data: conflicts = [] } = useRoomConflicts(session.room_id ?? "", session.opens_at ?? "", session.closes_at ?? "", session.id);
-  if (rooms.length === 0 && !session.room_id) return null;
+  const { data: conflicts = [] } = useRoomConflicts(room.room_id ? [room.room_id] : [], session.opens_at ?? "", session.closes_at ?? "", session.id);
+  if (rooms.length === 0 && !room.room_id) return null;
   return (
     <>
       <Select
         aria-label="ห้องสอบ"
         className="ui-control-compact h-8 min-w-0 px-2.5 pr-7 text-[13px] sm:w-64"
-        value={session.room_id ?? ""}
-        onChange={(e) => update.mutate({ id: session.id, room_id: e.target.value || null }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
+        value={room.room_id ?? ""}
+        onChange={(e) => setRoom.mutate({ sessionId: session.id, roomRowId: room.id, roomId: e.target.value || null }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
       >
         <option value="">ไม่ระบุห้องสอบ</option>
         {rooms
-          .filter((r) => r.is_active || r.id === session.room_id)
+          // A room another row of this session already uses is not offered again.
+          .filter((r) => (r.is_active && !usedRoomIds.includes(r.id)) || r.id === room.room_id)
           .map((r) => (
             <option key={r.id} value={r.id}>
               {r.name}

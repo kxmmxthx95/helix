@@ -218,21 +218,27 @@ export function useCreateExamSession() {
   });
 }
 
-/** Sessions of any teacher that use the same room at an overlapping time (warning only). */
-export function useRoomConflicts(roomId: string, opensAt: string, closesAt: string, excludeId: string) {
-  const enabled = !!roomId && !!opensAt && !!closesAt && new Date(closesAt) > new Date(opensAt);
+/** Sessions of any teacher that use any of these rooms at an overlapping time (warning only). */
+export function useRoomConflicts(roomIds: string[], opensAt: string, closesAt: string, excludeId: string) {
+  const ids = [...new Set(roomIds.filter(Boolean))].sort();
+  const enabled = ids.length > 0 && !!opensAt && !!closesAt && new Date(closesAt) > new Date(opensAt);
   return useQuery({
-    queryKey: ["exam_sessions", "room_conflicts", roomId, opensAt, closesAt, excludeId],
+    queryKey: ["exam_sessions", "room_conflicts", ids, opensAt, closesAt, excludeId],
     enabled,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("exam_room_conflicts", {
-        p_room: roomId,
-        p_opens: new Date(opensAt).toISOString(),
-        p_closes: new Date(closesAt).toISOString(),
-        p_exclude: excludeId,
-      });
-      if (error) throw error;
-      return data;
+      const lists = await Promise.all(
+        ids.map(async (roomId) => {
+          const { data, error } = await supabase.rpc("exam_room_conflicts", {
+            p_room: roomId,
+            p_opens: new Date(opensAt).toISOString(),
+            p_closes: new Date(closesAt).toISOString(),
+            p_exclude: excludeId,
+          });
+          if (error) throw error;
+          return data;
+        }),
+      );
+      return [...new Map(lists.flat().map((c) => [c.session_id, c])).values()];
     },
   });
 }

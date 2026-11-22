@@ -848,7 +848,9 @@ export type ExamSeatTemplate = {
 };
 /** Grid size of one session's seating, copied from a template so later template edits don't move a laid-out chart. */
 export type ExamSessionSeating = { session_id: string; seat_rows: number; seat_cols: number; template_id: string | null; updated_at: string };
-export type ExamSessionSeat = { session_id: string; student_id: string; seat_row: number; seat_col: number };
+/** One room of an exam session (migration 0203): the physical room, and its grid copied from a seat template (null until one is picked). Position 1 is the first room. */
+export type ExamSessionRoom = { id: string; session_id: string; position: number; room_id: string | null; seat_rows: number | null; seat_cols: number | null; template_id: string | null };
+export type ExamSessionSeat = { session_id: string; session_room_id: string; student_id: string; seat_row: number; seat_col: number };
 export type ExamApprovalStatus = "draft" | "pending" | "approved" | "rejected";
 
 /** ชุดหัวข้อการสอบ: one subject + ผังการเรียน topics, approved before sessions can use it (migration 0183). */
@@ -1986,6 +1988,7 @@ export type Database = {
       exam_session_sets: Table<ExamSessionSet, InsertOf<ExamSessionSet, "gradebook_item_id">>;
       exam_seat_templates: Table<ExamSeatTemplate, InsertOf<ExamSeatTemplate, "created_by">>;
       exam_session_seating: Table<ExamSessionSeating, InsertOf<ExamSessionSeating, "template_id" | "updated_at">>;
+      exam_session_rooms: Table<ExamSessionRoom, InsertOf<ExamSessionRoom, "id" | "room_id" | "seat_rows" | "seat_cols" | "template_id">>;
       exam_session_seats: Table<ExamSessionSeat, ExamSessionSeat>;
       exam_session_questions: Table<ExamSessionQuestion, ExamSessionQuestion>;
       exam_attempts: Table<
@@ -2050,15 +2053,19 @@ export type Database = {
         Returns: { copied: number; skipped: number }[];
       };
       set_exam_session_seats: {
-        Args: { p_session: string; p_seats: { student_id: string; seat_row: number; seat_col: number }[] };
+        Args: { p_session: string; p_seats: { student_id: string; room: string; seat_row: number; seat_col: number }[] };
         Returns: void;
+      };
+      add_exam_session_room: {
+        Args: { p_session: string };
+        Returns: string;
       };
       exam_room_conflicts: {
         Args: { p_room: string; p_opens: string; p_closes: string; p_exclude?: string | null };
         Returns: { session_id: string; title: string; exam_type: string | null; round: number | null; opens_at: string; closes_at: string; teacher_name: string }[];
       };
       exam_room_conflict_seats: {
-        Args: { p_session: string };
+        Args: { p_session: string; p_room: string };
         Returns: { session_id: string; title: string; opens_at: string; student_name: string; student_code: string; seat_row: number; seat_col: number; seat_rows: number; seat_cols: number }[];
       };
       attendance_duties: {
