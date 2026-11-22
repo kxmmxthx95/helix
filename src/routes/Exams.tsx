@@ -258,10 +258,7 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
           {unscheduled.length > 0 && (
-            <section className="space-y-2">
-              <h3 className="text-xs font-semibold text-muted-foreground">ยังไม่กำหนดเวลา ({unscheduled.length})</h3>
-              {unscheduled.map((s) => row(s, "ตั้งเวลา"))}
-            </section>
+            <section className="space-y-2">{unscheduled.map((s) => row(s, "ตั้งเวลา"))}</section>
           )}
           {[...byDay].map(([day, list]) => (
             <section key={day} className="space-y-2">
