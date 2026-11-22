@@ -129,7 +129,11 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
           <TeacherExams teacherId={teacherId} canSeeAll={canApprove} />
         </div>
       )}
-      {tab === "schedule" && teacherId && <ExamSchedule teacherId={teacherId} />}
+      {tab === "schedule" && teacherId && (
+        <div className="-mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pt-1">
+          <ExamSchedule teacherId={teacherId} />
+        </div>
+      )}
       {(tab === "topics" || tab === "list" || tab === "approve") && (
         <div className="-mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pt-1">
           {tab === "topics" && teacherId && <ExamTopicsTab teacherId={teacherId} canSeeAll={canApprove} />}
