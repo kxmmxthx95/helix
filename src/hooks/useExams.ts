@@ -243,7 +243,7 @@ export function useUpdateExamSession() {
     mutationFn: async ({ id, ...patch }: { id: string } & Partial<
       Pick<
         ExamSession,
-        "title" | "opens_at" | "closes_at" | "room_id" | "is_enabled" | "duration_minutes" | "max_attempts" | "shuffle_questions" | "shuffle_choices" | "sync_to_gradebook" | "review_released" | "strict_mode"
+        "title" | "exam_type" | "round" | "opens_at" | "closes_at" | "room_id" | "is_enabled" | "duration_minutes" | "max_attempts" | "shuffle_questions" | "shuffle_choices" | "sync_to_gradebook" | "review_released" | "strict_mode"
       >
     >) => {
       const { error } = await supabase.from("exam_sessions").update(patch).eq("id", id);

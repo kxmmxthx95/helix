@@ -1314,8 +1314,21 @@ function ExamSettingsCard({ session }: { session: ExamSession }) {
   // Numbers are edited as text and saved on blur; an invalid entry snaps back to the saved value.
   const [duration, setDuration] = useState(session.duration_minutes?.toString() ?? "");
   const [attempts, setAttempts] = useState(session.max_attempts.toString());
+  const [round, setRound] = useState(session.round?.toString() ?? "");
+  useEffect(() => setRound(session.round?.toString() ?? ""), [session.round]);
   useEffect(() => setDuration(session.duration_minutes?.toString() ?? ""), [session.duration_minutes]);
   useEffect(() => setAttempts(session.max_attempts.toString()), [session.max_attempts]);
+  // The title starts with "ประเภท [ครั้งที่ n]" (see the create dialog), so a type/round change swaps that prefix and keeps the rest.
+  const saveExam = (exam_type: string, round: number | null) => {
+    const old = examLabel(session);
+    const rest = old && session.title.startsWith(old) ? session.title.slice(old.length).trimStart() : session.title;
+    update.mutate({ id: session.id, exam_type, round, title: [examLabel({ exam_type, round }), rest].filter(Boolean).join(" ") }, { onError });
+  };
+  const saveRound = () => {
+    const n = round.trim() === "" ? null : Math.floor(Number(round));
+    if (n !== null && !(n >= 1)) return setRound(session.round?.toString() ?? "");
+    if (n !== session.round && session.exam_type) saveExam(session.exam_type, n);
+  };
   const saveDuration = () => {
     const n = duration.trim() === "" ? null : Math.floor(Number(duration));
     if (n !== null && !(n >= 1)) return setDuration(session.duration_minutes?.toString() ?? "");
@@ -1347,6 +1360,18 @@ function ExamSettingsCard({ session }: { session: ExamSession }) {
       <Collapse open={open}>
         <div className="space-y-3 border-t border-border bg-muted/40 p-3 [&_.text-sm]:text-xs [&_input]:!h-6 [&_input]:!text-xs">
           <FormSection>
+            <Field label="ประเภทการสอบ">
+              <Select value={session.exam_type ?? ""} placeholder="เลือกประเภท" onChange={(e) => e.target.value !== session.exam_type && saveExam(e.target.value, session.round)}>
+                {(session.exam_type && !EXAM_KINDS.includes(session.exam_type) ? [session.exam_type, ...EXAM_KINDS] : EXAM_KINDS).map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="ครั้งที่">
+              <Input type="number" min="1" value={round} onChange={(e) => setRound(e.target.value)} onBlur={saveRound} placeholder="ไม่ระบุ" disabled={!session.exam_type} />
+            </Field>
             <Field label="เวลาทำ (นาที)">
               <Input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} onBlur={saveDuration} placeholder="ไม่จำกัด" />
             </Field>
