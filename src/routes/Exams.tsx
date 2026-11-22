@@ -11,7 +11,7 @@ import { useSessionRoomIds, useSessionsWithSeating, useSetRoomPhysical } from "@
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, Select, Skeleton, Switch, TableSkeleton } from "@/components/ui";
+import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, Select, Spinner, Switch } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useProfilesByIds } from "@/hooks/usePractice";
@@ -62,7 +62,7 @@ import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { ExamApprovalTab, ExamSubmissionsTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
 import { DIFFICULTY_BADGE_CLASS, DIFFICULTY_LABEL, QuestionForm, QuestionSheet, SubjectPicker, useQuestionForm } from "@/routes/ExamBank";
 import type { ExamAttempt, ExamSecurityEventType, ExamSession, ExamSessionRoom, ExamTopicSet, Student, Subject } from "@/lib/database.types";
-import { EXAM_KINDS, examLabel } from "@/lib/examKinds";
+import { EXAM_KINDS, examLabel, kindTone, roundTone } from "@/lib/examKinds";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { canApproveExams } from "@/lib/roles";
 import { ICON, ICON_BTN } from "@/lib/iconButton";
@@ -77,6 +77,14 @@ export function Exams() {
   if (isTeacher || canApproveExams(me?.roles ?? [])) return <StaffExams teacherId={isTeacher ? me!.id : null} canApprove={canApproveExams(me?.roles ?? [])} />;
   if (myStudent || isParent) return <StudentExams />;
   return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
+}
+
+function LoadingSpinner() {
+  return (
+    <div className="flex flex-1 items-center justify-center py-8">
+      <Spinner className="h-5 w-5 text-muted-foreground" />
+    </div>
+  );
 }
 
 // ============================================================== teacher side
@@ -130,7 +138,7 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
       )}
       {tab === "schedule" && teacherId && (
         <div className="-mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pt-1">
-          <ExamSchedule teacherId={teacherId} />
+          <ExamSchedule teacherId={teacherId} canSeeAll={canApprove} />
         </div>
       )}
       {(tab === "topics" || tab === "list" || tab === "approve") && (
@@ -146,11 +154,16 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
 }
 
 /** Exam timetable: scheduled rooms by opening day, plus rooms still waiting for a time. Tap a row to set/change its window. */
-function ExamSchedule({ teacherId }: { teacherId: string }) {
-  const { data: sessions = [], isLoading } = useMyExamSessions(teacherId);
+function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: boolean }) {
+  const [scope, setScope] = useState<"mine" | "all">("mine");
+  const mine = useMyExamSessions(teacherId);
+  const all = useAllExamSessions(canSeeAll && scope === "all");
+  const { data: sessions = [], isLoading } = scope === "all" && canSeeAll ? all : mine;
   const { data: sessionSets } = useSessionSets(sessions.map((s) => s.id));
   const { data: subjects = [] } = useSubjectsByIds([...new Set([...sessions.map((s) => s.subject_id), ...[...(sessionSets?.values() ?? [])].flat().map((x) => x.subject_id)])]);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
+  const { data: owners = [] } = useProfilesByIds([...new Set(sessions.map((s) => s.teacher_id))]);
+  const ownerById = new Map(owners.map((o) => [o.id, o]));
   const [editing, setEditing] = useState<ExamSession | null>(null);
   const [view, setView] = useState<"cards" | "table">("cards");
   const [when, setWhen] = useState<"active" | "past" | "all">("active");
@@ -163,14 +176,13 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
     const names = (roomIdsOf?.get(s.id) ?? []).flatMap((id) => venues.find((v) => v.id === id)?.name ?? []);
     return names.length > 0 ? names.join(", ") : undefined;
   };
-  // subject → room, via the topic set each session subject was created from.
-  const { data: topicSets = [] } = useMyTopicSets(teacherId);
-  const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
-  const { data: classrooms = [] } = useClassroomsByIds([...new Set(assignments.map((a) => a.classroom_id))]);
+  // subject → room, via the topic set each session subject was created from (works for other teachers' rooms too).
+  const { data: roomSets = [] } = useTopicSetsByIds([...new Set([...(sessionSets?.values() ?? [])].flat().map((x) => x.topic_set_id).filter(Boolean))]);
+  const { data: classroomOfAssignment } = useAssignmentClassrooms([...new Set(roomSets.map((t) => t.teaching_assignment_id).filter((id): id is string => !!id))]);
+  const { data: classrooms = [] } = useClassroomsByIds([...new Set(classroomOfAssignment?.values() ?? [])]);
   const { data: grades = [] } = useGradeLevelsByIds([...new Set(classrooms.map((c) => c.grade_level_id))]);
   const roomOfSet = (setId: string) => {
-    const a = assignments.find((x) => x.id === topicSets.find((ts) => ts.id === setId)?.teaching_assignment_id);
-    const c = classrooms.find((x) => x.id === a?.classroom_id);
+    const c = classrooms.find((x) => x.id === classroomOfAssignment?.get(roomSets.find((t) => t.id === setId)?.teaching_assignment_id ?? ""));
     const g = grades.find((x) => x.id === c?.grade_level_id);
     return c && g ? `${gradeShortLabel(g.code)}/${c.name}` : null;
   };
@@ -196,7 +208,8 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
       </div>
     );
   }
-  const subjectsOf = (s: ExamSession) => (sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]).map((id) => subjectById.get(id)?.name_th).filter(Boolean).join(" · ") || "—";
+  const subjectsOf = (s: ExamSession) => (sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]).flatMap((id) => subjectById.get(id) ?? []);
+  const setIdOf = (s: ExamSession, subjectId: string) => sessionSets?.get(s.id)?.find((x) => x.subject_id === subjectId)?.topic_set_id ?? "";
   const row = (s: ExamSession) => {
     const sets = sessionSets?.get(s.id) ?? [{ subject_id: s.subject_id, topic_set_id: "" }];
     return (
@@ -210,10 +223,11 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
       >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 space-y-2">
+            <p className="text-sm font-semibold tabular-nums">{fmtTime(s.opens_at!)}{s.closes_at ? ` – ${fmtTime(s.closes_at)}` : ""}</p>
             {s.exam_type ? (
               <p className="flex flex-wrap items-center gap-1">
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{s.exam_type}</span>
-                {s.round && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">ครั้งที่ {s.round}</span>}
+                <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", kindTone(s.exam_type))}>{s.exam_type}</span>
+                {s.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(s.round))}>ครั้งที่ {s.round}</span>}
                 {venueOf(s) && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">ห้องสอบ {venueOf(s)}</span>}
               </p>
             ) : (
@@ -232,6 +246,10 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
                 </div>
               ) : null;
             })}
+            <div className="flex min-w-0 items-center gap-2 pt-1 text-muted-foreground">
+              <Avatar name={ownerName(ownerById.get(s.teacher_id))} src={ownerById.get(s.teacher_id) ? avatarUrl(ownerById.get(s.teacher_id)!) : null} className="h-6 w-6 text-[9px]" />
+              <span className="truncate">{ownerName(ownerById.get(s.teacher_id))}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -241,6 +259,12 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 pt-1">
       <div className="flex shrink-0 items-center justify-end gap-2">
+        {canSeeAll && (
+          <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:w-40 sm:pr-8" aria-label="ขอบเขตตารางสอบ" value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")}>
+            <option value="mine">ของฉัน</option>
+            <option value="all">ทุกวิชา</option>
+          </Select>
+        )}
         <Select className="ui-control-compact mr-auto h-8 px-2.5 pr-7 text-[13px] sm:w-64 sm:pr-8" aria-label="ช่วงเวลาสอบ" value={when} onChange={(e) => setWhen(e.target.value as typeof when)}>
           <option value="active">ยังไม่สิ้นสุด</option>
           <option value="past">ผ่านไปแล้ว</option>
@@ -248,33 +272,7 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
         </Select>
         <ViewToggle value={view} onChange={setView} />
       </div>
-      {isLoading ? (
-        view === "table" ? (
-          <TableSkeleton headers={["วันที่", "เวลา", "ห้องสอบ", "การสอบ", "วิชา"]} />
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden" role="status" aria-label="กำลังโหลด">
-            {[2, 2].map((n, d) => (
-              <section key={d} className="space-y-2">
-                <Skeleton className="h-3 w-28" />
-                {Array.from({ length: n }, (_, i) => (
-                  <div key={i} className="space-y-2 rounded-xl border border-border bg-card p-3">
-                    <div className="flex gap-1">
-                      <Skeleton className="h-5 w-20 rounded-full" />
-                      <Skeleton className="h-5 w-14 rounded-full" />
-                      <Skeleton className="h-5 w-24 rounded-full" />
-                    </div>
-                    <Skeleton className="h-4 w-40" />
-                    <div className="flex gap-1">
-                      <Skeleton className="h-5 w-14 rounded-full" />
-                      <Skeleton className="h-5 w-12 rounded-full" />
-                    </div>
-                  </div>
-                ))}
-              </section>
-            ))}
-          </div>
-        )
-      ) : shown.length === 0 ? (
+      {isLoading ? <LoadingSpinner /> : shown.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
             title={when === "past" ? "ยังไม่มีการสอบที่ผ่านไปแล้ว" : "ไม่มีการสอบที่ยังไม่สิ้นสุด"}
@@ -287,21 +285,38 @@ function ExamSchedule({ teacherId }: { teacherId: string }) {
             <table className="w-full min-w-[36rem] text-[13px]">
               <thead className="text-left text-xs">
                 <tr>
-                  <th className="px-4 py-3">วันที่</th>
-                  <th className="px-4 py-3">เวลา</th>
-                  <th className="px-4 py-3">ห้องสอบ</th>
-                  <th className="px-4 py-3">การสอบ</th>
+                  <th className="px-4 py-3">วันที่และเวลา</th>
+                  <th className="px-4 py-3">รหัสวิชา</th>
                   <th className="px-4 py-3">วิชา</th>
+                  <th className="px-4 py-3">ชั้น</th>
+                  <th className="px-4 py-3">ห้องสอบ</th>
+                  <th className="px-4 py-3">ประเภทการสอบ</th>
+                  <th className="px-4 py-3">ครั้งที่</th>
+                  <th className="px-4 py-3">ครูผู้สอน</th>
                 </tr>
               </thead>
               <tbody>
                 {scheduled.map((s) => (
                   <tr key={s.id} onClick={() => setEditing(s)} className="h-12 cursor-pointer border-t border-border first:border-t-0">
-                    <td className="px-4 py-0">{s.opens_at ? new Date(s.opens_at).toLocaleDateString("th-TH", { dateStyle: "medium" }) : <span className="text-muted-foreground">ยังไม่กำหนด</span>}</td>
-                    <td className="px-4 py-0 font-mono tabular-nums">{s.opens_at ? `${fmtTime(s.opens_at)} – ${fmtTime(s.closes_at!)}` : "ตั้งเวลา"}</td>
+                    <td className="whitespace-nowrap px-4 py-2">
+                      <div>{s.opens_at ? new Date(s.opens_at).toLocaleDateString("th-TH", { dateStyle: "medium" }) : <span className="text-muted-foreground">ยังไม่กำหนด</span>}</div>
+                      <div className="tabular-nums text-muted-foreground">{s.opens_at ? `${fmtTime(s.opens_at)} – ${fmtTime(s.closes_at!)}` : "ตั้งเวลา"}</div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 tabular-nums">{subjectsOf(s).map((x) => <div key={x.id} className="flex h-8 items-center"><span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(x.learning_area_id))}>{x.code}</span></div>)}</td>
+                    <td className="px-4 py-3 font-medium">{subjectsOf(s).map((x) => <div key={x.id} className="flex h-8 items-center">{x.name_th}</div>)}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{subjectsOf(s).map((x) => {
+                        const room = roomOfSet(setIdOf(s, x.id));
+                        return <div key={x.id} className="flex h-8 items-center">{room ? <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(room))}>{room}</span> : "—"}</div>;
+                      })}</td>
                     <td className="px-4 py-0">{venueOf(s) ?? <span className="text-muted-foreground">—</span>}</td>
-                    <td className="px-4 py-0 font-medium">{s.title}</td>
-                    <td className="px-4 py-0 text-muted-foreground">{subjectsOf(s)}</td>
+                    <td className="px-4 py-0">{s.exam_type ? <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", kindTone(s.exam_type))}>{s.exam_type}</span> : <span className="text-muted-foreground">{s.title}</span>}</td>
+                    <td className="px-4 py-0">{s.round ? <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums", roundTone(s.round))}>{s.round}</span> : <span className="text-muted-foreground">—</span>}</td>
+                    <td className="px-4 py-0">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Avatar name={ownerName(ownerById.get(s.teacher_id))} src={ownerById.get(s.teacher_id) ? avatarUrl(ownerById.get(s.teacher_id)!) : null} className="h-7 w-7 text-[10px]" />
+                        <span className="whitespace-nowrap">{ownerName(ownerById.get(s.teacher_id))}</span>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -561,65 +576,7 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
         <ViewToggle value={view} onChange={setView} />
       </div>
 
-      {isLoading && view === "cards" ? (
-        <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden" role="status" aria-label="กำลังโหลด">
-          {[0, 1, 2, 3].map((i) => (
-            <li key={i} className="rounded-xl border border-border bg-card p-3">
-              <div className="flex items-center gap-1">
-                <Skeleton className="h-5 w-20 rounded-full" />
-                <Skeleton className="h-5 w-14 rounded-full" />
-                <Skeleton className="h-5 w-12 rounded-full" />
-                <Skeleton className="ml-auto h-5 w-24 rounded-full" />
-              </div>
-              <Skeleton className="mt-3 h-4 w-40" />
-              <Skeleton className="mt-2 h-5 w-14 rounded-full" />
-              <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-6 w-6 rounded-full" />
-                  <Skeleton className="h-3 w-28" />
-                </div>
-                <div className="flex items-center gap-1">
-                  <Skeleton className="h-5 w-9 rounded-full" />
-                  <Skeleton className="h-8 w-8 rounded-lg" />
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : isLoading ? (
-        <div className="table-panel flex-1 rounded-none border-t border-border shadow-none" role="status" aria-label="กำลังโหลด">
-          <div className="table-panel-scroll scrollbar-hidden">
-            <table className="w-full min-w-[36rem] text-[13px]">
-              <thead className="text-left text-xs">
-                <tr>
-                  <th className="px-4 py-3">ประเภทห้องสอบ</th>
-                  <th className="px-4 py-3">ครั้งที่</th>
-                  <th className="px-4 py-3">วิชา</th>
-                  <th className="px-4 py-3">ห้อง</th>
-                  <th className="px-4 py-3">ข้อสอบ</th>
-                  <th className="px-4 py-3">ครูผู้สอน</th>
-                  <th className="px-4 py-3">เปิดใช้งาน</th>
-                  <th className="w-14 px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {[0, 1, 2, 3].map((i) => (
-                  <tr key={i} className="h-14 border-t border-border first:border-t-0">
-                    <td className="px-4 py-0"><Skeleton className="h-3 w-24" /></td>
-                    <td className="px-4 py-0"><Skeleton className="h-3 w-8" /></td>
-                    <td className="px-4 py-0"><Skeleton className="h-3 w-28" /></td>
-                    <td className="px-4 py-0"><Skeleton className="h-4 w-12 rounded-md" /></td>
-                    <td className="px-4 py-0"><Skeleton className="h-3 w-12" /></td>
-                    <td className="px-4 py-0"><Skeleton className="h-3 w-24" /></td>
-                    <td className="px-4 py-0"><Skeleton className="h-4 w-9 rounded-full" /></td>
-                    <td className="px-4 py-0" />
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : sessions.length === 0 ? (
+      {isLoading ? <LoadingSpinner /> : sessions.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="ยังไม่มีการเปิดสอบ" description="กด “เปิดสอบใหม่” เพื่อเลือกข้อสอบจากคลังมาจัดสอบ" />
         </div>
@@ -644,8 +601,8 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
                   className="cursor-pointer rounded-xl border border-border bg-card p-3 text-xs hover:bg-muted active:bg-muted"
                 >
                   <div className="flex flex-wrap items-center gap-1">
-                    {s.exam_type && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{s.exam_type}</span>}
-                    {s.round && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">ครั้งที่ {s.round}</span>}
+                    {s.exam_type && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", kindTone(s.exam_type))}>{s.exam_type}</span>}
+                    {s.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(s.round))}>ครั้งที่ {s.round}</span>}
                     {room && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(room))}>{room}</span>}
                     {(questionCounts?.get(s.id) ?? 0) > 0 ? (
                       <span className="ml-auto rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">มีข้อสอบ {questionCounts?.get(s.id)} ข้อ</span>
@@ -1136,22 +1093,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
 
       <SessionTopicsCard session={session} />
 
-      {isLoading || rosterLoading ? (
-        <div className="table-panel flex-1" role="status" aria-label="กำลังโหลด">
-          <table className="w-full min-w-[28rem] text-xs">
-            <tbody>
-              {[0, 1, 2].map((i) => (
-                <tr key={i} className="border-t border-border">
-                  <td className="px-3 py-2"><Skeleton className="h-3 w-24" /></td>
-                  <td className="px-3 py-2"><Skeleton className="h-3 w-10" /></td>
-                  <td className="px-3 py-2"><Skeleton className="h-3 w-14" /></td>
-                  <td className="px-3 py-2"><Skeleton className="h-3 w-8" /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : rosterRows.length === 0 ? (
+      {isLoading || rosterLoading ? <LoadingSpinner /> : rosterRows.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title="ยังไม่มีนักเรียนในห้องนี้" description="ตรวจสอบการลงทะเบียนนักเรียนของห้องเรียน" />
         </div>
@@ -1456,26 +1398,6 @@ function SecurityPanel({ session, attempts }: { session: ExamSession; attempts: 
 }
 
 /** One bank question as in คลังข้อสอบ: number, prompt, badges, choices with the correct ones ticked. */
-/** Placeholder with the same shape as a question row (number, prompt, badges, four choices). */
-function QuestionSkeleton() {
-  return (
-    <div className="flex gap-3 p-3" role="status" aria-label="กำลังโหลด">
-      <Skeleton className="h-6 w-6 shrink-0 rounded-md" />
-      <div className="min-w-0 flex-1 space-y-2">
-        <Skeleton className="h-4 w-3/4" />
-        <div className="flex gap-1.5">
-          <Skeleton className="h-4 w-12 rounded-full" />
-          <Skeleton className="h-4 w-20 rounded-full" />
-          <Skeleton className="h-4 w-14" />
-        </div>
-        {[0, 1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-8 w-full rounded-md" />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 const CHOICE_LETTERS = ["ก", "ข", "ค", "ง", "จ", "ฉ"];
 
 function QuestionBody({ q, i }: { q: ExamQuestionWithChoices; i: number }) {
@@ -1524,7 +1446,7 @@ function SessionQuestionList({ session, sessionQuestions }: { session: ExamSessi
   const fetchBank = warm || open;
   const { data: roomSets } = useSessionSets(fetchBank ? [session.id] : []);
   const subjectIds = (roomSets?.get(session.id) ?? []).map((x) => x.subject_id);
-  const { data: bank = [], isLoading: bankLoading } = useExamQuestionsOf(fetchBank ? (subjectIds.length > 0 ? subjectIds : [session.subject_id]) : []);
+  const { data: bank = [] } = useExamQuestionsOf(fetchBank ? (subjectIds.length > 0 ? subjectIds : [session.subject_id]) : []);
   const byId = new Map(bank.map((q) => [q.id, q]));
   const chosen = sessionQuestions.map((r) => byId.get(r.question_id)).filter((q): q is ExamQuestionWithChoices => !!q);
   // Every row is a stack of rich-text/math editors; mounting 20 at once stalls the opening animation. Mount a few
@@ -1574,10 +1496,6 @@ function SessionQuestionList({ session, sessionQuestions }: { session: ExamSessi
               </div>
             </div>
           ))}
-          {open &&
-            Array.from({ length: bankLoading ? Math.min(3, sessionQuestions.length) : Math.min(2, Math.max(0, chosen.length - mounted)) }, (_, i) => (
-              <QuestionSkeleton key={`sk${i}`} />
-            ))}
         </div>
       </Collapse>
       {/* Keyed so the form remounts with the picked question; its state is seeded once on mount. */}
@@ -1744,23 +1662,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
     </button>
   );
 
-  if (isLoading) {
-    return (
-      <ul className="space-y-2" role="status" aria-label="กำลังโหลด">
-        {[0, 1].map((i) => (
-          <li key={i}>
-            <Card className="flex items-center justify-between gap-2 text-xs">
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <Skeleton className="h-3.5 w-32" />
-                <Skeleton className="h-3 w-48" />
-              </div>
-              <Skeleton className="h-8 w-16 shrink-0 rounded-md" />
-            </Card>
-          </li>
-        ))}
-      </ul>
-    );
-  }
+  if (isLoading) return <LoadingSpinner />;
   if (exams.length === 0) {
     return (
       <>
@@ -1826,22 +1728,7 @@ function TakeExam({ student, session, onExit }: { student: Student; session: Ava
 
   if (needsCode) return <ExamCodeForm sessionId={session.id} onPassed={() => setCodeOk(true)} onExit={onExit} />;
 
-  if (!attempt) {
-    return (
-      <div className="mx-auto max-w-xl space-y-3 pb-4" role="status" aria-label="กำลังโหลด">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-4 w-12" />
-        </div>
-        {[0, 1, 2].map((i) => (
-          <Card key={i} className="space-y-2">
-            <Skeleton className="h-3.5 w-full" />
-            <Skeleton className="h-3 w-3/4" />
-          </Card>
-        ))}
-      </div>
-    );
-  }
+  if (!attempt) return <LoadingSpinner />;
 
   if (attempt.status === "submitted") {
     return <AttemptResult attempt={attempt} session={session} onExit={onExit} />;
@@ -1902,7 +1789,7 @@ function AttemptGuard({ attemptId, onExit, children }: { attemptId: string; onEx
 
   if (status === "ok") return <>{children}</>;
   if (!status && !isError) {
-    return <div className="mx-auto max-w-xl pt-8" role="status" aria-label="กำลังโหลด"><Skeleton className="h-3.5 w-full" /></div>;
+    return <LoadingSpinner />;
   }
   const message =
     status === "blocked"
@@ -1982,22 +1869,7 @@ function AttemptRunner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remainingMs <= 0]);
 
-  if (!data) {
-    return (
-      <div className="mx-auto max-w-xl space-y-3 pb-4" role="status" aria-label="กำลังโหลด">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-4 w-12" />
-        </div>
-        {[0, 1, 2].map((i) => (
-          <Card key={i} className="space-y-2">
-            <Skeleton className="h-3.5 w-full" />
-            <Skeleton className="h-3 w-3/4" />
-          </Card>
-        ))}
-      </div>
-    );
-  }
+  if (!data) return <LoadingSpinner />;
 
   const orderedQuestions = attempt.question_order
     .map((id) => data.questions.find((q) => q.id === id))
