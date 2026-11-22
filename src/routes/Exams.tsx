@@ -34,6 +34,7 @@ import {
   useLogAttemptEvent,
   useMyAttempts,
   useMyCurrentClassroom,
+  useAllExamSessions,
   useMyExamSessions,
   useMyTopicSets,
   useSaveAnswer,
@@ -46,6 +47,7 @@ import {
   useStartOrResumeAttempt,
   useStudentNames,
   useSubmitAttempt,
+  useTopicSetsByIds,
   useTopicSetsInUse,
   useTopicSetsTopics,
   useUnlockExamCode,
@@ -90,7 +92,8 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
   // Room created from an approved topic set (topics card or approval drawer); the room belongs to the set's teacher.
   const [roomFor, setRoomFor] = useState<ExamTopicSet[] | null>(null);
   const tabs: [StaffTab, string][] = [
-    ...(teacherId ? ([["rooms", "ห้องสอบ"], ["schedule", "ตารางสอบ"], ["topics", "หัวข้อการสอบ"], ["list", "รายการ"]] as [StaffTab, string][]) : []),
+    ...(teacherId || canApprove ? ([["rooms", "ห้องสอบ"]] as [StaffTab, string][]) : []),
+    ...(teacherId ? ([["schedule", "ตารางสอบ"], ["topics", "หัวข้อการสอบ"], ["list", "รายการ"]] as [StaffTab, string][]) : []),
     ...(canApprove ? ([["approve", pending > 0 ? `อนุมัติสอบ (${pending})` : "อนุมัติสอบ"]] as [StaffTab, string][]) : []),
   ];
   return (
@@ -109,19 +112,18 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
               title={label}
               onClick={() => setTab(key)}
               className={cn(
-                "-mb-px flex flex-1 items-center justify-center gap-2 border-b-2 px-3.5 py-2.5 text-xs font-medium",
+                "-mb-px flex flex-1 flex-col items-center justify-center gap-1 border-b-2 px-2 py-2 text-[11px] font-medium whitespace-nowrap",
                 tab === key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              {/* Phones: icon only — the label stays for screen readers. */}
-              <span className="sr-only sm:not-sr-only">{label}</span>
+              <span>{label}</span>
             </button>
             );
           })}
         </div>
       )}
-      {tab === "rooms" && teacherId && <TeacherExams teacherId={teacherId} />}
+      {tab === "rooms" && <TeacherExams teacherId={teacherId} canSeeAll={canApprove} />}
       {tab === "schedule" && teacherId && <ExamSchedule teacherId={teacherId} />}
       {(tab === "topics" || tab === "list" || tab === "approve") && (
         <div className="-mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pt-1">
@@ -418,12 +420,13 @@ function RoomSheet({ session, onClose }: { session: ExamSession; onClose: () => 
 
 const ownerName = (o: { first_name: string; last_name: string } | undefined) => (o ? `${o.first_name} ${o.last_name}` : "—");
 
-function TeacherExams({ teacherId }: { teacherId: string }) {
+/** canSeeAll: heads/approvers may switch to every room RLS shows them (their department; all for org-wide). A head with no teaching load has no "mine". */
+function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canSeeAll: boolean }) {
   const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
-  const subjectIds = [...new Set(assignments.map((a) => a.subject_id))];
-  const { data: subjects = [] } = useSubjectsByIds(subjectIds);
-
-  const { data: sessions = [], isLoading } = useMyExamSessions(teacherId);
+  const [scope, setScope] = useState<"mine" | "all">(teacherId ? "mine" : "all");
+  const mine = useMyExamSessions(teacherId);
+  const all = useAllExamSessions(canSeeAll && scope === "all");
+  const { data: sessions = [], isLoading } = scope === "all" && canSeeAll ? all : mine;
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<ExamSession | null>(null);
   const [view, setView] = useState<"cards" | "table">("cards");
@@ -434,11 +437,13 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
   const updateSession = useUpdateExamSession();
   const toast = useToast();
   const { data: sessionSets } = useSessionSets(sessions.map((s) => s.id));
+  // Subjects come from the rooms themselves — rooms of other teachers aren't in my assignments.
+  const { data: subjects = [] } = useSubjectsByIds([...new Set(sessions.flatMap((s) => sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]))]);
   const { data: owners = [] } = useProfilesByIds([...new Set(sessions.map((s) => s.teacher_id))]);
   const ownerById = new Map(owners.map((o) => [o.id, o]));
   // Room of a session = classroom of its topic set's teaching assignment.
-  const { data: mySets = [] } = useMyTopicSets(teacherId);
-  const assignmentOfSet = new Map(mySets.map((t) => [t.id, t.teaching_assignment_id]));
+  const { data: roomSets = [] } = useTopicSetsByIds([...new Set(sessions.map((s) => s.topic_set_id))]);
+  const assignmentOfSet = new Map(roomSets.map((t) => [t.id, t.teaching_assignment_id]));
   const { data: classroomOfAssignment } = useAssignmentClassrooms([...new Set([...assignmentOfSet.values()].filter((id): id is string => !!id))]);
   const { data: roomClassrooms = [] } = useClassroomsByIds([...new Set(classroomOfAssignment?.values() ?? [])]);
   const { data: roomGrades = [] } = useGradeLevelsByIds([...new Set(roomClassrooms.map((c) => c.grade_level_id))]);
@@ -457,7 +462,13 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
   return (
     <div className="page-fill gap-3 pt-1">
       <div className="flex shrink-0 items-center justify-end gap-2">
-        <Button size="sm" className="ui-control-compact h-8 gap-1 px-2.5 sm:px-3" onClick={() => setCreating(true)} disabled={assignments.length === 0}>
+        {canSeeAll && teacherId && (
+          <Select className="mr-auto w-auto" aria-label="ขอบเขตห้องสอบ" value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")}>
+            <option value="mine">ของฉัน</option>
+            <option value="all">ทุกวิชา</option>
+          </Select>
+        )}
+        <Button size="sm" className="ui-control-compact h-8 gap-1 px-2.5 sm:px-3" onClick={() => setCreating(true)} disabled={!teacherId || assignments.length === 0}>
           <Plus className="h-3 w-3" /> เปิดสอบใหม่
         </Button>
         <ViewToggle value={view} onChange={setView} />
@@ -660,7 +671,7 @@ function TeacherExams({ teacherId }: { teacherId: string }) {
         </div>
       )}
 
-      <CreateSessionSheet open={creating} onOpenChange={setCreating} teacherId={teacherId} />
+      {teacherId && <CreateSessionSheet open={creating} onOpenChange={setCreating} teacherId={teacherId} />}
       <ConfirmDialog
         open={!!deleting}
         title="ลบห้องสอบ?"

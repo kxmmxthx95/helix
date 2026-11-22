@@ -55,6 +55,33 @@ export function useMyExamSessions(teacherId: string | null) {
   });
 }
 
+/** Every session RLS lets the caller see: a head's department (can_write_exam_session), everything for org-wide roles. */
+export function useAllExamSessions(enabled: boolean) {
+  return useQuery({
+    queryKey: ["exam_sessions", "all"],
+    enabled,
+    queryFn: async (): Promise<ExamSession[]> => {
+      const { data, error } = await supabase.from("exam_sessions").select("*").order("opens_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+/** Topic sets by id (any owner RLS allows) — resolves each room's classroom for sessions the caller doesn't own. */
+export function useTopicSetsByIds(ids: string[]) {
+  const key = [...ids].sort();
+  return useQuery({
+    queryKey: ["exam_topic_sets", "by_ids", key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<ExamTopicSet[]> => {
+      const { data, error } = await supabase.from("exam_topic_sets").select("*").in("id", key);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 /** session id → the sets (subjects) each room covers. */
 export function useSessionSets(sessionIds: string[]) {
   const key = [...sessionIds].sort();
