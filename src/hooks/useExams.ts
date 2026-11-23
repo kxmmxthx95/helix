@@ -934,6 +934,17 @@ export function useDecideTopicSet() {
   });
 }
 
+export function useRevokeTopicSetApproval() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc("revoke_exam_topic_set_approval", { p_id: id });
+      if (error) throw error;
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["exam_topic_sets"] }),
+  });
+}
+
 /** topic_ids of one set — the question picker only offers bank questions inside them. */
 export function useTopicSetTopicIds(setId: string | null) {
   const { data } = useTopicSetsTopics(setId ? [setId] : []);

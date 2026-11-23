@@ -10,6 +10,7 @@ import {
   useAssignmentClassrooms,
   useCreateTopicSet,
   useDecideTopicSet,
+  useRevokeTopicSetApproval,
   useDeleteTopicSet,
   useMyTopicSets,
   useSetTopicSetTopics,
@@ -389,6 +390,7 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
   // "ยกเลิก" on a card opens the review sheet straight at the reason box (a rejection needs one).
   const [rejectFirst, setRejectFirst] = useState(false);
   const decide = useDecideTopicSet();
+  const revoke = useRevokeTopicSetApproval();
   const { data: subjects = [], isLoading: subjectsLoading } = useSubjectsByIds([...new Set(queue.map((s) => s.subject_id))]);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
   const { data: teachers = [], isLoading: teachersLoading } = useProfilesByIds([...new Set(queue.map((s) => s.teacher_id))]);
@@ -439,6 +441,15 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
       toast(e instanceof Error ? e.message : "ไม่สำเร็จ", "error");
     }
   }
+  async function revokeApproval(sets: ExamTopicSet[]) {
+    if (!confirm("ยกเลิกการอนุมัติ? ชุดหัวข้อจะกลับไปรออนุมัติ")) return;
+    try {
+      await Promise.all(sets.map((s) => revoke.mutateAsync(s.id)));
+      toast("ยกเลิกการอนุมัติแล้ว");
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "ไม่สำเร็จ", "error");
+    }
+  }
   const count = (f: Filter) => queue.filter((s) => s.approval_status === f).length;
   const selected = selectedIds ? queue.filter((s) => selectedIds.includes(s.id)) : [];
 
@@ -448,6 +459,8 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
     const members = group.map((s) => subjectById.get(s.subject_id)).filter((x): x is Subject => !!x);
     const createable = group.filter(canCreateRoom);
     const withdrawable = group.filter(canWithdraw);
+    // Revoking an approval: approvers only, never on own sets, never once a room uses the set.
+    const revocable = mineOf || !inUse ? [] : group.filter((s) => s.approval_status === "approved" && s.teacher_id !== profile?.id && !inUse.has(s.id));
     // Own sets can't be decided by their author (decide_exam_topic_set refuses self-decisions).
     const reviewable = mineOf ? [] : group.filter((s) => s.approval_status === "pending" && s.teacher_id !== profile?.id);
     return {
@@ -463,7 +476,7 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
         setSelectedIds(group.map((s) => s.id));
       },
       actions:
-        createable.length > 0 || withdrawable.length > 0 || reviewable.length > 0 ? (
+        createable.length > 0 || withdrawable.length > 0 || reviewable.length > 0 || revocable.length > 0 ? (
           <div className="flex items-center gap-2">
             {reviewable.length > 0 && (
               <>
@@ -490,6 +503,19 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
                   อนุมัติ
                 </Button>
               </>
+            )}
+            {revocable.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={revoke.isPending}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void revokeApproval(revocable);
+                }}
+              >
+                ยกเลิกอนุมัติ
+              </Button>
             )}
             {withdrawable.length > 0 && (
               <Button
