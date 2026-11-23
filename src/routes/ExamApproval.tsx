@@ -65,7 +65,7 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
   const { data: everyone = [], isLoading: allLoading } = useAllTeachingAssignments(all);
   const assignments = all ? everyone : mine;
   const isLoading = all ? allLoading : mineLoading;
-  const { data: teachers = [] } = useProfilesByIds(all ? [...new Set(everyone.map((a) => a.teacher_id).filter((x): x is string => !!x))] : []);
+  const { data: teachers = [], isLoading: teachersLoading } = useProfilesByIds(all ? [...new Set(everyone.map((a) => a.teacher_id).filter((x): x is string => !!x))] : []);
   const teacherNameById = new Map(teachers.map((t) => [t.id, `${t.first_name} ${t.last_name}`]));
   const [view, setView] = useState<"cards" | "table">(defaultView);
   const scopeSelect = canSeeAll ? (
@@ -80,15 +80,17 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
       <ViewToggle value={view} onChange={setView} className="ml-auto" />
     </div>
   );
-  const { data: subjects = [] } = useSubjectsByIds([...new Set(assignments.map((a) => a.subject_id))]);
-  const { data: classrooms = [] } = useClassroomsByIds([...new Set(assignments.map((a) => a.classroom_id))]);
-  const { data: lessonLinks } = usePlanLessonLinks(assignments.map((a) => a.subject_id));
+  const { data: subjects = [], isLoading: subjectsLoading } = useSubjectsByIds([...new Set(assignments.map((a) => a.subject_id))]);
+  const { data: classrooms = [], isLoading: classroomsLoading } = useClassroomsByIds([...new Set(assignments.map((a) => a.classroom_id))]);
+  const { data: lessonLinks, isLoading: linksLoading } = usePlanLessonLinks(assignments.map((a) => a.subject_id));
   const colors = useSubjectColors([]); // hue from กลุ่มสาระ only, like the period attendance views
   const [picking, setPicking] = useState<string | null>(null);
 
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
   const classroomById = new Map(classrooms.map((c) => [c.id, c]));
-  const { data: grades = [] } = useGradeLevelsByIds([...new Set(classrooms.map((c) => c.grade_level_id))]);
+  const { data: grades = [], isLoading: gradesLoading } = useGradeLevelsByIds([...new Set(classrooms.map((c) => c.grade_level_id))]);
+  // Cards are built from these chained lookups; hold the spinner until all land so nothing pops in late.
+  const detailsLoading = teachersLoading || subjectsLoading || classroomsLoading || linksLoading || gradesLoading;
   const gradeById = new Map(grades.map((g) => [g.id, g]));
   const gradeOf = (classroomId: string) => gradeById.get(classroomById.get(classroomId)?.grade_level_id ?? "");
   const cards = [...assignments]
@@ -112,7 +114,7 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
   const subjectsOf = (members: TeachingAssignment[]) => members.map((a) => subjectById.get(a.subject_id)).filter((x): x is Subject => !!x);
   const pickingGroup = picking ? (groups.get(picking) ?? null) : null;
 
-  if (isLoading)
+  if (isLoading || detailsLoading)
     return (
       <div className="flex flex-1 flex-col gap-2">
         {header}
@@ -387,22 +389,23 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
   // "ยกเลิก" on a card opens the review sheet straight at the reason box (a rejection needs one).
   const [rejectFirst, setRejectFirst] = useState(false);
   const decide = useDecideTopicSet();
-  const { data: subjects = [] } = useSubjectsByIds([...new Set(queue.map((s) => s.subject_id))]);
+  const { data: subjects = [], isLoading: subjectsLoading } = useSubjectsByIds([...new Set(queue.map((s) => s.subject_id))]);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
-  const { data: teachers = [] } = useProfilesByIds([...new Set(queue.map((s) => s.teacher_id))]);
+  const { data: teachers = [], isLoading: teachersLoading } = useProfilesByIds([...new Set(queue.map((s) => s.teacher_id))]);
   const teacherById = new Map(teachers.map((t) => [t.id, t]));
   const colors = useSubjectColors([]);
-  const { data: roomOfAssignment } = useAssignmentClassrooms(queue.flatMap((s) => (s.teaching_assignment_id ? [s.teaching_assignment_id] : [])));
-  const { data: classrooms = [] } = useClassroomsByIds([...new Set(roomOfAssignment?.values() ?? [])]);
-  const { data: grades = [] } = useGradeLevelsByIds([...new Set(classrooms.map((c) => c.grade_level_id))]);
-  const { data: lessonLinks } = usePlanLessonLinks(queue.map((s) => s.subject_id));
+  const { data: roomOfAssignment, isLoading: assignLoading } = useAssignmentClassrooms(queue.flatMap((s) => (s.teaching_assignment_id ? [s.teaching_assignment_id] : [])));
+  const { data: classrooms = [], isLoading: classroomsLoading } = useClassroomsByIds([...new Set(roomOfAssignment?.values() ?? [])]);
+  const { data: grades = [], isLoading: gradesLoading } = useGradeLevelsByIds([...new Set(classrooms.map((c) => c.grade_level_id))]);
+  const { data: lessonLinks, isLoading: linksLoading } = usePlanLessonLinks(queue.map((s) => s.subject_id));
   const roomLabel = (s: ExamTopicSet) => {
     const c = classrooms.find((x) => x.id === roomOfAssignment?.get(s.teaching_assignment_id ?? ""));
     const g = grades.find((x) => x.id === c?.grade_level_id);
     return c && g ? `${gradeShortLabel(g.code)}/${c.name}` : null;
   };
-  const { data: topicsBySet } = useTopicSetsTopics(queue.map((s) => s.id));
-  const { data: inUse } = useTopicSetsInUse(queue.map((s) => s.id));
+  const { data: topicsBySet, isLoading: topicsLoading } = useTopicSetsTopics(queue.map((s) => s.id));
+  const { data: inUse, isLoading: inUseLoading } = useTopicSetsInUse(queue.map((s) => s.id));
+  const detailsLoading = subjectsLoading || teachersLoading || assignLoading || classroomsLoading || gradesLoading || linksLoading || topicsLoading || inUseLoading;
   const deleteSet = useDeleteTopicSet();
   const toast = useToast();
   const shown = queue.filter((s) => s.approval_status === filter);
@@ -534,7 +537,7 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
         <ViewToggle value={view} onChange={setView} className="ml-auto" />
       </div>
 
-      {isLoading ? <PageSpinner /> : shown.length === 0 ? (
+      {isLoading || detailsLoading ? <PageSpinner /> : shown.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
             title={filter === "pending" ? "ไม่มีชุดหัวข้อที่รออนุมัติ" : "ไม่มีรายการ"}

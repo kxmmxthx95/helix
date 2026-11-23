@@ -156,10 +156,10 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
   const mine = useMyExamSessions(teacherId);
   const all = useAllExamSessions(canSeeAll && scope === "all");
   const { data: sessions = [], isLoading } = scope === "all" && canSeeAll ? all : mine;
-  const { data: sessionSets } = useSessionSets(sessions.map((s) => s.id));
-  const { data: subjects = [] } = useSubjectsByIds([...new Set([...sessions.map((s) => s.subject_id), ...[...(sessionSets?.values() ?? [])].flat().map((x) => x.subject_id)])]);
+  const { data: sessionSets, isLoading: setsLoading } = useSessionSets(sessions.map((s) => s.id));
+  const { data: subjects = [], isLoading: subjectsLoading } = useSubjectsByIds([...new Set([...sessions.map((s) => s.subject_id), ...[...(sessionSets?.values() ?? [])].flat().map((x) => x.subject_id)])]);
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
-  const { data: owners = [] } = useProfilesByIds([...new Set(sessions.map((s) => s.teacher_id))]);
+  const { data: owners = [], isLoading: ownersLoading } = useProfilesByIds([...new Set(sessions.map((s) => s.teacher_id))]);
   const ownerById = new Map(owners.map((o) => [o.id, o]));
   const [editing, setEditing] = useState<ExamSession | null>(null);
   const [view, setView] = useState<"cards" | "table">(defaultView);
@@ -167,17 +167,18 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
   const colors = useSubjectColors([]);
   // Physical rooms where each exam is sat (exam_session_rooms → rooms), first room first.
   const { profile: scheduleMe } = useAuth();
-  const { data: venues = [] } = useRooms(scheduleMe?.department_id ?? null);
-  const { data: roomIdsOf } = useSessionRoomIds(sessions.map((s) => s.id));
+  const { data: venues = [], isLoading: venuesLoading } = useRooms(scheduleMe?.department_id ?? null);
+  const { data: roomIdsOf, isLoading: roomIdsLoading } = useSessionRoomIds(sessions.map((s) => s.id));
   const venueOf = (s: ExamSession) => {
     const names = (roomIdsOf?.get(s.id) ?? []).flatMap((id) => venues.find((v) => v.id === id)?.name ?? []);
     return names.length > 0 ? names.join(", ") : undefined;
   };
   // subject → room, via the topic set each session subject was created from (works for other teachers' rooms too).
-  const { data: roomSets = [] } = useTopicSetsByIds([...new Set([...(sessionSets?.values() ?? [])].flat().map((x) => x.topic_set_id).filter(Boolean))]);
-  const { data: classroomOfAssignment } = useAssignmentClassrooms([...new Set(roomSets.map((t) => t.teaching_assignment_id).filter((id): id is string => !!id))]);
-  const { data: classrooms = [] } = useClassroomsByIds([...new Set(classroomOfAssignment?.values() ?? [])]);
-  const { data: grades = [] } = useGradeLevelsByIds([...new Set(classrooms.map((c) => c.grade_level_id))]);
+  const { data: roomSets = [], isLoading: roomSetsLoading } = useTopicSetsByIds([...new Set([...(sessionSets?.values() ?? [])].flat().map((x) => x.topic_set_id).filter(Boolean))]);
+  const { data: classroomOfAssignment, isLoading: assignLoading } = useAssignmentClassrooms([...new Set(roomSets.map((t) => t.teaching_assignment_id).filter((id): id is string => !!id))]);
+  const { data: classrooms = [], isLoading: classroomsLoading } = useClassroomsByIds([...new Set(classroomOfAssignment?.values() ?? [])]);
+  const { data: grades = [], isLoading: gradesLoading } = useGradeLevelsByIds([...new Set(classrooms.map((c) => c.grade_level_id))]);
+  const detailsLoading = setsLoading || subjectsLoading || ownersLoading || venuesLoading || roomIdsLoading || roomSetsLoading || assignLoading || classroomsLoading || gradesLoading;
   const roomOfSet = (setId: string) => {
     const c = classrooms.find((x) => x.id === classroomOfAssignment?.get(roomSets.find((t) => t.id === setId)?.teaching_assignment_id ?? ""));
     const g = grades.find((x) => x.id === c?.grade_level_id);
@@ -269,7 +270,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
         </Select>
         <ViewToggle value={view} onChange={setView} />
       </div>
-      {isLoading ? <PageSpinner /> : shown.length === 0 ? (
+      {isLoading || detailsLoading ? <PageSpinner /> : shown.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
             title={when === "past" ? "ยังไม่มีการสอบที่ผ่านไปแล้ว" : "ไม่มีการสอบที่ยังไม่สิ้นสุด"}
@@ -492,21 +493,23 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
   const [view, setView] = useState<"cards" | "table">(defaultView);
   const [deleting, setDeleting] = useState<ExamSession | null>(null);
   const colors = useSubjectColors([]);
-  const { data: questionCounts } = useSessionQuestionCounts(sessions.map((s) => s.id));
+  const { data: questionCounts, isLoading: countsLoading } = useSessionQuestionCounts(sessions.map((s) => s.id));
   const deleteSession = useDeleteExamSession();
   const updateSession = useUpdateExamSession();
   const toast = useToast();
-  const { data: sessionSets } = useSessionSets(sessions.map((s) => s.id));
+  const { data: sessionSets, isLoading: setsLoading } = useSessionSets(sessions.map((s) => s.id));
   // Subjects come from the rooms themselves — rooms of other teachers aren't in my assignments.
-  const { data: subjects = [] } = useSubjectsByIds([...new Set(sessions.flatMap((s) => sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]))]);
-  const { data: owners = [] } = useProfilesByIds([...new Set(sessions.map((s) => s.teacher_id))]);
+  const { data: subjects = [], isLoading: subjectsLoading } = useSubjectsByIds([...new Set(sessions.flatMap((s) => sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]))]);
+  const { data: owners = [], isLoading: ownersLoading } = useProfilesByIds([...new Set(sessions.map((s) => s.teacher_id))]);
   const ownerById = new Map(owners.map((o) => [o.id, o]));
   // Room of a session = classroom of its topic set's teaching assignment.
-  const { data: roomSets = [] } = useTopicSetsByIds([...new Set(sessions.map((s) => s.topic_set_id))]);
+  const { data: roomSets = [], isLoading: roomSetsLoading } = useTopicSetsByIds([...new Set(sessions.map((s) => s.topic_set_id))]);
   const assignmentOfSet = new Map(roomSets.map((t) => [t.id, t.teaching_assignment_id]));
-  const { data: classroomOfAssignment } = useAssignmentClassrooms([...new Set([...assignmentOfSet.values()].filter((id): id is string => !!id))]);
-  const { data: roomClassrooms = [] } = useClassroomsByIds([...new Set(classroomOfAssignment?.values() ?? [])]);
-  const { data: roomGrades = [] } = useGradeLevelsByIds([...new Set(roomClassrooms.map((c) => c.grade_level_id))]);
+  const { data: classroomOfAssignment, isLoading: assignLoading } = useAssignmentClassrooms([...new Set([...assignmentOfSet.values()].filter((id): id is string => !!id))]);
+  const { data: roomClassrooms = [], isLoading: classroomsLoading } = useClassroomsByIds([...new Set(classroomOfAssignment?.values() ?? [])]);
+  const { data: roomGrades = [], isLoading: gradesLoading } = useGradeLevelsByIds([...new Set(roomClassrooms.map((c) => c.grade_level_id))]);
+  // Rows are built from these chained lookups; hold the spinner until all land so cells don't pop in one by one.
+  const detailsLoading = countsLoading || setsLoading || subjectsLoading || ownersLoading || roomSetsLoading || assignLoading || classroomsLoading || gradesLoading;
   const roomOf = (topicSetId: string) => {
     const c = roomClassrooms.find((x) => x.id === classroomOfAssignment?.get(assignmentOfSet.get(topicSetId) ?? ""));
     const g = roomGrades.find((x) => x.id === c?.grade_level_id);
@@ -601,7 +604,7 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
         </div>
       </Sheet>
 
-      {isLoading ? <PageSpinner /> : shown.length === 0 ? (
+      {isLoading || detailsLoading ? <PageSpinner /> : shown.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title={sessions.length === 0 ? "ยังไม่มีการเปิดสอบ" : "ไม่พบห้องสอบตามตัวกรอง"} description={sessions.length === 0 ? "กด “เปิดสอบใหม่” เพื่อเลือกข้อสอบจากคลังมาจัดสอบ" : "ลองล้างตัวกรอง"} />
         </div>

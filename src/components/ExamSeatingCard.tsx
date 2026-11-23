@@ -2,11 +2,11 @@ import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { AlertTriangle, ChevronForward, PencilIcon, Plus, TimetableIcon, TrashIcon } from "@/components/icons";
+import { AlertTriangle, ChevronForward, ListIcon, PencilIcon, Plus, ShuffleIcon, TimetableIcon, TrashIcon } from "@/components/icons";
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Field, FormSection, Input, Select } from "@/components/ui";
+import { Avatar, Button, Field, FormSection, Input, Select } from "@/components/ui";
 import {
   useAddSessionRoom,
   useAddSpecialSeat,
@@ -147,11 +147,6 @@ export function ExamSeatingCard({
     const pool = order(students.filter((s) => !specialIds.has(s.student_id) && (!seatedIds.has(s.student_id) || mine.has(s.student_id))));
     write([...seated.filter((x) => x.room !== r.id), ...pool.slice(0, free.length).map((s, i) => ({ student_id: s.student_id, ...free[i]! }))]);
   };
-  // All rooms: everyone in order, room 1 first, spilling into the next room.
-  const fillAll = (order: SeatStudent[]) => {
-    const cells = rooms.flatMap(freeCells);
-    write(order.filter((s) => !specialIds.has(s.student_id)).slice(0, cells.length).map((s, i) => ({ student_id: s.student_id, ...cells[i]! })));
-  };
 
   function tapSeat(room: string, row: number, col: number) {
     const here = at.get(`${room}:${row}:${col}`);
@@ -228,11 +223,12 @@ export function ExamSeatingCard({
           <ChevronForward className={cn("h-3 w-3 transition-transform", setupShown ? "-rotate-90" : "rotate-90")} />
         </Button>
         <div className={cn("flex-col gap-2", setupShown ? "flex" : "hidden")}>
-          {roomPicker?.(r, usedRoomIds)}
+          <div className="flex items-center gap-2">
+          {roomPicker && <div className="min-w-0 flex-1">{roomPicker(r, usedRoomIds)}</div>}
           <Select
             aria-label="Template ผังที่นั่ง"
             placeholder="เลือก template ผังที่นั่ง"
-            className="ui-control-compact h-8 min-w-0 px-2.5 pr-7 text-[13px]"
+            className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px]"
             value={r.template_id ?? ""}
             disabled={locked}
             onChange={(e) => {
@@ -246,9 +242,10 @@ export function ExamSeatingCard({
               </option>
             ))}
           </Select>
-          <Button size="sm" variant="outline" className="ui-control-compact h-8" onClick={() => setManaging(true)}>
+          <Button size="sm" variant="outline" className="ui-control-compact h-8 shrink-0" onClick={() => setManaging(true)}>
             จัดการ template
           </Button>
+          </div>
         </div>
 
         {r.seat_rows == null ? (
@@ -257,12 +254,15 @@ export function ExamSeatingCard({
           <>
             <div className={cn("flex-wrap items-center gap-2", setupShown ? "flex" : "hidden")}>
               <Button size="sm" variant="outline" className="ui-control-compact h-8 flex-1" disabled={locked || students.length === 0} onClick={() => fillRoom(r, (l) => l)}>
+                <ListIcon className={ICON} />
                 เรียงตามลำดับ
               </Button>
               <Button size="sm" variant="outline" className="ui-control-compact h-8 flex-1" disabled={locked || students.length === 0} onClick={() => fillRoom(r, shuffled)}>
+                <ShuffleIcon className={ICON} />
                 สุ่ม
               </Button>
               <Button size="sm" variant="outline" className="ui-control-compact h-8 flex-1" disabled={locked || !hasSeats} onClick={() => setClearing(r.id)}>
+                <TrashIcon className={ICON} />
                 ล้างผัง
               </Button>
             </div>
@@ -300,7 +300,11 @@ export function ExamSeatingCard({
                         <span className="min-w-0 flex-1 font-medium tabular-nums">{other.student_code}</span>
                       ) : st ? (
                         <>
-                          <span className="min-w-0 flex-1 font-medium tabular-nums text-foreground">{st.code}</span>
+                          <Avatar name={st.name} src={st.avatar} className="h-7 w-7" />
+                          <span className="min-w-0 flex-1 pr-6">
+                            <span className="block truncate font-medium text-foreground">{st.name}</span>
+                            <span className="block truncate tabular-nums text-muted-foreground">{st.code}</span>
+                          </span>
                           <span className={cn("absolute right-1 top-1 rounded-full px-1.5 py-px text-[10px] font-semibold tabular-nums", COL_TONES[(col - 1) % COL_TONES.length])}>{seatLabel(row, col)}</span>
                         </>
                       ) : (
@@ -353,7 +357,11 @@ export function ExamSeatingCard({
                           >
                             {st ? (
                               <>
-                                <span className="min-w-0 flex-1 font-medium tabular-nums text-foreground">{st.code}</span>
+                                <Avatar name={st.name} src={st.avatar} className="h-7 w-7" />
+                          <span className="min-w-0 flex-1 pr-6">
+                            <span className="block truncate font-medium text-foreground">{st.name}</span>
+                            <span className="block truncate tabular-nums text-muted-foreground">{st.code}</span>
+                          </span>
                               </>
                             ) : (
                               <span className="tabular-nums">พิเศษ {x.special_no}</span>
@@ -425,18 +433,6 @@ export function ExamSeatingCard({
             <p role="alert" className="rounded-xl bg-[hsl(var(--warning)/0.12)] px-3 py-2 text-xs text-warning">
               ตั้งเวลาสอบก่อน จึงจะจัดผังห้องสอบได้
             </p>
-          )}
-
-          {rooms.length > 1 && anyGrid && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted-foreground">จัดทุกห้อง</span>
-              <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || students.length === 0} onClick={() => fillAll(students)}>
-                เรียงตามลำดับ
-              </Button>
-              <Button size="sm" variant="outline" className="ui-control-compact h-8" disabled={locked || students.length === 0} onClick={() => fillAll(shuffled(students))}>
-                สุ่ม
-              </Button>
-            </div>
           )}
 
           {pickedStudent && (
