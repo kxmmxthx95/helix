@@ -323,7 +323,12 @@ function TeachingLoadBoard({
     const c = classrooms.find((x) => x.id === a.classroom_id);
     const g = gradeLevels.find((x) => x.id === c?.grade_level_id);
     const sub = allSubjects.find((x) => x.id === a.subject_id);
-    return `${sub ? `${sub.code} ${sub.name_th}` : "—"} · ${c ? `${g ? gradeShortLabel(g.code) : "—"}/${c.name}` : "—"}`;
+    return {
+      title: sub?.name_th ?? "—",
+      code: sub?.code ?? "—",
+      room: c ? `${g ? gradeShortLabel(g.code) : "—"}/${c.name}` : "—",
+      periods: a.periods_per_week,
+    };
   };
   const areaName = (t: ProfileRow) =>
     learningAreas.find((l) => l.id === t.learning_area_id)?.name ?? "—";
@@ -536,7 +541,7 @@ function TeachingLoadBoard({
                 open={handing}
                 onClose={() => setHanding(false)}
                 fromName={profileFullName(selectedTeacher)}
-                rows={rows.map((a) => ({ assignment: a, label: handoverLabel(a) }))}
+                rows={rows.map((a) => ({ assignment: a, ...handoverLabel(a) }))}
                 allAssignments={assignments}
                 receivers={teachers.filter((t) => t.id !== selectedTeacher.id)}
               />

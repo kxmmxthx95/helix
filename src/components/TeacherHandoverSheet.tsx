@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Button, Field, Input, Select, Spinner } from "@/components/ui";
+import { Button, Field, FormSection, Input, Select, SheetFormContext, Spinner } from "@/components/ui";
 import { useHandoverAssignments } from "@/hooks/useTeachingLoad";
 import { profileFullName, type TeachingAssignment } from "@/lib/database.types";
 import type { ProfileRow } from "@/hooks/useProfiles";
 
-export type HandoverRow = { assignment: TeachingAssignment; label: string };
+export type HandoverRow = { assignment: TeachingAssignment; title: string; code: string; room: string; periods: number };
 
 const today = () => new Date().toLocaleDateString("sv-SE"); // yyyy-mm-dd, local
 
@@ -83,58 +83,74 @@ export function TeacherHandoverSheet({
       title="ส่งต่อภาระงาน"
       description={`ย้ายภาระงานของ ${fromName} ให้ครูผู้รับ — แผนการสอน ตารางสอน และคะแนนจะตามไปกับรายวิชา`}
       footer={
-        <div className="flex items-center gap-2">
-          <p className="text-xs text-muted-foreground">เลือกผู้รับแล้ว {items.length}/{rows.length} รายวิชา</p>
-          <div className="ml-auto flex gap-2">
-            <Button variant="outline" onClick={onClose}>
-              ยกเลิก
-            </Button>
-            <Button onClick={submit} disabled={items.length === 0 || !effective || handover.isPending}>
-              {handover.isPending ? <Spinner className="h-3 w-3" /> : "ยืนยันส่งต่อ"}
-            </Button>
-          </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+            ยกเลิก
+          </Button>
+          <Button
+            type="button"
+            className="flex-1"
+            onClick={submit}
+            disabled={items.length === 0 || !effective || handover.isPending}
+          >
+            {handover.isPending ? <Spinner className="h-3 w-3" /> : `ยืนยันส่งต่อ${items.length ? ` (${items.length})` : ""}`}
+          </Button>
         </div>
       }
     >
-      <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="ส่งทั้งหมดให้">
-            <Select value="" onChange={(e) => fillAll(e.target.value)} aria-label="ส่งทั้งหมดให้" placeholder="เลือกครูผู้รับ">
-              {receivers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {profileFullName(t)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="วันที่มีผล">
-            <Input type="date" value={effective} max={today()} onChange={(e) => setEffective(e.target.value)} />
-            <p className="mt-1 text-xs text-muted-foreground">ใช้บันทึกประวัติผู้สอนเท่านั้น ย้อนหลังได้ ห้ามเกินวันนี้</p>
-          </Field>
-        </div>
+      <SheetFormContext.Provider value>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <FormSection title="ผู้รับและวันที่มีผล">
+              <Field label="ส่งทั้งหมดให้">
+                <Select value="" onChange={(e) => fillAll(e.target.value)} placeholder="เลือกครูผู้รับ">
+                  {receivers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {profileFullName(t)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="วันที่มีผล">
+                <Input type="date" value={effective} max={today()} onChange={(e) => setEffective(e.target.value)} />
+              </Field>
+            </FormSection>
+            <p className="px-0.5 text-xs text-muted-foreground">ใช้บันทึกประวัติผู้สอนเท่านั้น ย้อนหลังได้ ห้ามเกินวันนี้</p>
+          </div>
 
-        <ul className="space-y-2">
-          {rows.map(({ assignment: a, label }) => (
-            <li key={a.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-border px-3 py-2">
-              <span className="min-w-0 flex-1 truncate text-sm">{label}</span>
-              <Select
-                className="w-auto min-w-[10rem]"
-                value={pick[a.id] ?? ""}
-                aria-label={`ครูผู้รับ ${label}`}
-                onChange={(e) => setPick((p) => ({ ...p, [a.id]: e.target.value }))}
-                placeholder="ยังไม่ส่งต่อ"
+          <FormSection title={`รายวิชาที่ส่งต่อ (${rows.length})`}>
+            {rows.map(({ assignment: a, title, code, room, periods }) => (
+              <Field
+                key={a.id}
+                label={
+                  <>
+                    <span className="block font-medium text-foreground">{title}</span>
+                    <span className="mt-1 flex flex-wrap items-center gap-1">
+                      <span className="rounded-md bg-accent/10 px-1.5 py-0.5 text-[11px] font-medium leading-4 text-accent">{code}</span>
+                      <span className="rounded-md bg-success/15 px-1.5 py-0.5 text-[11px] font-medium leading-4 text-success">{room}</span>
+                    </span>
+                    <span className="mt-1 block whitespace-nowrap text-xs text-muted-foreground">{periods} คาบ/สัปดาห์</span>
+                  </>
+                }
               >
-                {receivers.map((t) => (
-                  <option key={t.id} value={t.id} disabled={blocked(a, t.id)}>
-                    {profileFullName(t)}
-                    {blocked(a, t.id) ? " (สอนวิชา/ห้องนี้อยู่แล้ว)" : ""}
-                  </option>
-                ))}
-              </Select>
-            </li>
-          ))}
-        </ul>
-      </div>
+                <Select
+                  value={pick[a.id] ?? ""}
+                  aria-label={`ครูผู้รับ ${title} ${code} ${room}`}
+                  onChange={(e) => setPick((p) => ({ ...p, [a.id]: e.target.value }))}
+                  placeholder="ยังไม่ส่งต่อ"
+                >
+                  {receivers.map((t) => (
+                    <option key={t.id} value={t.id} disabled={blocked(a, t.id)}>
+                      {profileFullName(t)}
+                      {blocked(a, t.id) ? " (สอนวิชา/ห้องนี้อยู่แล้ว)" : ""}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            ))}
+          </FormSection>
+        </div>
+      </SheetFormContext.Provider>
     </Sheet>
   );
 }
