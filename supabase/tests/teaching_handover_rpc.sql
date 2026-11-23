@@ -84,12 +84,12 @@ begin
         jsonb_build_object('assignment_id',t1,'to_teacher',b),
         jsonb_build_object('assignment_id',t3,'to_teacher',b)), current_date-2);
   raise notice '5 result: %', r;
-  if (r->>'moved')::int<>2 or (r->>'topic_sets')::int<>1 or (r->>'sessions_moved')::int<>1 or (r->>'plans_unlinked')::int<>1 then
+  if (r->>'moved')::int<>2 or (r->>'topic_sets')::int<>1 or (r->>'sessions_moved')::int<>2 or (r->>'plans_unlinked')::int<>1 then
     raise exception 'FAIL unexpected result %', r; end if;
   if (select teacher_id from teaching_assignments where id=t1)<>b then raise exception 'FAIL teacher not moved'; end if;
   if (select teacher_id from exam_topic_sets where id=v_set)<>b then raise exception 'FAIL set owner'; end if;
   if (select teacher_id from exam_sessions where id=v_ses)<>b then raise exception 'FAIL open session'; end if;
-  if (select teacher_id from exam_sessions where id=v_ses2)<>a then raise exception 'FAIL closed session moved'; end if;
+  if (select teacher_id from exam_sessions where id=v_ses2)<>b then raise exception 'FAIL closed session not moved'; end if;
   if exists (select 1 from teaching_assignments where id in (t1,t2) and plan_group_id is not null) then raise exception 'FAIL plan group'; end if;
   if not exists (select 1 from teaching_assignment_teachers where assignment_id=t1 and teacher_id=a and to_date=current_date-2)
      or not exists (select 1 from teaching_assignment_teachers where assignment_id=t1 and teacher_id=b and from_date=current_date-2 and to_date is null)
