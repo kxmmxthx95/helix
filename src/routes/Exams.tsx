@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ViewToggle, defaultView } from "@/components/ViewToggle";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
@@ -1622,6 +1622,18 @@ export function useOpenExamSubjectIds(studentId: string | null) {
   return useMemo(() => new Set(exams.filter((e) => isExamOpen(e)).flatMap((e) => e.subject_ids)), [exams]);
 }
 
+type ExamStatusFilter = "all" | "open" | "upcoming" | "done";
+const EXAM_STATUS_FILTERS: readonly [ExamStatusFilter, string][] = [
+  ["all", "ทั้งหมด"],
+  ["open", "เข้าสอบได้"],
+  ["upcoming", "ยังไม่ถึงเวลา"],
+  ["done", "จบแล้ว"],
+];
+function examStatus(e: AvailableExam, now: Date): Exclude<ExamStatusFilter, "all"> {
+  if (isExamOpen(e, now)) return "open";
+  return now < new Date(e.opens_at) ? "upcoming" : "done";
+}
+
 function ExamList({ student, onOpen }: { student: Student; onOpen: (s: AvailableExam) => void }) {
   const { data: classroom } = useMyCurrentClassroom(student.id);
   const { data: allExams = [], isLoading } = useAvailableExams(
@@ -1638,25 +1650,63 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
   const roomGrade = roomGrades.find((g) => g.id === rooms[0]?.grade_level_id);
   const roomLabel = rooms[0] && roomGrade ? `${gradeShortLabel(roomGrade.code)}/${rooms[0].name}` : null;
   const subjectId = subjects.find((s) => s.code === subjectCode)?.id;
-  const exams = subjectCode ? allExams.filter((e) => !!subjectId && e.subject_ids.includes(subjectId)) : allExams;
-  const clearFilter = subjectCode && (
-    <button type="button" onClick={() => setParams({})} className="tappable mb-2 rounded-full bg-foreground/10 px-3 py-1.5 text-xs font-medium">
-      {subjectCode} ✕ ดูทั้งหมด
-    </button>
+  const status = (params.get("status") ?? "all") as ExamStatusFilter;
+  const nowF = new Date();
+  const exams = allExams.filter(
+    (e) =>
+      (!subjectCode || (!!subjectId && e.subject_ids.includes(subjectId))) &&
+      (status === "all" || examStatus(e, nowF) === status),
+  );
+  const setFilter = (key: "subject" | "status", value: string | null) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next, { replace: true });
+  };
+  const chip = (active: boolean) =>
+    cn("tappable shrink-0 rounded-full px-3 py-1.5 text-xs font-medium", active ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:bg-muted");
+  const filters = allExams.length > 0 && (
+    <div className="mb-2 space-y-1">
+      {subjects.length > 1 && (
+        <div className="scrollbar-hidden flex gap-2 overflow-x-auto">
+          <button type="button" onClick={() => setFilter("subject", null)} className={chip(!subjectCode)}>ทุกวิชา</button>
+          {subjects.map((sub) => (
+            <button key={sub.id} type="button" onClick={() => setFilter("subject", sub.code)} className={chip(subjectCode === sub.code)}>
+              {sub.name_th}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="scrollbar-hidden flex gap-2 overflow-x-auto">
+        {EXAM_STATUS_FILTERS.map(([v, label]) => (
+          <button key={v} type="button" onClick={() => setFilter("status", v === "all" ? null : v)} className={chip(status === v)}>
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 
   const { data: mySeats } = useMyExamSeats(student.id, exams.filter((e) => new Date(e.closes_at) >= new Date()).map((e) => e.id));
   const [topicFor, setTopicFor] = useState<AvailableExam | null>(null);
-  const [practiceFor, setPracticeFor] = useState<AvailableExam | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
   const { data: practiceCounts } = usePracticeCounts(exams.map((e) => e.id));
 
-  if (practiceFor) return <PracticeRunner session={practiceFor} onExit={() => setPracticeFor(null)} />;
   if (isLoading) return <PageSpinner />;
   if (exams.length === 0) {
     return (
       <>
-        {clearFilter}
-        <EmptyState title="ไม่มีข้อสอบ" description="ยังไม่มีการเปิดสอบสำหรับห้องนี้" />
+        {filters}
+        {allExams.length === 0 ? (
+          <EmptyState title="ไม่มีข้อสอบ" description="ยังไม่มีการเปิดสอบสำหรับห้องนี้" />
+        ) : (
+          <EmptyState
+            title="ไม่พบข้อสอบ"
+            description="ลองเปลี่ยนตัวกรอง"
+            action={<Button size="sm" variant="outline" onClick={() => setParams({}, { replace: true })}>ล้างตัวกรอง</Button>}
+          />
+        )}
       </>
     );
   }
@@ -1664,7 +1714,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
   const now = new Date();
   return (
     <>
-      {clearFilter}
+      {filters}
       {topicFor && <StudentTopicsSheet session={topicFor} onClose={() => setTopicFor(null)} />}
       <ul className="space-y-2">
       {exams.map((e) => {
@@ -1709,7 +1759,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
               )}
             </button>
             {(practiceCounts?.get(e.id) ?? 0) > 0 && (
-              <Button size="sm" variant="outline" className="w-full" onClick={() => setPracticeFor(e)}>
+              <Button size="sm" variant="outline" className="w-full" onClick={() => navigate(`/exams/practice/${e.id}`, { state: { studentId: student.id, search: location.search } })}>
                 ฝึกทำแนวข้อสอบ ({practiceCounts?.get(e.id)} ข้อ)
               </Button>
             )}
@@ -1725,7 +1775,25 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
 }
 
 /** Practice mode: answer one question at a time, check it server-side (practice_check), retry freely. Nothing is stored. */
-function PracticeRunner({ session, onExit }: { session: AvailableExam; onExit: () => void }) {
+/** Practice runner route. Back navigation is handled by GameShell via location.state.search. */
+export function ExamPractice() {
+  const { sessionId } = useParams();
+  const { profile, myStudent } = useAuth();
+  const isParent = profile?.roles.includes("parent") ?? false;
+  const { data: children = [] } = useMyChildren(isParent ? (profile?.id ?? null) : null);
+  const options = [...(myStudent ? [myStudent] : []), ...children];
+  const state = useLocation().state as { studentId?: string; search?: string } | null;
+  const student = options.find((s) => s.id === state?.studentId) ?? options[0] ?? null;
+  const { data: classroom } = useMyCurrentClassroom(student?.id ?? null);
+  const { data: exams = [], isLoading } = useAvailableExams(student?.id ?? null, classroom?.classroomId ?? null, classroom?.academicYear ?? null);
+  const session = exams.find((e) => e.id === sessionId);
+  if (!student) return <Navigate to="/exams" replace />;
+  if (isLoading) return <PageSpinner />;
+  if (!session) return <Navigate to={{ pathname: "/exams", search: state?.search ?? "" }} replace />;
+  return <PracticeRunner session={session} />;
+}
+
+function PracticeRunner({ session }: { session: AvailableExam }) {
   const { data: rows = [], isLoading } = usePracticeQuestions(session.id);
   const { data } = useAttemptQuestions(rows.map((r) => r.question_id));
   const check = usePracticeCheck();
@@ -1740,10 +1808,7 @@ function PracticeRunner({ session, onExit }: { session: AvailableExam; onExit: (
   };
   return (
     <div className="mx-auto max-w-xl space-y-3 pb-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">แนวข้อสอบ · {session.title}</p>
-        <Button size="sm" variant="outline" onClick={onExit}>กลับ</Button>
-      </div>
+      <p className="text-sm font-semibold">แนวข้อสอบ · {session.title}</p>
       {questions.map((q, i) => {
         const a = picked.get(q.id) ?? { choiceId: null, text: "" };
         const r = results.get(q.id);

@@ -96,7 +96,10 @@ function GameShellInner() {
   // Pages that lay out their own full-width canvas (no centred max-width column).
   const fullWidth = location.pathname === "/my-curriculum";
   const isTopupForm = location.pathname.startsWith("/card-topup/");
-  const title = isTopupForm ? "เติมเงิน" : (TITLES[location.pathname] ?? "");
+  // Practice mode returns to the exam list with the filters the student had (passed via location.state).
+  const isPractice = location.pathname.startsWith("/exams/practice/");
+  const backSearch = (location.state as { search?: string } | null)?.search ?? "";
+  const title = isTopupForm ? "เติมเงิน" : isPractice ? "สอบ" : (TITLES[location.pathname] ?? "");
   // iOS large title: collapses into the nav bar once the page scrolls under it.
   const [scrolled, setScrolled] = useState(false);
   // Every non-home page shows its title centered in the nav bar (the large title below is sr-only).
@@ -154,10 +157,10 @@ function GameShellInner() {
           className={cn(
             "z-20 shrink-0 border-b-[0.5px] pt-safe transition-colors duration-200",
             isHome ? "relative lg:hidden" : "relative",
-            scrolled ? "pointer-events-auto border-border bg-card/80 backdrop-blur-xl backdrop-saturate-150" : "border-transparent bg-background",
+            scrolled ? "pointer-events-auto border-border bg-card/80 backdrop-blur-xl backdrop-saturate-150" : "border-transparent bg-background lg:border-border",
           )}
         >
-          <div className="relative flex h-11 items-center justify-center px-2 lg:h-14 lg:px-8">
+          <div className="relative flex h-11 items-center justify-center px-2 lg:h-12 lg:px-8">
             {isHome && (
               <button
                 type="button"
@@ -171,8 +174,8 @@ function GameShellInner() {
             {!isHome && (
               <button
                 type="button"
-                aria-label={isTopupForm ? "กลับบัตรเติมเงิน" : "กลับหน้าแรก"}
-                onClick={() => navigate(isTopupForm ? "/card-topup" : "/")}
+                aria-label={isTopupForm ? "กลับบัตรเติมเงิน" : isPractice ? "กลับรายการสอบ" : "กลับหน้าแรก"}
+                onClick={() => (isPractice ? navigate({ pathname: "/exams", search: backSearch }) : navigate(isTopupForm ? "/card-topup" : "/"))}
                 className={cn("absolute left-2 flex h-10 w-10 items-center justify-center rounded-lg text-foreground active:opacity-40 lg:hidden", FOCUS)}
               >
                 <ChevronBack className="h-6 w-6" />
@@ -181,8 +184,7 @@ function GameShellInner() {
             <p
               aria-hidden={!titleShown}
               className={cn(
-                "font-heading max-w-[55%] truncate text-[17px] font-semibold transition-opacity duration-200 lg:max-w-none lg:text-[22px] lg:font-bold lg:opacity-100",
-                !collapsed && "lg:hidden",
+                "font-heading max-w-[55%] truncate text-[17px] font-semibold transition-opacity duration-200 lg:max-w-none lg:text-[15px] lg:tracking-[-0.01em] lg:opacity-100",
                 titleShown ? "opacity-100" : "opacity-0",
               )}
             >

@@ -12,7 +12,7 @@ import { Attendance } from "@/routes/Attendance";
 import { BehaviorScore } from "@/routes/BehaviorScore";
 import { ExamBank } from "@/routes/ExamBank";
 import { Documents } from "@/routes/Documents";
-import { Exams } from "@/routes/Exams";
+import { Exams, ExamPractice } from "@/routes/Exams";
 import { Practice } from "@/routes/Practice";
 import { ScoreRecording } from "@/routes/ScoreRecording";
 import { Profile } from "@/routes/Profile";
@@ -106,6 +106,7 @@ function Gate() {
         <Route path="assignments" element={<Assignments />} />
         <Route path="exam-bank" element={<ExamBank />} />
         <Route path="exams" element={<Exams />} />
+        <Route path="exams/practice/:sessionId" element={<ExamPractice />} />
         <Route path="practice" element={<Practice />} />
         <Route path="documents" element={<Documents />} />
         <Route path="attendance" element={<Attendance />} />
