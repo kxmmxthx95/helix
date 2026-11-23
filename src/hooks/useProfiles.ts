@@ -39,8 +39,9 @@ export function usePositionTitles() {
   });
 }
 
-export function useProfiles(filters: ProfileFilters) {
+export function useProfiles(filters: ProfileFilters, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: ["profiles", filters],
     queryFn: async (): Promise<ProfileRow[]> => {
       let q = supabase.from("profiles").select("*").order("first_name").order("last_name");
