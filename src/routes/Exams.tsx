@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ViewToggle, defaultView } from "@/components/ViewToggle";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
@@ -205,7 +205,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
       </div>
     );
   }
-  const subjectsOf = (s: ExamSession) => (sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]).flatMap((id) => subjectById.get(id) ?? []);
+  const subjectsOf = (s: ExamSession) => [...new Set(sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id])].flatMap((id) => subjectById.get(id) ?? []);
   const setIdOf = (s: ExamSession, subjectId: string) => sessionSets?.get(s.id)?.find((x) => x.subject_id === subjectId)?.topic_set_id ?? "";
   const row = (s: ExamSession) => {
     const sets = sessionSets?.get(s.id) ?? [{ subject_id: s.subject_id, topic_set_id: "" }];
@@ -826,6 +826,7 @@ function CreateSessionSheet({
   const { data: roomGrades = [] } = useGradeLevelsByIds([...new Set(classrooms.map((c) => c.grade_level_id))]);
 
   const create = useCreateExamSession();
+  const submitting = useRef(false);
   const toast = useToast();
 
   function reset() {
@@ -863,7 +864,8 @@ function CreateSessionSheet({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSave) return;
+    if (!canSave || submitting.current) return;
+    submitting.current = true; // sync lock: a double click / Enter lands before isPending re-renders
     try {
       const first = targets[0]!;
       await create.mutateAsync({
@@ -886,6 +888,8 @@ function CreateSessionSheet({
       close();
     } catch {
       toast("สร้างห้องสอบไม่สำเร็จ", "error");
+    } finally {
+      submitting.current = false;
     }
   }
 

@@ -192,23 +192,29 @@ export function useCreateExamSession() {
       const { data: inserted, error } = await supabase.from("exam_sessions").insert({ ...session, is_enabled: false }).select().single();
       if (error) throw error;
 
-      // before targets: the target trigger checks them against the listed sets
-      const { error: setsError } = await supabase
-        .from("exam_session_sets")
-        .insert((sets ?? [{ topic_set_id: draft.topic_set_id, subject_id: draft.subject_id }]).map((x) => ({ session_id: inserted.id, ...x })));
-      if (setsError) throw setsError;
+      // Child inserts are separate calls: if one fails, drop the shell so a retry cannot leave a second (orphan) room behind.
+      try {
+        // before targets: the target trigger checks them against the listed sets
+        const { error: setsError } = await supabase
+          .from("exam_session_sets")
+          .insert((sets ?? [{ topic_set_id: draft.topic_set_id, subject_id: draft.subject_id }]).map((x) => ({ session_id: inserted.id, ...x })));
+        if (setsError) throw setsError;
 
-      if (teaching_assignment_ids.length > 0) {
-        const { error: targetsError } = await supabase
-          .from("exam_session_targets")
-          .insert(teaching_assignment_ids.map((teaching_assignment_id) => ({ session_id: inserted.id, teaching_assignment_id })));
-        if (targetsError) throw targetsError;
-      }
-      if (questions.length > 0) {
-        const { error: questionsError } = await supabase.from("exam_session_questions").insert(
-          questions.map((q, i) => ({ session_id: inserted.id, question_id: q.question_id, position: i, points: q.points })),
-        );
-        if (questionsError) throw questionsError;
+        if (teaching_assignment_ids.length > 0) {
+          const { error: targetsError } = await supabase
+            .from("exam_session_targets")
+            .insert(teaching_assignment_ids.map((teaching_assignment_id) => ({ session_id: inserted.id, teaching_assignment_id })));
+          if (targetsError) throw targetsError;
+        }
+        if (questions.length > 0) {
+          const { error: questionsError } = await supabase.from("exam_session_questions").insert(
+            questions.map((q, i) => ({ session_id: inserted.id, question_id: q.question_id, position: i, points: q.points })),
+          );
+          if (questionsError) throw questionsError;
+        }
+      } catch (e) {
+        await supabase.from("exam_sessions").delete().eq("id", inserted.id);
+        throw e;
       }
       return inserted as ExamSession;
     },
@@ -390,7 +396,7 @@ export function useAvailableExams(studentId: string | null, classroomId: string 
 
       const attemptCounts = new Map<string, number>();
       for (const a of attempts) attemptCounts.set(a.session_id, (attemptCounts.get(a.session_id) ?? 0) + 1);
-      return sessions.map((s) => ({ ...s, my_attempts: attemptCounts.get(s.id) ?? 0, subject_ids: subjectIdsOf.get(s.id) ?? [s.subject_id] }) as AvailableExam);
+      return sessions.map((s) => ({ ...s, my_attempts: attemptCounts.get(s.id) ?? 0, subject_ids: [...new Set(subjectIdsOf.get(s.id) ?? [s.subject_id])] }) as AvailableExam);
     },
   });
 }
