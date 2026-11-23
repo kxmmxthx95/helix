@@ -1006,13 +1006,13 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   const eventCount = useSecurityEvents(session.id).data?.length ?? 0;
   const toast = useToast();
   const updateSession = useUpdateExamSession();
-  const { data: seatedIds } = useSessionsWithSeating([session.id]);
+  const { data: seatedIds, isLoading: seatedLoading } = useSessionsWithSeating([session.id]);
   // Toggle appears once time, questions and seating are all set (or while on, so it can be switched off).
   const canEnable = session.is_enabled || (!!session.opens_at && !!session.closes_at && sessionQuestions.length > 0 && !!seatedIds?.has(session.id));
 
   const maxPoints = sessionQuestions.reduce((s, q) => s + q.points, 0);
   const submitted = attempts.filter((a) => a.status === "submitted");
-  const { data: roomSets } = useSessionSets([session.id]);
+  const { data: roomSets, isLoading: roomSetsLoading } = useSessionSets([session.id]);
   const sets = roomSets?.get(session.id) ?? [];
   // Warm the queries of the cards below (shared cache) so every card appears at once instead of one by one.
   const warm = [
@@ -1035,10 +1035,11 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   const roomList = [...new Set(classrooms.flatMap((c) => { const g = grades.find((x) => x.id === c.grade_level_id); return g ? [`${gradeShortLabel(g.code)}/${c.name}`] : []; }))];
   const targets = assignments.filter((a) => targetIds.includes(a.id)).map((a) => ({ classroom_id: a.classroom_id, academic_year: a.academic_year }));
   const { data: roster = [], isLoading: rosterLoading } = useSessionRoster(targets);
-  const { data: rosterNames } = useStudentNames(roster.map((r) => r.student_id));
+  const { data: rosterNames, isLoading: namesLoading } = useStudentNames(roster.map((r) => r.student_id));
   const { data: rosterAvatars } = useStudentAvatars(roster.map((r) => r.student_id));
   const { data: lockedRows = [] } = useLockedCodeStudents(session.id);
-  const ready = !(isLoading || targetsLoading || assignmentsLoading || rosterLoading || questionsLoading || warm || !roomSets || !seatedIds || !rosterNames && roster.length > 0);
+  // Gate on loading flags, not on data being defined: an errored or offline-paused query never gets data and would spin forever.
+  const ready = !(isLoading || targetsLoading || assignmentsLoading || rosterLoading || questionsLoading || warm || roomSetsLoading || seatedLoading || namesLoading);
   const roomOfClassroom = new Map(classrooms.map((c) => { const g = grades.find((x) => x.id === c.grade_level_id); return [c.id, g ? `${gradeShortLabel(g.code)}/${c.name}` : c.name]; }));
   const lockedIds = new Set(lockedRows.map((l) => l.student_id));
   const rosterRows = roster
@@ -1198,12 +1199,12 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
       {rosterRows.length > 0 && <ExamSeatingCard session={session} roomPicker={(room, usedRoomIds) => <ExamRoomField session={session} room={room} usedRoomIds={usedRoomIds} />} students={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "", avatar: rosterAvatars?.get(r.student_id) ?? null }))} />}
 
       <SessionQuestionList session={session} sessionQuestions={sessionQuestions} />
-        </>
-      )}
-
       <PracticeQuestionsCards session={session} />
 
       <SecurityPanel session={session} attempts={attempts} />
+        </>
+      )}
+
       <SecurityEventsSheet sessionId={session.id} open={eventsOpen} onOpenChange={setEventsOpen} />
     </div>
   );
@@ -1497,7 +1498,7 @@ function SessionQuestionList({ session, sessionQuestions, practice }: { session:
           {practice ? "แนวข้อสอบ" : "รายการข้อสอบ"}
         </span>
         <span className="flex shrink-0 items-center gap-2">
-          <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success">{sessionQuestions.length} ข้อ</span>
+          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", sessionQuestions.length === 0 ? "bg-destructive/15 text-destructive" : "bg-success/15 text-success")}>{sessionQuestions.length} ข้อ</span>
           {sessionQuestions.length === 0 && <span className="flex shrink-0 text-destructive" role="img" aria-label="ยังไม่ได้ตั้งค่า"><AlertTriangle className="h-4 w-4" /></span>}
           <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", open && "rotate-90")} />
         </span>
