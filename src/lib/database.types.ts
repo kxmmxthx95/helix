@@ -2129,6 +2129,16 @@ export type Database = {
         Args: { p_attempt_id: string };
         Returns: void;
       };
+      handover_teaching_assignments: {
+        Args: { p_items: { assignment_id: string; to_teacher: string }[]; p_effective?: string };
+        Returns: {
+          moved: number;
+          topic_sets: number;
+          sessions_moved: number;
+          sessions_left: number;
+          plans_unlinked: number;
+        };
+      };
       submit_exam_topic_set: { Args: { p_id: string }; Returns: undefined };
       submit_no_exam_set: { Args: { p_assignment: string; p_exam_type: string; p_round?: number | null }; Returns: string };
       request_exam_no_exam: { Args: { p_id: string }; Returns: undefined };

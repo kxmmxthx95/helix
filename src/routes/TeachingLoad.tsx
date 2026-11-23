@@ -14,6 +14,7 @@ import {
   X,
 } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
+import { TeacherHandoverSheet } from "@/components/TeacherHandoverSheet";
 import { useToast } from "@/components/Toast";
 import {
   Avatar,
@@ -27,7 +28,7 @@ import {
   Spinner,
 } from "@/components/ui";
 import { avatarUrl } from "@/hooks/useAvatar";
-import { useActiveAcademicYear, useCurrentTerm } from "@/hooks/useAcademicTerms";
+import { useAcademicTerms, useActiveAcademicYear, useCurrentTerm } from "@/hooks/useAcademicTerms";
 import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
 import {
@@ -213,6 +214,15 @@ function TeachingLoadBoard({
     role: "teacher",
     active: "true",
   });
+  // Teachers who left (is_active = false) but still hold rows: kept in the list so the load can be handed over.
+  const { data: inactiveTeachers = [] } = useProfiles({
+    search: "",
+    departmentId,
+    role: "teacher",
+    active: "false",
+  });
+  const { data: terms = [] } = useAcademicTerms(departmentId);
+  const [handing, setHanding] = useState(false);
   const { data: assignments = [], isLoading } =
     useDepartmentTeachingAssignments(departmentId, academicYear, term);
   const del = useDeleteTeachingAssignment();
@@ -259,7 +269,19 @@ function TeachingLoadBoard({
   }, [teachers, sortKey, sortDir, totalByTeacher]);
 
   const noTeacher = selectedTeacherId === NO_TEACHER;
-  const selectedTeacher = teachers.find((t) => t.id === selectedTeacherId);
+  const leavers = useMemo(
+    () => inactiveTeachers.filter((t) => assignments.some((a) => a.teacher_id === t.id)),
+    [inactiveTeachers, assignments],
+  );
+  const selectedTeacher = [...teachers, ...leavers].find((t) => t.id === selectedTeacherId);
+  const leaverIds = new Set(leavers.map((t) => t.id));
+  // The DB refuses to touch a locked/archived term (0018); do not offer the handover there.
+  const termLocked = terms.some(
+    (t) =>
+      t.academic_year === academicYear &&
+      (term === null || t.term_type === (term === 1 ? "term1" : "term2")) &&
+      (t.status === "locked" || t.status === "archived"),
+  );
   const teacherlessCount = assignments.filter((a) => a.teacher_id === null).length;
   const { data: classrooms = [] } = useClassroomsByDepartment(departmentId);
   const { data: gradeLevels = [] } = useGradeLevels(departmentId);
@@ -297,6 +319,12 @@ function TeachingLoadBoard({
         );
       });
   }, [assignments, selectedTeacherId, classrooms, gradeLevels, allSubjects]);
+  const handoverLabel = (a: TeachingAssignment) => {
+    const c = classrooms.find((x) => x.id === a.classroom_id);
+    const g = gradeLevels.find((x) => x.id === c?.grade_level_id);
+    const sub = allSubjects.find((x) => x.id === a.subject_id);
+    return `${sub ? `${sub.code} ${sub.name_th}` : "—"} · ${c ? `${g ? gradeShortLabel(g.code) : "—"}/${c.name}` : "—"}`;
+  };
   const areaName = (t: ProfileRow) =>
     learningAreas.find((l) => l.id === t.learning_area_id)?.name ?? "—";
 
@@ -315,6 +343,9 @@ function TeachingLoadBoard({
           .includes(q),
       )
     : sortedTeachers;
+  const leaversShown = q
+    ? leavers.filter((t) => profileFullName(t).toLowerCase().includes(q))
+    : leavers;
 
   const totalPeriods = rows.reduce((sum, a) => sum + a.periods_per_week, 0);
   const classroomCount = new Set(rows.map((a) => a.classroom_id)).size;
@@ -380,8 +411,9 @@ function TeachingLoadBoard({
               </button>
             </li>
           )}
-          {visibleTeachers.map((t) => {
+          {[...leaversShown, ...visibleTeachers].map((t) => {
             const active = selectedTeacherId === t.id;
+            const left = leaverIds.has(t.id);
             const status = loadStatus(
               totalByTeacher.get(t.id) ?? 0,
               minPeriods,
@@ -417,11 +449,14 @@ function TeachingLoadBoard({
                       "shrink-0 rounded-full px-2.5 py-0.5 text-xs",
                       active
                         ? "bg-accent/15 font-medium text-accent"
+                        : left
+                        ? "bg-destructive/15 text-destructive"
                         : status === "ok"
                           ? "bg-muted text-muted-foreground"
                           : "bg-warning/15 text-warning",
                     )}
                   >
+                    {left ? "ย้ายออก · ค้าง " : ""}
                     {subjectCountByTeacher.get(t.id) ?? 0} รายวิชา
                   </span>
                 </button>
@@ -475,6 +510,16 @@ function TeachingLoadBoard({
                   {selectedTeacher ? areaName(selectedTeacher) : "ไม่นับเป็นภาระงานสอนของครูคนใด"}
                 </p>
               </div>
+              {mayEdit && selectedTeacher && rows.length > 0 && (
+                <Button
+                  variant="outline"
+                  disabled={termLocked}
+                  title={termLocked ? "ภาคเรียนนี้ล็อกแล้ว ส่งต่อไม่ได้" : undefined}
+                  onClick={() => setHanding(true)}
+                >
+                  ส่งต่อภาระงาน
+                </Button>
+              )}
               {mayEdit && (!noTeacher || academic) && (
                 <NewAssignmentForm
                   departmentId={departmentId}
@@ -485,6 +530,17 @@ function TeachingLoadBoard({
                 />
               )}
             </div>
+
+            {selectedTeacher && (
+              <TeacherHandoverSheet
+                open={handing}
+                onClose={() => setHanding(false)}
+                fromName={profileFullName(selectedTeacher)}
+                rows={rows.map((a) => ({ assignment: a, label: handoverLabel(a) }))}
+                allAssignments={assignments}
+                receivers={teachers.filter((t) => t.id !== selectedTeacher.id)}
+              />
+            )}
 
             <div className="grid gap-3 sm:grid-cols-3">
               <StatTile

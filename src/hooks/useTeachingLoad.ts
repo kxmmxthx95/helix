@@ -73,6 +73,25 @@ export function useUpdateAssignmentTeacher() {
   });
 }
 
+/** ส่งต่อภาระงานของครูที่ย้ายออก (migration 0210): one call, all-or-nothing. */
+export function useHandoverAssignments() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ items, effective }: { items: { assignment_id: string; to_teacher: string }[]; effective: string }) => {
+      const { data, error } = await supabase.rpc("handover_teaching_assignments", {
+        p_items: items,
+        p_effective: effective,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["teaching_assignments"] });
+      void qc.invalidateQueries({ queryKey: ["exam_sessions"] });
+    },
+  });
+}
+
 export function useDeleteTeachingAssignment() {
   const qc = useQueryClient();
   return useMutation({
