@@ -252,21 +252,6 @@ export function ExamSeatingCard({
           <p className="text-xs text-muted-foreground">{templates.length > 0 ? "เลือก template เพื่อเริ่มจัดผังที่นั่ง" : "ยังไม่มี template สร้างจาก \"จัดการ template\" ก่อน"}</p>
         ) : (
           <>
-            <div className={cn("flex-wrap items-center gap-2", setupShown ? "flex" : "hidden")}>
-              <Button size="sm" variant="outline" className="ui-control-compact h-8 flex-1" disabled={locked || students.length === 0} onClick={() => fillRoom(r, (l) => l)}>
-                <ListIcon className={ICON} />
-                เรียงตามลำดับ
-              </Button>
-              <Button size="sm" variant="outline" className="ui-control-compact h-8 flex-1" disabled={locked || students.length === 0} onClick={() => fillRoom(r, shuffled)}>
-                <ShuffleIcon className={ICON} />
-                สุ่ม
-              </Button>
-              <Button size="sm" variant="outline" className="ui-control-compact h-8 flex-1" disabled={locked || !hasSeats} onClick={() => setClearing(r.id)}>
-                <TrashIcon className={ICON} />
-                ล้างผัง
-              </Button>
-            </div>
-
             <div className="-mx-1 overflow-x-auto px-1 py-1">
               <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(6.5rem, 1fr))` }}>
                 {Array.from({ length: rows * cols }, (_, i) => {
@@ -319,8 +304,21 @@ export function ExamSeatingCard({
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-foreground">ที่นั่งพิเศษ</span>
+                <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || students.length === 0} onClick={() => fillRoom(r, (l) => l)}>
+                  <ListIcon className={ICON} />
+                  เรียงตามลำดับ
+                </Button>
+                <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || students.length === 0} onClick={() => fillRoom(r, shuffled)}>
+                  <ShuffleIcon className={ICON} />
+                  สุ่ม
+                </Button>
+                <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || !hasSeats} onClick={() => setClearing(r.id)}>
+                  <TrashIcon className={ICON} />
+                  ล้างผัง
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
@@ -335,6 +333,7 @@ export function ExamSeatingCard({
                 >
                   <Plus className="h-3 w-3" /> เพิ่มที่นั่งพิเศษ
                 </Button>
+                </div>
               </div>
               {roomSpecials.length > 0 && (
                 <div className="-mx-1 overflow-x-auto px-1 py-1">
