@@ -13,7 +13,6 @@ import {
   useDeleteTopicSet,
   useMyTopicSets,
   useSetTopicSetTopics,
-  useSubmitNoExamSet,
   useSubmitTopicSet,
   useTopicSetQueue,
   useTopicSetsInUse,
@@ -86,7 +85,6 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
   const { data: lessonLinks } = usePlanLessonLinks(assignments.map((a) => a.subject_id));
   const colors = useSubjectColors([]); // hue from กลุ่มสาระ only, like the period attendance views
   const [picking, setPicking] = useState<string | null>(null);
-  const [noExamFor, setNoExamFor] = useState<string | null>(null);
 
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
   const classroomById = new Map(classrooms.map((c) => [c.id, c]));
@@ -113,7 +111,6 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
   );
   const subjectsOf = (members: TeachingAssignment[]) => members.map((a) => subjectById.get(a.subject_id)).filter((x): x is Subject => !!x);
   const pickingGroup = picking ? (groups.get(picking) ?? null) : null;
-  const noExamGroup = noExamFor ? (groups.get(noExamFor) ?? null) : null;
 
   if (isLoading)
     return (
@@ -157,7 +154,6 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
                   <th className="px-4 py-3">วิชา</th>
                   <th className="px-4 py-3">ห้อง</th>
                   {all && <th className="px-4 py-3">ครูผู้สอน</th>}
-                  <th className="w-28 px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
@@ -182,20 +178,6 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
                         <span className={cn("inline-flex rounded-md px-2 py-0.5 text-xs font-medium", levelTone(room))}>{room}</span>
                       </td>
                       {all && <td className="px-4 py-0">{teacherName}</td>}
-                      <td className="px-4 py-0 text-right">
-                        {!all && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setNoExamFor(key);
-                            }}
-                          >
-                            ไม่มีสอบ
-                          </Button>
-                        )}
-                      </td>
                     </tr>
                   );
                 })}
@@ -233,24 +215,10 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
                 ))}
                 {teacherName && <p className="text-xs text-muted-foreground">{teacherName}</p>}
               </div>
-              {!all && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNoExamFor(key);
-                  }}
-                >
-                  ไม่มีสอบ
-                </Button>
-              )}
             </div>
           </div>
         );
       })}
-      {noExamGroup && <NoExamSheet targets={noExamGroup} names={subjectsOf(noExamGroup).map((x) => x.name_th).join(" · ")} onClose={() => setNoExamFor(null)} />}
     </div>
   );
 }
@@ -272,51 +240,6 @@ function ExamFields({ kind, round, onKind, onRound }: { kind: string; round: str
         <Input type="number" min="1" value={round} onChange={(e) => onRound(e.target.value)} placeholder="เช่น 1 (ไม่ระบุได้)" />
       </Field>
     </div>
-  );
-}
-
-/** "ไม่มีสอบ" for one exam — sent to อนุมัติสอบ like a topic set (heads: approved at once). */
-function NoExamSheet({ targets, names, onClose }: { targets: TeachingAssignment[]; names: string; onClose: () => void }) {
-  const selfApprove = isDeptHead(useAuth().profile?.roles ?? []);
-  const [kind, setKind] = useState("");
-  const [round, setRound] = useState("");
-  const send = useSubmitNoExamSet();
-  const toast = useToast();
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!kind) return;
-    try {
-      for (const a of targets) await send.mutateAsync({ assignmentId: a.id, examType: kind, round: round ? Number(round) : null });
-      toast(selfApprove ? "ส่งไม่มีสอบแล้ว" : "ส่งขออนุมัติไม่มีสอบแล้ว");
-      onClose();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "ส่งไม่สำเร็จ", "error");
-    }
-  }
-
-  return (
-    <Sheet
-      open
-      onOpenChange={(o) => !o && onClose()}
-      title="ไม่มีสอบ"
-      description={names}
-      footer={
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
-            ยกเลิก
-          </Button>
-          <Button type="submit" form="no-exam" className="flex-1" disabled={!kind || send.isPending}>
-            ส่ง
-          </Button>
-        </div>
-      }
-    >
-      <form id="no-exam" onSubmit={submit} className="space-y-3">
-        <p className="text-sm text-muted-foreground">{names}</p>
-        <ExamFields kind={kind} round={round} onKind={setKind} onRound={setRound} />
-      </form>
-    </Sheet>
   );
 }
 

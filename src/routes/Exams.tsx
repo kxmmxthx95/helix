@@ -3,7 +3,7 @@ import { ViewToggle, defaultView } from "@/components/ViewToggle";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
-import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
+import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, FunnelIcon, LayersIcon, ListIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { COL_TONES, ExamSeatingCard, seatLabel } from "@/components/ExamSeatingCard";
@@ -60,6 +60,8 @@ import {
   type ExamSessionQuestionRow,
 } from "@/hooks/useExams";
 import { useRooms } from "@/hooks/useSchedule";
+import { useLearningAreas } from "@/hooks/useCurriculum";
+import { topArea } from "@/lib/subjectColor";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { ExamApprovalTab, ExamSubmissionsTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
@@ -458,6 +460,26 @@ function SeatingSheet({ session, onClose }: { session: ExamSession; onClose: () 
 
 const ownerName = (o: { first_name: string; last_name: string } | undefined) => (o ? `${o.first_name} ${o.last_name}` : "—");
 
+/** Wrapping pill row with "ทั้งหมด" first — same look as the student exam filters. */
+function ChipRow({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
+  const chip = (active: boolean) =>
+    cn(
+      "tappable rounded-full border px-3 py-1 text-[13px] font-medium",
+      active ? "border-accent bg-accent-soft text-accent" : "border-border bg-card text-foreground hover:bg-muted",
+    );
+  return (
+    <div className="space-y-2">
+      <p className="text-[13px] font-medium">{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        <button type="button" aria-pressed={!value} onClick={() => onChange("")} className={chip(!value)}>ทั้งหมด</button>
+        {options.map(([id, name]) => (
+          <button key={id} type="button" aria-pressed={value === id} onClick={() => onChange(id)} className={chip(value === id)}>{name}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** canSeeAll: heads/approvers may switch to every room RLS shows them (their department; all for org-wide). A head with no teaching load has no "mine". */
 function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canSeeAll: boolean }) {
   const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
@@ -492,6 +514,25 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
   };
 
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
+
+  // One filter button: กลุ่มสาระ + ชั้น + ห้อง, derived from the rooms loaded.
+  const { data: areas = [] } = useLearningAreas();
+  const areaById = new Map(areas.map((a) => [a.id, a]));
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [fArea, setFArea] = useState("");
+  const [fGrade, setFGrade] = useState("");
+  const [fRoom, setFRoom] = useState("");
+  const classroomIdOf = (s: ExamSession) => classroomOfAssignment?.get(assignmentOfSet.get(s.topic_set_id) ?? "") ?? "";
+  const areaIdsOf = (s: ExamSession) =>
+    (sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]).map((id) => topArea(subjectById.get(id)?.learning_area_id, areaById)?.id ?? "");
+  const gradeIdOf = (s: ExamSession) => roomClassrooms.find((c) => c.id === classroomIdOf(s))?.grade_level_id ?? "";
+  const shown = sessions.filter(
+    (s) => (!fArea || areaIdsOf(s).includes(fArea)) && (!fGrade || gradeIdOf(s) === fGrade) && (!fRoom || classroomIdOf(s) === fRoom),
+  );
+  const areaOptions = [...new Map(sessions.flatMap(areaIdsOf).filter(Boolean).map((id) => [id, areaById.get(id)?.name ?? id])).entries()];
+  const gradeOptions = [...roomGrades].sort((a, b) => a.code.localeCompare(b.code));
+  const roomOptions = roomClassrooms.filter((c) => !fGrade || c.grade_level_id === fGrade).sort((a, b) => a.name.localeCompare(b.name, "th", { numeric: true }));
+  const filterCount = [fArea, fGrade, fRoom].filter(Boolean).length;
 
   // A room can only be switched on once time, questions and seating are set (switching off is always allowed).
   const { data: seatedIds } = useSessionsWithSeating(sessions.map((s) => s.id));
@@ -529,19 +570,44 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
             <option value="all">ทุกวิชา</option>
           </Select>
         )}
+        <Button size="sm" variant="outline" className="ui-control-compact h-8 gap-1 px-2.5 sm:px-3" onClick={() => setFilterOpen(true)}>
+          <FunnelIcon className="h-3 w-3" /> กรอง{filterCount > 0 && ` (${filterCount})`}
+        </Button>
         <Button size="sm" className="ui-control-compact h-8 gap-1 px-2.5 sm:px-3" onClick={() => setCreating(true)} disabled={!teacherId || assignments.length === 0}>
           <Plus className="h-3 w-3" /> เปิดสอบใหม่
         </Button>
         <ViewToggle value={view} onChange={setView} />
       </div>
 
-      {isLoading ? <PageSpinner /> : sessions.length === 0 ? (
+      <Sheet
+        open={filterOpen}
+        onOpenChange={setFilterOpen}
+        title="กรองห้องสอบ"
+        footer={
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" disabled={filterCount === 0} onClick={() => { setFArea(""); setFGrade(""); setFRoom(""); }}>
+              ล้าง
+            </Button>
+            <Button type="button" className="flex-1" onClick={() => setFilterOpen(false)}>
+              ดู {shown.length} ห้อง
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          <ChipRow label="กลุ่มสาระ" value={fArea} onChange={setFArea} options={areaOptions.map(([id, name]) => [id, name])} />
+          <ChipRow label="ชั้น" value={fGrade} onChange={(v) => { setFGrade(v); setFRoom(""); }} options={gradeOptions.map((g) => [g.id, gradeShortLabel(g.code)])} />
+          <ChipRow label="ห้อง" value={fRoom} onChange={setFRoom} options={roomOptions.map((c) => [c.id, roomOf(sessions.find((x) => classroomIdOf(x) === c.id)?.topic_set_id ?? "") ?? c.name])} />
+        </div>
+      </Sheet>
+
+      {isLoading ? <PageSpinner /> : shown.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title="ยังไม่มีการเปิดสอบ" description="กด “เปิดสอบใหม่” เพื่อเลือกข้อสอบจากคลังมาจัดสอบ" />
+          <EmptyState title={sessions.length === 0 ? "ยังไม่มีการเปิดสอบ" : "ไม่พบห้องสอบตามตัวกรอง"} description={sessions.length === 0 ? "กด “เปิดสอบใหม่” เพื่อเลือกข้อสอบจากคลังมาจัดสอบ" : "ลองล้างตัวกรอง"} />
         </div>
       ) : view === "cards" ? (
         <ul className="-mx-1 -mt-1 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-1 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-1">
-          {sessions.map((s) => {
+          {shown.map((s) => {
             const roomSubjects = (sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]).map((id) => subjectById.get(id)).filter((x): x is Subject => !!x);
             const owner = ownerById.get(s.teacher_id);
             const room = roomOf(s.topic_set_id);
@@ -622,7 +688,7 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
                 </tr>
               </thead>
               <tbody>
-                {sessions.map((s) => {
+                {shown.map((s) => {
                   const roomSubjects = (sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]).map((id) => subjectById.get(id)).filter((x): x is Subject => !!x);
                   const owner = ownerById.get(s.teacher_id);
                   return (

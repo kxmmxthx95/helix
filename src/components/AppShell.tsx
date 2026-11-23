@@ -1050,7 +1050,7 @@ function AppShellInner() {
               <motion.div
                 key={location.pathname}
                 className="flex min-h-0 flex-1 flex-col pt-4"
-                initial={{ opacity: 0, y: 8 }}
+                initial={location.pathname.startsWith("/exams") ? false : { opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.18, ease: "easeOut" }}
               >
