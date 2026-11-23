@@ -1661,7 +1661,7 @@ function StudentExams() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-1 flex-col space-y-4">
+    <div className="mx-auto flex w-full max-w-xl lg:max-w-none flex-1 flex-col space-y-4">
       {options.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {options.map((s) => (
@@ -1715,12 +1715,13 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
     classroom?.classroomId ?? null,
     classroom?.academicYear ?? null,
   );
+  const [view, setView] = useState<"cards" | "table">(defaultView);
   const [params, setParams] = useSearchParams();
   const subjectCode = params.get("subject");
-  const { data: subjects = [] } = useSubjectsByIds([...new Set(allExams.flatMap((e) => e.subject_ids))]);
+  const { data: subjects = [], isLoading: subjectsLoading } = useSubjectsByIds([...new Set(allExams.flatMap((e) => e.subject_ids))]);
   const colors = useSubjectColors([]);
-  const { data: rooms = [] } = useClassroomsByIds(classroom ? [classroom.classroomId] : []);
-  const { data: roomGrades = [] } = useGradeLevelsByIds(rooms.map((c) => c.grade_level_id));
+  const { data: rooms = [], isLoading: roomsLoading } = useClassroomsByIds(classroom ? [classroom.classroomId] : []);
+  const { data: roomGrades = [], isLoading: roomGradesLoading } = useGradeLevelsByIds(rooms.map((c) => c.grade_level_id));
   const roomGrade = roomGrades.find((g) => g.id === rooms[0]?.grade_level_id);
   const roomLabel = rooms[0] && roomGrade ? `${gradeShortLabel(roomGrade.code)}/${rooms[0].name}` : null;
   const subjectId = subjects.find((s) => s.code === subjectCode)?.id;
@@ -1740,7 +1741,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
   const chip = (active: boolean) =>
     cn("tappable shrink-0 rounded-full px-3 py-1.5 text-xs font-medium", active ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:bg-muted");
   const filters = allExams.length > 0 && (
-    <div className="mb-2 space-y-1">
+    <div className="mb-2 space-y-2">
       {subjects.length > 1 && (
         <div className="scrollbar-hidden flex gap-2 overflow-x-auto">
           <button type="button" onClick={() => setFilter("subject", null)} className={chip(!subjectCode)}>ทุกวิชา</button>
@@ -1751,23 +1752,30 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
           ))}
         </div>
       )}
-      <div className="scrollbar-hidden flex gap-2 overflow-x-auto">
-        {EXAM_STATUS_FILTERS.map(([v, label]) => (
-          <button key={v} type="button" onClick={() => setFilter("status", v === "all" ? null : v)} className={chip(status === v)}>
-            {label}
-          </button>
-        ))}
+      <div className="flex items-center gap-2">
+        <Select
+          className="ui-control-compact mr-auto h-8 px-2.5 pr-7 text-[13px] sm:w-64 sm:pr-8"
+          value={status}
+          onChange={(e) => setFilter("status", e.target.value === "all" ? null : e.target.value)}
+          aria-label="สถานะการสอบ"
+        >
+          {EXAM_STATUS_FILTERS.map(([v, label]) => (
+            <option key={v} value={v}>{label}</option>
+          ))}
+        </Select>
+        <ViewToggle value={view} onChange={setView} framed />
       </div>
     </div>
   );
 
-  const { data: mySeats } = useMyExamSeats(student.id, exams.filter((e) => new Date(e.closes_at) >= new Date()).map((e) => e.id));
+  const { data: mySeats, isLoading: seatsLoading } = useMyExamSeats(student.id, exams.filter((e) => new Date(e.closes_at) >= new Date()).map((e) => e.id));
   const [topicFor, setTopicFor] = useState<AvailableExam | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: practiceCounts } = usePracticeCounts(exams.map((e) => e.id));
+  const { data: practiceCounts, isLoading: practiceLoading } = usePracticeCounts(exams.map((e) => e.id));
 
-  if (isLoading) return <PageSpinner />;
+  // Wait for every piece the cards show (subject, room, seat, practice count) so they appear together.
+  if (isLoading || subjectsLoading || roomsLoading || roomGradesLoading || seatsLoading || practiceLoading) return <PageSpinner />;
   if (exams.length === 0) {
     return (
       <>
@@ -1790,7 +1798,81 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
     <>
       {filters}
       {topicFor && <StudentTopicsSheet session={topicFor} onClose={() => setTopicFor(null)} />}
-      <ul className="space-y-2">
+      {view === "table" ? (
+        <div className="table-panel flex rounded-none border-t border-border shadow-none">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[48rem] text-[13px]">
+              <thead className="text-left text-xs">
+                <tr>
+                  <th className="px-4 py-3">วิชา</th>
+                  <th className="px-4 py-3">รหัสวิชา</th>
+                  <th className="px-4 py-3">ครั้งที่</th>
+                  <th className="px-4 py-3">ชั้น</th>
+                  <th className="px-4 py-3">วันที่และเวลา</th>
+                  <th className="px-4 py-3">ห้องสอบ</th>
+                  <th className="px-4 py-3">ที่นั่ง</th>
+                  <th className="px-4 py-3">สอบแล้ว</th>
+                  <th className="w-px px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {exams.map((e) => {
+                  const seat = mySeats?.get(e.id);
+                  const opens = new Date(e.opens_at);
+                  const closes = new Date(e.closes_at);
+                  const isOpen = now >= opens && now <= closes;
+                  const usedUp = e.my_attempts >= e.max_attempts;
+                  const subs = e.subject_ids.map((id) => subjects.find((x) => x.id === id)).filter((x) => !!x);
+                  return (
+                    <tr key={e.id} onClick={() => setTopicFor(e)} className="h-14 cursor-pointer border-t border-border first:border-t-0">
+                      <td className="px-4 py-2 font-medium">{subs.map((x) => x.name_th).join(" / ") || e.title}</td>
+                      <td className="whitespace-nowrap px-4 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          {subs.map((sub) => (
+                            <span key={sub.id} className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", colors.shade(sub.learning_area_id))}>{sub.code}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">{e.round ? <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums", roundTone(e.round))}>{e.round}</span> : <span className="text-muted-foreground">—</span>}</td>
+                      <td className="px-4 py-2">{roomLabel ? <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabel))}>{roomLabel}</span> : "—"}</td>
+                      <td className="whitespace-nowrap px-4 py-2">
+                        <div>{opens.toLocaleDateString("th-TH", { dateStyle: "medium" })}</div>
+                        <div className="tabular-nums text-muted-foreground">
+                          {opens.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}–{closes.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2">{seat?.room ?? <span className="text-muted-foreground">—</span>}</td>
+                      <td className="px-4 py-2">
+                        {seat?.seat ? (
+                          <span className={cn("inline-flex rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums", COL_TONES[(seat.seat.col - 1) % COL_TONES.length])}>{seatLabel(seat.seat.row, seat.seat.col)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", e.my_attempts > 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive")}>{e.my_attempts}/{e.max_attempts}</span>
+                      </td>
+                      <td className="px-4 py-2" onClick={(ev) => ev.stopPropagation()}>
+                        <div className="flex justify-end gap-2">
+                          {(practiceCounts?.get(e.id) ?? 0) > 0 && (
+                            <Button size="sm" variant="outline" onClick={() => navigate(`/exams/practice/${e.id}`, { state: { studentId: student.id, search: location.search } })}>
+                              ฝึกทำ ({practiceCounts?.get(e.id)})
+                            </Button>
+                          )}
+                          <Button size="sm" disabled={!isOpen || usedUp} onClick={() => onOpen(e)}>
+                            {usedUp ? "ทำครบแล้ว" : "เข้าสอบ"}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+      <ul className="grid gap-3 lg:grid-cols-[repeat(auto-fit,minmax(22rem,1fr))]">
       {exams.map((e) => {
         const seat = mySeats?.get(e.id);
         const opens = new Date(e.opens_at);
@@ -1798,7 +1880,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
         const isOpen = now >= opens && now <= closes;
         const usedUp = e.my_attempts >= e.max_attempts;
         return (
-          <Card key={e.id} className="flex flex-col gap-3 text-xs">
+          <Card key={e.id} className="flex flex-col gap-3 text-xs shadow-float">
             <button type="button" onClick={() => setTopicFor(e)} className="min-w-0 flex-1 space-y-2 text-left">
               <div className="flex items-start justify-between gap-2">
                 <p className="min-w-0 text-sm font-semibold">{e.subject_ids.map((id) => subjects.find((x) => x.id === id)?.name_th).filter(Boolean).join(" / ") || e.title}</p>
@@ -1832,18 +1914,21 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
                 </div>
               )}
             </button>
-            {(practiceCounts?.get(e.id) ?? 0) > 0 && (
-              <Button size="sm" variant="outline" className="w-full" onClick={() => navigate(`/exams/practice/${e.id}`, { state: { studentId: student.id, search: location.search } })}>
-                ฝึกทำแนวข้อสอบ ({practiceCounts?.get(e.id)} ข้อ)
+            <div className="flex gap-2">
+              {(practiceCounts?.get(e.id) ?? 0) > 0 && (
+                <Button size="sm" variant="outline" className="flex-1 border-border" onClick={() => navigate(`/exams/practice/${e.id}`, { state: { studentId: student.id, search: location.search } })}>
+                  ฝึกทำแนวข้อสอบ ({practiceCounts?.get(e.id)} ข้อ)
+                </Button>
+              )}
+              <Button size="sm" className="flex-1" disabled={!isOpen || usedUp} onClick={() => onOpen(e)}>
+                {usedUp ? "ทำครบแล้ว" : "เข้าสอบ"}
               </Button>
-            )}
-            <Button size="sm" className="w-full" disabled={!isOpen || usedUp} onClick={() => onOpen(e)}>
-              {usedUp ? "ทำครบแล้ว" : "เข้าสอบ"}
-            </Button>
+            </div>
           </Card>
         );
       })}
     </ul>
+      )}
     </>
   );
 }
@@ -1860,15 +1945,21 @@ export function ExamPractice() {
   const student = options.find((s) => s.id === state?.studentId) ?? options[0] ?? null;
   const { data: classroom } = useMyCurrentClassroom(student?.id ?? null);
   const { data: exams = [], isLoading } = useAvailableExams(student?.id ?? null, classroom?.classroomId ?? null, classroom?.academicYear ?? null);
+  const { data: rooms = [] } = useClassroomsByIds(classroom ? [classroom.classroomId] : []);
+  const { data: roomGrades = [] } = useGradeLevelsByIds(rooms.map((c) => c.grade_level_id));
+  const roomGrade = roomGrades.find((g) => g.id === rooms[0]?.grade_level_id);
+  const roomLabel = rooms[0] && roomGrade ? `${gradeShortLabel(roomGrade.code)}/${rooms[0].name}` : null;
   const session = exams.find((e) => e.id === sessionId);
   if (!student) return <Navigate to="/exams" replace />;
   if (isLoading) return <PageSpinner />;
   if (!session) return <Navigate to={{ pathname: "/exams", search: state?.search ?? "" }} replace />;
-  return <PracticeRunner session={session} />;
+  return <PracticeRunner session={session} roomLabel={roomLabel} />;
 }
 
-function PracticeRunner({ session }: { session: AvailableExam }) {
+function PracticeRunner({ session, roomLabel }: { session: AvailableExam; roomLabel: string | null }) {
   const { data: rows = [], isLoading } = usePracticeQuestions(session.id);
+  const { data: subjects = [] } = useSubjectsByIds(session.subject_ids);
+  const colors = useSubjectColors([]);
   const { data } = useAttemptQuestions(rows.map((r) => r.question_id));
   const check = usePracticeCheck();
   const toast = useToast();
@@ -1882,7 +1973,16 @@ function PracticeRunner({ session }: { session: AvailableExam }) {
   };
   return (
     <div className="mx-auto max-w-xl space-y-3 pb-4">
-      <p className="text-sm font-semibold">แนวข้อสอบ · {session.title}</p>
+      <Card className="space-y-2">
+        <p className="text-sm font-semibold">{subjects.map((x) => x.name_th).join(" / ") || session.title}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {session.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(session.round))}>ครั้งที่ {session.round}</span>}
+          {subjects.map((sub) => (
+            <span key={sub.id} className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", colors.shade(sub.learning_area_id))}>{sub.code}</span>
+          ))}
+          {roomLabel && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabel))}>{roomLabel}</span>}
+        </div>
+      </Card>
       {questions.map((q, i) => {
         const a = picked.get(q.id) ?? { choiceId: null, text: "" };
         const r = results.get(q.id);

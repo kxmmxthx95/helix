@@ -160,7 +160,7 @@ function GameShellInner() {
             scrolled ? "pointer-events-auto border-border bg-card/80 backdrop-blur-xl backdrop-saturate-150" : "border-transparent bg-background lg:border-border",
           )}
         >
-          <div className="relative flex h-11 items-center justify-center px-2 lg:h-12 lg:px-8">
+          <div className="relative flex h-12 items-center justify-center px-shell lg:h-12 lg:px-8">
             {isHome && (
               <button
                 type="button"
@@ -178,13 +178,13 @@ function GameShellInner() {
                 onClick={() => (isPractice ? navigate({ pathname: "/exams", search: backSearch }) : navigate(isTopupForm ? "/card-topup" : "/"))}
                 className={cn("absolute left-2 flex h-10 w-10 items-center justify-center rounded-lg text-foreground active:opacity-40 lg:hidden", FOCUS)}
               >
-                <ChevronBack className="h-6 w-6" />
+                <ChevronBack className="h-5 w-5" />
               </button>
             )}
             <p
               aria-hidden={!titleShown}
               className={cn(
-                "font-heading max-w-[55%] truncate text-[17px] font-semibold transition-opacity duration-200 lg:max-w-none lg:text-[15px] lg:tracking-[-0.01em] lg:opacity-100",
+                "font-heading max-w-[55%] truncate text-[17px] font-semibold tracking-[-0.01em] transition-opacity duration-200 lg:max-w-none lg:text-[15px] lg:opacity-100",
                 titleShown ? "opacity-100" : "opacity-0",
               )}
             >
@@ -242,7 +242,7 @@ function GameShellInner() {
           {isHome ? (
             <Outlet />
           ) : (
-            <div className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col px-4 pb-4 lg:p-6", !fullWidth && "max-w-5xl")}>
+            <div className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col px-shell pb-4 lg:py-6", !fullWidth && "max-w-5xl")}>
               <h1 className="sr-only">{title}</h1>
               <Outlet />
             </div>

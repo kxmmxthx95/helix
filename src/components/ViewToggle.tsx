@@ -2,9 +2,28 @@ import { AppsIcon, ListIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 /** Cards/table switch used by every staff tab that has both views. Icons match the tab icons (h-4 w-4). */
-export function ViewToggle({ value, onChange, className }: { value: "cards" | "table"; onChange: (v: "cards" | "table") => void; className?: string }) {
+export function ViewToggle({
+  value,
+  onChange,
+  className,
+  framed = false,
+}: {
+  value: "cards" | "table";
+  onChange: (v: "cards" | "table") => void;
+  className?: string;
+  /** Bordered, smaller-icon variant for the student exams page. Default keeps the staff look. */
+  framed?: boolean;
+}) {
   return (
-    <div className={cn("flex shrink-0 rounded-lg bg-muted p-0.5", className)} role="group" aria-label="มุมมอง">
+    <div
+      className={cn(
+        "flex shrink-0 rounded-lg p-0.5",
+        framed ? "border border-border bg-muted" : "bg-muted",
+        className,
+      )}
+      role="group"
+      aria-label="มุมมอง"
+    >
       {(["cards", "table"] as const).map((v) => (
         <button
           key={v}
@@ -14,7 +33,7 @@ export function ViewToggle({ value, onChange, className }: { value: "cards" | "t
           onClick={() => onChange(v)}
           className={cn("flex h-8 w-9 items-center justify-center rounded-md", value === v ? "bg-background shadow-sm" : "text-muted-foreground")}
         >
-          {v === "cards" ? <AppsIcon className="h-4 w-4" /> : <ListIcon className="h-4 w-4" />}
+          {v === "cards" ? <AppsIcon className={framed ? "h-3.5 w-3.5" : "h-4 w-4"} /> : <ListIcon className={framed ? "h-3.5 w-3.5" : "h-4 w-4"} />}
         </button>
       ))}
     </div>
