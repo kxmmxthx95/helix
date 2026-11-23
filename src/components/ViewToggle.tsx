@@ -31,7 +31,7 @@ export function ViewToggle({
           aria-pressed={value === v}
           aria-label={v === "cards" ? "มุมมองการ์ด" : "มุมมองตาราง"}
           onClick={() => onChange(v)}
-          className={cn("flex h-8 w-9 items-center justify-center rounded-md", value === v ? "bg-background shadow-sm" : "text-muted-foreground")}
+          className={cn(framed ? "flex h-full w-10 items-center justify-center rounded-md" : "flex h-8 w-9 items-center justify-center rounded-md", value === v ? "bg-background shadow-sm" : "text-muted-foreground")}
         >
           {v === "cards" ? <AppsIcon className={framed ? "h-3.5 w-3.5" : "h-4 w-4"} /> : <ListIcon className={framed ? "h-3.5 w-3.5" : "h-4 w-4"} />}
         </button>

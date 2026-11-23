@@ -1741,7 +1741,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
   const chip = (active: boolean) =>
     cn("tappable shrink-0 rounded-full px-3 py-1.5 text-xs font-medium", active ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:bg-muted");
   const filters = allExams.length > 0 && (
-    <div className="mb-2 space-y-2">
+    <div className="mb-2 space-y-2 px-1">
       {subjects.length > 1 && (
         <div className="scrollbar-hidden flex gap-2 overflow-x-auto">
           <button type="button" onClick={() => setFilter("subject", null)} className={chip(!subjectCode)}>ทุกวิชา</button>
@@ -1754,7 +1754,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
       )}
       <div className="flex items-center gap-2">
         <Select
-          className="ui-control-compact mr-auto h-8 px-2.5 pr-7 text-[13px] sm:w-64 sm:pr-8"
+          className="ui-control-compact mr-auto h-10 px-2.5 pr-7 text-[13px] sm:w-64 sm:pr-8"
           value={status}
           onChange={(e) => setFilter("status", e.target.value === "all" ? null : e.target.value)}
           aria-label="สถานะการสอบ"
@@ -1763,7 +1763,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
             <option key={v} value={v}>{label}</option>
           ))}
         </Select>
-        <ViewToggle value={view} onChange={setView} framed />
+        <ViewToggle value={view} onChange={setView} framed className="h-10" />
       </div>
     </div>
   );
@@ -1872,7 +1872,7 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
           </div>
         </div>
       ) : (
-      <ul className="grid gap-3 lg:grid-cols-[repeat(auto-fit,minmax(22rem,1fr))]">
+      <ul className="-m-2 grid gap-3 p-2 lg:grid-cols-[repeat(auto-fit,minmax(22rem,1fr))]">
       {exams.map((e) => {
         const seat = mySeats?.get(e.id);
         const opens = new Date(e.opens_at);
@@ -1965,64 +1965,165 @@ function PracticeRunner({ session, roomLabel }: { session: AvailableExam; roomLa
   const toast = useToast();
   const [picked, setPicked] = useState<Map<string, { choiceId: string | null; text: string }>>(new Map());
   const [results, setResults] = useState<Map<string, PracticeCheckResult>>(new Map());
+  const [idx, setIdx] = useState(0);
+  const [tab, setTab] = useState<"exam" | "overview">("exam");
+  const SubjectIcon = colors.icon(subjects[0]?.learning_area_id);
   if (isLoading || !data) return <PageSpinner />;
   const questions = rows.map((r) => data.questions.find((q) => q.id === r.question_id)).filter((q): q is NonNullable<typeof q> => !!q);
   const pick = (id: string, v: { choiceId: string | null; text: string }) => {
     setPicked(new Map(picked).set(id, v));
     setResults((m) => { const n = new Map(m); n.delete(id); return n; });
   };
+  const runCheck = (questionId: string, choiceId: string | null, text: string) =>
+    check.mutate(
+      { sessionId: session.id, questionId, choiceId, text: text || null },
+      { onSuccess: (res) => setResults((m) => new Map(m).set(questionId, res)), onError: () => toast("ตรวจคำตอบไม่สำเร็จ", "error") },
+    );
+  const last = questions.length - 1;
+  const q = questions[Math.min(idx, last)];
+  const a = (q && picked.get(q.id)) ?? { choiceId: null, text: "" };
+  const r = q ? results.get(q.id) : undefined;
+  const choices = q ? (data.choicesByQuestion.get(q.id) ?? []) : [];
+  const percent = questions.length ? Math.floor(((idx + 1) / questions.length) * 100) : 0;
+
+  const status = (id: string) => {
+    const res = results.get(id);
+    return res ? (res.correct ? "correct" : "wrong") : picked.has(id) ? "answered" : "todo";
+  };
+  const STATUS_TONE = {
+    correct: "border-success/40 bg-success/10 text-success",
+    wrong: "border-destructive/40 bg-destructive/10 text-destructive",
+    answered: "border-accent/40 bg-accent/10 text-accent",
+    todo: "border-border bg-card text-muted-foreground",
+  } as const;
+
+  const overview = (
+    <Card className="space-y-3">
+      <p className="text-sm font-semibold">ภาพรวม</p>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(2.5rem,1fr))] gap-2">
+        {questions.map((x, i) => (
+          <button
+            key={x.id}
+            type="button"
+            onClick={() => { setIdx(i); setTab("exam"); }}
+            aria-label={`ข้อ ${i + 1}`}
+            className={cn(
+              "h-10 rounded-lg border text-sm font-medium",
+              STATUS_TONE[status(x.id)],
+              i === idx && "ring-2 ring-accent ring-offset-1",
+            )}
+          >
+            {i + 1}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+        <span>ขาว = ยังไม่ตอบ</span>
+        <span className="text-accent">ฟ้า = ตอบแล้ว</span>
+        <span className="text-success">เขียว = ถูก</span>
+        <span className="text-destructive">แดง = ผิด</span>
+      </div>
+    </Card>
+  );
+
   return (
-    <div className="mx-auto max-w-xl space-y-3 pb-4">
-      <Card className="space-y-2">
-        <p className="text-sm font-semibold">{subjects.map((x) => x.name_th).join(" / ") || session.title}</p>
-        <div className="flex flex-wrap gap-1.5">
-          {session.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(session.round))}>ครั้งที่ {session.round}</span>}
-          {subjects.map((sub) => (
-            <span key={sub.id} className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", colors.shade(sub.learning_area_id))}>{sub.code}</span>
-          ))}
-          {roomLabel && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabel))}>{roomLabel}</span>}
-        </div>
-      </Card>
-      {questions.map((q, i) => {
-        const a = picked.get(q.id) ?? { choiceId: null, text: "" };
-        const r = results.get(q.id);
-        const choices = data.choicesByQuestion.get(q.id) ?? [];
-        return (
-          <Card key={q.id} className={cn("space-y-2 text-sm", r && (r.correct ? "border-success/40" : "border-destructive/40"))}>
-            <div className="font-medium">{i + 1}. <QuestionPromptView value={q.prompt_json} /></div>
-            {q.question_type === "short_answer" ? (
-              <Input value={a.text} onChange={(e) => pick(q.id, { choiceId: null, text: e.target.value })} placeholder="พิมพ์คำตอบ" />
-            ) : (
-              <div className="space-y-1.5">
-                {choices.map((c) => (
-                  <label key={c.id} className={cn("flex items-center gap-2 text-xs", r?.correct_choice_ids.includes(c.id) && "font-medium text-success")}>
-                    <input type="radio" name={`p-${q.id}`} checked={a.choiceId === c.id} onChange={() => pick(q.id, { choiceId: c.id, text: "" })} />
-                    <QuestionPromptView value={c.label_json} />
-                  </label>
-                ))}
+    <div className="mx-auto flex w-full max-w-xl flex-1 flex-col lg:max-w-none">
+      <div className="space-y-3 pb-4 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-4 lg:space-y-0">
+        <div className={cn("space-y-3", tab !== "exam" && "max-lg:hidden")}>
+          <div className="flex items-center gap-3 px-1">
+            <span className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl [&>svg]:size-6", colors.shade(subjects[0]?.learning_area_id))}>
+              <SubjectIcon />
+            </span>
+            <div className="min-w-0 space-y-1.5">
+            <p className="text-base font-semibold">{subjects.map((x) => x.name_th).join(" / ") || session.title}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {session.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(session.round))}>ครั้งที่ {session.round}</span>}
+              {subjects.map((sub) => (
+                <span key={sub.id} className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", colors.shade(sub.learning_area_id))}>{sub.code}</span>
+              ))}
+              {roomLabel && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabel))}>{roomLabel}</span>}
+            </div>
+            </div>
+          </div>
+          {q && (
+            <>
+              <Card className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span>ข้อที่ {idx + 1} จาก {questions.length}</span>
+                  <span className="text-muted-foreground">{percent}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${percent}%` }} />
+                </div>
+              </Card>
+              <Card className={cn("space-y-3 text-sm", r && (r.correct ? "border-success/40" : "border-destructive/40"))}>
+                <span className="inline-block rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent">{idx + 1}.</span>
+                <div className="text-base font-semibold"><QuestionPromptView value={q.prompt_json} /></div>
+                {q.question_type === "short_answer" ? (
+                  <Input
+                    value={a.text}
+                    onChange={(e) => pick(q.id, { choiceId: null, text: e.target.value })}
+                    onBlur={() => a.text.trim() && !r && runCheck(q.id, null, a.text)}
+                    onKeyDown={(e) => e.key === "Enter" && a.text.trim() && runCheck(q.id, null, a.text)}
+                    placeholder="พิมพ์คำตอบแล้วกด Enter"
+                  />
+                ) : (
+                  <div className="space-y-2">
+                    {choices.map((c) => {
+                      const selected = a.choiceId === c.id;
+                      const right = r?.correct_choice_ids.includes(c.id);
+                      return (
+                        <label
+                          key={c.id}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-3 rounded-xl border border-border px-3 py-2.5 text-sm",
+                            selected && "border-accent/40 bg-accent/10",
+                            right && "border-success/50 bg-success/10 font-medium text-success",
+                            r && selected && !right && "border-destructive/50 bg-destructive/10 text-destructive",
+                          )}
+                        >
+                          <input type="radio" name={`p-${q.id}`} checked={selected} onChange={() => { pick(q.id, { choiceId: c.id, text: "" }); runCheck(q.id, c.id, ""); }} />
+                          <QuestionPromptView value={c.label_json} />
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+                {r && (
+                  <p className={cn("text-xs", r.correct ? "text-success" : "text-destructive")}>
+                    {r.correct ? "ถูกต้อง" : "ไม่ถูกต้อง"}
+                    {!r.correct && r.correct_answer && ` · เฉลย: ${r.correct_answer}`}
+                  </p>
+                )}
+              </Card>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" className="flex-1 border-border" disabled={idx === 0} onClick={() => setIdx(idx - 1)}>
+                  <ChevronBack className="h-4 w-4" /> ข้อก่อนหน้า
+                </Button>
+                <Button type="button" className="flex-1" disabled={idx >= last} onClick={() => setIdx(idx + 1)}>
+                  ข้อถัดไป <ChevronForward className="h-4 w-4" />
+                </Button>
               </div>
-            )}
-            {r && (
-              <p className={cn("text-xs", r.correct ? "text-success" : "text-destructive")}>
-                {r.correct ? "ถูกต้อง" : "ไม่ถูกต้อง"}
-                {!r.correct && r.correct_answer && ` · เฉลย: ${r.correct_answer}`}
-              </p>
-            )}
-            <Button
-              size="sm"
-              disabled={check.isPending || (q.question_type === "short_answer" ? !a.text.trim() : !a.choiceId)}
-              onClick={() =>
-                check.mutate(
-                  { sessionId: session.id, questionId: q.id, choiceId: a.choiceId, text: a.text || null },
-                  { onSuccess: (res) => setResults(new Map(results).set(q.id, res)), onError: () => toast("ตรวจคำตอบไม่สำเร็จ", "error") },
-                )
-              }
-            >
-              ตรวจคำตอบ
-            </Button>
-          </Card>
-        );
-      })}
+            </>
+          )}
+        </div>
+        <div className={cn("lg:sticky lg:top-0", tab !== "overview" && "max-lg:hidden")}>{overview}</div>
+      </div>
+
+      <nav aria-label="ส่วนของหน้า" className="sticky bottom-0 -mx-1 mt-auto grid grid-cols-2 gap-1 rounded-2xl border border-border bg-card p-1 shadow-float lg:hidden">
+        {([["overview", "ภาพรวม", ListIcon], ["exam", "ข้อสอบ", DocumentTextIcon]] as const).map(([key, label, Icon]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            aria-current={tab === key}
+            className={cn("flex flex-col items-center gap-0.5 rounded-xl py-1.5 text-xs font-medium", tab === key ? "bg-accent/10 text-accent" : "text-muted-foreground")}
+          >
+            <Icon className="h-5 w-5" />
+            {label}
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
@@ -2240,7 +2341,7 @@ function AttemptRunner({
   const secs = Math.max(0, Math.floor((remainingMs % 60_000) / 1000));
 
   return (
-    <div className="mx-auto max-w-xl space-y-3 pb-4">
+    <div className="mx-auto max-w-xl space-y-3 pb-4 lg:max-w-none">
       <div className="sticky top-0 z-10 -mx-3 flex items-center justify-between bg-background/95 px-3 py-2 backdrop-blur">
         <p className="text-xs text-muted-foreground">
           ตอบแล้ว {answeredCount}/{orderedQuestions.length} ข้อ
@@ -2319,7 +2420,7 @@ function AttemptResult({
   const maxPoints = sessionQuestions.reduce((s, q) => s + q.points, 0);
 
   return (
-    <div className="mx-auto max-w-xl space-y-3">
+    <div className="mx-auto max-w-xl space-y-3 lg:max-w-none">
       <Card className="text-center">
         <p className="text-xs text-muted-foreground">คะแนนที่ได้</p>
         <p className="font-heading text-2xl font-bold">

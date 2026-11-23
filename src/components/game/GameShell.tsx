@@ -94,7 +94,6 @@ function GameShellInner() {
   const navigate = useNavigate();
   const isHome = location.pathname === "/";
   // Pages that lay out their own full-width canvas (no centred max-width column).
-  const fullWidth = location.pathname === "/my-curriculum";
   const isTopupForm = location.pathname.startsWith("/card-topup/");
   // Practice mode returns to the exam list with the filters the student had (passed via location.state).
   const isPractice = location.pathname.startsWith("/exams/practice/");
@@ -160,7 +159,7 @@ function GameShellInner() {
             scrolled ? "pointer-events-auto border-border bg-card/80 backdrop-blur-xl backdrop-saturate-150" : "border-transparent bg-background lg:border-border",
           )}
         >
-          <div className="relative flex h-12 items-center justify-center px-shell lg:h-12 lg:px-8">
+          <div className="relative flex h-12 items-center justify-center px-shell">
             {isHome && (
               <button
                 type="button"
@@ -237,12 +236,12 @@ function GameShellInner() {
             const next = e.currentTarget.scrollTop > (isHome ? 64 : 30);
             if (next !== scrolled) setScrolled(next);
           }}
-          className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", !isHome && "flex flex-col")}
+          className={cn("scrollbar-hidden min-h-0 flex-1 overflow-y-auto overscroll-contain", !isHome && "flex flex-col")}
         >
           {isHome ? (
             <Outlet />
           ) : (
-            <div className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col px-shell pb-4 lg:py-6", !fullWidth && "max-w-5xl")}>
+            <div className="mx-auto flex min-h-0 w-full max-w-screen-2xl flex-1 flex-col px-shell pb-4 pt-3 lg:py-6">
               <h1 className="sr-only">{title}</h1>
               <Outlet />
             </div>
