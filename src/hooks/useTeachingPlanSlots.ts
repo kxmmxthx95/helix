@@ -12,7 +12,7 @@ import { supabase } from "@/lib/supabase";
 // (lib/planSlots); only placed/taught slots are rows here.
 
 /** A ผังการเรียน topic, flattened with its lesson (บทเรียน) for display. */
-export type PlanTopicItem = { id: string; title: string; lessonName: string };
+export type PlanTopicItem = { id: string; title: string; lessonName: string; gradeCode?: string | null };
 
 /** Topics grouped by lesson, keeping order — for บทเรียน → หัวข้อ lists. */
 export function groupByLesson(topics: PlanTopicItem[]): [string, PlanTopicItem[]][] {
@@ -43,7 +43,7 @@ export function usePlanTopics(
       const byName = matched.length
         ? await supabase
             .from("plan_lessons")
-            .select("id,name,sort_order")
+            .select("id,name,sort_order,grade_levels(code)")
             .in("subject_id", matched.map((s) => s.id))
             .eq("grade_level_id", gradeLevelId!)
         : { data: [], error: null };
@@ -51,11 +51,11 @@ export function usePlanTopics(
       const tagged = subjectId
         ? await supabase
             .from("plan_lesson_subjects")
-            .select("plan_lessons!inner(id,name,sort_order)")
+            .select("plan_lessons!inner(id,name,sort_order,grade_levels(code))")
             .eq("subject_id", subjectId)
         : { data: [], error: null };
       if (tagged.error) throw tagged.error;
-      const byTag = (tagged.data as unknown as { plan_lessons: { id: string; name: string; sort_order: number } }[]).map((r) => r.plan_lessons);
+      const byTag = (tagged.data as unknown as { plan_lessons: { id: string; name: string; sort_order: number; grade_levels: { code: string } | null } }[]).map((r) => r.plan_lessons);
       const lessons = [...new Map([...(byName.data ?? []), ...byTag].map((l) => [l.id, l])).values()].sort(
         (a, b) => a.sort_order - b.sort_order,
       );
@@ -67,7 +67,7 @@ export function usePlanTopics(
         .order("sort_order");
       if (e3) throw e3;
       return lessons.flatMap((l) =>
-        topics.filter((t) => t.lesson_id === l.id).map((t) => ({ id: t.id, title: t.name, lessonName: l.name })),
+        topics.filter((t) => t.lesson_id === l.id).map((t) => ({ id: t.id, title: t.name, lessonName: l.name, gradeCode: (l as { grade_levels?: { code: string } | null }).grade_levels?.code ?? null })),
       );
     },
   });

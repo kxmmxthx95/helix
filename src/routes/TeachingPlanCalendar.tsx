@@ -6,7 +6,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { CheckmarkCircleIcon, ChevronBack, ChevronForward, Search } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { type DragPoint, type MarkedPoints, PlanMonthGrid, type PlanLook, type PlanOther, placedTopics, pointKey } from "@/components/PlanMonthGrid";
-import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
+import { gradeBadgeClass, gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { PlanWeekGrid } from "@/components/PlanWeekGrid";
 import { useAssignmentLabel } from "@/components/TeachingPlanParts";
 import { useToast } from "@/components/Toast";
@@ -803,7 +803,14 @@ function LessonCards({
           <details key={lesson} name={forceOpen ? undefined : group} open={forceOpen || items.some((t) => openIds?.includes(t.id))} className="group rounded-xl border border-border bg-card">
             <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
               <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold leading-snug">{lesson}</span>
+                <span className="block text-[15px] font-semibold leading-snug">
+                  {lesson}
+                  {items[0]?.gradeCode && (
+                    <span className={cn("ml-2 inline-block rounded-full px-2 py-0.5 align-middle text-xs font-semibold", gradeBadgeClass(items[0].gradeCode))}>
+                      {gradeShortLabel(items[0].gradeCode)}
+                    </span>
+                  )}
+                </span>
                 {placed !== null && (
                   <span aria-hidden className="mt-1.5 block h-1 overflow-hidden rounded-full bg-secondary">
                     <span className="block h-full rounded-full bg-success" style={{ width: `${(placed / items.length) * 100}%` }} />
