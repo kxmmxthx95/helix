@@ -51,6 +51,11 @@ export function levelTone(label: string | undefined): string {
   return n >= 1 ? LEVEL_TONES[(n - 1) % LEVEL_TONES.length]! : "bg-secondary text-muted-foreground";
 }
 
+/** Tint by position in a list — neighbours always differ (cycles through the palette). */
+export function paletteTone(index: number): string {
+  return LEVEL_TONES[index % LEVEL_TONES.length]!;
+}
+
 /** Department badge tint — stable per department id, same palette as the level badges. */
 export function departmentTone(id: string | undefined): string {
   if (!id) return "bg-secondary text-muted-foreground";

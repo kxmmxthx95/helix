@@ -336,25 +336,3 @@ export function useDepartmentHeadcount(departmentId: string | null) {
     },
   });
 }
-
-/** งานที่ยังผูกกับบุคลากร (ภาคเรียนไหนก็ได้ของปีล่าสุดที่มีข้อมูล): วิชาที่สอน + ห้องที่เป็นครูที่ปรึกษา — ใช้เตือนก่อนลาออก/สิ้นสุดการจ้าง. */
-export function useEmployeeWorkload(profileId: string | undefined) {
-  return useQuery({
-    queryKey: ["employee-workload", profileId],
-    enabled: !!profileId,
-    queryFn: async () => {
-      const [ta, hr] = await Promise.all([
-        supabase.from("teaching_assignments").select("academic_year").eq("teacher_id", profileId!),
-        supabase.from("classroom_homeroom_teachers").select("academic_year").eq("teacher_id", profileId!),
-      ]);
-      if (ta.error) throw ta.error;
-      if (hr.error) throw hr.error;
-      const year = Math.max(0, ...ta.data.map((r) => r.academic_year), ...hr.data.map((r) => r.academic_year));
-      return {
-        academicYear: year,
-        teaching: ta.data.filter((r) => r.academic_year === year).length,
-        homeroom: hr.data.filter((r) => r.academic_year === year).length,
-      };
-    },
-  });
-}

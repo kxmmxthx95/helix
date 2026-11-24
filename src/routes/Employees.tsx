@@ -1,15 +1,10 @@
 import { useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { BriefcaseIcon, Plus, Search, Upload as UploadIcon, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, BuddhistDateSelect, Card, EmptyState, Field, FormSection, Input, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
 import { avatarUrl } from "@/hooks/useAvatar";
-import { summarizeAttendance } from "@/hooks/useAttendance";
-import { useStaffAttendanceRange } from "@/hooks/useStaffAttendance";
-import { STATUS_LABEL, STATUS_STYLE } from "@/routes/Attendance";
-import { bangkokTime } from "@/routes/TimeTracking";
 import {
   employeeDocumentSignedUrl,
   useChangeEmployeeStatus,
@@ -20,7 +15,6 @@ import {
   useEmployeeDocuments,
   useEmployees,
   useEmployeeStatusHistory,
-  useEmployeeWorkload,
   useSalaryGrades,
   useUpdateEmployeeCompensation,
   useUpdateEmployeePosition,
@@ -35,26 +29,24 @@ import {
   DOCUMENT_CATEGORY_LABEL,
   EMPLOYEE_STATUS_LABEL,
   profileFullName,
-  type AttendanceStatus,
   type Contract,
   type ContractType,
   type DocumentCategory,
   type EmployeeStatus,
   type ProfileWithRoles,
 } from "@/lib/database.types";
-import { canManage, canManageHr } from "@/lib/roles";
-import { cn } from "@/lib/utils";
+import { canManageHr } from "@/lib/roles";
+import { departmentTone, paletteTone } from "@/lib/gradeLevels";
 
 const EMPTY: EmployeeFilters = { search: "", departmentId: "", status: "" };
 
-type Tab = "position" | "compensation" | "status" | "contracts" | "documents" | "attendance";
+type Tab = "position" | "compensation" | "status" | "contracts" | "documents";
 const TABS: { key: Tab; label: string }[] = [
   { key: "position", label: "ตำแหน่งงาน" },
   { key: "compensation", label: "เงินเดือน" },
   { key: "status", label: "สถานะ" },
   { key: "contracts", label: "สัญญาจ้าง" },
   { key: "documents", label: "เอกสาร" },
-  { key: "attendance", label: "การมาทำงาน" },
 ];
 
 export function Employees() {
@@ -69,7 +61,8 @@ export function Employees() {
 
   const deptName = useMemo(() => new Map(departments.map((d) => [d.id, d.name])), [departments]);
   const titleName = useMemo(() => new Map(positionTitles.map((t) => [t.id, t.name])), [positionTitles]);
-  const employeeName = useMemo(() => new Map((rows ?? []).map((r) => [r.id, profileFullName(r)])), [rows]);
+  const titleTone = useMemo(() => new Map(positionTitles.map((t, i) => [t.id, paletteTone(i)])), [positionTitles]);
+  const employeeById = useMemo(() => new Map((rows ?? []).map((r) => [r.id, r])), [rows]);
 
   // Re-select the freshly refetched row after a mutation invalidates ["employees"],
   // so the open sheet doesn't keep showing stale data.
@@ -133,43 +126,43 @@ export function Employees() {
             ))}
           </ul>
 
-          <div className="hidden overflow-hidden rounded-lg border border-border bg-card lg:block">
-            <table className="w-full text-xs">
-              <thead className="bg-muted text-left text-xs text-muted-foreground">
+          <div className="table-panel hidden rounded-none border-t border-border shadow-none lg:flex"><div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full text-[13px]">
+              <thead className="text-left text-xs">
                 <tr>
-                  <th className="px-3 py-2 font-medium">ชื่อ</th>
-                  <th className="px-3 py-2 font-medium">ตำแหน่งงาน</th>
-                  <th className="px-3 py-2 font-medium">แผนก</th>
-                  <th className="px-3 py-2 font-medium">หัวหน้างาน</th>
-                  <th className="px-3 py-2 font-medium">สถานะ</th>
+                  <th className="px-4 py-3">ชื่อ</th>
+                  <th className="px-4 py-3">ตำแหน่งงาน</th>
+                  <th className="px-4 py-3">แผนก</th>
+                  <th className="px-4 py-3">หัวหน้างาน</th>
+                  <th className="px-4 py-3">สถานะ</th>
                 </tr>
               </thead>
               <tbody>
                 {[0, 1, 2, 3, 4].map((i) => (
-                  <tr key={i} className="border-t border-border">
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2.5">
-                        <Skeleton className="h-7 w-7 shrink-0 rounded-full" />
+                  <tr key={i} className="h-14 border-t border-border first:border-t-0">
+                    <td className="px-4 py-0">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
                         <Skeleton className="h-3 w-28" />
                       </div>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-20" />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-16" />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-20" />
                     </td>
-                    <td className="px-3 py-2">
-                      <Skeleton className="h-4 w-12 rounded-full" />
+                    <td className="px-4 py-0">
+                      <Skeleton className="h-4 w-14 rounded-full" />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </div></div>
         </div>
       )}
 
@@ -216,15 +209,15 @@ export function Employees() {
             })}
           </ul>
 
-          <div className="hidden overflow-x-auto rounded-lg border border-border bg-card lg:block">
-            <table className="w-full text-xs">
-              <thead className="bg-muted text-left text-xs text-muted-foreground">
+          <div className="table-panel hidden rounded-none border-t border-border shadow-none lg:flex"><div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full text-[13px]">
+              <thead className="text-left text-xs">
                 <tr>
-                  <th className="px-3 py-2 font-medium">ชื่อ</th>
-                  <th className="px-3 py-2 font-medium">ตำแหน่งงาน</th>
-                  <th className="px-3 py-2 font-medium">แผนก</th>
-                  <th className="px-3 py-2 font-medium">หัวหน้างาน</th>
-                  <th className="px-3 py-2 font-medium">สถานะ</th>
+                  <th className="px-4 py-3">ชื่อ</th>
+                  <th className="px-4 py-3">ตำแหน่งงาน</th>
+                  <th className="px-4 py-3">แผนก</th>
+                  <th className="px-4 py-3">หัวหน้างาน</th>
+                  <th className="px-4 py-3">สถานะ</th>
                 </tr>
               </thead>
               <tbody>
@@ -232,31 +225,48 @@ export function Employees() {
                   <tr
                     key={row.id}
                     onClick={() => setSelected(row)}
-                    className="cursor-pointer border-t border-border active:bg-muted"
+                    className="h-14 cursor-pointer border-t border-border first:border-t-0"
                   >
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar name={profileFullName(row)} src={avatarUrl(row)} className="h-7 w-7 shrink-0 text-[10px]" />
+                    <td className="px-4 py-0">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Avatar name={profileFullName(row)} src={avatarUrl(row)} className="h-9 w-9 shrink-0 text-xs" />
                         <p className="truncate font-medium">{profileFullName(row)}</p>
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {row.position.job_title_id ? (titleName.get(row.position.job_title_id) ?? "—") : "—"}
+                    <td className="px-4 py-0">
+                      {row.position.job_title_id ? (
+                        <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${titleTone.get(row.position.job_title_id) ?? "bg-secondary text-muted-foreground"}`}>
+                          {titleName.get(row.position.job_title_id) ?? "—"}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {row.department_id ? (deptName.get(row.department_id) ?? "—") : "ทุกแผนก"}
+                    <td className="px-4 py-0">
+                      <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${departmentTone(row.department_id ?? undefined)}`}>
+                        {row.department_id ? (deptName.get(row.department_id) ?? "—") : "ทุกแผนก"}
+                      </span>
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {row.position.manager_id ? (employeeName.get(row.position.manager_id) ?? "—") : "—"}
+                    <td className="px-4 py-0">
+                      {(() => {
+                        const m = row.position.manager_id ? employeeById.get(row.position.manager_id) : undefined;
+                        if (!m) return "—";
+                        return (
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Avatar name={profileFullName(m)} src={avatarUrl(m)} className="h-9 w-9 shrink-0 text-xs" />
+                            <p className="truncate font-medium">{profileFullName(m)}</p>
+                          </div>
+                        );
+                      })()}
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <StatusBadge status={row.position.employee_status} />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </div></div>
 
           <Pagination page={page} pageCount={pageCount} onChange={setPage} />
         </div>
@@ -275,13 +285,18 @@ export function Employees() {
 function StatusBadge({ status }: { status: EmployeeStatus }) {
   const tone =
     status === "active"
-      ? "bg-success/15 text-success"
+      ? { pill: "bg-success/10 text-success", dot: "bg-success" }
       : status === "onboarding"
-        ? "bg-accent/15 text-accent"
+        ? { pill: "bg-accent/10 text-accent", dot: "bg-accent" }
         : status === "suspended"
-          ? "bg-amber-500/15 text-amber-600"
-          : "bg-muted text-muted-foreground";
-  return <span className={`rounded-full px-2 py-0.5 text-[10px] ${tone}`}>{EMPLOYEE_STATUS_LABEL[status]}</span>;
+          ? { pill: "bg-amber-500/10 text-amber-600", dot: "bg-amber-500" }
+          : { pill: "bg-secondary text-muted-foreground", dot: "bg-muted-foreground" };
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${tone.pill}`}>
+      <span className={`size-1.5 rounded-full ${tone.dot}`} />
+      {EMPLOYEE_STATUS_LABEL[status]}
+    </span>
+  );
 }
 
 function EmployeeDetailSheet({
@@ -303,14 +318,8 @@ function EmployeeDetailSheet({
     canManageHr(me.roles) ||
     (me.roles.includes("dept_director") && !isSelf && !!row?.department_id && row.department_id === me.department_id);
   const canSeeSensitive = isSelf || mayManageHr;
-  // Attendance is day-to-day ops data (same access level as time_clock_records
-  // itself — self or canManage()), not confidential HR data like
-  // salary/contract/status/document, so it uses a wider gate than those.
-  const canSeeAttendance = isSelf || canManage(me.roles);
 
-  const visibleTabs = TABS.filter((t) =>
-    t.key === "position" ? true : t.key === "attendance" ? canSeeAttendance : canSeeSensitive,
-  );
+  const visibleTabs = TABS.filter((t) => t.key === "position" || canSeeSensitive);
   const activeTab = visibleTabs.some((t) => t.key === tab) ? tab : (visibleTabs[0]?.key ?? "position");
 
   return (
@@ -339,7 +348,6 @@ function EmployeeDetailSheet({
           {activeTab === "status" && canSeeSensitive && <StatusPanel row={row} mayManageHr={mayManageHr} me={me} />}
           {activeTab === "contracts" && canSeeSensitive && <ContractsPanel row={row} mayManageHr={mayManageHr} me={me} />}
           {activeTab === "documents" && canSeeSensitive && <DocumentsPanel row={row} mayManageHr={mayManageHr} me={me} />}
-          {activeTab === "attendance" && canSeeAttendance && <AttendancePanel row={row} />}
         </div>
       )}
     </Sheet>
@@ -401,7 +409,7 @@ function PositionPanel({
         </Select>
       </Field>
 
-      <Field label="หัวหน้างาน (สายบังคับบัญชา)">
+      <Field label="หัวหน้างาน">
         <Select
           value={current.manager_id ?? ""}
           onChange={(e) => setDraft({ ...current, manager_id: e.target.value || null })}
@@ -477,23 +485,21 @@ function StatusPanel({ row, mayManageHr, me }: { row: EmployeeRow; mayManageHr: 
   const toast = useToast();
   const { data: history = [], isLoading } = useEmployeeStatusHistory(row.id);
   const change = useChangeEmployeeStatus();
-  const [nextStatus, setNextStatus] = useState<EmployeeStatus | "">("");
-  const [reason, setReason] = useState("");
-  const [effectiveDate, setEffectiveDate] = useState(() => new Date().toLocaleDateString("sv-SE"));
-  const { data: workload } = useEmployeeWorkload(row.id);
-  const ends = nextStatus === "resigned" || nextStatus === "terminated";
-  const hasWork = !!workload && (workload.teaching > 0 || workload.homeroom > 0);
+  const current = row.position.employee_status;
 
-  function submit() {
-    if (!nextStatus || !reason.trim() || !effectiveDate) return;
+  // Picking a status saves at once. Ending employment takes effect today; reason stays empty (column is NOT NULL, "" is allowed).
+  function changeTo(next: EmployeeStatus) {
+    if (next === current) return;
     change.mutate(
-      { profileId: row.id, status: nextStatus, reason: reason.trim(), changedBy: me.id, effectiveDate },
       {
-        onSuccess: () => {
-          toast("เปลี่ยนสถานะสำเร็จ");
-          setNextStatus("");
-          setReason("");
-        },
+        profileId: row.id,
+        status: next,
+        reason: "",
+        changedBy: me.id,
+        effectiveDate: new Date().toLocaleDateString("sv-SE"),
+      },
+      {
+        onSuccess: () => toast("เปลี่ยนสถานะสำเร็จ"),
         onError: (err) => toast(err instanceof Error ? err.message : "เปลี่ยนสถานะไม่สำเร็จ", "error"),
       },
     );
@@ -503,58 +509,28 @@ function StatusPanel({ row, mayManageHr, me }: { row: EmployeeRow; mayManageHr: 
     <div className="space-y-4">
       <div className="flex items-center justify-between rounded-lg border border-border p-3">
         <span className="text-sm">สถานะปัจจุบัน</span>
-        <StatusBadge status={row.position.employee_status} />
+        {mayManageHr ? (
+          <Select
+            className="w-auto"
+            value={current}
+            onChange={(e) => changeTo(e.target.value as EmployeeStatus)}
+            disabled={change.isPending}
+            aria-label="สถานะปัจจุบัน"
+          >
+            {(Object.keys(EMPLOYEE_STATUS_LABEL) as EmployeeStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {EMPLOYEE_STATUS_LABEL[s]}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          <StatusBadge status={current} />
+        )}
       </div>
       {row.position.end_date && (
         <p className="px-1 text-xs text-muted-foreground">
           วันสุดท้ายของการทำงาน {new Date(row.position.end_date).toLocaleDateString("th-TH", { dateStyle: "long" })}
         </p>
-      )}
-
-      {mayManageHr && (
-        <div className="space-y-2 rounded-lg border border-border p-3">
-          <Field label="เปลี่ยนเป็นสถานะ">
-            <Select
-              value={nextStatus}
-              onChange={(e) => setNextStatus(e.target.value as EmployeeStatus)}
-              placeholder="เลือกสถานะ"
-            >
-              {(Object.keys(EMPLOYEE_STATUS_LABEL) as EmployeeStatus[]).map((s) => (
-                <option key={s} value={s}>
-                  {EMPLOYEE_STATUS_LABEL[s]}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          {ends && (
-            <Field label="วันสุดท้ายของการทำงาน">
-              <Input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} />
-            </Field>
-          )}
-          <Field label="เหตุผล">
-            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="ระบุเหตุผลการเปลี่ยนสถานะ" />
-          </Field>
-          {ends && (
-            <div className="space-y-1 rounded-lg bg-muted p-3 text-xs text-muted-foreground">
-              <p>หลังวันสุดท้าย ระบบจะหยุดนับการเช็คชื่อ/ขาดงาน และปิดการเข้าสู่ระบบของบัญชีนี้ (ประวัติเดิมยังอยู่ครบ)</p>
-              {hasWork && (
-                <p className="text-amber-600">
-                  ยังมีภาระงานปี {workload.academicYear}: สอน {workload.teaching} วิชา, ครูที่ปรึกษา {workload.homeroom} ห้อง —{" "}
-                  <Link to="/teaching-load" className="underline">
-                    ส่งต่อภาระงาน
-                  </Link>
-                </p>
-              )}
-            </div>
-          )}
-          <Button
-            className="w-full"
-            onClick={submit}
-            disabled={!nextStatus || !reason.trim() || !effectiveDate || change.isPending}
-          >
-            {change.isPending ? <Spinner className="h-3 w-3" /> : "บันทึกการเปลี่ยนสถานะ"}
-          </Button>
-        </div>
       )}
 
       <div className="space-y-2">
@@ -585,93 +561,6 @@ function StatusPanel({ row, mayManageHr, me }: { row: EmployeeRow; mayManageHr: 
           ))}
         </ul>
       </div>
-    </div>
-  );
-}
-
-const ATTENDANCE_MONTH_NAMES = Array.from({ length: 12 }, (_, i) =>
-  new Intl.DateTimeFormat("th-TH", { month: "long" }).format(new Date(2000, i, 1)),
-);
-const attendanceDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
-const ATTENDANCE_STATUS_ORDER: AttendanceStatus[] = ["present", "late", "absent", "leave"];
-
-/** Read-only — derived from staff_attendance_status() (migration 0062), nothing to edit here. */
-function AttendancePanel({ row }: { row: EmployeeRow }) {
-  const now = new Date();
-  const [year, setYear] = useState(now.getFullYear() + 543); // พ.ศ.
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const ceYear = year - 543;
-  const startDate = `${ceYear}-${String(month).padStart(2, "0")}-01`;
-  const endDate = `${ceYear}-${String(month).padStart(2, "0")}-${String(attendanceDaysInMonth(ceYear, month)).padStart(2, "0")}`;
-  const years = Array.from({ length: 4 }, (_, i) => now.getFullYear() + 543 - i);
-
-  const { data: allRows = [], isLoading } = useStaffAttendanceRange(startDate, endDate);
-  const rows = allRows.filter((r) => r.profile_id === row.id);
-  const counts = summarizeAttendance(rows);
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Select className="w-32" value={String(month)} onChange={(e) => setMonth(Number(e.target.value))}>
-          {ATTENDANCE_MONTH_NAMES.map((name, i) => (
-            <option key={name} value={i + 1}>
-              {name}
-            </option>
-          ))}
-        </Select>
-        <Select className="w-24" value={String(year)} onChange={(e) => setYear(Number(e.target.value))}>
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </Select>
-      </div>
-
-      {isLoading && (
-        <div className="grid grid-cols-4 gap-2" role="status" aria-label="กำลังโหลด">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="rounded-lg px-2 py-1.5 text-center">
-              <Skeleton className="mx-auto h-2.5 w-8" />
-              <Skeleton className="mx-auto mt-1 h-3.5 w-5" />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!isLoading && (
-        <div className="grid grid-cols-4 gap-2">
-          {ATTENDANCE_STATUS_ORDER.map((st) => (
-            <div key={st} className={cn("rounded-lg px-2 py-1.5 text-center text-[10px] font-medium", STATUS_STYLE[st])}>
-              <p>{STATUS_LABEL[st]}</p>
-              <p className="mt-0.5 text-sm tabular-nums">{counts[st]}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!isLoading && rows.length === 0 && (
-        <p className="text-xs text-muted-foreground">ไม่มีข้อมูลการมาทำงานในเดือนนี้</p>
-      )}
-      {rows.length > 0 && (
-        <ul className="max-h-64 space-y-1.5 overflow-y-auto text-xs">
-          {rows.map((r) => (
-            <li key={r.date} className="flex items-center justify-between rounded-lg border border-border px-2.5 py-1.5">
-              <span className="tabular-nums">{r.date}</span>
-              <span className="text-muted-foreground tabular-nums">
-                {r.clock_in_time ? bangkokTime(r.clock_in_time) : "—"}
-              </span>
-              {r.status ? (
-                <span className={cn("rounded-full px-2 py-0.5 text-[10px]", STATUS_STYLE[r.status])}>
-                  {STATUS_LABEL[r.status]}
-                </span>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }
