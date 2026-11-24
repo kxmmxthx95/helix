@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthProvider";
@@ -43,6 +43,7 @@ import { bangkokTime } from "@/routes/TimeTracking";
 import { PremisesExitSheet } from "@/routes/PremisesExitSheet";
 import { useConfirmStudentReturn, useDecideStudentExit, useOpenStudentExits } from "@/hooks/useStudentPremisesExit";
 import { TeacherTimetable } from "@/routes/Timetable";
+import { eventApplies, periodReplaced } from "@/lib/planSlots";
 
 // Teacher home: "what do I teach today" first, open work second. Cards are widget-style (macOS).
 
@@ -207,31 +208,39 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
   const { data: schoolSettings } = useSchoolSettings();
   const showClock = !!schoolSettings?.time_tracking_roles.some((r) => me.roles.includes(r));
 
+  // Whole-school closed day (assembly is skipped).
   const isHoliday = (iso: string) =>
     events.some(
       (e) =>
-        (e.event_type === "holiday" || e.event_type === "suspended") &&
+        !e.students_attend &&
+        e.gradeLevelIds.length === 0 &&
         e.start_date <= iso &&
         iso <= e.end_date &&
         (e.departmentIds.length === 0 || e.departmentIds.includes(departmentId)),
     );
 
+  // Entries on `iso` not replaced by an event (closed day, grade-scoped closure, or a replaces_classes window).
+  const liveEntries = (iso: string) => {
+    const day = weekdayOf(iso);
+    return entries
+      .filter((e) => {
+        if (e.day_of_week !== day) return false;
+        const slot = periods.find((p) => p.day_of_week === day && p.period_no === e.period_no && p.period_type === "teaching");
+        const grade = classrooms.find((c) => c.id === e.teaching_assignment.classroom_id)?.grade_level_id ?? null;
+        return !periodReplaced(iso, slot ?? {}, events.filter((ev) => eventApplies(ev, departmentId || null, grade)));
+      })
+      .sort((a, b) => a.period_no - b.period_no);
+  };
+
   // First teaching day from today on (a holiday or empty day rolls forward).
-  const shown = useMemo(() => {
-    for (let offset = 0; offset <= 14; offset++) {
-      const iso = addDays(today, offset);
-      const day = weekdayOf(iso);
-      if (isHoliday(iso) || !entries.some((e) => e.day_of_week === day)) continue;
-      return { iso, offset, day };
-    }
-    return null;
-  }, [today, entries, events]); // eslint-disable-line react-hooks/exhaustive-deps
+  let shown: { iso: string; offset: number; day: number } | null = null;
+  for (let offset = 0; offset <= 14 && !shown; offset++) {
+    const iso = addDays(today, offset);
+    if (liveEntries(iso).length) shown = { iso, offset, day: weekdayOf(iso) };
+  }
 
   const isToday = shown?.offset === 0;
-  const dayEntries = useMemo(
-    () => (shown ? entries.filter((e) => e.day_of_week === shown.day).sort((a, b) => a.period_no - b.period_no) : []),
-    [entries, shown],
-  );
+  const dayEntries = shown ? liveEntries(shown.iso) : [];
   const slotOf = (e: ScheduleEntryRow) =>
     periods.find((p) => p.day_of_week === e.day_of_week && p.period_no === e.period_no && p.period_type === "teaching");
   const timed = dayEntries.flatMap((e) => {
@@ -260,9 +269,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     periods.filter((p) => p.day_of_week === day && p.period_type === "teaching" && p.period_no <= periodNo).length;
   const timedOf = (iso: string) => {
     const day = weekdayOf(iso);
-    return entries
-      .filter((e) => e.day_of_week === day)
-      .sort((a, b) => a.period_no - b.period_no)
+    return liveEntries(iso)
       .flatMap((e) => {
         const slot = periods.find((p) => p.day_of_week === day && p.period_no === e.period_no && p.period_type === "teaching");
         return slot ? [{ entry: e, start: toMin(slot.start_time), end: toMin(slot.end_time), startText: hhmm(slot.start_time), endText: hhmm(slot.end_time) }] : [];
@@ -290,7 +297,6 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     for (let offset = 0; offset <= 14; offset++) {
       const iso = addDays(today, offset);
       const day = weekdayOf(iso);
-      if (isHoliday(iso)) continue;
       const first = timedOf(iso).find((t) => offset > 0 || t.end > nowMin);
       if (!first) continue;
       const label =
@@ -332,7 +338,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
     c.schedule_entry_id ? [] : [{ id: c.classroom_id, grade_level_id: "", department_id: "", label: c.room_label }],
   );
   const ownDays: SheetDay[] =
-    !isHoliday(today) && timedOf(today).length > 0 ? [{ date: today, label: "วันนี้", periods: periodsOf(today) }] : [];
+    timedOf(today).length > 0 ? [{ date: today, label: "วันนี้", periods: periodsOf(today) }] : [];
   const sheetDays: SheetDay[] =
     coverPeriods.length === 0
       ? ownDays
