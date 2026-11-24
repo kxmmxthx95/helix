@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ViewToggle, defaultView } from "@/components/ViewToggle";
 import { useAuth } from "@/auth/AuthProvider";
 import { Sheet } from "@/components/Sheet";
-import { ChevronBack, TrashIcon } from "@/components/icons";
+import { CheckmarkCircleIcon, ChevronBack, PencilIcon, TimeIcon, TrashIcon, X } from "@/components/icons";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, EmptyState, Field, Input, PageSpinner, Select } from "@/components/ui";
 import { useClassroomsByIds, useGradeLevelsByIds, useSubjectsByIds } from "@/hooks/useExamBank";
@@ -50,8 +50,23 @@ const STATUS_STYLE: Record<ExamApprovalStatus, string> = {
 };
 const CHIP = "rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground";
 
-export function ApprovalBadge({ status }: { status: ExamApprovalStatus }) {
-  return <span className={cn("inline-block rounded-full px-2 py-0.5 text-[11px] font-medium", STATUS_STYLE[status])}>{STATUS_LABEL[status]}</span>;
+const STATUS_ICON = { draft: PencilIcon, pending: TimeIcon, approved: CheckmarkCircleIcon, rejected: X };
+
+/** `collapse`: below xl show just an icon (label in title/aria-label) so a squeezed table column never wraps the text. */
+export function ApprovalBadge({ status, collapse = false }: { status: ExamApprovalStatus; collapse?: boolean }) {
+  const Icon = STATUS_ICON[status];
+  return (
+    <>
+      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", STATUS_STYLE[status], collapse ? "hidden whitespace-nowrap xl:inline-block" : "inline-block")}>
+        {STATUS_LABEL[status]}
+      </span>
+      {collapse && (
+        <span role="img" aria-label={STATUS_LABEL[status]} title={STATUS_LABEL[status]} className={cn("inline-flex h-7 w-7 items-center justify-center rounded-full xl:hidden", STATUS_STYLE[status])}>
+          <Icon className="h-4 w-4" />
+        </span>
+      )}
+    </>
+  );
 }
 
 const thDate = (iso: string) => new Date(iso).toLocaleDateString("th-TH", { dateStyle: "medium" });
@@ -620,7 +635,7 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
                       </td>
                       <td className="px-4 py-0">
                         {v.first.no_exam && <span className={cn(CHIP, "mr-1.5")}>ไม่มีสอบ</span>}
-                        {!(v.first.no_exam && v.first.approval_status === "approved") && <ApprovalBadge status={v.first.approval_status} />}
+                        {!(v.first.no_exam && v.first.approval_status === "approved") && <ApprovalBadge status={v.first.approval_status} collapse />}
                       </td>
                       <td className="px-4 py-0 text-muted-foreground">{v.first.approved_at ? thDate(v.first.approved_at) : "—"}</td>
                       <td className="px-4 py-0 text-right">{v.actions}</td>
