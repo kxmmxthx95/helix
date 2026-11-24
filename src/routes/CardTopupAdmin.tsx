@@ -38,7 +38,7 @@ export function TerminalsTab({ onTestScanner, onTestRfid }: { onTestScanner?: ()
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"on" | "off" | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
-  const here = thisDeviceTerminal();
+  const [here, setHere] = useState(thisDeviceTerminal);
 
   const onCount = terminals.filter((t) => t.active).length;
   const offCount = terminals.length - onCount;
@@ -159,7 +159,7 @@ export function TerminalsTab({ onTestScanner, onTestRfid }: { onTestScanner?: ()
                   <span className="flex flex-wrap gap-2">
                     {t.id === here && <span className="rounded-full bg-foreground px-3 py-1 text-sm font-semibold text-background">เครื่องนี้</span>}
                     {!t.active && <span className="rounded-full bg-destructive px-3 py-1 text-sm font-semibold text-white">ปิดใช้งาน</span>}
-                    {!t.profile_id && <span className="rounded-full bg-muted px-3 py-1 text-sm font-semibold text-muted-foreground">ยังไม่ตั้ง PIN</span>}
+                    {!t.profile_id && <span className="rounded-full bg-muted px-3 py-1 text-sm font-semibold text-muted-foreground">ยังไม่ตั้ง PIN · แตะเพื่อตั้ง</span>}
                   </span>
                 )}
               </button>
@@ -200,6 +200,24 @@ export function TerminalsTab({ onTestScanner, onTestRfid }: { onTestScanner?: ()
             </Field>
             {form.id && <Switch label="เปิดใช้งาน" checked={form.active} onChange={(active) => setForm({ ...form, active })} />}
           </form>
+        )}
+        {form?.id && form.id === here && (
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-4 h-14 w-full text-lg"
+            onClick={() => {
+              try {
+                localStorage.removeItem(POS_TERMINAL_KEY);
+              } catch {
+                /* storage blocked: nothing to clear */
+              }
+              setHere("");
+              toast("เลิกผูกเครื่องนี้แล้ว");
+            }}
+          >
+            เลิกผูกเครื่องนี้กับ {form.name}
+          </Button>
         )}
         {form?.id && <TerminalPin terminalId={form.id} hasPin={!!terminals.find((t) => t.id === form.id)?.profile_id} />}
       </Modal>
