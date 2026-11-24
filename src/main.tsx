@@ -3,22 +3,26 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import App from "@/App";
-import { applyIfIdle } from "@/lib/swUpdate";
+import { applyIfIdle, applyWaitingIfIdle } from "@/lib/swUpdate";
 import "@/index.css";
 
-// registerType "prompt": new SW waits; we activate + reload it ourselves, only when idle
-// (see applyIfIdle). Browser only re-checks sw.js on navigation, so also poll.
+// registerType "prompt": new SW waits; we activate + reload it ourselves, only when the user
+// has been idle (no input for IDLE_MS) and the outbox is empty. Browser only re-checks sw.js on
+// navigation, so also poll; an always-open page never hides, so idle is tracked from input, not visibility.
 const updateSW = registerSW({
   immediate: true,
   onRegisteredSW(_url, reg) {
     if (!reg) return;
     const apply = () => void updateSW(true);
-    let hiddenAt = 0;
+    let lastActive = Date.now();
+    const idle = () => Date.now() - lastActive;
+    for (const e of ["pointerdown", "keydown", "scroll", "touchstart"])
+      window.addEventListener(e, () => (lastActive = Date.now()), { passive: true, capture: true });
     void applyIfIdle(reg, Infinity, apply); // cold start
-    setInterval(() => void reg.update().catch(() => {}), 30 * 60 * 1000);
+    setInterval(() => void reg.update().catch(() => {}), 10 * 60 * 1000);
+    setInterval(() => void applyWaitingIfIdle(reg, idle(), apply), 60 * 1000);
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") hiddenAt = Date.now();
-      else if (hiddenAt) void applyIfIdle(reg, Date.now() - hiddenAt, apply);
+      if (document.visibilityState === "visible") void applyIfIdle(reg, idle(), apply);
     });
   },
 });
