@@ -1,23 +1,19 @@
 import JsBarcode from "jsbarcode";
 import { fromThaiLayout } from "@/lib/scanText";
-import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { FiSidebar } from "react-icons/fi";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { AlertTriangle, HomeIcon, LockIcon, BarChartIcon, BarcodeIcon, CartIcon, CheckmarkCircleIcon, CoinIcon, DesktopIcon, ListIcon, LogOut, Moon, Monitor, Search, Sun, SwapIcon } from "@/components/icons";
+import { AlertTriangle, HomeIcon, BarChartIcon, BarcodeIcon, CartIcon, CheckmarkCircleIcon, CoinIcon, DesktopIcon, ListIcon, LogOut, Moon, Monitor, Search, Sun } from "@/components/icons";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { useTheme } from "@/components/ThemeProvider";
-import { Avatar, Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
+import { Avatar, Button, Field, Input, Spinner } from "@/components/ui";
 import {
   posLookup,
   posStudentByCode,
   useOnline,
-  usePinLock,
-  usePinStatus,
-  usePinUnlock,
   productImageUrl,
   usePosMyToday,
   usePosProducts,
@@ -26,7 +22,6 @@ import {
   usePosSaleItems,
   usePosTopupCash,
   usePosVoid,
-  useSetPin,
   useStudentSearch,
   useTerminals,
 } from "@/hooks/useCardTopup";
@@ -46,15 +41,7 @@ import { SlipsTab } from "@/routes/CardTopupSlips";
 import { SalesHistoryTab } from "@/routes/CardTopupSales";
 import { VoidTopupTab } from "@/routes/CardTopupVoid";
 
-const TERMINAL_KEY = "helix-pos-terminal";
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "ทำรายการไม่สำเร็จ");
-const readTerminal = () => {
-  try {
-    return localStorage.getItem(TERMINAL_KEY) ?? "";
-  } catch {
-    return "";
-  }
-};
 
 const VIEWS = [
   { key: "sale", label: "ขายสินค้า", icon: CartIcon },
@@ -82,8 +69,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const online = useOnline();
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
-  const { data: terminals = [] } = useTerminals();
-  const [terminalId, setTerminalId] = useState(readTerminal);
+  const { data: terminals = [], isLoading: terminalsLoading } = useTerminals();
   // org-wide only: the other card-top-up tabs live in a sidebar (collapsible like the portal's; a drawer below lg).
   const [view, setView] = useState<View>("sale");
   const onSale = isCounterView(view);
@@ -99,25 +85,12 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   // One always-focused capture input takes the card reader's keystrokes AND typed digits: a swipe
   // starts with % or ; and ends in Enter, a short digits-only entry is the amount.
   const [entry, setEntry] = useState("");
-  // Cash top-up: PIN popup (once per hour, server-side) -> keypad amount in the right panel -> confirm popup.
+  // Cash top-up: keypad amount in the right panel -> confirm popup.
   const mode: "sale" | "topup" = view === "topup" ? "topup" : "sale";
   const [topupAmount, setTopupAmount] = useState("");
-  const [pinOpen, setPinOpen] = useState(false);
-  const [pinFor, setPinFor] = useState<"topup" | "void" | "saleTopup">("topup"); // what the PIN popup unlocks; saleTopup = top-up from the sale popup
   const [confirmOpen, setConfirmOpen] = useState(false);
   const topupKey = useRef(crypto.randomUUID());
   const topup = usePosTopupCash();
-  const lockPin = usePinLock();
-  const { data: pinStatus } = usePinStatus();
-  const unlockedUntil = pinStatus?.unlocked_until ? Date.parse(pinStatus.unlocked_until) : 0;
-  // Re-render every 20 s so the minutes left on the top-up tab count down.
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 20_000);
-    return () => clearInterval(id);
-  }, []);
-  const isUnlocked = unlockedUntil > now;
-  const minutesLeft = Math.max(1, Math.ceil((unlockedUntil - now) / 60000));
   const [todayOpen, setTodayOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -142,26 +115,18 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const sale = usePosSale();
   const saleItems = usePosSaleItems();
 
-  const activeTerminals = terminals.filter((t) => t.active);
-  const terminal = activeTerminals.find((t) => t.id === terminalId) ?? null;
-  const pickTerminal = (id: string) => {
-    setTerminalId(id);
-    try {
-      localStorage.setItem(TERMINAL_KEY, id);
-    } catch {
-      /* private mode: the choice just isn't remembered */
-    }
-  };
+  // The terminal is the signed-in account's own (set up by an admin); an admin signed in directly has none and sells without one.
+  const terminal = terminals.find((t) => t.profile_id === profile?.id) ?? null;
 
   useEffect(() => {
     document.documentElement.classList.add("pos-large");
     return () => document.documentElement.classList.remove("pos-large");
   }, []);
 
-  const modalOpen = pinOpen || confirmOpen || todayOpen || codeOpen || testOpen || rfidTestOpen || historyOpen;
+  const modalOpen = confirmOpen || todayOpen || codeOpen || testOpen || rfidTestOpen || historyOpen;
   useEffect(() => {
-    if (terminal && onSale && !modalOpen) capture.current?.focus();
-  }, [terminal, onSale, modalOpen, student, done, looking]); // looking: a disabled input drops focus, so re-take it when the lookup ends (also after a failed one)
+    if (onSale && !terminalsLoading && !modalOpen) capture.current?.focus();
+  }, [terminalsLoading, onSale, modalOpen, student, done, looking]); // looking: a disabled input drops focus, so re-take it when the lookup ends (also after a failed one)
 
   // The "done" screen clears itself so the next customer starts from a clean idle state.
   useEffect(() => {
@@ -273,25 +238,22 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   }
 
   const topupValue = parseAmount(topupAmount, TOPUP_MIN, TOPUP_MAX);
-  // The top-up tab is behind the cashier PIN (valid an hour, server-side).
   function openTopup() {
-    if (isUnlocked) setView("topup");
-    else (setPinFor("topup"), setPinOpen(true));
+    setView("topup");
   }
-  // Sale popup, balance too low: quick top-up amounts. Needs the PIN hour; the confirm popup follows.
+  // Sale popup, balance too low: quick top-up amounts; the confirm popup follows.
   function startSaleTopup(amount: number) {
     setTopupAmount(String(amount));
-    if (isUnlocked) setConfirmOpen(true);
-    else (setPinFor("saleTopup"), setPinOpen(true));
+    setConfirmOpen(true);
   }
   async function confirmTopup() {
-    if (!student || !terminal || topupValue === null) return;
+    if (!student || topupValue === null) return;
     try {
       const r = await topup.mutateAsync({
         card_uid: student.card_uid,
         student_id: student.card_uid ? undefined : student.student_id,
         amount: topupValue,
-        terminal_id: terminal.id,
+        terminal_id: terminal?.id ?? null,
         client_tx_id: topupKey.current,
       });
       topupKey.current = crypto.randomUUID();
@@ -308,22 +270,8 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
       setDone({ kind: "topup", amount: r.amount, balance: r.balance });
     } catch (e) {
       setConfirmOpen(false);
-      // The hour ran out (or the lock was pressed elsewhere): ask for the PIN again.
-      if (e instanceof Error && e.message.includes("PIN")) {
-        if (mode === "sale") setPinFor("saleTopup");
-        else (setView("sale"), setPinFor("topup"));
-        setPinOpen(true);
-      }
       toast(errMsg(e), "error");
     }
-  }
-  async function signOutAndLock() {
-    try {
-      await lockPin.mutateAsync();
-    } catch {
-      /* offline: the hour simply runs out on the server */
-    }
-    await signOut();
   }
 
   function press(k: (typeof KEYS)[number]) {
@@ -337,23 +285,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
     setDone(null);
     setKeyed((p) => (k === "C" ? "" : k === "⌫" ? p.slice(0, -1) : /^\d{0,2}$/.test(p) ? p + k : p));
   }
-
-  const picker = (
-    <div className="flex flex-1 items-center justify-center p-5">
-      <Card className="w-full max-w-md space-y-3">
-        <p className="font-ui text-2xl font-semibold">เลือกเครื่องขายของอุปกรณ์นี้</p>
-        <p className="text-base text-muted-foreground">ใช้สำหรับรายงานเท่านั้น — จดจำไว้ในเครื่องนี้ และเปลี่ยนได้ภายหลัง</p>
-        <Select value="" onChange={(e) => pickTerminal(e.target.value)} aria-label="เครื่องขาย" placeholder="เลือกเครื่องขาย">
-          {activeTerminals.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </Select>
-        {activeTerminals.length === 0 && <p className="text-base text-muted-foreground">ยังไม่มีเครื่องขาย — ให้ผู้ดูแลเพิ่มที่แท็บ "เครื่องขาย"</p>}
-      </Card>
-    </div>
-  );
 
   const toggleButton = (
     <button
@@ -399,7 +330,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                     <button key={key} type="button" aria-current={view === key ? "page" : undefined} onClick={() => (key === "topup" ? openTopup() : setView(key), setDrawer(false))} className={itemClass(view === key)}>
                       <Icon className="h-6 w-6 shrink-0" />
                       <span className="truncate">{label}</span>
-                      {key === "topup" && isUnlocked && <span className={cn("ml-auto shrink-0 text-base font-semibold tabular-nums", minutesLeft <= 5 ? "font-semibold text-destructive motion-safe:animate-pulse" : "text-muted-foreground")}>เหลือ {minutesLeft} นาที</span>}
                     </button>
                   ))}
                 </div>
@@ -413,11 +343,8 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               </button>
             )}
             {terminal && (
-              <div className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-card py-1 pl-4 pr-1 text-base font-semibold">
+              <div className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-card px-4 py-1 text-base font-semibold">
                 <span className="min-w-0 flex-1 truncate">{terminal.name}</span>
-                <button type="button" className="tappable flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted" aria-label="เปลี่ยนเครื่อง" title="เปลี่ยนเครื่อง" onClick={() => (setTerminalId(""), setDrawer(false))}>
-                  <SwapIcon className="h-6 w-6" />
-                </button>
               </div>
             )}
             <div className="flex items-center gap-2.5 rounded-xl bg-card p-2.5 shadow-card">
@@ -436,7 +363,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 {preference === "system" ? <Monitor className="h-5 w-5" /> : preference === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                 {themeLabel}
               </button>
-              <button type="button" onClick={() => void signOutAndLock()} title="ออกจากระบบ" aria-label="ออกจากระบบ" className={cn(footerIconClass, "hover:bg-destructive/10 hover:text-destructive")}>
+              <button type="button" onClick={() => void signOut()} title="ออกจากระบบ" aria-label="ออกจากระบบ" className={cn(footerIconClass, "hover:bg-destructive/10 hover:text-destructive")}>
                 <LogOut className="h-5 w-5" />
                 ออกจากระบบ
               </button>
@@ -451,7 +378,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
     <div className="min-h-0 flex-1 overflow-y-auto p-4">
       {view === "slips" && <SlipsTab />}
       {view === "sales" && <SalesHistoryTab />}
-      {view === "void" && <VoidTopupTab unlocked={isUnlocked} onNeedPin={() => (setPinFor("void"), setPinOpen(true))} />}
+      {view === "void" && <VoidTopupTab />}
       {view === "report" && <ReportTab />}
       {view === "products" && <ProductsTab />}
       {view === "terminals" && <TerminalsTab onTestScanner={() => setTestOpen(true)} onTestRfid={() => setRfidTestOpen(true)} />}
@@ -765,7 +692,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   return createPortal(
     <div
       className="fixed inset-0 z-40 flex overflow-hidden"
-      onClick={(e) => onSale && terminal && !(e.target as HTMLElement).closest("input,select,textarea,dialog") && capture.current?.focus()}
+      onClick={(e) => onSale && !(e.target as HTMLElement).closest("input,select,textarea,dialog") && capture.current?.focus()}
     >
       <div className="absolute inset-0 z-0 bg-shell" aria-hidden />
       {sidebar}
@@ -788,11 +715,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 >
                   <Icon className="h-6 w-6 shrink-0" />
                   <span className="truncate">{label}</span>
-                  {key === "topup" && isUnlocked && (
-                    <span className={cn("shrink-0 text-base font-semibold tabular-nums", minutesLeft <= 5 ? "text-destructive motion-safe:animate-pulse" : "text-muted-foreground")}>
-                      {minutesLeft} น.
-                    </span>
-                  )}
                 </button>
               ))}
             </div>
@@ -810,7 +732,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               <span className={cn("size-3 rounded-full motion-safe:animate-pulse", online ? "bg-success" : "bg-destructive")} aria-hidden />
               {online ? "ออนไลน์" : "ออฟไลน์"}
             </span>
-            {onSale && terminal && (
+            {onSale && (
               <button
                 type="button"
                 onClick={() => setTodayOpen(true)}
@@ -821,13 +743,13 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
             )}
           </div>
         </header>
-        {!online && onSale && terminal && (
+        {!online && onSale && (
           <p className="flex items-center gap-3 bg-destructive/10 px-4 py-3 text-lg font-semibold text-destructive" role="alert">
             <AlertTriangle className="size-6" />
             ออฟไลน์ — ขายและเติมเงินไม่ได้จนกว่าจะเชื่อมต่ออินเทอร์เน็ต
           </p>
         )}
-        {!onSale ? adminView : !terminal ? picker : saleBody}
+        {!onSale ? adminView : terminalsLoading ? <Spinner className="m-auto size-8" /> : saleBody}
       </div>
 
       <Modal open={todayOpen} onOpenChange={setTodayOpen} title="รายการวันนี้" className="max-w-2xl" centered>
@@ -875,16 +797,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
       <Modal open={testOpen} onOpenChange={setTestOpen} title="ทดสอบเครื่องอ่านบาร์โค้ด">
         <ScannerTest />
       </Modal>
-      <PinUnlockModal
-        open={pinOpen}
-        onClose={() => setPinOpen(false)}
-        onUnlocked={() => {
-          setPinOpen(false);
-          if (pinFor === "topup") setView("topup");
-          else if (pinFor === "saleTopup") setConfirmOpen(true);
-        }}
-        forVoid={pinFor === "void"}
-      />
       <Modal
         open={confirmOpen && !!student && topupValue !== null}
         onOpenChange={(o) => !o && !topup.isPending && setConfirmOpen(false)}
@@ -1342,194 +1254,6 @@ function ScannerTest() {
         </details>
       )}
     </div>
-  );
-}
-
-/** PIN popup with an on-screen pad: one correct PIN unlocks cash top-up for an hour (the server keeps the proof).
- *  Six digits submit by themselves. First use sets the PIN: enter it, then enter it again. */
-function PinUnlockModal({ open, onClose, onUnlocked, forVoid = false }: { open: boolean; onClose: () => void; onUnlocked: () => void; forVoid?: boolean }) {
-  const { data: pinStatus } = usePinStatus();
-  const unlock = usePinUnlock();
-  const setPin = useSetPin();
-  const reduce = useReducedMotion();
-  const [pin, setPinText] = useState("");
-  const [first, setFirst] = useState<string | null>(null); // first entry while choosing a new PIN
-  // Errors stay on screen (not a toast) so they can be read; `shake` replays the wobble on each new error.
-  const [error, setError] = useState<string | null>(null);
-  const [shake, setShake] = useState(0);
-  const hasPin = pinStatus?.has_pin ?? true;
-  const locked = !!pinStatus?.locked_until;
-  const busy = unlock.isPending || setPin.isPending;
-
-  const fail = (msg: string) => {
-    setError(msg);
-    setShake((n) => n + 1);
-  };
-
-  function reset() {
-    setPinText("");
-    setFirst(null);
-    setError(null);
-    onClose();
-  }
-
-  async function submit(full: string) {
-    try {
-      if (!hasPin) {
-        if (first === null) {
-          setFirst(full);
-          return setPinText("");
-        }
-        if (full !== first) {
-          setFirst(null);
-          setPinText("");
-          return fail("PIN สองครั้งไม่ตรงกัน — เริ่มตั้งใหม่อีกครั้ง");
-        }
-        await setPin.mutateAsync(full);
-      }
-      const r = await unlock.mutateAsync(full);
-      setPinText("");
-      setFirst(null);
-      if (r.ok) {
-        setError(null);
-        return onUnlocked();
-      }
-      fail(
-        r.status === "locked"
-          ? "ใส่ PIN ผิดเกินกำหนด — ล็อก 15 นาที"
-          : r.status === "bad"
-            ? `PIN ไม่ถูกต้อง — ลองได้อีก ${r.attempts_left} ครั้ง`
-            : "ยังไม่ได้ตั้ง PIN",
-      );
-    } catch (err) {
-      setPinText("");
-      setFirst(null);
-      fail(errMsg(err));
-    }
-  }
-
-  function press(k: (typeof KEYS)[number]) {
-    if (busy || locked) return;
-    tick(k === "C" || k === "⌫" ? 700 : 1000);
-    setError(null);
-    if (k === "C") return setPinText("");
-    if (k === "⌫") return setPinText((p) => p.slice(0, -1));
-    if (pin.length >= 6) return;
-    const next = pin + k;
-    setPinText(next);
-    if (next.length === 6) void submit(next);
-  }
-
-  const settingUp = !hasPin;
-  const what = forVoid ? "ยกเลิกรายการ" : "เติมเงินสด";
-  const title = settingUp ? `ตั้ง PIN สำหรับ${what}` : `ใส่ PIN เพื่อ${what}`;
-  const instruction = locked
-    ? "ล็อกชั่วคราว"
-    : settingUp
-      ? first === null
-        ? "กด PIN ใหม่ 6 หลักที่จำได้ง่าย"
-        : "กด PIN เดิมอีกครั้งเพื่อยืนยัน"
-      : "กด PIN 6 หลักของคุณ";
-
-  return (
-    <Modal
-      open={open}
-      onOpenChange={(o) => !o && !busy && reset()}
-      title={title}
-      footer={
-        <Button type="button" variant="outline" className="h-14 w-full text-lg" disabled={busy} onClick={reset}>
-          ยกเลิก
-        </Button>
-      }
-    >
-      <div
-        className="space-y-5"
-        tabIndex={-1}
-        // Physical keyboard works too: digits, Backspace.
-        onKeyDown={(e) => {
-          if (/^\d$/.test(e.key)) press(e.key as (typeof KEYS)[number]);
-          else if (e.key === "Backspace") press("⌫");
-        }}
-      >
-        {/* Header: lock + what to do now */}
-        <div className="flex flex-col items-center gap-2 text-center">
-          <span className={cn("flex size-16 items-center justify-center rounded-2xl", locked ? "bg-destructive/15 text-destructive" : "bg-muted text-foreground")} aria-hidden>
-            <LockIcon className="h-8 w-8" />
-          </span>
-          {settingUp && !locked && (
-            <div className="flex items-center gap-2" aria-label={`ขั้นที่ ${first === null ? 1 : 2} จาก 2`}>
-              {[0, 1].map((i) => (
-                <span key={i} className={cn("h-2 w-10 rounded-full", i <= (first === null ? 0 : 1) ? "bg-foreground" : "bg-foreground/15")} />
-              ))}
-            </div>
-          )}
-          <p className="text-2xl font-semibold">{instruction}</p>
-          {!locked && (
-            <p className="text-lg text-muted-foreground">
-              {settingUp ? (first === null ? "ขั้นที่ 1 จาก 2 · ใช้ปลดล็อกการเติมเงินสดทุกครั้ง" : "ขั้นที่ 2 จาก 2") : "ใส่ครั้งเดียว เติมเงินสดได้ต่อเนื่อง 1 ชั่วโมง"}
-            </p>
-          )}
-        </div>
-
-        {/* Six boxes; the next one is outlined so it's clear where the digit goes */}
-        <motion.div
-          key={shake}
-          initial={false}
-          animate={shake && !reduce ? { x: [0, -14, 12, -8, 6, 0] } : { x: 0 }}
-          transition={{ duration: 0.4 }}
-          className="flex justify-center gap-2.5"
-          role="status"
-          aria-label={`ใส่แล้ว ${pin.length} จาก 6 หลัก`}
-        >
-          {Array.from({ length: 6 }, (_, i) => (
-            <span
-              key={i}
-              className={cn(
-                "flex size-12 items-center justify-center rounded-xl border-2 transition-colors",
-                error ? "border-destructive" : i < pin.length ? "border-foreground bg-foreground" : i === pin.length && !busy && !locked ? "border-foreground" : "border-border",
-              )}
-            >
-              {i < pin.length && <span className="size-3.5 rounded-full bg-background" />}
-            </span>
-          ))}
-        </motion.div>
-
-        <div className="min-h-[3.25rem]" aria-live="assertive">
-          {busy ? (
-            <p className="flex items-center justify-center gap-3 text-lg font-medium">
-              <Spinner className="size-6" />
-              กำลังตรวจสอบ…
-            </p>
-          ) : error ? (
-            <p className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-lg font-semibold text-destructive">{error}</p>
-          ) : null}
-        </div>
-
-        {locked ? (
-          <p className="rounded-xl bg-destructive/10 px-4 py-4 text-center text-lg font-semibold text-destructive">
-            ใส่ PIN ผิดหลายครั้ง — รอ 15 นาที หรือให้ผู้ดูแลรีเซ็ต PIN ที่เมนู "เครื่องขาย"
-          </p>
-        ) : (
-          <div className="mx-auto grid max-w-sm grid-cols-3 gap-3">
-            {KEYS.map((k) => (
-              <button
-                key={k}
-                type="button"
-                disabled={busy}
-                aria-label={k === "⌫" ? "ลบหนึ่งตัว" : k === "C" ? "ล้างทั้งหมด" : k}
-                onClick={() => press(k)}
-                className={cn(
-                  "tappable flex h-20 items-center justify-center rounded-2xl border border-border font-semibold transition-colors active:bg-foreground/15 disabled:opacity-40",
-                  k === "C" || k === "⌫" ? "bg-muted text-xl" : "bg-background text-4xl tabular-nums hover:bg-foreground/5",
-                )}
-              >
-                {k === "C" ? "ล้าง" : k === "⌫" ? "ลบ" : k}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </Modal>
   );
 }
 

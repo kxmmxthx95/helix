@@ -11,7 +11,6 @@ import type {
   PosProduct,
   PosStudent,
   PosTerminal,
-  PinUnlockResult,
   Student,
   StudentQr,
   CardSaleRow,
@@ -22,6 +21,7 @@ import type {
   LiveCard,
 } from "@/lib/database.types";
 import { compressImage } from "@/lib/image";
+import { posPin } from "@/lib/posPin";
 import { supabase } from "@/lib/supabase";
 
 // บัตรเติมเงิน — see migration 0107. Money only moves through RPCs, and ONLY online:
@@ -76,6 +76,15 @@ export function useSaveTerminal() {
         : await supabase.from("pos_terminals").insert({ name: patch.name! });
       if (error) throw error;
     },
+    onSettled: () => void qc.invalidateQueries({ queryKey: ["pos_terminals"] }),
+  });
+}
+
+/** Org-wide: sets (or resets) a terminal's 6-digit PIN, creating its cashier account on first use. Omit `pin` to get a random one back. */
+export function useSetTerminalPin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (a: { terminal_id: string; pin?: string }) => posPin<{ pin: string }>({ action: "set_pin", ...a }),
     onSettled: () => void qc.invalidateQueries({ queryKey: ["pos_terminals"] }),
   });
 }
@@ -190,7 +199,6 @@ export function useSaveProduct() {
   });
 }
 
-/** Needs the cashier unlocked (usePinUnlock) — the server refuses otherwise. */
 export function usePosTopupCash() {
   const refresh = useRefreshMoney();
   return useMutation({
@@ -246,63 +254,6 @@ export function usePosVoid() {
     mutationFn: (a: { tx_id: string; reason: string }) =>
       rpc<{ balance: number }>(() => supabase.rpc("pos_void", { p_tx_id: a.tx_id, p_reason: a.reason })),
     onSettled: refresh,
-  });
-}
-
-export function usePinStatus() {
-  return useQuery({
-    queryKey: ["cashier_pin_status"],
-    queryFn: () => rpc<{ has_pin: boolean; locked_until: string | null; unlocked_until: string | null }>(() => supabase.rpc("cashier_pin_status")),
-  });
-}
-
-export function useSetPin() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (pin: string) => rpc<void>(() => supabase.rpc("cashier_pin_set", { p_pin: pin })),
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["cashier_pin_status"] }),
-  });
-}
-
-/** One correct PIN unlocks cash top-up for an hour (server-side, migration 0125). */
-export function usePinUnlock() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (pin: string) => rpc<PinUnlockResult>(() => supabase.rpc("cashier_pin_unlock", { p_pin: pin })),
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["cashier_pin_status"] }),
-  });
-}
-
-export function usePinLock() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => rpc<void>(() => supabase.rpc("cashier_pin_lock")),
-    onSettled: () => void qc.invalidateQueries({ queryKey: ["cashier_pin_status"] }),
-  });
-}
-
-export function useResetPin() {
-  return useMutation({
-    mutationFn: (profileId: string) => rpc<void>(() => supabase.rpc("cashier_pin_reset", { p_profile_id: profileId })),
-  });
-}
-
-export type CashierRow = { id: string; name: string };
-
-/** Org-wide: every account holding the cashier role (for the PIN reset list). */
-export function useCashiers() {
-  return useQuery({
-    queryKey: ["cashiers"],
-    queryFn: async (): Promise<CashierRow[]> => {
-      const { data, error } = await supabase
-        .from("profile_roles")
-        .select("profile:profiles(id, first_name, last_name)")
-        .eq("role", "cashier");
-      if (error) throw error;
-      return (data as unknown as { profile: { id: string; first_name: string; last_name: string } | null }[])
-        .filter((r) => r.profile)
-        .map((r) => ({ id: r.profile!.id, name: `${r.profile!.first_name} ${r.profile!.last_name}` }));
-    },
   });
 }
 

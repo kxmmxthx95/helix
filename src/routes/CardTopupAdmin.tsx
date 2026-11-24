@@ -5,15 +5,15 @@ import { BarcodeIcon, DesktopIcon, Search } from "@/components/icons";
 import { Button, Field, Input, Spinner, Switch } from "@/components/ui";
 import {
   useCardSettings,
-  useCashiers,
   useResetCardPin,
-  useResetPin,
   useSaveTerminal,
+  useSetTerminalPin,
   useSetPinThreshold,
   useStudentSearch,
   useTerminals,
 } from "@/hooks/useCardTopup";
 import type { PosTerminal } from "@/lib/database.types";
+import { POS_TERMINAL_KEY } from "@/lib/posPin";
 import { cn } from "@/lib/utils";
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "บันทึกไม่สำเร็จ");
@@ -21,7 +21,7 @@ const errMsg = (e: unknown) => (e instanceof Error ? e.message : "บันท�
 /** The terminal id this device selected on the sale screen (same key as CardTopupPos). */
 function thisDeviceTerminal(): string {
   try {
-    return localStorage.getItem("helix-pos-terminal") ?? "";
+    return localStorage.getItem(POS_TERMINAL_KEY) ?? "";
   } catch {
     return "";
   }
@@ -29,13 +29,11 @@ function thisDeviceTerminal(): string {
 
 type Form = { id?: string; name: string; active: boolean };
 
-/** เครื่องขาย — terminals (add / rename / on-off) and cashier PIN resets. */
+/** เครื่องขาย — terminals (add / rename / on-off) and their sign-in PIN. */
 export function TerminalsTab({ onTestScanner, onTestRfid }: { onTestScanner?: () => void; onTestRfid?: () => void } = {}) {
   const toast = useToast();
   const { data: terminals = [], isLoading } = useTerminals();
-  const { data: cashiers = [] } = useCashiers();
   const save = useSaveTerminal();
-  const resetPin = useResetPin();
   const [form, setForm] = useState<Form | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"on" | "off" | null>(null);
@@ -52,7 +50,6 @@ export function TerminalsTab({ onTestScanner, onTestRfid }: { onTestScanner?: ()
   });
   const canSave = !!form && form.name.trim() !== "" && !save.isPending;
 
-  const run = (p: Promise<unknown>, ok: string) => p.then(() => toast(ok), (e) => toast(errMsg(e), "error"));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -158,10 +155,11 @@ export function TerminalsTab({ onTestScanner, onTestRfid }: { onTestScanner?: ()
                   <span className={cn("line-clamp-2 text-xl font-semibold leading-snug", !t.active && "text-muted-foreground")}>{t.name}</span>
                   <span className="text-base text-muted-foreground">เพิ่มเมื่อ {new Date(t.created_at).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })}</span>
                 </span>
-                {(t.id === here || !t.active) && (
+                {(t.id === here || !t.active || !t.profile_id) && (
                   <span className="flex flex-wrap gap-2">
                     {t.id === here && <span className="rounded-full bg-foreground px-3 py-1 text-sm font-semibold text-background">เครื่องนี้</span>}
                     {!t.active && <span className="rounded-full bg-destructive px-3 py-1 text-sm font-semibold text-white">ปิดใช้งาน</span>}
+                    {!t.profile_id && <span className="rounded-full bg-muted px-3 py-1 text-sm font-semibold text-muted-foreground">ยังไม่ตั้ง PIN</span>}
                   </span>
                 )}
               </button>
@@ -173,23 +171,6 @@ export function TerminalsTab({ onTestScanner, onTestRfid }: { onTestScanner?: ()
                   <Switch label={`เปิดใช้งาน ${t.name}`} checked={t.active} disabled={save.isPending} onChange={(v) => void setActive(t, v)} />
                 )}
               </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="space-y-4">
-        <h2 className="font-ui text-2xl font-semibold">รีเซ็ต PIN แคชเชียร์</h2>
-        {cashiers.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-border px-4 py-8 text-center text-lg text-muted-foreground">ยังไม่มีบัญชีแคชเชียร์ — สร้างได้ที่เมนูผู้ใช้งาน (บทบาท แคชเชียร์)</p>
-        )}
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {cashiers.map((c) => (
-            <li key={c.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 text-lg">
-              <span className="min-w-0 truncate font-semibold">{c.name}</span>
-              <Button variant="outline" className="h-14 shrink-0 px-5 text-lg" disabled={resetPin.isPending} onClick={() => void run(resetPin.mutateAsync(c.id), "รีเซ็ต PIN แล้ว")}>
-                รีเซ็ต PIN
-              </Button>
             </li>
           ))}
         </ul>
@@ -220,6 +201,7 @@ export function TerminalsTab({ onTestScanner, onTestRfid }: { onTestScanner?: ()
             {form.id && <Switch label="เปิดใช้งาน" checked={form.active} onChange={(active) => setForm({ ...form, active })} />}
           </form>
         )}
+        {form?.id && <TerminalPin terminalId={form.id} hasPin={!!terminals.find((t) => t.id === form.id)?.profile_id} />}
       </Modal>
     </div>
   );
@@ -290,6 +272,54 @@ function StudentPinAdmin() {
           ))}
         </ul>
       </div>
+    </div>
+  );
+}
+
+/** Admin sets a terminal's 6-digit sign-in PIN: typed, or random (shown once — it is stored hashed and can't be read back). */
+function TerminalPin({ terminalId, hasPin }: { terminalId: string; hasPin: boolean }) {
+  const toast = useToast();
+  const setPin = useSetTerminalPin();
+  const [pin, setPinText] = useState("");
+  const [shown, setShown] = useState<string | null>(null);
+
+  async function save(typed?: string) {
+    try {
+      const r = await setPin.mutateAsync({ terminal_id: terminalId, pin: typed });
+      setPinText("");
+      setShown(r.pin);
+      toast(hasPin ? "เปลี่ยน PIN แล้ว" : "ตั้ง PIN แล้ว");
+    } catch (err) {
+      toast(errMsg(err), "error");
+    }
+  }
+
+  return (
+    <div className="mt-6 space-y-3 border-t border-border pt-5">
+      <p className="text-lg font-semibold">{hasPin ? "เปลี่ยน PIN เข้าเครื่อง" : "ตั้ง PIN เข้าเครื่อง"}</p>
+      <div className="flex gap-3">
+        <Input
+          value={pin}
+          onChange={(e) => setPinText(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="PIN 6 หลัก"
+          aria-label="PIN 6 หลัก"
+          className="h-14 text-lg tabular-nums"
+        />
+        <Button type="button" className="h-14 shrink-0 px-5 text-lg" disabled={pin.length !== 6 || setPin.isPending} onClick={() => void save(pin)}>
+          ตั้ง PIN
+        </Button>
+      </div>
+      <Button type="button" variant="outline" className="h-14 w-full text-lg" disabled={setPin.isPending} onClick={() => void save()}>
+        {setPin.isPending ? <Spinner /> : "สุ่ม PIN ให้"}
+      </Button>
+      {shown && (
+        <p className="rounded-xl bg-muted px-4 py-3 text-center text-lg" role="status">
+          PIN ใหม่ <span className="font-mono text-3xl font-semibold tabular-nums tracking-widest">{shown}</span>
+          <span className="mt-1 block text-base text-muted-foreground">จดไว้ตอนนี้ — ปิดหน้าต่างแล้วดูอีกไม่ได้</span>
+        </p>
+      )}
     </div>
   );
 }

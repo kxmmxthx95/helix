@@ -1423,6 +1423,8 @@ export type PosTerminal = {
   id: string;
   name: string;
   active: boolean;
+  /** The terminal's own cashier account (0212); null until an admin sets its PIN. Written only by the pos-pin function. */
+  profile_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -1493,11 +1495,6 @@ export type PosStudent = {
   spent_today: number;
   card_status: StudentCardStatus | null;
 };
-
-/** cashier_pin_unlock() returns a wrong PIN as a result (not an error) so the attempt counter commits. */
-export type PinUnlockResult =
-  | { ok: true; unlocked_until: string }
-  | { ok: false; status: "no_pin" | "bad" | "locked"; attempts_left?: number; locked_until?: string };
 
 export type CardSlipStatus = "pending" | "approved" | "rejected" | "voided";
 
@@ -1944,7 +1941,7 @@ export type Database = {
         TuitionPayment,
         InsertOf<TuitionPayment, "receipt_no" | "paid_at" | "note" | "voided_at" | "void_reason">
       >;
-      pos_terminals: Table<PosTerminal, InsertOf<PosTerminal, "active">>;
+      pos_terminals: Table<PosTerminal, InsertOf<PosTerminal, "active" | "profile_id">>;
       pos_products: Table<PosProduct, Pick<PosProduct, "name" | "price"> & Partial<Pick<PosProduct, "category" | "active" | "image_path">>>;
       student_wallets: Table<StudentWallet, InsertOf<StudentWallet, "daily_limit">>;
       student_cards: Table<StudentCard, Partial<StudentCard>>;
@@ -2276,26 +2273,6 @@ export type Database = {
       card_my_qr: {
         Args: { p_student_id: string };
         Returns: StudentQr | null;
-      };
-      cashier_pin_status: {
-        Args: Record<string, never>;
-        Returns: { has_pin: boolean; locked_until: string | null; unlocked_until: string | null };
-      };
-      cashier_pin_unlock: {
-        Args: { p_pin: string };
-        Returns: PinUnlockResult;
-      };
-      cashier_pin_lock: {
-        Args: Record<string, never>;
-        Returns: void;
-      };
-      cashier_pin_set: {
-        Args: { p_pin: string };
-        Returns: void;
-      };
-      cashier_pin_reset: {
-        Args: { p_profile_id: string };
-        Returns: void;
       };
       card_slip_approve: {
         Args: { p_request_id: string; p_amount: number | null };

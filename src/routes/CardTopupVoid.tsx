@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, LockIcon, Search } from "@/components/icons";
+import { AlertTriangle, Search } from "@/components/icons";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { Button, Field, Input, Skeleton, Spinner } from "@/components/ui";
@@ -31,7 +31,7 @@ const typeBadge = (t: CardTopupRow["type"]) =>
   t === "topup_cash" ? "bg-success/15 text-success" : "bg-violet-500/15 text-violet-700 dark:text-violet-300";
 
 /** ยกเลิกรายการ — org-wide voids a past top-up (cash or slip) of any age. The balance may go negative; the student then cannot buy until topped up. */
-export function VoidTopupTab({ unlocked, onNeedPin }: { unlocked: boolean; onNeedPin: () => void }) {
+export function VoidTopupTab() {
   const [preset, setPreset] = useState<Preset>("week");
   const [from, setFrom] = useState(() => daysAgo(6));
   const [to, setTo] = useState(() => daysAgo(0));
@@ -197,12 +197,12 @@ export function VoidTopupTab({ unlocked, onNeedPin }: { unlocked: boolean; onNee
       )}
       {rows.length >= 300 && <p className="text-center text-lg text-muted-foreground">แสดง 300 รายการล่าสุด — ใช้การค้นหาหรือช่วงวันที่เพื่อจำกัดผลลัพธ์</p>}
 
-      {target && <VoidDialog row={target} unlocked={unlocked} onNeedPin={onNeedPin} onClose={() => setTarget(null)} />}
+      {target && <VoidDialog row={target} onClose={() => setTarget(null)} />}
     </div>
   );
 }
 
-function VoidDialog({ row, unlocked, onNeedPin, onClose }: { row: CardTopupRow; unlocked: boolean; onNeedPin: () => void; onClose: () => void }) {
+function VoidDialog({ row, onClose }: { row: CardTopupRow; onClose: () => void }) {
   const toast = useToast();
   const voidTopup = useVoidTopup();
   const { data: bal } = usePortalSummary(row.student_id);
@@ -214,15 +214,12 @@ function VoidDialog({ row, unlocked, onNeedPin, onClose }: { row: CardTopupRow; 
   async function confirm() {
     if (!reason.trim()) return;
     setErr(null);
-    if (!unlocked) return onNeedPin(); // PIN popup; press confirm again once unlocked
     try {
       const r = await voidTopup.mutateAsync({ tx_id: row.id, reason: reason.trim() });
       toast(`ยกเลิกแล้ว · ยอดคงเหลือ ${formatBaht(r.balance)} ฿`);
       onClose();
     } catch (e) {
-      // The unlock hour ran out on the server: ask for the PIN again.
-      if (e instanceof Error && e.message.includes("PIN")) onNeedPin();
-      else setErr(errMsg(e));
+      setErr(errMsg(e));
     }
   }
 
@@ -238,7 +235,7 @@ function VoidDialog({ row, unlocked, onNeedPin, onClose }: { row: CardTopupRow; 
             ไม่ยกเลิก
           </Button>
           <Button variant="destructive" className="h-14 flex-[1.4] text-lg" disabled={!reason.trim() || voidTopup.isPending} onClick={() => void confirm()}>
-            {voidTopup.isPending ? <Spinner /> : unlocked ? "ยืนยันยกเลิกรายการ" : "ใส่ PIN แล้วยกเลิก"}
+            {voidTopup.isPending ? <Spinner /> : "ยืนยันยกเลิกรายการ"}
           </Button>
         </div>
       }
@@ -296,12 +293,6 @@ function VoidDialog({ row, unlocked, onNeedPin, onClose }: { row: CardTopupRow; 
           <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="เลือกด้านบน หรือพิมพ์เหตุผลเอง" aria-label="เหตุผลที่ยกเลิก" />
         </div>
 
-        {!unlocked && (
-          <p className="flex items-center gap-3 rounded-xl border border-border px-4 py-3 text-lg">
-            <LockIcon className="h-6 w-6 shrink-0 text-muted-foreground" />
-            ต้องใส่ PIN แคชเชียร์ก่อน — กดปุ่มด้านล่าง แล้วกดยืนยันอีกครั้งหลังปลดล็อก
-          </p>
-        )}
         {err && <p className="rounded-xl bg-destructive/10 px-4 py-3 text-lg font-semibold text-destructive">{err}</p>}
       </div>
     </Modal>
