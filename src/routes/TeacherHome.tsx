@@ -43,7 +43,7 @@ import { bangkokTime } from "@/routes/TimeTracking";
 import { PremisesExitSheet } from "@/routes/PremisesExitSheet";
 import { useConfirmStudentReturn, useDecideStudentExit, useOpenStudentExits } from "@/hooks/useStudentPremisesExit";
 import { TeacherTimetable } from "@/routes/Timetable";
-import { eventApplies, periodReplaced } from "@/lib/planSlots";
+import { closingEvent, eventApplies, periodReplaced } from "@/lib/planSlots";
 
 // Teacher home: "what do I teach today" first, open work second. Cards are widget-style (macOS).
 
@@ -210,14 +210,7 @@ export function TeacherHome({ me }: { me: ProfileWithRoles }) {
 
   // Whole-school closed day (assembly is skipped).
   const isHoliday = (iso: string) =>
-    events.some(
-      (e) =>
-        !e.students_attend &&
-        e.gradeLevelIds.length === 0 &&
-        e.start_date <= iso &&
-        iso <= e.end_date &&
-        (e.departmentIds.length === 0 || e.departmentIds.includes(departmentId)),
-    );
+    !!closingEvent(iso, events.filter((e) => e.gradeLevelIds.length === 0 && (e.departmentIds.length === 0 || e.departmentIds.includes(departmentId))));
 
   // Entries on `iso` not replaced by an event (closed day, grade-scoped closure, or a replaces_classes window).
   const liveEntries = (iso: string) => {

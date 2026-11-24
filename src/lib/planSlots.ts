@@ -26,16 +26,28 @@ export function eventApplies(e: Scoped, departmentId: string | null, gradeLevelI
 }
 
 /**
+ * The event closing the whole day on `date`, if any. `events` must already be scoped to the department/grade.
+ * A closed-all-day event (students_attend false — holiday, suspended) yields to an event that says students come
+ * and lessons run as normal (students_attend, not replaces_classes), e.g. a department opening on an official holiday.
+ * Same rule as period_replaced_by_event in migration 0213.
+ */
+export function closingEvent<T extends Event>(date: string, events: T[]): T | undefined {
+  const on = events.filter((e) => e.start_date <= date && date <= e.end_date);
+  if (on.some((e) => e.students_attend && !e.replaces_classes)) return undefined;
+  return on.find((e) => !e.students_attend);
+}
+
+/**
  * Is this period replaced by an event on `date`? Same rule as the SQL function
  * period_replaced_by_event (0166): closed-all-day events replace every period;
  * replaces_classes events replace every period (no window) or those whose time
  * overlaps the window. Times are "HH:MM" or "HH:MM:SS" — compared as strings.
  */
 export function periodReplaced(date: string, period: { start_time?: string; end_time?: string }, events: Event[]) {
+  if (closingEvent(date, events)) return true;
   return events.some((e) => {
     if (e.start_date > date || date > e.end_date) return false;
-    if (!e.students_attend) return true;
-    if (!e.replaces_classes) return false;
+    if (!e.students_attend || !e.replaces_classes) return false;
     if (!e.start_time || !e.end_time || !period.start_time || !period.end_time) return true;
     return period.start_time.slice(0, 5) < e.end_time.slice(0, 5) && e.start_time.slice(0, 5) < period.end_time.slice(0, 5);
   });

@@ -9,6 +9,10 @@ describe("clockHoliday", () => {
     expect(clockHoliday("2026-11-04", [ev("suspended", ["d1"], false)], "d1")).toBe("วันหยุด · X");
     expect(clockHoliday("2026-11-04", [ev("holiday", ["d2"], false)], "d1")).toBeNull();
   });
+  it("an event with staff working outranks a closed holiday", () => {
+    expect(clockHoliday("2026-12-07", [ev("holiday", [], false), ev("holiday", ["d1"], true)], "d1")).toBeNull();
+    expect(clockHoliday("2026-12-07", [ev("holiday", [], false), ev("holiday", ["d2"], true)], "d1")).toBe("วันหยุด · X");
+  });
   it("a holiday flagged staff_attend does not lock", () => {
     expect(clockHoliday("2026-11-04", [ev("holiday", [], true)], "d1")).toBeNull();
   });

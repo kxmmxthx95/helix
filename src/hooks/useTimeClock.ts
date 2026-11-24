@@ -92,7 +92,8 @@ type HolidayEvent = { name: string; event_type: string; staff_attend: boolean; d
 export function clockHoliday(date: string, events: HolidayEvent[], departmentId: string | null): string | null {
   const mine = events.filter((e) => e.departmentIds.length === 0 || (!!departmentId && e.departmentIds.includes(departmentId)));
   if (mine.some((e) => e.event_type === "teacher_workday" && e.staff_attend)) return null;
-  const off = mine.find((e) => (e.event_type === "holiday" || e.event_type === "suspended") && !e.staff_attend);
+  // Any event that has staff working (e.g. a department opening on an official holiday) outranks the closed day.
+  const off = mine.some((e) => e.staff_attend) ? undefined : mine.find((e) => e.event_type === "holiday" || e.event_type === "suspended");
   if (off) return `วันหยุด · ${off.name}`;
   const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
   return dow === 0 || dow === 6 ? "วันหยุดสุดสัปดาห์" : null;

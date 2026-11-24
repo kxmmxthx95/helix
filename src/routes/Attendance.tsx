@@ -21,6 +21,7 @@ import { avatarUrl } from "@/hooks/useAvatar";
 import type { StudentListItem } from "@/hooks/useStudents";
 import { canManage, isOrgWide, isSelfScoped } from "@/lib/roles";
 import { cn, todayIso } from "@/lib/utils";
+import { closingEvent } from "@/lib/planSlots";
 
 export const STATUS_LABEL: Record<AttendanceStatus, string> = {
   present: "มา",
@@ -466,7 +467,7 @@ function SummaryPanel({
             departmentId={picked.department_id}
             useRecords={(startDate, endDate) => useAttendanceRange({ studentId: picked.id, startDate, endDate })}
             holiday={(iso, events) =>
-              events.find((e) => !e.students_attend && (e.departmentIds.length === 0 || e.departmentIds.includes(picked.department_id)) && iso >= e.start_date && iso <= e.end_date)?.name ?? null
+              closingEvent(iso, events.filter((e) => e.departmentIds.length === 0 || e.departmentIds.includes(picked.department_id)))?.name ?? null
             }
           />
         )}

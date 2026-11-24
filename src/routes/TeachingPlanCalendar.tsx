@@ -33,7 +33,7 @@ import {
 } from "@/hooks/useTeachingPlanSlots";
 import type { TeachingAssignment } from "@/lib/database.types";
 import { mergePeriods, withTimes } from "@/lib/periods";
-import { addDays, computeSlots, eventApplies, isoDow, type SlotCell, termRange, weekStart } from "@/lib/planSlots";
+import { addDays, closingEvent, computeSlots, eventApplies, isoDow, type SlotCell, termRange, weekStart } from "@/lib/planSlots";
 import { supabase } from "@/lib/supabase";
 import { useTimetableStyling } from "@/routes/Timetable";
 import { cn } from "@/lib/utils";
@@ -235,7 +235,7 @@ export function TeachingPlanCalendar() {
   const step = (dir: 1 | -1) =>
     setAnchor(view === "week" ? addDays(week, 7 * dir) : dir === 1 ? addDays(first, 31) : addDays(first, -1));
   const closed = (d: string) =>
-    deptEvents.find((e) => !e.students_attend && e.start_date <= d && d <= e.end_date)?.name ?? null;
+    closingEvent(d, deptEvents)?.name ?? null;
   const closedWeek = (d: string) => (!range || d < range.start || d > range.end ? "นอกภาคเรียน" : closed(d));
 
   // A linked subject's period: edits go to that assignment (the DB mirrors them back here when it meets).

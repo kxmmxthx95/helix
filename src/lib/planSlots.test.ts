@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, computeSlots, eventApplies, isoDow, periodReplaced, weekStart } from "./planSlots";
+import { addDays, closingEvent, computeSlots, eventApplies, isoDow, periodReplaced, weekStart } from "./planSlots";
 
 describe("planSlots", () => {
   it("computes ISO weekday and week start", () => {
@@ -33,6 +33,18 @@ describe("planSlots", () => {
     expect(periodReplaced("2026-11-09", p, [{ ...morning, start_time: null, end_time: null }])).toBe(true);
     expect(periodReplaced("2026-11-09", p, [{ ...morning, students_attend: false }])).toBe(true);
     expect(periodReplaced("2026-11-09", p, [{ ...morning, replaces_classes: false }])).toBe(false);
+  });
+  it("an open-as-normal event overrides a closed-all-day holiday on the same day", () => {
+    const holiday = { start_date: "2026-12-07", end_date: "2026-12-07", students_attend: false };
+    const open = { start_date: "2026-12-07", end_date: "2026-12-07", students_attend: true, replaces_classes: false };
+    const p = { start_time: "09:00", end_time: "09:50" };
+    expect(closingEvent("2026-12-07", [holiday])).toBe(holiday);
+    expect(closingEvent("2026-12-07", [holiday, open])).toBeUndefined();
+    expect(closingEvent("2026-12-08", [holiday, open])).toBeUndefined();
+    expect(closingEvent("2026-12-07", [holiday, { ...open, replaces_classes: true }])).toBe(holiday); // a window event does not reopen the day
+    expect(periodReplaced("2026-12-07", p, [holiday])).toBe(true);
+    expect(periodReplaced("2026-12-07", p, [holiday, open])).toBe(false);
+    expect(computeSlots({ start: "2026-12-07", end: "2026-12-07" }, [{ day_of_week: 1, period_no: 1 }], [holiday, open])).toHaveLength(1);
   });
   it("computeSlots drops only the replaced periods of a half-day activity", () => {
     const entries = [

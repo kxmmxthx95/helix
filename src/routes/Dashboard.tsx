@@ -45,6 +45,7 @@ import { STATUS_LABEL } from "@/routes/Attendance";
 import { bangkokTime } from "@/routes/TimeTracking";
 import { dayCount } from "@/routes/NewLeaveSheet";
 import { TeacherHome } from "@/routes/TeacherHome";
+import { closingEvent } from "@/lib/planSlots";
 
 const LEAVE_STATUS_LABEL: Record<StudentLeaveStatus, string> = {
   pending: "รออนุมัติ",
@@ -1109,7 +1110,7 @@ export function AttendanceSummarySection({ student }: { student: Student }) {
       departmentId={student.department_id}
       useRecords={(startDate, endDate) => useAttendanceRange({ studentId: student.id, startDate, endDate })}
       holiday={(iso, events) =>
-        events.find((e) => !e.students_attend && (e.departmentIds.length === 0 || e.departmentIds.includes(student.department_id)) && iso >= e.start_date && iso <= e.end_date)?.name ?? null
+        closingEvent(iso, events.filter((e) => e.departmentIds.length === 0 || e.departmentIds.includes(student.department_id)))?.name ?? null
       }
     />
   );

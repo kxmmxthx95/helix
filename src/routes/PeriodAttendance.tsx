@@ -19,6 +19,7 @@ import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManageAcademic } from "@/lib/roles";
 import { SEGMENT_STYLE } from "@/routes/Attendance";
 import { cn, todayIso } from "@/lib/utils";
+import { closingEvent } from "@/lib/planSlots";
 
 // ----------------------------------------------------------- period check-in
 // เช็คชื่อเข้าเรียน — keyed by (schedule_entry_id, date),
@@ -496,7 +497,7 @@ function StudentAttendanceCalendar({
       departmentId={student.department_id}
       useRecords={useMine}
       holiday={(iso, events) =>
-        events.find((e) => !e.students_attend && (e.departmentIds.length === 0 || e.departmentIds.includes(student.department_id)) && iso >= e.start_date && iso <= e.end_date)?.name ?? null
+        closingEvent(iso, events.filter((e) => e.departmentIds.length === 0 || e.departmentIds.includes(student.department_id)))?.name ?? null
       }
     />
   );

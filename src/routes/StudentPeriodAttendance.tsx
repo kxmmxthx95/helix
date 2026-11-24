@@ -16,7 +16,7 @@ import { useDepartments } from "@/hooks/useProfiles";
 import { useClassroomSchedule } from "@/hooks/useSchedule";
 import type { AttendanceStatus, Student } from "@/lib/database.types";
 import { mergePeriods, periodTimes, teachingOrdinal } from "@/lib/periods";
-import { addDays, eventApplies, isoDow, periodReplaced } from "@/lib/planSlots";
+import { addDays, closingEvent, eventApplies, isoDow, periodReplaced } from "@/lib/planSlots";
 import { cn, todayIso } from "@/lib/utils";
 import { STATUS_LABEL } from "@/routes/Attendance";
 import {
@@ -99,9 +99,7 @@ export function StudentPeriodAttendanceSection({
   const holiday = (iso: string) =>
     term0 && (iso < term0.start_date! || iso > term0.end_date!)
       ? "ปิดเทอม"
-      : (myEvents.find(
-          (e) => !e.students_attend && iso >= e.start_date && iso <= e.end_date,
-        )?.name ?? null);
+      : (closingEvent(iso, myEvents)?.name ?? null);
   const replaced = (iso: string, entryId: string) => {
     const e = entryById.get(entryId);
     return (
