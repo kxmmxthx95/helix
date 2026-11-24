@@ -800,13 +800,13 @@ function LessonCards({
       {groupByLesson(topics).map(([lesson, items]) => {
         const placed = countOf ? items.filter((t) => countOf(t.id) > 0).length : null;
         return (
-          <details key={lesson} name={forceOpen ? undefined : group} open={forceOpen || items.some((t) => openIds?.includes(t.id))} className="group rounded-xl border border-border bg-card">
+          <details key={lesson} name={forceOpen ? undefined : group} open={forceOpen || items.some((t) => openIds?.includes(t.id))} className="group rounded-xl border border-border/50 bg-card">
             <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
               <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold leading-snug">
+                <span className="block text-sm font-semibold leading-snug">
                   {lesson}
                   {items[0]?.gradeCode && (
-                    <span className={cn("ml-2 inline-block rounded-full px-2 py-0.5 align-middle text-xs font-semibold", gradeBadgeClass(items[0].gradeCode))}>
+                    <span className={cn("ml-1.5 inline-block rounded-full px-1.5 py-0.5 align-middle text-[11px] font-semibold", gradeBadgeClass(items[0].gradeCode))}>
                       {gradeShortLabel(items[0].gradeCode)}
                     </span>
                   )}
