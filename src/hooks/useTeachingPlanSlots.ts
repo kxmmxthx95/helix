@@ -24,7 +24,7 @@ export function groupByLesson(topics: PlanTopicItem[]): [string, PlanTopicItem[]
 /**
  * Topics offered for an assignment: ผังการเรียน (0088) is independent of subjects, so a lesson counts when
  * its plan_subject name is a prefix of the subject name ("ฟิสิกส์เพิ่มเติม" ~ "ฟิสิกส์"), or when the lesson
- * is tagged with the subject (plan_lesson_subjects, the "ผูกวิชา" link). Lessons are of the classroom's grade level.
+ * is tagged with the subject (plan_lesson_subjects, the "ผูกวิชา" link). Name-prefix lessons are of the classroom's grade level; tagged ones may be of any grade (ม.5 biology can use ม.6 lessons).
  * Mirrors check_teaching_plan_slot_topic (0171).
  */
 export function usePlanTopics(
@@ -34,7 +34,7 @@ export function usePlanTopics(
   subjectId: string | null,
 ) {
   return useQuery({
-    queryKey: ["plan_topics_for", departmentId, gradeLevelId, subjectName, subjectId],
+    queryKey: ["plan", "topics_for", departmentId, gradeLevelId, subjectName, subjectId],
     enabled: !!departmentId && !!gradeLevelId && !!subjectName,
     queryFn: async (): Promise<PlanTopicItem[]> => {
       const { data: subs, error: e1 } = await supabase.from("plan_subjects").select("id,name").eq("department_id", departmentId!);
@@ -51,9 +51,8 @@ export function usePlanTopics(
       const tagged = subjectId
         ? await supabase
             .from("plan_lesson_subjects")
-            .select("plan_lessons!inner(id,name,sort_order,grade_level_id)")
+            .select("plan_lessons!inner(id,name,sort_order)")
             .eq("subject_id", subjectId)
-            .eq("plan_lessons.grade_level_id", gradeLevelId!)
         : { data: [], error: null };
       if (tagged.error) throw tagged.error;
       const byTag = (tagged.data as unknown as { plan_lessons: { id: string; name: string; sort_order: number } }[]).map((r) => r.plan_lessons);
