@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
 import { BriefcaseIcon, Plus, Search, Upload as UploadIcon, X } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
-import { Avatar, Button, BuddhistDateSelect, Card, EmptyState, Field, Input, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
+import { Avatar, Button, BuddhistDateSelect, Card, EmptyState, Field, FormSection, Input, Pagination, Select, Skeleton, Spinner } from "@/components/ui";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { summarizeAttendance } from "@/hooks/useAttendance";
 import { useStaffAttendanceRange } from "@/hooks/useStaffAttendance";
@@ -19,6 +20,7 @@ import {
   useEmployeeDocuments,
   useEmployees,
   useEmployeeStatusHistory,
+  useEmployeeWorkload,
   useSalaryGrades,
   useUpdateEmployeeCompensation,
   useUpdateEmployeePosition,
@@ -41,7 +43,6 @@ import {
   type ProfileWithRoles,
 } from "@/lib/database.types";
 import { canManage, canManageHr } from "@/lib/roles";
-import { textareaClass } from "@/routes/Roster";
 import { cn } from "@/lib/utils";
 
 const EMPTY: EmployeeFilters = { search: "", departmentId: "", status: "" };
@@ -360,13 +361,11 @@ function PositionPanel({
   const [draft, setDraft] = useState<{
     manager_id: string | null;
     job_title_id: string | null;
-    career_path_notes: string | null;
   } | null>(null);
 
   const current = draft ?? {
     manager_id: row.position.manager_id,
     job_title_id: row.position.job_title_id,
-    career_path_notes: row.position.career_path_notes,
   };
   const dirty = draft !== null;
   const managerOptions = employees.filter((e) => e.id !== row.id);
@@ -385,7 +384,8 @@ function PositionPanel({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      <FormSection title="ตำแหน่งงาน">
       <Field label="ตำแหน่งงาน">
         <Select
           value={current.job_title_id ?? ""}
@@ -415,15 +415,7 @@ function PositionPanel({
           ))}
         </Select>
       </Field>
-
-      <Field label="เส้นทางความก้าวหน้า">
-        <textarea
-          className={textareaClass}
-          value={current.career_path_notes ?? ""}
-          onChange={(e) => setDraft({ ...current, career_path_notes: e.target.value || null })}
-          disabled={!mayManageHr}
-        />
-      </Field>
+      </FormSection>
 
       {mayManageHr && (
         <Button className="w-full" onClick={save} disabled={!dirty || update.isPending}>
@@ -487,11 +479,15 @@ function StatusPanel({ row, mayManageHr, me }: { row: EmployeeRow; mayManageHr: 
   const change = useChangeEmployeeStatus();
   const [nextStatus, setNextStatus] = useState<EmployeeStatus | "">("");
   const [reason, setReason] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState(() => new Date().toLocaleDateString("sv-SE"));
+  const { data: workload } = useEmployeeWorkload(row.id);
+  const ends = nextStatus === "resigned" || nextStatus === "terminated";
+  const hasWork = !!workload && (workload.teaching > 0 || workload.homeroom > 0);
 
   function submit() {
-    if (!nextStatus || !reason.trim()) return;
+    if (!nextStatus || !reason.trim() || !effectiveDate) return;
     change.mutate(
-      { profileId: row.id, status: nextStatus, reason: reason.trim(), changedBy: me.id },
+      { profileId: row.id, status: nextStatus, reason: reason.trim(), changedBy: me.id, effectiveDate },
       {
         onSuccess: () => {
           toast("เปลี่ยนสถานะสำเร็จ");
@@ -509,6 +505,11 @@ function StatusPanel({ row, mayManageHr, me }: { row: EmployeeRow; mayManageHr: 
         <span className="text-sm">สถานะปัจจุบัน</span>
         <StatusBadge status={row.position.employee_status} />
       </div>
+      {row.position.end_date && (
+        <p className="px-1 text-xs text-muted-foreground">
+          วันสุดท้ายของการทำงาน {new Date(row.position.end_date).toLocaleDateString("th-TH", { dateStyle: "long" })}
+        </p>
+      )}
 
       {mayManageHr && (
         <div className="space-y-2 rounded-lg border border-border p-3">
@@ -525,10 +526,32 @@ function StatusPanel({ row, mayManageHr, me }: { row: EmployeeRow; mayManageHr: 
               ))}
             </Select>
           </Field>
+          {ends && (
+            <Field label="วันสุดท้ายของการทำงาน">
+              <Input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} />
+            </Field>
+          )}
           <Field label="เหตุผล">
             <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="ระบุเหตุผลการเปลี่ยนสถานะ" />
           </Field>
-          <Button className="w-full" onClick={submit} disabled={!nextStatus || !reason.trim() || change.isPending}>
+          {ends && (
+            <div className="space-y-1 rounded-lg bg-muted p-3 text-xs text-muted-foreground">
+              <p>หลังวันสุดท้าย ระบบจะหยุดนับการเช็คชื่อ/ขาดงาน และปิดการเข้าสู่ระบบของบัญชีนี้ (ประวัติเดิมยังอยู่ครบ)</p>
+              {hasWork && (
+                <p className="text-amber-600">
+                  ยังมีภาระงานปี {workload.academicYear}: สอน {workload.teaching} วิชา, ครูที่ปรึกษา {workload.homeroom} ห้อง —{" "}
+                  <Link to="/teaching-load" className="underline">
+                    ส่งต่อภาระงาน
+                  </Link>
+                </p>
+              )}
+            </div>
+          )}
+          <Button
+            className="w-full"
+            onClick={submit}
+            disabled={!nextStatus || !reason.trim() || !effectiveDate || change.isPending}
+          >
             {change.isPending ? <Spinner className="h-3 w-3" /> : "บันทึกการเปลี่ยนสถานะ"}
           </Button>
         </div>
@@ -555,7 +578,7 @@ function StatusPanel({ row, mayManageHr, me }: { row: EmployeeRow; mayManageHr: 
             <li key={h.id} className="rounded-lg border border-border p-2.5 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-medium">{EMPLOYEE_STATUS_LABEL[h.status]}</span>
-                <span className="text-muted-foreground">{new Date(h.created_at).toLocaleDateString("th-TH")}</span>
+                <span className="text-muted-foreground">{new Date(h.effective_date).toLocaleDateString("th-TH")}</span>
               </div>
               <p className="mt-1 text-muted-foreground">{h.reason}</p>
             </li>

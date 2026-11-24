@@ -108,7 +108,7 @@ export function useEmployees(filters: EmployeeFilters) {
   });
 }
 
-export type EmployeePositionEdit = Pick<EmployeePosition, "manager_id" | "job_title_id" | "career_path_notes">;
+export type EmployeePositionEdit = Pick<EmployeePosition, "manager_id" | "job_title_id">;
 
 /** Never touches employee_status — that only ever changes via useChangeEmployeeStatus, so the history log can't drift from it (migration 0061 sync_employee_status trigger). */
 export function useUpdateEmployeePosition() {
@@ -161,12 +161,13 @@ export function useEmployeeStatusHistory(profileId: string | undefined) {
 export function useChangeEmployeeStatus() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (entry: { profileId: string; status: EmployeeStatus; reason: string; changedBy: string }) => {
+    mutationFn: async (entry: { profileId: string; status: EmployeeStatus; reason: string; changedBy: string; effectiveDate: string }) => {
       const { error } = await supabase.from("employee_status_history").insert({
         profile_id: entry.profileId,
         status: entry.status,
         reason: entry.reason,
         changed_by: entry.changedBy,
+        effective_date: entry.effectiveDate,
       });
       if (error) throw error;
     },
@@ -174,6 +175,7 @@ export function useChangeEmployeeStatus() {
       void qc.invalidateQueries({ queryKey: ["employees"] });
       void qc.invalidateQueries({ queryKey: ["employee-status-history", vars.profileId] });
       void qc.invalidateQueries({ queryKey: ["profiles"] }); // is_active changed too
+      void qc.invalidateQueries({ queryKey: ["staff_attendance_status"] }); // end_date cuts the expected work days
     },
   });
 }
@@ -331,6 +333,28 @@ export function useDepartmentHeadcount(departmentId: string | null) {
         .in("profile_id", profiles.map((p) => p.id));
       if (posErr) throw posErr;
       return count ?? 0;
+    },
+  });
+}
+
+/** งานที่ยังผูกกับบุคลากร (ภาคเรียนไหนก็ได้ของปีล่าสุดที่มีข้อมูล): วิชาที่สอน + ห้องที่เป็นครูที่ปรึกษา — ใช้เตือนก่อนลาออก/สิ้นสุดการจ้าง. */
+export function useEmployeeWorkload(profileId: string | undefined) {
+  return useQuery({
+    queryKey: ["employee-workload", profileId],
+    enabled: !!profileId,
+    queryFn: async () => {
+      const [ta, hr] = await Promise.all([
+        supabase.from("teaching_assignments").select("academic_year").eq("teacher_id", profileId!),
+        supabase.from("classroom_homeroom_teachers").select("academic_year").eq("teacher_id", profileId!),
+      ]);
+      if (ta.error) throw ta.error;
+      if (hr.error) throw hr.error;
+      const year = Math.max(0, ...ta.data.map((r) => r.academic_year), ...hr.data.map((r) => r.academic_year));
+      return {
+        academicYear: year,
+        teaching: ta.data.filter((r) => r.academic_year === year).length,
+        homeroom: hr.data.filter((r) => r.academic_year === year).length,
+      };
     },
   });
 }

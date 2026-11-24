@@ -351,6 +351,8 @@ export type EmployeePosition = {
   job_title_id: string | null;
   career_path_notes: string | null;
   employee_status: EmployeeStatus;
+  /** วันสุดท้ายของการทำงาน — set เมื่อลาออก/สิ้นสุดการจ้าง (migration 0215). */
+  end_date: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -371,6 +373,7 @@ export type EmployeeStatusHistoryEntry = {
   status: EmployeeStatus;
   reason: string;
   changed_by: string;
+  effective_date: string;
   created_at: string;
 };
 
@@ -1883,10 +1886,10 @@ export type Database = {
       salary_grades: Table<SalaryGrade, InsertOf<SalaryGrade, "min_salary" | "max_salary">>;
       employee_positions: Table<
         EmployeePosition,
-        InsertOf<EmployeePosition, "manager_id" | "job_title_id" | "career_path_notes" | "employee_status">
+        InsertOf<EmployeePosition, "manager_id" | "job_title_id" | "career_path_notes" | "employee_status" | "end_date">
       >;
       employee_compensation: Table<EmployeeCompensation, InsertOf<EmployeeCompensation, "salary_grade_id">>;
-      employee_status_history: Table<EmployeeStatusHistoryEntry, InsertOf<EmployeeStatusHistoryEntry, never>>;
+      employee_status_history: Table<EmployeeStatusHistoryEntry, InsertOf<EmployeeStatusHistoryEntry, "effective_date">>;
       documents: Table<EmployeeDocument, InsertOf<EmployeeDocument, never>>;
       contracts: Table<Contract, InsertOf<Contract, "end_date" | "document_id">>;
       academic_terms: Table<AcademicTerm, InsertOf<AcademicTerm, "start_date" | "end_date" | "status">>;
