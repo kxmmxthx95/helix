@@ -2,7 +2,6 @@ import { NodeApi, type Value } from "platejs";
 import { useMemo, useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { AiQuestionDrawer } from "@/components/AiQuestionDrawer";
-import { EMPTY_PROMPT } from "@/components/editor/plateConfig";
 import { QuestionEditor } from "@/components/editor/QuestionEditor";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { ChevronForward, DocumentTextIcon, HighlightIcon, PencilIcon, Plus, X } from "@/components/icons";
@@ -42,7 +41,7 @@ function promptToPlainText(value: Value): string {
     .trim();
 }
 
-/** A fresh empty Plate doc per call — unlike the shared EMPTY_PROMPT constant, this can't collide when several choice editors mount at once. Reusing one object's node identity across multiple simultaneous Plate editors corrupts Slate's internal node-path tracking ("Unable to find the path for Slate node"). */
+/** A fresh empty Plate doc per call — a shared constant would collide when several editors (prompt + choices, or two forms) mount at once. Reusing one object's node identity across multiple simultaneous Plate editors corrupts Slate's internal node-path tracking ("Unable to find the path for Slate node"). */
 function emptyLabelJson(): Value {
   return [{ type: "p", children: [{ text: "" }] }];
 }
@@ -343,7 +342,7 @@ export function useQuestionForm({
   const [questionId, setQuestionId] = useState<string | null>(question?.id ?? null);
 
   const [type, setType] = useState<ExamQuestionType>(question?.question_type ?? "multiple_choice");
-  const [prompt, setPrompt] = useState<Value>(question?.prompt_json ?? EMPTY_PROMPT);
+  const [prompt, setPrompt] = useState<Value>(question?.prompt_json ?? emptyLabelJson());
   const [correctAnswer, setCorrectAnswer] = useState(question?.correct_answer ?? "");
   const [difficulty, setDifficulty] = useState<ExamQuestionDifficulty>(question?.difficulty ?? "medium");
   const [topic, setTopic] = useState(question?.topic ?? defaultTopic);
@@ -359,7 +358,7 @@ export function useQuestionForm({
 
   function reset() {
     setType("multiple_choice");
-    setPrompt(EMPTY_PROMPT);
+    setPrompt(emptyLabelJson());
     setCorrectAnswer("");
     setDifficulty("medium");
     setTopic(defaultTopic);
@@ -467,7 +466,7 @@ export function useQuestionForm({
           plan_topic_id: planTopicId,
           question_type: type,
           prompt: "",
-          prompt_json: EMPTY_PROMPT,
+          prompt_json: emptyLabelJson(),
           points: 1,
           correct_answer: type === "short_answer" ? "" : null,
           difficulty,
@@ -731,7 +730,7 @@ export function QuestionSheet({
         className="max-w-3xl"
         centered
       >
-        {/* Mounted only while open: a closed <dialog> keeps its children, and two always-mounted Plate editors seeded from the same EMPTY_PROMPT nodes corrupt Slate's node->path maps ("Unable to find the path for Slate node"). */}
+        {/* Mounted only while open: a closed <dialog> keeps its children, and two always-mounted Plate editors seeded from the same empty-doc nodes corrupt Slate's node->path maps ("Unable to find the path for Slate node"). */}
         {open && QuestionFormFields(form)}
       </Modal>
     );

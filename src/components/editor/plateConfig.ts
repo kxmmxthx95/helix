@@ -2,15 +2,12 @@ import { BoldPlugin, HighlightPlugin, ItalicPlugin, UnderlinePlugin } from "@pla
 import { ListPlugin } from "@platejs/list/react";
 import { EquationPlugin, InlineEquationPlugin } from "@platejs/math/react";
 import { ImagePlugin } from "@platejs/media/react";
-import type { Value } from "platejs";
 import { ParagraphPlugin } from "platejs/react";
 import { uploadExamQuestionImage } from "@/hooks/useExamBank";
 import { EquationElement } from "./EquationElement";
 import { ImageElement } from "./ImageElement";
 import { BoldLeaf, HighlightLeaf, ItalicLeaf, UnderlineLeaf } from "./marks";
 import { ParagraphElement } from "./ParagraphElement";
-
-export const EMPTY_PROMPT: Value = [{ type: "p", children: [{ text: "" }] }];
 
 /**
  * Shared by the authoring editor and the read-only view — same plugin set
