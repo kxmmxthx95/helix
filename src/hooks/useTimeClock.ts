@@ -85,13 +85,14 @@ export function clockGate(kind: "in" | "out", s: ClockTimes | undefined, nowMin:
 type HolidayEvent = { name: string; event_type: string; staff_attend: boolean; departmentIds: string[] };
 
 /**
- * Thai reason when `date` (YYYY-MM-DD) is a non-working day for clock-in, else null. Holiday/suspended events and
- * weekends lock; a teacher_workday with staff_attend (event rows already filtered to cover `date`) unlocks both.
+ * Thai reason when `date` (YYYY-MM-DD) is a non-working day for clock-in, else null. Holiday/suspended events
+ * (unless flagged staff_attend — e.g. an official holiday the school works through) and weekends lock; a
+ * teacher_workday with staff_attend (event rows already filtered to cover `date`) unlocks both.
  */
 export function clockHoliday(date: string, events: HolidayEvent[], departmentId: string | null): string | null {
   const mine = events.filter((e) => e.departmentIds.length === 0 || (!!departmentId && e.departmentIds.includes(departmentId)));
   if (mine.some((e) => e.event_type === "teacher_workday" && e.staff_attend)) return null;
-  const off = mine.find((e) => e.event_type === "holiday" || e.event_type === "suspended");
+  const off = mine.find((e) => (e.event_type === "holiday" || e.event_type === "suspended") && !e.staff_attend);
   if (off) return `วันหยุด · ${off.name}`;
   const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
   return dow === 0 || dow === 6 ? "วันหยุดสุดสัปดาห์" : null;

@@ -144,25 +144,23 @@ Deno.serve(async (req) => {
     }
     const body: { items: GCalEvent[] } = await res.json();
 
+    // Re-syncing must not undo an admin's override (a holiday switched to students_attend / staff_attend):
+    // rows already pulled in only get name/dates refreshed; the attend flags are set once, on insert.
+    const { data: existing } = await admin
+      .from("academic_events")
+      .select("external_ref")
+      .like("external_ref", `gcal:${year}-%`);
+    const known = new Set((existing ?? []).map((r) => r.external_ref as string));
+
     for (const ev of body.items) {
       if (!ev.start.date || !ev.end.date) continue; // skip any non-all-day entry — holidays are always all-day
       const startDate = ev.start.date;
-      const endDate = dayBefore(ev.end.date);
+      const row = { name: toThaiName(ev.summary), event_type: "holiday", start_date: startDate, end_date: dayBefore(ev.end.date) };
+      const ref = `gcal:${startDate}`;
 
-      const { error } = await admin
-        .from("academic_events")
-        .upsert(
-          {
-            external_ref: `gcal:${startDate}`,
-            name: toThaiName(ev.summary),
-            event_type: "holiday",
-            start_date: startDate,
-            end_date: endDate,
-            students_attend: false,
-            staff_attend: false,
-          },
-          { onConflict: "external_ref" },
-        );
+      const { error } = known.has(ref)
+        ? await admin.from("academic_events").update(row).eq("external_ref", ref)
+        : await admin.from("academic_events").insert({ ...row, external_ref: ref, students_attend: false, staff_attend: false });
       if (error) errors.push(`${startDate} ${ev.summary}: ${error.message}`);
       else upserted.push(startDate);
     }
