@@ -2331,7 +2331,7 @@ function StudentTopicsSheet({ session, onClose }: { session: AvailableExam; onCl
 }
 
 function TakeExam({ student, session, onExit }: { student: Student; session: AvailableExam; onExit: () => void }) {
-  const { data: sessionQuestions = [] } = useExamSessionQuestions(session.id);
+  const { data: sessionQuestions = [], isLoading: questionsLoading } = useExamSessionQuestions(session.id);
   const { data: mine, isLoading: mineLoading } = useMyAttempts(session.id, student.id);
   const startOrResume = useStartOrResumeAttempt();
   const [attempt, setAttempt] = useState<ExamAttempt | null>(null);
@@ -2361,6 +2361,17 @@ function TakeExam({ student, session, onExit }: { student: Student; session: Ava
   }, [sessionQuestions.length, mineLoading, needsCode]);
 
   if (needsCode) return <ExamCodeForm sessionId={session.id} onPassed={() => setCodeOk(true)} onExit={onExit} />;
+
+  if (!attempt && !questionsLoading && sessionQuestions.length === 0) {
+    return (
+      <Card className="mx-auto max-w-xl space-y-3 text-sm" role="alert">
+        <p>ข้อสอบนี้ยังไม่มีข้อสอบให้ทำ กรุณาแจ้งครู</p>
+        <Button variant="ghost" onClick={onExit}>
+          กลับ
+        </Button>
+      </Card>
+    );
+  }
 
   if (!attempt && startOrResume.isError) {
     return (

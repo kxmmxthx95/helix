@@ -380,7 +380,7 @@ export function useDeleteExamSession() {
 
 /** Students only ever get scheduled rooms (opens_at/closes_at set). */
 /** subject_ids: every subject the room covers (merged rooms show under each). */
-export type AvailableExam = ExamSession & { opens_at: string; closes_at: string; my_attempts: number; subject_ids: string[] };
+export type AvailableExam = ExamSession & { opens_at: string; closes_at: string; /** Submitted attempts only — an unfinished one must stay resumable. */ my_attempts: number; subject_ids: string[] };
 
 /** Sessions targeting the student's current classroom, whole window (not just currently-open) — the UI splits into upcoming/open/closed by opens_at/closes_at itself. */
 export function useAvailableExams(studentId: string | null, classroomId: string | null, academicYear: number | null) {
@@ -399,7 +399,7 @@ export function useAvailableExams(studentId: string | null, classroomId: string 
 
       const [{ data: sessions, error: sessionsError }, { data: attempts, error: attemptsError }, { data: sets, error: setsError }] = await Promise.all([
         supabase.from("exam_sessions").select("*").in("id", sessionIds).not("opens_at", "is", null).not("closes_at", "is", null).order("opens_at", { ascending: false }),
-        supabase.from("exam_attempts").select("session_id").eq("student_id", studentId!).in("session_id", sessionIds),
+        supabase.from("exam_attempts").select("session_id").eq("student_id", studentId!).eq("status", "submitted").in("session_id", sessionIds),
         supabase.from("exam_session_sets").select("session_id, subject_id").in("session_id", sessionIds),
       ]);
       if (sessionsError) throw sessionsError;
