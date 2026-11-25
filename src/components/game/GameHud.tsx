@@ -304,32 +304,6 @@ export function GameHud() {
                 ))}
               </dl>
             )}
-            <button
-              type="button"
-              onClick={() => setPanel("bag")}
-              aria-label={`เลเวล ${lvl.level} ดูกระเป๋า`}
-              className={cn("mt-4 flex w-full items-center gap-3 rounded-xl text-left", FOCUS)}
-            >
-              <span className="shrink-0 rounded-full bg-primary px-2.5 text-xs font-bold leading-5 text-white">Lv.{lvl.level}</span>
-              <span
-                className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-foreground/10"
-                role="progressbar"
-                aria-label={`EXP เลเวล ${lvl.level}`}
-                aria-valuemin={0}
-                aria-valuemax={lvl.span}
-                aria-valuenow={lvl.into}
-              >
-                <motion.span
-                  className="block h-full rounded-full bg-primary"
-                  initial={reduce ? false : { width: 0 }}
-                  animate={{ width: `${Math.round((lvl.into / lvl.span) * 100)}%` }}
-                  transition={{ duration: 0.8, ease: "easeOut" }}
-                />
-              </span>
-              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                {lvl.into}/{lvl.span} EXP
-              </span>
-            </button>
           </div>
         </header>
 
