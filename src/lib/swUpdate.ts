@@ -6,9 +6,15 @@ export const IDLE_MS = 5 * 60 * 1000;
 export const shouldReload = (idleMs: number, pendingOps: number) =>
   idleMs >= IDLE_MS && pendingOps === 0;
 
+/** A student is mid-exam: unsent answers backup exists (removed on submit) and the exams page is open. */
+const examInProgress = () =>
+  location.pathname.startsWith("/exams") &&
+  Object.keys(localStorage).some((k) => k.startsWith("helix-exam-answers:"));
+
 /** Apply an already-waiting service worker if the user is idle and the outbox is empty. */
 export async function applyWaitingIfIdle(reg: ServiceWorkerRegistration, idleMs: number, apply: () => void) {
   if (!reg.waiting) return;
+  if (examInProgress()) return;
   const pending = await idbStore.all().then((o) => o.length, () => 0);
   if (shouldReload(idleMs, pending)) apply();
 }
