@@ -2304,6 +2304,10 @@ export type Database = {
         Args: { p_request_id: string; p_reason: string };
         Returns: void;
       };
+      my_card_students: {
+        Args: Record<string, never>;
+        Returns: Pick<Student, "id" | "student_code" | "prefix" | "first_name" | "last_name" | "avatar_path" | "updated_at" | "department_id" | "grade_level_id" | "profile_id">[];
+      };
       card_portal_summary: {
         Args: { p_student_id: string };
         Returns: CardPortalSummary;
