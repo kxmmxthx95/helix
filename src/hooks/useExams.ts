@@ -397,11 +397,13 @@ export function useAvailableExams(studentId: string | null, classroomId: string 
       const sessionIds = [...new Set((targets as unknown as { session_id: string }[]).map((t) => t.session_id))];
       if (sessionIds.length === 0) return [];
 
-      const [{ data: sessions, error: sessionsError }, { data: attempts, error: attemptsError }, { data: sets, error: setsError }] = await Promise.all([
+      const [{ data: sessions, error: sessionsError }, { data: attempts, error: attemptsError }, { data: sets, error: setsError }, { data: grants, error: grantsError }] = await Promise.all([
         supabase.from("exam_sessions").select("*").in("id", sessionIds).not("opens_at", "is", null).not("closes_at", "is", null).order("opens_at", { ascending: false }),
         supabase.from("exam_attempts").select("session_id").eq("student_id", studentId!).eq("status", "submitted").in("session_id", sessionIds),
         supabase.from("exam_session_sets").select("session_id, subject_id").in("session_id", sessionIds),
+        supabase.from("exam_attempt_grants").select("session_id, extra").eq("student_id", studentId!).in("session_id", sessionIds),
       ]);
+      if (grantsError) throw grantsError;
       if (sessionsError) throw sessionsError;
       if (attemptsError) throw attemptsError;
       if (setsError) throw setsError;
@@ -410,7 +412,9 @@ export function useAvailableExams(studentId: string | null, classroomId: string 
 
       const attemptCounts = new Map<string, number>();
       for (const a of attempts) attemptCounts.set(a.session_id, (attemptCounts.get(a.session_id) ?? 0) + 1);
-      return sessions.map((s) => ({ ...s, my_attempts: attemptCounts.get(s.id) ?? 0, subject_ids: [...new Set(subjectIdsOf.get(s.id) ?? [s.subject_id])] }) as AvailableExam);
+      const extraOf = new Map(grants.map((g) => [g.session_id, g.extra]));
+      // Teacher-granted retakes fold into max_attempts so every "attempts left" check stays as is.
+      return sessions.map((s) => ({ ...s, max_attempts: s.max_attempts + (extraOf.get(s.id) ?? 0), my_attempts: attemptCounts.get(s.id) ?? 0, subject_ids: [...new Set(subjectIdsOf.get(s.id) ?? [s.subject_id])] }) as AvailableExam);
     },
   });
 }
@@ -523,6 +527,34 @@ export function useSaveAnswers() {
     mutationFn: async ({ attemptId, answers }: { attemptId: string; answers: AnswerDraft[] }) => {
       const { error } = await supabase.rpc("save_exam_answers", { p_attempt_id: attemptId, p_answers: answers });
       if (error) throw error;
+    },
+  });
+}
+
+/** Teacher: +1 attempt for the given students (server skips anyone not eligible). Resolves to how many were granted. */
+export function useGrantRetake() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ sessionId, studentIds }: { sessionId: string; studentIds: string[] }): Promise<number> => {
+      const { data, error } = await supabase.rpc("grant_exam_retake", { p_session_id: sessionId, p_student_ids: studentIds });
+      if (error) throw error;
+      return data;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["exam_attempt_grants"] });
+      void qc.invalidateQueries({ queryKey: ["exam_sessions", "available"] });
+    },
+  });
+}
+
+export function useSessionGrants(sessionId: string | null) {
+  return useQuery({
+    queryKey: ["exam_attempt_grants", sessionId],
+    enabled: !!sessionId,
+    queryFn: async (): Promise<Map<string, number>> => {
+      const { data, error } = await supabase.from("exam_attempt_grants").select("student_id, extra").eq("session_id", sessionId!);
+      if (error) throw error;
+      return new Map(data.map((g) => [g.student_id, g.extra]));
     },
   });
 }

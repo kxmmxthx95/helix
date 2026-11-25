@@ -900,6 +900,8 @@ export type ExamReviewKeyRow = { question_id: string; correct_answer: string | n
 
 export type PracticeCheckResult = { correct: boolean; correct_answer: string | null; correct_choice_ids: string[] };
 
+export type ExamAttemptGrant = { session_id: string; student_id: string; extra: number; updated_at: string };
+
 export type ExamAttemptStatus = "in_progress" | "submitted";
 
 export type ExamAttempt = {
@@ -2002,6 +2004,7 @@ export type Database = {
       exam_session_special_seats: Table<ExamSessionSpecialSeat, never>;
       exam_session_questions: Table<ExamSessionQuestion, ExamSessionQuestion>;
       exam_session_practice_questions: Table<ExamSessionPracticeQuestion, ExamSessionPracticeQuestion>;
+      exam_attempt_grants: Table<ExamAttemptGrant, never>;
       exam_attempts: Table<
         ExamAttempt,
         InsertOf<
@@ -2135,6 +2138,10 @@ export type Database = {
       submit_exam_attempt: {
         Args: { p_attempt_id: string; p_answers?: { question_id: string; choice_id: string | null; short_answer: string | null }[] };
         Returns: void;
+      };
+      grant_exam_retake: {
+        Args: { p_session_id: string; p_student_ids: string[] };
+        Returns: number;
       };
       save_exam_answers: {
         Args: { p_attempt_id: string; p_answers: { question_id: string; choice_id: string | null; short_answer: string | null }[] };

@@ -44,6 +44,8 @@ import {
   useSaveAnswers,
   useSecurityEvents,
   useSessionAttempts,
+  useSessionGrants,
+  useGrantRetake,
   useSessionQuestionCounts,
   useSessionRoster,
   useStudentAvatars,
@@ -1025,6 +1027,9 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   const { data: sessionQuestions = [], isLoading: questionsLoading } = useExamSessionQuestions(session.id);
   const [eventsOpen, setEventsOpen] = useState(false);
   const [rosterOpen, setRosterOpen] = useState(false);
+  const [retakeIds, setRetakeIds] = useState<string[] | null>(null);
+  const { data: grants } = useSessionGrants(session.id);
+  const grantRetake = useGrantRetake();
   const eventCount = useSecurityEvents(session.id).data?.length ?? 0;
   const toast = useToast();
   const updateSession = useUpdateExamSession();
@@ -1079,6 +1084,8 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
       const full = rosterNames?.get(r.student_id) ?? "นักเรียน";
       const [code, ...rest] = full.split(" ");
       return {
+        // Submitted and every attempt (max_attempts + granted extra) used up → teacher can grant one more.
+        canRetake: status === "submitted" && mine.length >= session.max_attempts + (grants?.get(r.student_id) ?? 0),
         student_id: r.student_id,
         room: roomOfClassroom.get(r.classroom_id) ?? "—",
         code: rest.length > 0 ? code : "",
@@ -1089,6 +1096,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
       };
     })
     .sort((a, b) => a.room.localeCompare(b.room, "th") || a.full.localeCompare(b.full, "th"));
+  const retakeable = rosterRows.filter((r) => r.canRetake);
   const count = (st: string) => rosterRows.filter((r) => r.status === st).length;
   const STATUS_LABEL = { locked: "ถูกล็อก", submitted: "ส่งแล้ว", in_progress: "กำลังทำ", none: "ยังไม่เข้าสอบ" } as const;
   const STATUS_CLASS = { locked: "text-destructive", submitted: "text-success", in_progress: "text-foreground", none: "text-muted-foreground" } as const;
@@ -1185,6 +1193,13 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
             <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", rosterOpen && "rotate-90")} />
           </button>
           <Collapse open={rosterOpen}>
+            {retakeable.length > 0 && (
+              <div className="flex justify-end border-t border-border bg-muted/40 px-2 pt-2">
+                <Button variant="outline" className="ui-control-compact h-7 sm:h-8" onClick={() => setRetakeIds(retakeable.map((r) => r.student_id))}>
+                  ให้ทั้งห้องสอบใหม่ ({retakeable.length})
+                </Button>
+              </div>
+            )}
             <ul className="max-h-[60vh] space-y-2 overflow-y-auto border-t border-border bg-muted/40 p-2">
               {rosterRows.map((r) => (
                 <li key={r.student_id} className="rounded-xl bg-card p-3.5 shadow-card">
@@ -1203,6 +1218,11 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
                         {r.room !== "—" && <span className={cn("inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium", levelTone(r.room))}>{r.room}</span>}
                         <span className="ml-auto text-xs tabular-nums text-muted-foreground">{r.best != null ? `${r.best}/${maxPoints}` : "—"}</span>
                       </div>
+                      {r.canRetake && (
+                        <Button variant="outline" className="ui-control-compact mt-2 h-7" onClick={() => setRetakeIds([r.student_id])}>
+                          สอบใหม่
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </li>
@@ -1227,6 +1247,15 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         </>
       )}
 
+      <ConfirmDialog
+        open={!!retakeIds}
+        title="ให้สอบใหม่?"
+        description={retakeIds ? `เพิ่มสิทธิ์สอบอีก 1 ครั้งให้นักเรียน ${retakeIds.length} คน ต้องสอบในช่วงเวลาสอบเดิม ผลรอบเก่าจะยังเก็บไว้ และคะแนนรอบล่าสุดจะเข้าสมุดคะแนน` : undefined}
+        confirmLabel="ให้สอบใหม่"
+        pending={grantRetake.isPending}
+        onCancel={() => setRetakeIds(null)}
+        onConfirm={() => retakeIds && grantRetake.mutate({ sessionId: session.id, studentIds: retakeIds }, { onSuccess: () => { setRetakeIds(null); toast("เพิ่มสิทธิ์สอบใหม่แล้ว"); }, onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
+      />
       <SecurityEventsSheet sessionId={session.id} open={eventsOpen} onOpenChange={setEventsOpen} />
     </div>
   );
