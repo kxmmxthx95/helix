@@ -2341,8 +2341,7 @@ function TakeExam({ student, session, onExit }: { student: Student; session: Ava
   // Resuming an unsubmitted attempt needs no code; starting a new one does (strict_mode, migration 0132).
   const needsCode = session.strict_mode && !mineLoading && !codeOk && !mine?.some((a) => a.status === "in_progress");
 
-  useEffect(() => {
-    if (attempt || sessionQuestions.length === 0 || mineLoading || needsCode) return;
+  function start() {
     startOrResume.mutate(
       {
         sessionId: session.id,
@@ -2352,10 +2351,29 @@ function TakeExam({ student, session, onExit }: { student: Student; session: Ava
       },
       { onSuccess: setAttempt, onError: () => toast("เข้าสอบไม่สำเร็จ", "error") },
     );
+  }
+
+  useEffect(() => {
+    if (attempt || sessionQuestions.length === 0 || mineLoading || needsCode) return;
+    start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionQuestions.length, mineLoading, needsCode]);
 
   if (needsCode) return <ExamCodeForm sessionId={session.id} onPassed={() => setCodeOk(true)} onExit={onExit} />;
+
+  if (!attempt && startOrResume.isError) {
+    return (
+      <Card className="mx-auto max-w-xl space-y-3 text-sm" role="alert">
+        <p>เข้าสอบไม่สำเร็จ กรุณาลองใหม่</p>
+        <div className="flex gap-2">
+          <Button onClick={start}>ลองใหม่</Button>
+          <Button variant="ghost" onClick={onExit}>
+            กลับ
+          </Button>
+        </div>
+      </Card>
+    );
+  }
 
   if (!attempt) return <PageSpinner />;
 
