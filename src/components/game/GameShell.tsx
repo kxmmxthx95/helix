@@ -1,5 +1,5 @@
 import { MotionConfig } from "framer-motion";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { FiSidebar } from "react-icons/fi";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
@@ -7,7 +7,7 @@ import {
   BookIcon,
   CalendarIcon,
   ChevronBack,
-  ClipboardIcon,
+  CheckboxOutlineIcon,
   CloudOff,
   DocumentTextIcon,
   HomeIcon,
@@ -23,6 +23,7 @@ import {
   TimetableIcon,
 } from "@/components/icons";
 import { MobileHeaderProvider } from "@/components/MobileHeaderSlot";
+import { GlyphTile, SECTION_TONE } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useTheme } from "@/components/ThemeProvider";
 import { Avatar } from "@/components/ui";
@@ -48,21 +49,23 @@ const TITLES: Record<string, string> = {
 };
 
 type Icon = typeof BookIcon;
-type NavItem = { to: string; label: string; icon: Icon };
+/** `section` only picks the tile colour — same palette as the teacher sidebar. */
+type NavItem = { to: string; label: string; icon: Icon; section: string };
 
-/** Desktop sidebar. */
+/** Desktop sidebar + menu sheet, grouped by section (a heading shows where the section changes). */
 const SIDE: readonly NavItem[] = [
-  { to: "/", label: "หน้าแรก", icon: HomeIcon },
-  { to: "/assignments", label: "งาน", icon: ClipboardIcon },
-  { to: "/exams", label: "สอบ", icon: DocumentTextIcon },
-  { to: "/timetable", label: "ตารางเรียน", icon: TimetableIcon },
-  { to: "/my-curriculum", label: "ผังการเรียน", icon: ListIcon },
-  { to: "/practice", label: "แบบฝึกหัด", icon: BookIcon },
-  { to: "/academic-events", label: "ปฏิทินกิจกรรม", icon: CalendarIcon },
-  { to: "/documents", label: "เอกสาร", icon: LibraryIcon },
-  { to: "/card-topup", label: "บัตรเติมเงิน", icon: PricetagIcon },
-  { to: "/profile", label: "โปรไฟล์", icon: ProfileIcon },
+  { to: "/", label: "หน้าแรก", icon: HomeIcon, section: "" },
+  { to: "/timetable", label: "ตารางเรียน", icon: TimetableIcon, section: "งานวิชาการ" },
+  { to: "/my-curriculum", label: "ผังการเรียน", icon: ListIcon, section: "งานวิชาการ" },
+  { to: "/academic-events", label: "ปฏิทินกิจกรรม", icon: CalendarIcon, section: "งานวิชาการ" },
+  { to: "/assignments", label: "งาน", icon: CheckboxOutlineIcon, section: "สอบและแบบฝึกหัด" },
+  { to: "/exams", label: "สอบ", icon: DocumentTextIcon, section: "สอบและแบบฝึกหัด" },
+  { to: "/practice", label: "แบบฝึกหัด", icon: BookIcon, section: "สอบและแบบฝึกหัด" },
+  { to: "/documents", label: "เอกสาร", icon: LibraryIcon, section: "สอบและแบบฝึกหัด" },
+  { to: "/card-topup", label: "บัตรเติมเงิน", icon: PricetagIcon, section: "การเงิน" },
+  { to: "/profile", label: "โปรไฟล์", icon: ProfileIcon, section: "บัญชี" },
 ];
+const startsSection = (i: number) => !!SIDE[i]!.section && SIDE[i]!.section !== SIDE[i - 1]?.section;
 
 const isActive = (pathname: string, to: string) => (to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`));
 const SIDEBAR_KEY = "helix-sidebar-collapsed"; // shared with the teacher shell
@@ -194,9 +197,10 @@ function GameShellInner() {
 
         <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="เมนู" side="left">
           <nav aria-label="เมนูหลัก" className="flex flex-col gap-1">
-            {SIDE.map(({ to, label, icon: Icon }) => (
+            {SIDE.map(({ to, label, icon: Icon, section }, i) => (
+              <Fragment key={to}>
+              {startsSection(i) && <p className="px-3 pb-1 pt-3 text-xs font-medium text-muted-foreground">{section}</p>}
               <button
-                key={to}
                 type="button"
                 aria-current={isActive(location.pathname, to) ? "page" : undefined}
                 onClick={() => {
@@ -209,9 +213,10 @@ function GameShellInner() {
                   FOCUS,
                 )}
               >
-                <Icon className="h-5 w-5 shrink-0 text-accent" />
+                <GlyphTile icon={Icon} tone={SECTION_TONE[section] ?? "bg-slate-500"} />
                 {label}
               </button>
+              </Fragment>
             ))}
             <button
               type="button"
@@ -265,23 +270,25 @@ function Sidebar({ pathname, collapsed }: { pathname: string; collapsed: boolean
         <img src="/logo.webp" alt="Helix" className="ml-auto h-6 w-auto dark:invert" />
       </div>
       <nav aria-label="เมนูหลัก" className="scrollbar-hidden flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
-        {SIDE.map(({ to, label, icon: Icon }) => {
+        {SIDE.map(({ to, label, icon: Icon, section }, i) => {
           const active = isActive(pathname, to);
           return (
+            <Fragment key={to}>
+            {startsSection(i) && <p className="px-2.5 pb-1 pt-3 text-xs font-medium text-muted-foreground">{section}</p>}
             <button
-              key={to}
               type="button"
               aria-current={active ? "page" : undefined}
               onClick={() => navigate(to)}
               className={cn(
-                "group tappable flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13px] font-semibold transition-colors",
-                active ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
+                "group tappable flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] font-semibold transition-colors",
+                active ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-foreground/5",
                 FOCUS,
               )}
             >
-              <Icon className={cn("h-4 w-4 shrink-0", active && "text-accent")} />
+              <GlyphTile icon={Icon} tone={SECTION_TONE[section] ?? "bg-slate-500"} />
               <span className="truncate">{label}</span>
             </button>
+            </Fragment>
           );
         })}
       </nav>

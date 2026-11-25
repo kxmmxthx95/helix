@@ -20,7 +20,15 @@ import BookFill from "react-ionicons/lib/Book";
 import BriefcaseFill from "react-ionicons/lib/Briefcase";
 import CalendarFill from "react-ionicons/lib/Calendar";
 import CheckmarkCircleFill from "react-ionicons/lib/CheckmarkCircle";
+import CalculatorFill from "react-ionicons/lib/Calculator";
 import ClipboardFill from "react-ionicons/lib/Clipboard";
+import ColorPaletteFill from "react-ionicons/lib/ColorPalette";
+import FlaskFill from "react-ionicons/lib/Flask";
+import FootballFill from "react-ionicons/lib/Football";
+import GlobeFill from "react-ionicons/lib/Globe";
+import LanguageFill from "react-ionicons/lib/Language";
+import ListFill from "react-ionicons/lib/List";
+import PersonCircleFill from "react-ionicons/lib/PersonCircle";
 import DocumentTextFill from "react-ionicons/lib/DocumentText";
 import GridFill from "react-ionicons/lib/Grid";
 import HomeFill from "react-ionicons/lib/Home";
@@ -309,4 +317,12 @@ export const FILLED_ICON = new Map<unknown, unknown>([
   [BarChartIcon, wrap(BarChartFill)],
   [PricetagIcon, wrap(PricetagFill)],
   [NotificationIcon, wrap(NotificationsFill)],
+  [FormulaIcon, wrap(CalculatorFill)],
+  [FlaskIcon, wrap(FlaskFill)],
+  [GlobeIcon, wrap(GlobeFill)],
+  [SportIcon, wrap(FootballFill)],
+  [PaletteIcon, wrap(ColorPaletteFill)],
+  [LanguageIcon, wrap(LanguageFill)],
+  [ListIcon, wrap(ListFill)],
+  [ProfileIcon, wrap(PersonCircleFill)],
 ]);

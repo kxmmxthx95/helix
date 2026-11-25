@@ -37,10 +37,10 @@ import {
   TimetableIcon,
   Users,
   WatchIcon,
-  FILLED_ICON,
 } from "@/components/icons";
 import { NavLink, useLocation, useNavigate, useOutlet } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
+import { GlyphTile, SECTION_TONE } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { MobileHeaderProvider, useMobileHeaderSlot } from "@/components/MobileHeaderSlot";
 import { useTheme } from "@/components/ThemeProvider";
@@ -439,25 +439,8 @@ const TABS = [
   },
 ];
 
-// macOS-Settings-style tile: white glyph on a coloured rounded square, one colour per menu group.
-const SECTION_TONE: Record<string, string> = {
-  "": "bg-gradient-to-b from-sky-400 to-sky-600",
-  การสอนและห้องเรียน: "bg-gradient-to-b from-orange-400 to-orange-600",
-  การเงิน: "bg-gradient-to-b from-green-400 to-green-600",
-  งานวิชาการ: "bg-gradient-to-b from-blue-400 to-blue-600",
-  บริหารจัดการ: "bg-gradient-to-b from-slate-400 to-slate-600",
-  บุคลากร: "bg-gradient-to-b from-purple-400 to-purple-600",
-  สนับสนุน: "bg-gradient-to-b from-pink-400 to-pink-600",
-  สอบและแบบฝึกหัด: "bg-gradient-to-b from-indigo-400 to-indigo-600",
-};
-
 function NavIcon({ icon, section }: { icon: (p: { className?: string }) => React.JSX.Element; section: string }) {
-  const Icon = (FILLED_ICON.get(icon) as typeof icon | undefined) ?? icon;
-  return (
-    <span className={cn("grid size-7 shrink-0 place-items-center rounded-[30%] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.35),0_0_0_0.5px_rgb(0_0_0/0.25)]", SECTION_TONE[section] ?? "bg-slate-500")}>
-      <Icon className="h-4 w-4" />
-    </span>
-  );
+  return <GlyphTile icon={icon} tone={SECTION_TONE[section] ?? "bg-slate-500"} />;
 }
 
 const SIDEBAR_KEY = "helix-sidebar-collapsed";

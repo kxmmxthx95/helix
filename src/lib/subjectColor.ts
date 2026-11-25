@@ -188,6 +188,19 @@ const SHADE_HEX: Record<AreaHue, [string, string, string]> = {
 export const subjectHex = (hue: AreaHue, step: GradeStep = 1) => SHADE_HEX[hue][step];
 export const subjectShade = (hue: AreaHue, step: GradeStep = 1) => SHADES[hue][step];
 export const subjectGradient = (hue: AreaHue, step: GradeStep = 1) => GRADIENTS[hue][step];
+/** Saturated tile for a white glyph (same look as the sidebar menu tiles). */
+const TILES: Record<AreaHue, string> = {
+  rose: "bg-gradient-to-b from-rose-400 to-rose-600",
+  blue: "bg-gradient-to-b from-blue-400 to-blue-600",
+  emerald: "bg-gradient-to-b from-emerald-400 to-emerald-600",
+  amber: "bg-gradient-to-b from-amber-400 to-amber-600",
+  orange: "bg-gradient-to-b from-orange-400 to-orange-600",
+  violet: "bg-gradient-to-b from-violet-400 to-violet-600",
+  cyan: "bg-gradient-to-b from-cyan-400 to-cyan-600",
+  pink: "bg-gradient-to-b from-pink-400 to-pink-600",
+  slate: "bg-gradient-to-b from-slate-400 to-slate-600",
+};
+export const subjectTile = (hue: AreaHue) => TILES[hue];
 /** Outline chip: coloured border + text on a white card. */
 const OUTLINES: Record<AreaHue, string> = {
   rose: "border-rose-400 text-rose-700 dark:text-rose-300",

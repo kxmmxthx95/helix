@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useLearningAreas } from "@/hooks/useCurriculum";
 import type { GradeLevel } from "@/lib/database.types";
 import { BookIcon, BriefcaseIcon, FlaskIcon, FormulaIcon, GlobeIcon, LanguageIcon, LibraryIcon, PaletteIcon, SportIcon } from "@/components/icons";
-import { areaDot, areaHue, gradeStep, subjectGradient, subjectHex, subjectOutline, subjectShade, topArea, type GradeStep } from "@/lib/subjectColor";
+import { areaDot, areaHue, gradeStep, subjectGradient, subjectHex, subjectOutline, subjectShade, subjectTile, topArea, type GradeStep } from "@/lib/subjectColor";
 
 const ICON_BY_AREA_CODE = {
   thai: BookIcon,
@@ -29,6 +29,8 @@ export function useSubjectColors(gradeLevels: GradeLevel[]) {
         subjectShade(areaHue(areaId, areaById), gradeLevelId ? gradeStep(gradeLevelId, gradeLevels) : 1),
       gradient: (areaId: string | null | undefined, gradeLevelId?: string | null) =>
         subjectGradient(areaHue(areaId, areaById), gradeLevelId ? gradeStep(gradeLevelId, gradeLevels) : 1),
+      /** Saturated gradient for a white glyph tile (see GlyphTile). */
+      tile: (areaId: string | null | undefined) => subjectTile(areaHue(areaId, areaById)),
       outline: (areaId: string | null | undefined) => subjectOutline(areaHue(areaId, areaById)),
       hex: (areaId: string | null | undefined, gradeLevelId?: string | null) =>
         subjectHex(areaHue(areaId, areaById), gradeLevelId ? gradeStep(gradeLevelId, gradeLevels) : 1),
