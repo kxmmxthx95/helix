@@ -56,6 +56,7 @@ import {
   useTopicSetsByIds,
   useTopicSetsInUse,
   useTopicSetsTopics,
+  useSetTopicSetTopics,
   useUnlockExamCode,
   useUpdateExamSession,
   useVerifyExamCode,
@@ -63,6 +64,7 @@ import {
   type ExamSessionQuestionRow,
   type AnswerDraft,
 } from "@/hooks/useExams";
+import { useSubjectsLinkedLessons } from "@/hooks/usePlan";
 import { useRooms } from "@/hooks/useSchedule";
 import { useLearningAreas } from "@/hooks/useCurriculum";
 import { topArea } from "@/lib/subjectColor";
@@ -1290,10 +1292,13 @@ function ExamRoomField({ session, room, usedRoomIds }: { session: ExamSession; r
   );
 }
 
-/** หัวข้อการสอบ card: the approved topics the room's sets cover, grouped by lesson (read-only; subjects sharing a plan show once). */
+/** หัวข้อการสอบ card: the approved topics the room's sets cover, grouped by lesson (subjects sharing a plan show once). Approvers can edit until the room opens (migration 0230). */
 function SessionTopicsCard({ session }: { session: ExamSession }) {
+  const { profile } = useAuth();
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const { data: roomSets } = useSessionSets([session.id]);
+  const canEdit = canApproveExams(profile?.roles ?? []) && !(session.opens_at && new Date(session.opens_at) <= new Date());
   const { data: topicsBySet } = useTopicSetsTopics((roomSets?.get(session.id) ?? []).map((x) => x.topic_set_id));
   const topics = [...new Map([...(topicsBySet?.values() ?? [])].flat().map((t) => [t.topic_id, t] as const)).values()];
   const lessons = [...Map.groupBy(topics, (t) => t.lesson)];
@@ -1314,6 +1319,11 @@ function SessionTopicsCard({ session }: { session: ExamSession }) {
       </button>
       <Collapse open={open}>
         <div className="space-y-3 border-t border-border bg-card p-3">
+          {canEdit && (
+            <div className="flex justify-end">
+              <Button type="button" size="sm" variant="outline" onClick={() => setEditing(true)}>แก้ไขหัวข้อ</Button>
+            </div>
+          )}
           {lessons.length === 0 ? (
             <p className="text-xs text-muted-foreground">ยังไม่มีหัวข้อ</p>
           ) : (
@@ -1332,7 +1342,54 @@ function SessionTopicsCard({ session }: { session: ExamSession }) {
           )}
         </div>
       </Collapse>
+      {editing && <EditSessionTopicsSheet sets={roomSets?.get(session.id) ?? []} current={topicsBySet} title={session.title} onClose={() => setEditing(false)} />}
     </div>
+  );
+}
+
+/** Approver edit of a room's topics: one checklist over the sets' subjects' ผังการเรียน lessons; each set keeps only topics that fit its own subject (the DB rejects others). */
+function EditSessionTopicsSheet({ sets, current, title, onClose }: { sets: { topic_set_id: string; subject_id: string }[]; current: Map<string, { topic_id: string }[]> | undefined; title: string; onClose: () => void }) {
+  const { data: lessons = [], isLoading } = useSubjectsLinkedLessons(sets.map((x) => x.subject_id));
+  const save = useSetTopicSetTopics();
+  const toast = useToast();
+  const [picked, setPicked] = useState(() => new Set(sets.flatMap((x) => (current?.get(x.topic_set_id) ?? []).map((t) => t.topic_id))));
+  const subjectsOf = new Map(lessons.flatMap((l) => l.topics.map((t) => [t.id, l.subjectIds] as const)));
+  const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (!n.delete(id)) n.add(id); return n; });
+  async function submit() {
+    try {
+      for (const x of sets) {
+        const cur = (current?.get(x.topic_set_id) ?? []).map((t) => t.topic_id);
+        await save.mutateAsync({ setId: x.topic_set_id, current: cur, next: [...picked].filter((id) => subjectsOf.get(id)?.includes(x.subject_id)) });
+      }
+      toast("บันทึกหัวข้อแล้ว");
+      onClose();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "บันทึกไม่สำเร็จ", "error");
+    }
+  }
+  return (
+    <Sheet open onOpenChange={(o) => !o && onClose()} title="แก้ไขหัวข้อการสอบ" description={title}>
+      {isLoading ? (
+        <PageSpinner />
+      ) : (
+        <div className="space-y-4">
+          {lessons.map((l) => (
+            <section key={l.id}>
+              <h3 className="mb-1.5 px-1 text-[13px] font-semibold">{l.name}</h3>
+              <div className="overflow-hidden rounded-xl bg-muted [&>*+*]:border-t [&>*+*]:border-border">
+                {l.topics.map((t) => (
+                  <label key={t.id} className="flex min-h-11 cursor-pointer items-center gap-3 px-4 py-2 text-sm">
+                    <input type="checkbox" className="h-[18px] w-[18px] shrink-0 accent-accent" checked={picked.has(t.id)} onChange={() => toggle(t.id)} />
+                    <span className="min-w-0">{t.name}</span>
+                  </label>
+                ))}
+              </div>
+            </section>
+          ))}
+          <Button type="button" className="w-full" disabled={save.isPending} onClick={() => void submit()}>บันทึก ({picked.size})</Button>
+        </div>
+      )}
+    </Sheet>
   );
 }
 
