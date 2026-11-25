@@ -344,10 +344,16 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 tabular-nums">{subjectsOf(s).map((x) => <div key={x.id} className="flex h-8 items-center"><span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(x.learning_area_id))}>{x.code}</span></div>)}</td>
                     <td className="px-4 py-3 font-medium">{subjectsOf(s).map((x) => <div key={x.id} className="flex h-8 items-center">{x.name_th}</div>)}</td>
-                    <td className="whitespace-nowrap px-4 py-3">{subjectsOf(s).map((x) => {
-                        const room = roomOfSet(setIdOf(s, x.id));
-                        return <div key={x.id} className="flex h-8 items-center">{room ? <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(room))}>{room}</span> : "—"}</div>;
-                      })}</td>
+                    {(() => {
+                      const rooms = subjectsOf(s).map((x) => roomOfSet(setIdOf(s, x.id)));
+                      const badge = (room: string | null) => (room ? <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(room))}>{room}</span> : "—");
+                      // Every subject in the same room: one badge for the row, like the other columns.
+                      return rooms.length > 1 && new Set(rooms).size === 1 ? (
+                        <td className="whitespace-nowrap px-4 py-0">{badge(rooms[0]!)}</td>
+                      ) : (
+                        <td className="whitespace-nowrap px-4 py-3">{rooms.map((room, i) => <div key={i} className="flex h-8 items-center">{badge(room)}</div>)}</td>
+                      );
+                    })()}
                     <td className="px-4 py-0">{venueOf(s) ?? <span className="text-muted-foreground">—</span>}</td>
                     <td className="whitespace-nowrap px-4 py-0">{seatBadge(s) ?? <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-4 py-0">{s.exam_type ? <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", kindTone(s.exam_type))}>{s.exam_type}</span> : <span className="text-muted-foreground">{s.title}</span>}</td>
