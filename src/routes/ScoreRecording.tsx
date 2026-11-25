@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { ChevronBack, Plus, SettingsIcon } from "@/components/icons";
+import { ChevronBack, PeopleIcon, PersonIcon, Plus, Search, SettingsIcon } from "@/components/icons";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, Card, EmptyState, Field, Input, Select, Skeleton, Spinner, Switch } from "@/components/ui";
@@ -14,7 +14,7 @@ import {
   useReopenSubmission,
 } from "@/hooks/useAssignments";
 import { useClassroomRoster } from "@/hooks/useAttendance";
-import { useSubjects } from "@/hooks/useCurriculum";
+import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
 import {
@@ -51,7 +51,8 @@ import type {
   Subject,
   TeachingAssignment,
 } from "@/lib/database.types";
-import { gradeShortLabel } from "@/lib/gradeLevels";
+import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
+import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
@@ -67,6 +68,12 @@ export function ScoreRecording() {
   // invalidate/refetch teaching_assignments show up immediately instead of
   // staying stuck on the stale object captured at click time.
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // ส่วนตัว = my own subjects; ภาพรวม = whole department (managers only).
+  const [tab, setTab] = useState<"mine" | "overview">("mine");
+  const [fGrade, setFGrade] = useState("");
+  const [fRoom, setFRoom] = useState("");
+  const [fArea, setFArea] = useState("");
+  const [fSearch, setFSearch] = useState("");
 
   const departmentId = orgWide ? pickedDept : (me?.department_id ?? "");
   const department = departments.find((d) => d.id === departmentId);
@@ -92,6 +99,8 @@ export function ScoreRecording() {
   });
   const { data: classrooms = [] } = useClassroomsByDepartment(departmentId || null);
   const { data: gradeLevels = [] } = useGradeLevels(departmentId || null);
+  const colors = useSubjectColors([]);
+  const { data: learningAreas = [] } = useLearningAreas();
 
   if (!me || (!manager && !isTeacher)) {
     return <Card className="text-sm text-muted-foreground">ไม่มีสิทธิ์เข้าถึงเมนูนี้</Card>;
@@ -99,23 +108,46 @@ export function ScoreRecording() {
 
   // Teachers only see their own assignments — grading is subject-specific,
   // not "any teacher" like /behavior (grill decision).
-  const assignments = manager ? allAssignments : allAssignments.filter((a) => a.teacher_id === me.id);
-  const selected = assignments.find((a) => a.id === selectedId) ?? null;
+  const overview = manager && tab === "overview";
+  const scoped = overview ? allAssignments : allAssignments.filter((a) => a.teacher_id === me.id);
+  const selected = scoped.find((a) => a.id === selectedId) ?? null;
 
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
   const classroomById = new Map(classrooms.map((c) => [c.id, c]));
   const gradeLevelById = new Map(gradeLevels.map((g) => [g.id, g]));
+  const roomLabel = (classroomId: string) => {
+    const c = classroomById.get(classroomId);
+    const g = c ? gradeLevelById.get(c.grade_level_id) : undefined;
+    return c ? `${g ? gradeShortLabel(g.code) : "—"}/${c.name}` : "—";
+  };
+  // Filter options come from what is actually in the list (current tab), so none lead to an empty table.
+  const gradeOpts = gradeLevels.filter((g) => scoped.some((a) => classroomById.get(a.classroom_id)?.grade_level_id === g.id));
+  const roomOpts = [...new Set(scoped.filter((a) => !fGrade || classroomById.get(a.classroom_id)?.grade_level_id === fGrade).map((a) => a.classroom_id))]
+    .sort((x, y) => roomLabel(x).localeCompare(roomLabel(y), "th", { numeric: true }));
+  const areaOpts = learningAreas.filter((l) => scoped.some((a) => subjectById.get(a.subject_id)?.learning_area_id === l.id));
+  const q = fSearch.trim().toLowerCase();
+  const assignments = scoped.filter(
+    (a) =>
+      (!fGrade || classroomById.get(a.classroom_id)?.grade_level_id === fGrade) &&
+      (!fRoom || a.classroom_id === fRoom) &&
+      (!fArea || subjectById.get(a.subject_id)?.learning_area_id === fArea) &&
+      (!q || [subjectById.get(a.subject_id)?.code, subjectById.get(a.subject_id)?.name_th].some((v) => v?.toLowerCase().includes(q))),
+  ).sort((x, y) => (subjectById.get(x.subject_id)?.code ?? "").localeCompare(subjectById.get(y.subject_id)?.code ?? "", "th", { numeric: true }));
+  const filtering = !!(fGrade || fRoom || fArea || q);
 
   return (
-    <div className="page-fill">
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {orgWide && departments.length > 0 && (
+    <div className="page-fill gap-3">
+      {orgWide && departments.length > 0 && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <Select
             className="w-auto min-w-[10rem]"
             value={pickedDept}
             onChange={(e) => {
               setPickedDept(e.target.value);
               setSelectedId(null);
+              setFGrade("");
+              setFRoom("");
+              setFArea("");
             }}
             aria-label="แผนก"
             placeholder="เลือกแผนก"
@@ -126,8 +158,56 @@ export function ScoreRecording() {
               </option>
             ))}
           </Select>
-        )}
-      </div>
+        </div>
+      )}
+
+      {manager && !selected && (
+        <div className="flex w-full shrink-0 border-b border-border" role="tablist">
+          {([["mine", "ส่วนตัว", PersonIcon], ["overview", "ภาพรวม", PeopleIcon]] as const).map(([key, label, Icon]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={tab === key}
+              onClick={() => { setTab(key); setFGrade(""); setFRoom(""); setFArea(""); setFSearch(""); }}
+              className={cn(
+                "-mb-px flex flex-1 flex-col items-center justify-center gap-1 border-b-2 px-2 py-2 text-[11px] font-medium whitespace-nowrap",
+                tab === key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {departmentId && !selected && scoped.length > 0 && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 pt-1">
+            <div className="relative min-w-[12rem] flex-[2]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+              <Input value={fSearch} onChange={(e) => setFSearch(e.target.value)} placeholder="ค้นหารหัสวิชา หรือชื่อวิชา" className="pl-9" type="search" aria-label="ค้นหาวิชา" />
+            </div>
+            <Select className="min-w-0 flex-1" value={fGrade} onChange={(e) => { setFGrade(e.target.value); setFRoom(""); }} aria-label="ชั้น" placeholder="ทุกชั้น">
+              {gradeOpts.map((g) => (
+                <option key={g.id} value={g.id}>{gradeShortLabel(g.code)}</option>
+              ))}
+            </Select>
+            <Select className="min-w-0 flex-1" value={fRoom} onChange={(e) => setFRoom(e.target.value)} aria-label="ห้อง" placeholder="ทุกห้อง">
+              {roomOpts.map((id) => (
+                <option key={id} value={id}>{roomLabel(id)}</option>
+              ))}
+            </Select>
+            <Select className="min-w-0 flex-1" value={fArea} onChange={(e) => setFArea(e.target.value)} aria-label="สาระวิชา" placeholder="ทุกสาระ">
+              {areaOpts.map((l) => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))}
+            </Select>
+            {filtering && (
+              <Button variant="ghost" size="sm" className="shrink-0" onClick={() => { setFGrade(""); setFRoom(""); setFArea(""); setFSearch(""); }}>ล้างตัวกรอง</Button>
+            )}
+        </div>
+      )}
 
       {!departmentId ? (
         <div className="flex flex-1 items-center justify-center">
@@ -147,31 +227,31 @@ export function ScoreRecording() {
           onBack={() => setSelectedId(null)}
         />
       ) : isLoading ? (
-        <div className="table-panel flex-1" role="status" aria-label="กำลังโหลด">
-          <div className="table-panel-scroll">
-            <table className="w-full min-w-[32rem] text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+        <div className="table-panel flex-1 rounded-none border-t border-border shadow-none" role="status" aria-label="กำลังโหลด">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[32rem] text-[13px]">
+              <thead className="sticky top-0 z-10 text-left text-xs">
                 <tr>
-                  <th className="px-3 py-2 font-medium">รหัสวิชา</th>
-                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
-                  <th className="px-3 py-2 font-medium">ห้อง</th>
-                  {manager && <th className="px-3 py-2 font-medium">ครูผู้สอน</th>}
+                  <th className="px-4 py-3">รหัสวิชา</th>
+                  <th className="px-4 py-3">ชื่อวิชา</th>
+                  <th className="px-4 py-3">ห้อง</th>
+                  {overview && <th className="px-4 py-3">ครูผู้สอน</th>}
                 </tr>
               </thead>
               <tbody>
                 {[0, 1, 2].map((i) => (
-                  <tr key={i} className="border-t border-border">
-                    <td className="px-3 py-2">
+                  <tr key={i} className="h-14 border-t border-border first:border-t-0">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-12" />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-32" />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-10" />
                     </td>
-                    {manager && (
-                      <td className="px-3 py-2">
+                    {overview && (
+                      <td className="px-4 py-0">
                         <Skeleton className="h-3 w-20" />
                       </td>
                     )}
@@ -181,23 +261,27 @@ export function ScoreRecording() {
             </table>
           </div>
         </div>
+      ) : overview && !filtering && scoped.length > 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState title="เลือกตัวกรอง" description="เลือกชั้น ห้อง หรือสาระวิชา เพื่อแสดงรายวิชา" />
+        </div>
       ) : assignments.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
             title="ไม่พบรายวิชา"
-            description={manager ? "ยังไม่มีภาระงานสอนในแผนกนี้" : "ยังไม่ได้รับมอบหมายวิชาที่สอน"}
+            description={filtering ? "ไม่มีรายวิชาตรงกับตัวกรอง" : overview ? "ยังไม่มีภาระงานสอนในแผนกนี้" : "ยังไม่ได้รับมอบหมายวิชาที่สอน"}
           />
         </div>
       ) : (
-        <div className="table-panel flex-1">
-          <div className="table-panel-scroll">
-            <table className="w-full min-w-[32rem] text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+        <div className="table-panel flex-1 rounded-none border-t border-border shadow-none">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[32rem] text-[13px]">
+              <thead className="sticky top-0 z-10 text-left text-xs">
                 <tr>
-                  <th className="px-3 py-2 font-medium">รหัสวิชา</th>
-                  <th className="px-3 py-2 font-medium">ชื่อวิชา</th>
-                  <th className="px-3 py-2 font-medium">ห้อง</th>
-                  {manager && <th className="px-3 py-2 font-medium">ครูผู้สอน</th>}
+                  <th className="px-4 py-3">รหัสวิชา</th>
+                  <th className="px-4 py-3">ชื่อวิชา</th>
+                  <th className="px-4 py-3">ห้อง</th>
+                  {overview && <th className="px-4 py-3">ครูผู้สอน</th>}
                 </tr>
               </thead>
               <tbody>
@@ -205,16 +289,21 @@ export function ScoreRecording() {
                   const subject = subjectById.get(a.subject_id);
                   const c = classroomById.get(a.classroom_id);
                   const g = c ? gradeLevelById.get(c.grade_level_id) : undefined;
+                  const room = c ? `${g ? gradeShortLabel(g.code) : "—"}/${c.name}` : null;
                   return (
                     <tr
                       key={a.id}
                       onClick={() => setSelectedId(a.id)}
-                      className="cursor-pointer border-t border-border hover:bg-muted active:bg-muted"
+                      className="h-14 cursor-pointer border-t border-border first:border-t-0"
                     >
-                      <td className="px-3 py-2 font-medium">{subject?.code ?? "—"}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{subject?.name_th ?? "—"}</td>
-                      <td className="px-3 py-2">{c ? `${g ? gradeShortLabel(g.code) : "—"}/${c.name}` : "—"}</td>
-                      {manager && <td className="px-3 py-2">{a.teacher_id === me.id ? "ตัวเอง" : a.teacher_id === null ? "ไม่มีครู" : "—"}</td>}
+                      <td className="px-4 py-0">
+                        <span className={cn("inline-flex rounded-md px-2 py-0.5 text-xs font-medium tabular-nums", colors.shade(subject?.learning_area_id))}>{subject?.code ?? "—"}</span>
+                      </td>
+                      <td className="px-4 py-0 text-sm font-medium">{subject?.name_th ?? "—"}</td>
+                      <td className="px-4 py-0">
+                        {room ? <span className={cn("inline-flex rounded-md px-2 py-0.5 text-xs font-medium", levelTone(room))}>{room}</span> : "—"}
+                      </td>
+                      {overview && <td className="px-4 py-0 text-muted-foreground">{a.teacher_id === me.id ? "ตัวเอง" : a.teacher_id === null ? "ไม่มีครู" : "—"}</td>}
                     </tr>
                   );
                 })}
