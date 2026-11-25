@@ -475,7 +475,7 @@ export function Avatar({ name, src, className }: { name: string; src?: string | 
       )}
       aria-hidden
     >
-      {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : initialsFromName(name)}
+      {src ? <img src={src} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : initialsFromName(name)}
     </div>
   );
 }
