@@ -82,7 +82,16 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
   const assignments = all ? everyone : mine;
   const isLoading = all ? allLoading : mineLoading;
   const { data: teachers = [], isLoading: teachersLoading } = useProfilesByIds(all ? [...new Set(everyone.map((a) => a.teacher_id).filter((x): x is string => !!x))] : []);
-  const teacherNameById = new Map(teachers.map((t) => [t.id, `${t.first_name} ${t.last_name}`]));
+  const teacherById = new Map(teachers.map((t) => [t.id, t]));
+  const teacherChip = (id: string | null | undefined, size = "h-7 w-7 text-[10px]") => {
+    const t = teacherById.get(id ?? "");
+    return t ? (
+      <div className="flex min-w-0 items-center gap-2">
+        <Avatar name={`${t.first_name} ${t.last_name}`} src={avatarUrl(t)} className={size} />
+        <span className="truncate">{t.first_name} {t.last_name}</span>
+      </div>
+    ) : null;
+  };
   const [view, setView] = useState<"cards" | "table">(defaultView);
   const scopeSelect = canSeeAll ? (
     <Select value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")} className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:w-64 sm:pr-8">
@@ -177,7 +186,6 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
               <tbody>
                 {[...groups].map(([key, members]) => {
                   const room = roomLabelOf(members[0]!);
-                  const teacherName = all ? teacherNameById.get(members[0]?.teacher_id ?? "") : undefined;
                   return (
                     <tr
                       key={key}
@@ -195,7 +203,7 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
                       <td className="px-4 py-0">
                         <span className={cn("inline-flex rounded-md px-2 py-0.5 text-xs font-medium", levelTone(room))}>{room}</span>
                       </td>
-                      {all && <td className="px-4 py-0">{teacherName}</td>}
+                      {all && <td className="px-4 py-0">{teacherChip(members[0]?.teacher_id)}</td>}
                     </tr>
                   );
                 })}
@@ -206,7 +214,6 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
       )}
       {view === "cards" && [...groups].map(([key, members]) => {
         const memberSubjects = subjectsOf(members);
-        const teacherName = all ? teacherNameById.get(members[0]?.teacher_id ?? "") : undefined;
         return (
           <div
             key={key}
@@ -231,7 +238,7 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
                     </p>
                   </div>
                 ))}
-                {teacherName && <p className="text-xs text-muted-foreground">{teacherName}</p>}
+                {all && <div className="text-xs text-muted-foreground">{teacherChip(members[0]?.teacher_id, "h-6 w-6 text-[10px]")}</div>}
               </div>
             </div>
           </div>
@@ -278,6 +285,7 @@ function TopicPickerPage({
 }) {
   const { profile } = useAuth();
   const selfApprove = isDeptHead(profile?.roles ?? []);
+  const colors = useSubjectColors([]);
   const { data: lessons = [], isLoading } = useSubjectsLinkedLessons(subjects.map((x) => x.id));
   const [picked, setPicked] = useState<string[]>([]);
   const [kind, setKind] = useState("");
@@ -318,14 +326,24 @@ function TopicPickerPage({
         </Button>
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold">เลือกหัวข้อการสอบ</h2>
-          <p className="truncate text-xs text-muted-foreground">
-            {subjects.map((x) => `${x.code} ${x.name_th}`).join(", ")} · {room} · เลือกแล้ว {picked.length} หัวข้อ
+          <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+            {subjects.map((x) => (
+              <span key={x.id} className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(x.learning_area_id))}>{x.code}</span>
+            ))}
+            <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(room))}>{room}</span>
+            <span>เลือกแล้ว {picked.length} หัวข้อ</span>
           </p>
         </div>
       </div>
       <div className="scrollbar-hidden -mx-1 min-h-0 flex-1 overflow-y-auto px-1 pt-1">
         <div className="space-y-4">
           <ExamFields kind={kind} round={round} onKind={setKind} onRound={setRound} />
+          {/* A subject only gets a set when a topic of its own ผังการเรียน is picked. */}
+          {subjects.length > 1 && picked.length > 0 && subjects.some((x) => !picked.some((id) => topicSubjects.get(id)?.includes(x.id))) && (
+            <p className="rounded-lg bg-warning/15 px-3 py-2 text-xs text-warning">
+              ยังไม่ได้เลือกหัวข้อของ {subjects.filter((x) => !picked.some((id) => topicSubjects.get(id)?.includes(x.id))).map((x) => x.code).join(", ")} วิชานี้จะไม่ถูกส่งอนุมัติ
+            </p>
+          )}
           {isLoading && <PageSpinner />}
           {!isLoading && lessons.length === 0 && (
             <p className="text-xs text-muted-foreground">ยังไม่มีบทเรียนที่ผูกกับวิชานี้ในผังการเรียน</p>
@@ -337,7 +355,12 @@ function TopicPickerPage({
             return (
               <section key={l.id}>
                 <div className="mb-1.5 flex items-center justify-between gap-3 px-1">
-                  <h3 className="min-w-0 truncate text-[13px] font-semibold">{l.name}</h3>
+                  <h3 className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold">
+                    <span className="truncate">{l.name}</span>
+                    {subjects.length > 1 && subjects.filter((x) => l.subjectIds.includes(x.id)).map((x) => (
+                      <span key={x.id} className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(x.learning_area_id))}>{x.code}</span>
+                    ))}
+                  </h3>
                   <button
                     type="button"
                     className="shrink-0 text-xs text-accent"
