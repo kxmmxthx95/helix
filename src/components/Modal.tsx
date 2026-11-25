@@ -33,6 +33,7 @@ export function Modal({
   const ref = useRef<HTMLDialogElement>(null);
   const phone = usePhone();
   const asSheet = phone && !centered;
+  const hasBody = children != null && children !== false; // no body (confirm pop-ups): no empty band between header and footer
 
   useEffect(() => {
     const dialog = ref.current;
@@ -62,7 +63,7 @@ export function Modal({
         className,
       )}
     >
-      <div className="relative shrink-0 border-b border-border px-5 pb-3 pt-5">
+      <div className={cn("relative shrink-0 px-5 pb-3 pt-5", hasBody && "border-b border-border")}>
         <button
           type="button"
           aria-label="ปิด"
@@ -76,8 +77,8 @@ export function Modal({
         </h2>
         {description && <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">{description}</p>}
       </div>
-      <div className="scrollbar-hidden min-h-0 flex-auto overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
-      {footer && <div className="shrink-0 border-t border-border px-5 pb-5 pt-3">{footer}</div>}
+      {hasBody && <div className="scrollbar-hidden min-h-0 flex-auto overflow-y-auto overscroll-contain px-5 py-4">{children}</div>}
+      {footer && <div className={cn("shrink-0 px-5 pb-5 pt-3", hasBody && "border-t border-border")}>{footer}</div>}
     </dialog>
   );
 }
