@@ -84,6 +84,7 @@ export function useSessionSeats(sessionId: string | null) {
 const refreshRooms = (qc: ReturnType<typeof useQueryClient>, sessionId: string) => {
   void qc.invalidateQueries({ queryKey: ["exam_session_rooms"] });
   void qc.invalidateQueries({ queryKey: ["exam_session_seats", sessionId] });
+  void qc.invalidateQueries({ queryKey: ["exam_seating_status"] });
   void qc.invalidateQueries({ queryKey: ["exam_session_special_seats", sessionId] }); // removing a room drops its special seats
   void qc.invalidateQueries({ queryKey: ["exam_sessions"] }); // room 1 mirrors exam_sessions.room_id
 };
@@ -145,6 +146,7 @@ export function useSetSessionSeats() {
     },
     onSettled: (_d, _e, v) => {
       void qc.invalidateQueries({ queryKey: ["exam_session_seats", v.sessionId] });
+      void qc.invalidateQueries({ queryKey: ["exam_seating_status"] });
       void qc.invalidateQueries({ queryKey: ["exam_session_special_seats", v.sessionId] }); // a student placed in the grid leaves their special seat
     },
   });
@@ -160,6 +162,37 @@ export function useSessionsWithSeating(sessionIds: string[]) {
       const { data, error } = await supabase.from("exam_session_rooms").select("session_id").in("session_id", key).not("seat_rows", "is", null);
       if (error) throw error;
       return new Set(data.map((r) => r.session_id));
+    },
+  });
+}
+
+export type SeatingStatus = { tone: "bad" | "warn" | "ok"; label: string; problems: string[] };
+
+/** Seating readiness per session (rooms, templates, clashes, capacity, seated/roster), one RPC for the whole list. */
+export function useSeatingStatus(sessionIds: string[]) {
+  const key = [...sessionIds].sort();
+  return useQuery({
+    queryKey: ["exam_seating_status", key],
+    enabled: key.length > 0,
+    queryFn: async (): Promise<Map<string, SeatingStatus>> => {
+      const { data, error } = await supabase.rpc("exam_seating_status", { p_sessions: key });
+      if (error) throw error;
+      return new Map(
+        data.map((r) => {
+          const problems = [
+            ...(r.rooms_no_room > 0 ? ["ยังไม่เลือกห้อง"] : []),
+            ...(r.rooms_no_grid > 0 ? ["ยังไม่เลือก template"] : []),
+            ...(r.clash ? ["ห้องชนกับรอบอื่น"] : []),
+            ...(r.roster > r.capacity ? [`ที่นั่งไม่พอ (${r.capacity}/${r.roster})`] : []),
+          ];
+          const left = r.roster - r.seated;
+          const status: SeatingStatus =
+            problems.length > 0 ? { tone: "bad", label: problems[0]!, problems }
+            : left > 0 ? { tone: "warn", label: `ยังไม่มีที่นั่ง ${left} คน`, problems: [`นั่งแล้ว ${r.seated}/${r.roster}`] }
+            : { tone: "ok", label: `ผังครบ ${r.seated}/${r.roster}`, problems: [] };
+          return [r.session_id, status];
+        }),
+      );
     },
   });
 }
@@ -201,7 +234,10 @@ export function useAddSpecialSeat() {
       const { error } = await supabase.rpc("add_exam_special_seat", { p_room_row: roomRowId });
       if (error) throw error;
     },
-    onSettled: (_d, _e, v) => void qc.invalidateQueries({ queryKey: ["exam_session_special_seats", v.sessionId] }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: ["exam_session_special_seats", v.sessionId] });
+      void qc.invalidateQueries({ queryKey: ["exam_seating_status"] });
+    },
   });
 }
 
@@ -216,6 +252,7 @@ export function useSetSpecialSeat() {
     onSettled: (_d, _e, v) => {
       void qc.invalidateQueries({ queryKey: ["exam_session_special_seats", v.sessionId] });
       void qc.invalidateQueries({ queryKey: ["exam_session_seats", v.sessionId] });
+      void qc.invalidateQueries({ queryKey: ["exam_seating_status"] });
     },
   });
 }
@@ -228,7 +265,10 @@ export function useDeleteSpecialSeat() {
       const { error } = await supabase.from("exam_session_special_seats").delete().eq("id", seatId);
       if (error) throw error;
     },
-    onSettled: (_d, _e, v) => void qc.invalidateQueries({ queryKey: ["exam_session_special_seats", v.sessionId] }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: ["exam_session_special_seats", v.sessionId] });
+      void qc.invalidateQueries({ queryKey: ["exam_seating_status"] });
+    },
   });
 }
 

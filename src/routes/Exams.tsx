@@ -7,7 +7,7 @@ import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, Ch
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { COL_TONES, ExamSeatingCard, seatLabel } from "@/components/ExamSeatingCard";
-import { useMyExamSeats, useSeatTemplates, useSessionRoomIds, useSessionRooms, useSessionSeats, useSessionsWithSeating, useSetRoomPhysical, useSpecialSeats } from "@/hooks/useExamSeating";
+import { useMyExamSeats, useSeatTemplates, useSessionRoomIds, useSessionRooms, useSessionSeats, useSeatingStatus, useSessionsWithSeating, useSetRoomPhysical, useSpecialSeats } from "@/hooks/useExamSeating";
 import { GlyphTile, IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -167,7 +167,9 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
   const [editing, setEditing] = useState<ExamSession | null>(null);
   const [view, setView] = useState<"cards" | "table">(defaultView);
   const [when, setWhen] = useState<"active" | "past" | "all">("active");
+  const [needFix, setNeedFix] = useState(false);
   const colors = useSubjectColors([]);
+  const { data: seatStatus } = useSeatingStatus(sessions.map((s) => s.id));
   // Physical rooms where each exam is sat (exam_session_rooms → rooms), first room first.
   const { profile: scheduleMe } = useAuth();
   const { data: venues = [], isLoading: venuesLoading } = useRooms(scheduleMe?.department_id ?? null);
@@ -195,7 +197,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
     if (when === "all") return true;
     const ended = !!s.closes_at && new Date(s.closes_at).getTime() < now;
     return when === "past" ? ended : !ended;
-  });
+  }).filter((s) => !needFix || ["bad", "warn"].includes(seatStatus?.get(s.id)?.tone ?? ""));
   const byDay = new Map<string, ExamSession[]>();
   for (const s of shown.slice().sort((a, b) => a.opens_at!.localeCompare(b.opens_at!))) {
     const day = new Date(s.opens_at!).toLocaleDateString("th-TH", { dateStyle: "full" });
@@ -211,6 +213,16 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
   }
   const subjectsOf = (s: ExamSession) => [...new Set(sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id])].flatMap((id) => subjectById.get(id) ?? []);
   const setIdOf = (s: ExamSession, subjectId: string) => sessionSets?.get(s.id)?.find((x) => x.subject_id === subjectId)?.topic_set_id ?? "";
+  const seatBadge = (s: ExamSession) => {
+    const st = seatStatus?.get(s.id);
+    if (!st) return null;
+    const tone = { bad: "bg-destructive/15 text-destructive", warn: "bg-warning/15 text-warning", ok: "bg-success/15 text-success" }[st.tone];
+    return (
+      <span title={st.problems.join(", ") || undefined} className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", tone)}>
+        {st.label}{st.problems.length > 1 && st.tone === "bad" ? ` +${st.problems.length - 1}` : ""}
+      </span>
+    );
+  };
   const row = (s: ExamSession) => {
     const sets = sessionSets?.get(s.id) ?? [{ subject_id: s.subject_id, topic_set_id: "" }];
     return (
@@ -230,6 +242,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
                 <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", kindTone(s.exam_type))}>{s.exam_type}</span>
                 {s.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(s.round))}>ครั้งที่ {s.round}</span>}
                 {venueOf(s) && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">ห้องสอบ {venueOf(s)}</span>}
+                {seatBadge(s)}
               </p>
             ) : (
               <p className="truncate text-muted-foreground">{s.title}</p>
@@ -271,6 +284,9 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
           <option value="past">ผ่านไปแล้ว</option>
           <option value="all">ทั้งหมด</option>
         </Select>
+        <Button size="sm" variant="outline" className={cn("ui-control-compact h-8", needFix && "border-accent bg-accent-soft text-accent")} aria-pressed={needFix} onClick={() => setNeedFix(!needFix)}>
+          ที่ต้องแก้
+        </Button>
         <ViewToggle value={view} onChange={setView} />
       </div>
       {isLoading || detailsLoading ? <PageSpinner /> : shown.length === 0 ? (
@@ -291,6 +307,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
                   <th className="px-4 py-3">วิชา</th>
                   <th className="px-4 py-3">ชั้น</th>
                   <th className="px-4 py-3">ห้องสอบ</th>
+                  <th className="px-4 py-3">ผังที่นั่ง</th>
                   <th className="px-4 py-3">ประเภทการสอบ</th>
                   <th className="px-4 py-3">ครั้งที่</th>
                   <th className="px-4 py-3">ครูผู้สอน</th>
@@ -310,6 +327,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
                         return <div key={x.id} className="flex h-8 items-center">{room ? <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(room))}>{room}</span> : "—"}</div>;
                       })}</td>
                     <td className="px-4 py-0">{venueOf(s) ?? <span className="text-muted-foreground">—</span>}</td>
+                    <td className="whitespace-nowrap px-4 py-0">{seatBadge(s) ?? <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-4 py-0">{s.exam_type ? <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", kindTone(s.exam_type))}>{s.exam_type}</span> : <span className="text-muted-foreground">{s.title}</span>}</td>
                     <td className="px-4 py-0">{s.round ? <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums", roundTone(s.round))}>{s.round}</span> : <span className="text-muted-foreground">—</span>}</td>
                     <td className="px-4 py-0">

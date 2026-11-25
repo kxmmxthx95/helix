@@ -2083,6 +2083,10 @@ export type Database = {
         Args: { p_room: string; p_opens: string; p_closes: string; p_exclude?: string | null };
         Returns: { session_id: string; title: string; exam_type: string | null; round: number | null; opens_at: string; closes_at: string; teacher_name: string }[];
       };
+      exam_seating_status: {
+        Args: { p_sessions: string[] };
+        Returns: { session_id: string; rooms_total: number; rooms_no_room: number; rooms_no_grid: number; clash: boolean; capacity: number; roster: number; seated: number }[];
+      };
       exam_room_conflict_seats: {
         Args: { p_session: string; p_room: string };
         Returns: { session_id: string; title: string; opens_at: string; student_name: string; student_code: string; seat_row: number; seat_col: number; seat_rows: number; seat_cols: number }[];
