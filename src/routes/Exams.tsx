@@ -171,6 +171,8 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
   const [view, setView] = useState<"cards" | "table">(defaultView);
   const [when, setWhen] = useState<"active" | "past" | "all">("active");
   const [needFix, setNeedFix] = useState(false);
+  const [fGrade, setFGrade] = useState("");
+  const [fRoom, setFRoom] = useState("");
   const colors = useSubjectColors([]);
   const { data: seatStatus } = useSeatingStatus(sessions.map((s) => s.id));
   // Physical rooms where each exam is sat (exam_session_rooms → rooms), first room first.
@@ -192,6 +194,13 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
     const g = grades.find((x) => x.id === c?.grade_level_id);
     return c && g ? `${gradeShortLabel(g.code)}/${c.name}` : null;
   };
+  // A session is in a class room (ชั้น/ห้อง) through the topic set of each of its subjects.
+  const classroomIdsOf = (s: ExamSession) => (sessionSets?.get(s.id) ?? []).flatMap((x) => classroomOfAssignment?.get(roomSets.find((t) => t.id === x.topic_set_id)?.teaching_assignment_id ?? "") ?? []);
+  const gradeOptions = grades.slice().sort((a, b) => a.code.localeCompare(b.code));
+  const roomOptions = classrooms
+    .filter((c) => !fGrade || c.grade_level_id === fGrade)
+    .map((c) => ({ id: c.id, label: `${gradeShortLabel(grades.find((g) => g.id === c.grade_level_id)?.code ?? "")}/${c.name}` }))
+    .sort((a, b) => a.label.localeCompare(b.label, "th", { numeric: true }));
   const fmtTime = (d: string) => new Date(d).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
   // Rooms without an exam time are not listed here; set the time from the room settings.
   const now = Date.now();
@@ -200,7 +209,9 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
     if (when === "all") return true;
     const ended = !!s.closes_at && new Date(s.closes_at).getTime() < now;
     return when === "past" ? ended : !ended;
-  }).filter((s) => !needFix || ["bad", "warn"].includes(seatStatus?.get(s.id)?.tone ?? ""));
+  }).filter((s) => !needFix || ["bad", "warn"].includes(seatStatus?.get(s.id)?.tone ?? ""))
+    .filter((s) => !fRoom || classroomIdsOf(s).includes(fRoom))
+    .filter((s) => !fGrade || classroomIdsOf(s).some((id) => classrooms.find((c) => c.id === id)?.grade_level_id === fGrade));
   const byDay = new Map<string, ExamSession[]>();
   for (const s of shown.slice().sort((a, b) => a.opens_at!.localeCompare(b.opens_at!))) {
     const day = new Date(s.opens_at!).toLocaleDateString("th-TH", { dateStyle: "full" });
@@ -277,15 +288,23 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
     <div className="flex min-h-0 flex-1 flex-col gap-3 pt-1">
       <div className="flex shrink-0 items-center justify-end gap-2">
         {canSeeAll && (
-          <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:w-40 sm:pr-8" aria-label="ขอบเขตตารางสอบ" value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")}>
+          <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:pr-8 min-w-0 flex-1" aria-label="ขอบเขตตารางสอบ" value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")}>
             <option value="mine">ของฉัน</option>
             <option value="all">ทุกวิชา</option>
           </Select>
         )}
-        <Select className="ui-control-compact mr-auto h-8 px-2.5 pr-7 text-[13px] sm:w-64 sm:pr-8" aria-label="ช่วงเวลาสอบ" value={when} onChange={(e) => setWhen(e.target.value as typeof when)}>
+        <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:pr-8 min-w-0 flex-1" aria-label="ช่วงเวลาสอบ" value={when} onChange={(e) => setWhen(e.target.value as typeof when)}>
           <option value="active">ยังไม่สิ้นสุด</option>
           <option value="past">ผ่านไปแล้ว</option>
           <option value="all">ทั้งหมด</option>
+        </Select>
+        <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:pr-8 min-w-0 flex-1" aria-label="ชั้น" value={fGrade} onChange={(e) => { setFGrade(e.target.value); setFRoom(""); }}>
+          <option value="">ทุกชั้น</option>
+          {gradeOptions.map((g) => <option key={g.id} value={g.id}>{gradeShortLabel(g.code)}</option>)}
+        </Select>
+        <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:pr-8 min-w-0 flex-1" aria-label="ห้อง" value={fRoom} onChange={(e) => setFRoom(e.target.value)}>
+          <option value="">ทุกห้อง</option>
+          {roomOptions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
         </Select>
         <Button size="sm" variant="outline" className={cn("ui-control-compact h-8", needFix && "border-accent bg-accent-soft text-accent")} aria-pressed={needFix} onClick={() => setNeedFix(!needFix)}>
           ที่ต้องแก้
@@ -355,7 +374,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
           ))}
         </div>
       )}
-      {editing && <SeatingSheet session={editing} onClose={() => setEditing(null)} />}
+      {editing && <SeatingSheet session={sessions.find((x) => x.id === editing.id) ?? editing} onClose={() => setEditing(null)} />}
     </div>
   );
 }
@@ -372,8 +391,8 @@ const closeAfter = (opensLocal: string, minutes: number | null) =>
   minutes && opensLocal ? toLocalInput(new Date(new Date(opensLocal).getTime() + minutes * 60_000).toISOString()) : null;
 
 /** เวลาสอบ card on the room page: same layout as ExamSettingsCard; the window saves on blur once both ends are valid. */
-function ScheduleCard({ session }: { session: ExamSession }) {
-  const [open, setOpen] = useState(false);
+function ScheduleCard({ session, defaultOpen = false }: { session: ExamSession; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [opensAt, setOpensAt] = useState(toLocalInput(session.opens_at));
   const [closesAt, setClosesAt] = useState(toLocalInput(session.closes_at));
   const update = useUpdateExamSession();
@@ -478,7 +497,10 @@ function SeatingSheet({ session, onClose }: { session: ExamSession; onClose: () 
     .sort((a, b) => a.code.localeCompare(b.code, "th") || a.name.localeCompare(b.name, "th"));
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()} title="ผังที่นั่ง" description={session.title}>
-      {isLoading ? <PageSpinner /> : <ExamSeatingCard defaultOpen session={session} roomPicker={(room, usedRoomIds) => <ExamRoomField session={session} room={room} usedRoomIds={usedRoomIds} />} students={students} />}
+      <div className="space-y-3">
+        <ScheduleCard session={session} defaultOpen />
+        {isLoading ? <PageSpinner /> : <ExamSeatingCard defaultOpen session={session} roomPicker={(room, usedRoomIds) => <ExamRoomField session={session} room={room} usedRoomIds={usedRoomIds} />} students={students} />}
+      </div>
     </Sheet>
   );
 }
