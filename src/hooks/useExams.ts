@@ -5,6 +5,7 @@ import type {
   ExamAttemptEventType,
   ExamQuestionChoiceForAttempt,
   ExamQuestionForAttempt,
+  ExamReviewKeyRow,
   PracticeCheckResult,
   ExamClaimStatus,
   ExamCodeState,
@@ -337,6 +338,19 @@ export function usePracticeCounts(sessionIds: string[]) {
 }
 
 /** Server-side practice check — returns right/wrong plus the key; nothing is stored. */
+/** The answer key of one submitted attempt — only exists while the session has review_released on (migration 0216). */
+export function useExamReviewKey(attemptId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["exam_review_key", attemptId],
+    enabled: !!attemptId && enabled,
+    queryFn: async (): Promise<Map<string, ExamReviewKeyRow>> => {
+      const { data, error } = await supabase.rpc("exam_review_key", { p_attempt: attemptId! });
+      if (error) throw error;
+      return new Map(data.map((r) => [r.question_id, r]));
+    },
+  });
+}
+
 export function usePracticeCheck() {
   return useMutation({
     mutationFn: async (a: { sessionId: string; questionId: string; choiceId: string | null; text: string | null }): Promise<PracticeCheckResult> => {

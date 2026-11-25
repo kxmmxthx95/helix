@@ -895,6 +895,9 @@ export type ExamSessionQuestion = {
 /** แนวข้อสอบ: practice questions of a room, kept apart from the real ones (migration 0207). */
 export type ExamSessionPracticeQuestion = Omit<ExamSessionQuestion, "points">;
 
+/** One row of exam_review_key(): the key of a question in a submitted attempt (migration 0216). */
+export type ExamReviewKeyRow = { question_id: string; correct_answer: string | null; correct_choice_ids: string[] };
+
 export type PracticeCheckResult = { correct: boolean; correct_answer: string | null; correct_choice_ids: string[] };
 
 export type ExamAttemptStatus = "in_progress" | "submitted";
@@ -2147,6 +2150,7 @@ export type Database = {
       self_approve_exam_topic_set: { Args: { p_id: string }; Returns: undefined };
       approver_set_no_exam: { Args: { p_id: string; p_no_exam: boolean }; Returns: undefined };
       decide_exam_topic_set: { Args: { p_id: string; p_approve: boolean; p_note?: string | null }; Returns: undefined };
+      exam_review_key: { Args: { p_attempt: string }; Returns: ExamReviewKeyRow[] };
       practice_check: { Args: { p_session: string; p_question: string; p_choice?: string | null; p_text?: string | null }; Returns: PracticeCheckResult };
       verify_exam_code: { Args: { p_session_id: string; p_code: string }; Returns: "ok" | "wrong" | "locked" };
       unlock_exam_code: { Args: { p_session_id: string; p_student_id: string }; Returns: void };

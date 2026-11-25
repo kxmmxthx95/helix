@@ -3,12 +3,12 @@ import { ViewToggle, defaultView } from "@/components/ViewToggle";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
-import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, FunnelIcon, LayersIcon, ListIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
+import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, FunnelIcon, LayersIcon, ListIcon, LocationIcon, TimeIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { COL_TONES, ExamSeatingCard, seatLabel } from "@/components/ExamSeatingCard";
 import { useMyExamSeats, useSeatTemplates, useSessionRoomIds, useSessionRooms, useSessionSeats, useSessionsWithSeating, useSetRoomPhysical, useSpecialSeats } from "@/hooks/useExamSeating";
-import { IconTile } from "@/components/IconTile";
+import { GlyphTile, IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, PageSpinner, Select, Switch } from "@/components/ui";
@@ -24,6 +24,7 @@ import {
   useRemoveSessionQuestion,
   useAttemptAnswers,
   useAttemptQuestions,
+  useExamReviewKey,
   useApproveTakeover,
   useAssignmentClassrooms,
   useAvailableExams,
@@ -72,6 +73,8 @@ import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { canApproveExams } from "@/lib/roles";
 import { ICON, ICON_BTN } from "@/lib/iconButton";
 import { cn } from "@/lib/utils";
+import { ExamPaper, type PaperQuestion } from "@/components/ExamPaper";
+import { ExamRehearsal } from "@/routes/ExamRehearsal";
 
 /** Both teacher (create/manage sessions) and student/parent (take exams) render from here — role-branched, same as Assignments.tsx/ScoreRecording.tsx. See migration 0047. */
 export function Exams() {
@@ -1646,7 +1649,10 @@ function StudentExams() {
   const options = [...(myStudent ? [myStudent] : []), ...children];
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const current = options.find((s) => s.id === selectedId) ?? options[0] ?? null;
+  const roomLabel = useRoomLabel(current?.id ?? null);
   const [activeSession, setActiveSession] = useState<AvailableExam | null>(null);
+  const [rehearsing, setRehearsing] = useState<AvailableExam | null>(null);
+  const [reviewing, setReviewing] = useState<AvailableExam | null>(null);
 
   if (options.length === 0) {
     return (
@@ -1654,6 +1660,12 @@ function StudentExams() {
         <EmptyState title="ไม่มีข้อมูล" description="เมนูนี้สำหรับนักเรียนและผู้ปกครองเท่านั้น" />
       </div>
     );
+  }
+
+  if (rehearsing) return <ExamRehearsal header={<ExamHeader session={rehearsing} roomLabel={roomLabel} />} onExit={() => setRehearsing(null)} />;
+
+  if (current && reviewing) {
+    return <ExamReview student={current} session={reviewing} roomLabel={roomLabel} onExit={() => setReviewing(null)} />;
   }
 
   if (current && activeSession) {
@@ -1679,7 +1691,7 @@ function StudentExams() {
           ))}
         </div>
       )}
-      {current && <ExamList student={current} onOpen={setActiveSession} />}
+      {current && <ExamList student={current} onOpen={setActiveSession} onRehearse={setRehearsing} onReview={setReviewing} />}
     </div>
   );
 }
@@ -1708,7 +1720,7 @@ function examStatus(e: AvailableExam, now: Date): Exclude<ExamStatusFilter, "all
   return now < new Date(e.opens_at) ? "upcoming" : "done";
 }
 
-function ExamList({ student, onOpen }: { student: Student; onOpen: (s: AvailableExam) => void }) {
+function ExamList({ student, onOpen, onRehearse, onReview }: { student: Student; onOpen: (s: AvailableExam) => void; onRehearse: (s: AvailableExam) => void; onReview: (s: AvailableExam) => void }) {
   const { data: classroom } = useMyCurrentClassroom(student.id);
   const { data: allExams = [], isLoading } = useAvailableExams(
     student.id,
@@ -1859,9 +1871,20 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
                               ฝึกทำ ({practiceCounts?.get(e.id)})
                             </Button>
                           )}
-                          <Button size="sm" disabled={!isOpen || usedUp} onClick={() => onOpen(e)}>
-                            {usedUp ? "ทำครบแล้ว" : "เข้าสอบ"}
-                          </Button>
+                          {seat && now <= closes && (
+                            <Button size="sm" variant="ghost" onClick={() => onRehearse(e)}>
+                              ทดลองเข้าห้อง
+                            </Button>
+                          )}
+                          {usedUp ? (
+                            <Button size="sm" onClick={() => onReview(e)}>
+                              ดูผลสอบ
+                            </Button>
+                          ) : (
+                            <Button size="sm" disabled={!isOpen} onClick={() => onOpen(e)}>
+                              เข้าสอบ
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1879,50 +1902,96 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
         const closes = new Date(e.closes_at);
         const isOpen = now >= opens && now <= closes;
         const usedUp = e.my_attempts >= e.max_attempts;
+        const subs = e.subject_ids.map((id) => subjects.find((x) => x.id === id)).filter((x) => !!x);
+        const SubjectIcon = colors.icon(subs[0]?.learning_area_id);
+        const hm = { hour: "2-digit", minute: "2-digit" } as const;
         return (
-          <Card key={e.id} className="flex flex-col gap-3 text-xs shadow-float">
-            <button type="button" onClick={() => setTopicFor(e)} className="min-w-0 flex-1 space-y-2 text-left">
-              <div className="flex items-start justify-between gap-2">
-                <p className="min-w-0 text-sm font-semibold">{e.subject_ids.map((id) => subjects.find((x) => x.id === id)?.name_th).filter(Boolean).join(" / ") || e.title}</p>
-                <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", e.my_attempts > 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive")}>{e.my_attempts}/{e.max_attempts}</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {e.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(e.round))}>ครั้งที่ {e.round}</span>}
-                {e.subject_ids.map((id) => subjects.find((x) => x.id === id)).filter((x) => !!x).map((sub) => (
-                  <span key={sub.id} className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", colors.shade(sub.learning_area_id))}>{sub.code}</span>
-                ))}
-                {roomLabel && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabel))}>{roomLabel}</span>}
-              </div>
-              {now >= opens && <p className="text-muted-foreground">{isOpen ? "กำลังเปิดสอบ" : "ปิดสอบแล้ว"}</p>}
-              {seat && now <= closes && (
-                <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/60 px-2.5 py-2.5">
-                  <div className="min-w-0 space-y-1">
-                    <p className="font-medium">{opens.toLocaleDateString("th-TH", { dateStyle: "medium" })}</p>
-                    <p className="font-medium">
-                      {opens.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}–{closes.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.
-                    </p>
-                    <p className="font-medium">{seat.room ? `ห้อง ${seat.room}` : "ยังไม่กำหนดห้อง"}</p>
+          <Card key={e.id} className="flex flex-col gap-0 overflow-hidden p-0 text-xs shadow-float md:p-0">
+            <button type="button" onClick={() => setTopicFor(e)} className="min-w-0 flex-1 space-y-3 p-4 text-left">
+              <div className="flex items-start gap-3">
+                <GlyphTile icon={SubjectIcon} tone={colors.tile(subs[0]?.learning_area_id)} className="size-11" iconSize={26} />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <p className="text-[15px] font-semibold leading-tight">{subs.map((x) => x.name_th).join(" / ") || e.title}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {e.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(e.round))}>ครั้งที่ {e.round}</span>}
+                    {subs.map((sub) => (
+                      <span key={sub.id} className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", colors.shade(sub.learning_area_id))}>{sub.code}</span>
+                    ))}
+                    {roomLabel && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabel))}>{roomLabel}</span>}
                   </div>
-                  {seat.seat ? (
-                    <div className={cn("flex shrink-0 flex-col items-center justify-center rounded-xl px-4 py-2", COL_TONES[(seat.seat.col - 1) % COL_TONES.length])}>
-                      <span className="text-[10px] font-medium opacity-80">ที่นั่ง</span>
-                      <span className="text-2xl font-bold leading-none tabular-nums">{seatLabel(seat.seat.row, seat.seat.col)}</span>
-                    </div>
-                  ) : (
-                    <span className="shrink-0 text-muted-foreground">ยังไม่กำหนดที่นั่ง</span>
-                  )}
+                </div>
+                {e.my_attempts > 0 ? (
+                  /* span, not <button>: this sits inside the card's topic button */
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label="ดูผลสอบ"
+                    onClick={(ev) => { ev.stopPropagation(); onReview(e); }}
+                    onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); onReview(e); } }}
+                    className="tappable shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    ทำแล้ว {e.my_attempts}/{e.max_attempts} ›
+                  </span>
+                ) : (
+                  <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
+                    ทำแล้ว 0/{e.max_attempts}
+                  </span>
+                )}
+              </div>
+              {now >= opens && (
+                <p className="flex items-center gap-1.5 font-medium">
+                  <span className={cn("size-2 rounded-full", isOpen ? "animate-pulse bg-success" : "bg-muted-foreground/50")} />
+                  {isOpen ? "กำลังเปิดสอบ" : "ปิดสอบแล้ว"}
+                </p>
+              )}
+              {seat && now <= closes && (
+                /* Ticket stub: schedule on the left, seat on the right, torn at a dashed edge. */
+                <div className="grid grid-cols-[1fr_auto] overflow-hidden rounded-2xl bg-muted/60">
+                  <div className="min-w-0 space-y-2 p-3 font-medium">
+                    <p className="flex items-center gap-2"><CalendarIcon className="size-4 shrink-0 text-muted-foreground" />{opens.toLocaleDateString("th-TH", { dateStyle: "medium" })}</p>
+                    <p className="flex items-center gap-2"><TimeIcon className="size-4 shrink-0 text-muted-foreground" />{opens.toLocaleTimeString("th-TH", hm)}–{closes.toLocaleTimeString("th-TH", hm)} น.</p>
+                    <p className="flex items-center gap-2"><LocationIcon className="size-4 shrink-0 text-muted-foreground" />{seat.room ? `ห้อง ${seat.room}` : "ยังไม่กำหนดห้อง"}</p>
+                    {/* span, not <button>: the stub sits inside the card's topic button */}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(ev) => { ev.stopPropagation(); onRehearse(e); }}
+                      onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); onRehearse(e); } }}
+                      className="tappable inline-flex items-center rounded-full bg-accent/10 px-2.5 py-1 text-[11px] font-semibold text-accent outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      ทดลองเข้าห้อง
+                    </span>
+                  </div>
+                  <div className="relative flex items-center border-l border-dashed border-border px-4">
+                    <span aria-hidden className="absolute -top-2 left-0 size-4 -translate-x-1/2 rounded-full bg-card" />
+                    <span aria-hidden className="absolute -bottom-2 left-0 size-4 -translate-x-1/2 rounded-full bg-card" />
+                    {seat.seat ? (
+                      <div className={cn("flex flex-col items-center justify-center rounded-xl px-4 py-2", COL_TONES[(seat.seat.col - 1) % COL_TONES.length])}>
+                        <span className="text-[10px] font-medium opacity-80">ที่นั่ง</span>
+                        <span className="text-2xl font-bold leading-none tabular-nums">{seatLabel(seat.seat.row, seat.seat.col)}</span>
+                      </div>
+                    ) : (
+                      <span className="w-16 text-center text-muted-foreground">ยังไม่กำหนดที่นั่ง</span>
+                    )}
+                  </div>
                 </div>
               )}
             </button>
-            <div className="flex gap-2">
+            <div className="flex gap-2 px-4 pb-4">
               {(practiceCounts?.get(e.id) ?? 0) > 0 && (
-                <Button size="sm" variant="outline" className="flex-1 border-border" onClick={() => navigate(`/exams/practice/${e.id}`, { state: { studentId: student.id, search: location.search } })}>
+                <Button variant="outline" className="flex-1 border-border" onClick={() => navigate(`/exams/practice/${e.id}`, { state: { studentId: student.id, search: location.search } })}>
                   ฝึกทำแนวข้อสอบ ({practiceCounts?.get(e.id)} ข้อ)
                 </Button>
               )}
-              <Button size="sm" className="flex-1" disabled={!isOpen || usedUp} onClick={() => onOpen(e)}>
-                {usedUp ? "ทำครบแล้ว" : "เข้าสอบ"}
-              </Button>
+              {usedUp ? (
+                <Button className="flex-1" onClick={() => onReview(e)}>
+                  ดูผลสอบ
+                </Button>
+              ) : (
+                <Button className="flex-1" disabled={!isOpen} onClick={() => onOpen(e)}>
+                  เข้าสอบ
+                </Button>
+              )}
             </div>
           </Card>
         );
@@ -1934,6 +2003,37 @@ function ExamList({ student, onOpen }: { student: Student; onOpen: (s: Available
 }
 
 /** Practice mode: answer one question at a time, check it server-side (practice_check), retry freely. Nothing is stored. */
+/** "ม.6/1" — the student's current room. */
+function useRoomLabel(studentId: string | null) {
+  const { data: classroom } = useMyCurrentClassroom(studentId);
+  const { data: rooms = [] } = useClassroomsByIds(classroom ? [classroom.classroomId] : []);
+  const { data: roomGrades = [] } = useGradeLevelsByIds(rooms.map((c) => c.grade_level_id));
+  const roomGrade = roomGrades.find((g) => g.id === rooms[0]?.grade_level_id);
+  return rooms[0] && roomGrade ? `${gradeShortLabel(roomGrade.code)}/${rooms[0].name}` : null;
+}
+
+/** Subject tile + title + round / code / room chips, on top of the practice and exam pages. */
+export function ExamHeader({ session, roomLabel }: { session: AvailableExam; roomLabel: string | null }) {
+  const { data: subjects = [] } = useSubjectsByIds(session.subject_ids);
+  const colors = useSubjectColors([]);
+  const SubjectIcon = colors.icon(subjects[0]?.learning_area_id);
+  return (
+    <div className="flex items-center gap-3 px-1">
+      <GlyphTile icon={SubjectIcon} tone={colors.tile(subjects[0]?.learning_area_id)} className="size-12" iconSize={28} />
+      <div className="min-w-0 space-y-1.5">
+        <p className="text-base font-semibold">{subjects.map((x) => x.name_th).join(" / ") || session.title}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {session.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(session.round))}>ครั้งที่ {session.round}</span>}
+          {subjects.map((sub) => (
+            <span key={sub.id} className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", colors.shade(sub.learning_area_id))}>{sub.code}</span>
+          ))}
+          {roomLabel && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabel))}>{roomLabel}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Practice runner route. Back navigation is handled by GameShell via location.state.search. */
 export function ExamPractice() {
   const { sessionId } = useParams();
@@ -1945,10 +2045,7 @@ export function ExamPractice() {
   const student = options.find((s) => s.id === state?.studentId) ?? options[0] ?? null;
   const { data: classroom } = useMyCurrentClassroom(student?.id ?? null);
   const { data: exams = [], isLoading } = useAvailableExams(student?.id ?? null, classroom?.classroomId ?? null, classroom?.academicYear ?? null);
-  const { data: rooms = [] } = useClassroomsByIds(classroom ? [classroom.classroomId] : []);
-  const { data: roomGrades = [] } = useGradeLevelsByIds(rooms.map((c) => c.grade_level_id));
-  const roomGrade = roomGrades.find((g) => g.id === rooms[0]?.grade_level_id);
-  const roomLabel = rooms[0] && roomGrade ? `${gradeShortLabel(roomGrade.code)}/${rooms[0].name}` : null;
+  const roomLabel = useRoomLabel(student?.id ?? null);
   const session = exams.find((e) => e.id === sessionId);
   if (!student) return <Navigate to="/exams" replace />;
   if (isLoading) return <PageSpinner />;
@@ -1956,10 +2053,10 @@ export function ExamPractice() {
   return <PracticeRunner session={session} roomLabel={roomLabel} />;
 }
 
+const CHOICE_MARKS = ["ก", "ข", "ค", "ง", "จ", "ฉ"];
+
 function PracticeRunner({ session, roomLabel }: { session: AvailableExam; roomLabel: string | null }) {
   const { data: rows = [], isLoading } = usePracticeQuestions(session.id);
-  const { data: subjects = [] } = useSubjectsByIds(session.subject_ids);
-  const colors = useSubjectColors([]);
   const { data } = useAttemptQuestions(rows.map((r) => r.question_id));
   const check = usePracticeCheck();
   const toast = useToast();
@@ -1967,7 +2064,6 @@ function PracticeRunner({ session, roomLabel }: { session: AvailableExam; roomLa
   const [results, setResults] = useState<Map<string, PracticeCheckResult>>(new Map());
   const [idx, setIdx] = useState(0);
   const [tab, setTab] = useState<"exam" | "overview">("exam");
-  const SubjectIcon = colors.icon(subjects[0]?.learning_area_id);
   if (isLoading || !data) return <PageSpinner />;
   const questions = rows.map((r) => data.questions.find((q) => q.id === r.question_id)).filter((q): q is NonNullable<typeof q> => !!q);
   const pick = (id: string, v: { choiceId: string | null; text: string }) => {
@@ -1984,12 +2080,17 @@ function PracticeRunner({ session, roomLabel }: { session: AvailableExam; roomLa
   const a = (q && picked.get(q.id)) ?? { choiceId: null, text: "" };
   const r = q ? results.get(q.id) : undefined;
   const choices = q ? (data.choicesByQuestion.get(q.id) ?? []) : [];
-  const percent = questions.length ? Math.floor(((idx + 1) / questions.length) * 100) : 0;
 
   const status = (id: string) => {
     const res = results.get(id);
     return res ? (res.correct ? "correct" : "wrong") : picked.has(id) ? "answered" : "todo";
   };
+  const RAIL_TONE = {
+    correct: "bg-success",
+    wrong: "bg-destructive",
+    answered: "bg-accent/45",
+    todo: "bg-border",
+  } as const;
   const STATUS_TONE = {
     correct: "border-success/40 bg-success/10 text-success",
     wrong: "border-destructive/40 bg-destructive/10 text-destructive",
@@ -2030,35 +2131,50 @@ function PracticeRunner({ session, roomLabel }: { session: AvailableExam; roomLa
     <div className="mx-auto flex w-full max-w-xl flex-1 flex-col lg:max-w-none">
       <div className="space-y-3 pb-4 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-4 lg:space-y-0">
         <div className={cn("space-y-3", tab !== "exam" && "max-lg:hidden")}>
-          <div className="flex items-center gap-3 px-1">
-            <span className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl [&>svg]:size-6", colors.shade(subjects[0]?.learning_area_id))}>
-              <SubjectIcon />
-            </span>
-            <div className="min-w-0 space-y-1.5">
-            <p className="text-base font-semibold">{subjects.map((x) => x.name_th).join(" / ") || session.title}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {session.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(session.round))}>ครั้งที่ {session.round}</span>}
-              {subjects.map((sub) => (
-                <span key={sub.id} className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", colors.shade(sub.learning_area_id))}>{sub.code}</span>
-              ))}
-              {roomLabel && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabel))}>{roomLabel}</span>}
-            </div>
-            </div>
-          </div>
+          <ExamHeader session={session} roomLabel={roomLabel} />
           {q && (
             <>
-              <Card className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-medium">
-                  <span>ข้อที่ {idx + 1} จาก {questions.length}</span>
-                  <span className="text-muted-foreground">{percent}%</span>
+              {/* Progress rail = answer map: one tappable segment per question, coloured by status. */}
+              <div className="space-y-2 px-1">
+                <div className="flex items-baseline justify-between">
+                  <p className="text-sm font-semibold tabular-nums">
+                    ข้อ {idx + 1}
+                    <span className="font-normal text-muted-foreground"> / {questions.length}</span>
+                  </p>
+                  <p className="text-xs tabular-nums text-muted-foreground">ตอบแล้ว {picked.size}</p>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-accent" style={{ width: `${percent}%` }} />
+                <div className="flex gap-0.5" role="group" aria-label="ความคืบหน้า">
+                  {questions.map((x, i) => (
+                    <button
+                      key={x.id}
+                      type="button"
+                      onClick={() => setIdx(i)}
+                      aria-label={`ไปข้อ ${i + 1}`}
+                      aria-current={i === idx}
+                      className="flex h-6 min-w-0 flex-1 items-center"
+                    >
+                      <span
+                        className={cn(
+                          "w-full rounded-full transition-all",
+                          i === idx ? "h-2.5" : "h-1.5",
+                          RAIL_TONE[status(x.id)],
+                          i === idx && status(x.id) === "todo" && "bg-accent",
+                        )}
+                      />
+                    </button>
+                  ))}
                 </div>
-              </Card>
-              <Card className={cn("space-y-3 text-sm", r && (r.correct ? "border-success/40" : "border-destructive/40"))}>
-                <span className="inline-block rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent">{idx + 1}.</span>
-                <div className="text-base font-semibold"><QuestionPromptView value={q.prompt_json} /></div>
+              </div>
+
+              <Card className="space-y-5 p-5">
+                <div className="flex items-start gap-3">
+                  <span aria-hidden className="font-heading text-4xl font-semibold leading-[1.1] tabular-nums text-accent/25">
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+                  <div className="min-w-0 flex-1 pt-0.5 text-[17px] font-semibold leading-snug">
+                    <QuestionPromptView value={q.prompt_json} />
+                  </div>
+                </div>
                 {q.question_type === "short_answer" ? (
                   <Input
                     value={a.text}
@@ -2068,39 +2184,71 @@ function PracticeRunner({ session, roomLabel }: { session: AvailableExam; roomLa
                     placeholder="พิมพ์คำตอบแล้วกด Enter"
                   />
                 ) : (
-                  <div className="space-y-2">
-                    {choices.map((c) => {
+                  <div className="space-y-2.5" role="radiogroup">
+                    {choices.map((c, ci) => {
                       const selected = a.choiceId === c.id;
-                      const right = r?.correct_choice_ids.includes(c.id);
+                      const right = !!r?.correct_choice_ids.includes(c.id);
+                      const wrong = !!r && selected && !right;
                       return (
                         <label
                           key={c.id}
                           className={cn(
-                            "flex cursor-pointer items-center gap-3 rounded-xl border border-border px-3 py-2.5 text-sm",
-                            selected && "border-accent/40 bg-accent/10",
-                            right && "border-success/50 bg-success/10 font-medium text-success",
-                            r && selected && !right && "border-destructive/50 bg-destructive/10 text-destructive",
+                            "flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-card p-3 font-sarabun text-[15px] leading-snug transition-colors active:scale-[0.99] has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent",
+                            selected && "border-accent bg-accent/5",
+                            right && "border-success/60 bg-success/10",
+                            wrong && "border-destructive/60 bg-destructive/10",
                           )}
                         >
-                          <input type="radio" name={`p-${q.id}`} checked={selected} onChange={() => { pick(q.id, { choiceId: c.id, text: "" }); runCheck(q.id, c.id, ""); }} />
-                          <QuestionPromptView value={c.label_json} />
+                          <input
+                            type="radio"
+                            className="sr-only"
+                            name={`p-${q.id}`}
+                            checked={selected}
+                            onChange={() => { pick(q.id, { choiceId: c.id, text: "" }); runCheck(q.id, c.id, ""); }}
+                          />
+                          <span
+                            aria-hidden
+                            className={cn(
+                              "flex size-7 shrink-0 items-center justify-center rounded-lg border text-[13px] font-semibold",
+                              "border-border bg-muted text-muted-foreground",
+                              selected && "border-accent bg-accent text-accent-foreground",
+                              right && "border-success bg-success text-white",
+                              wrong && "border-destructive bg-destructive text-white",
+                            )}
+                          >
+                            {right ? "✓" : wrong ? "✕" : (CHOICE_MARKS[ci] ?? ci + 1)}
+                          </span>
+                          <span className="min-w-0 flex-1 self-center">
+                            <QuestionPromptView value={c.label_json} />
+                          </span>
                         </label>
                       );
                     })}
                   </div>
                 )}
                 {r && (
-                  <p className={cn("text-xs", r.correct ? "text-success" : "text-destructive")}>
-                    {r.correct ? "ถูกต้อง" : "ไม่ถูกต้อง"}
-                    {!r.correct && r.correct_answer && ` · เฉลย: ${r.correct_answer}`}
-                  </p>
+                  <div
+                    role="status"
+                    className={cn("flex items-start gap-2.5 rounded-xl px-3 py-2.5 text-sm", r.correct ? "bg-success/10" : "bg-destructive/10")}
+                  >
+                    <span
+                      aria-hidden
+                      className={cn("mt-px flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white", r.correct ? "bg-success" : "bg-destructive")}
+                    >
+                      {r.correct ? "✓" : "✕"}
+                    </span>
+                    <div>
+                      <p className="font-semibold">{r.correct ? "ถูกต้อง" : "ไม่ถูกต้อง"}</p>
+                      {!r.correct && r.correct_answer && <p className="text-muted-foreground">เฉลย: {r.correct_answer}</p>}
+                    </div>
+                  </div>
                 )}
               </Card>
               <div className="flex gap-2">
                 <Button type="button" variant="outline" className="flex-1 border-border" disabled={idx === 0} onClick={() => setIdx(idx - 1)}>
                   <ChevronBack className="h-4 w-4" /> ข้อก่อนหน้า
                 </Button>
-                <Button type="button" className="flex-1" disabled={idx >= last} onClick={() => setIdx(idx + 1)}>
+                <Button type="button" className="flex-[2]" disabled={idx >= last} onClick={() => setIdx(idx + 1)}>
                   ข้อถัดไป <ChevronForward className="h-4 w-4" />
                 </Button>
               </div>
@@ -2169,6 +2317,7 @@ function TakeExam({ student, session, onExit }: { student: Student; session: Ava
   const startOrResume = useStartOrResumeAttempt();
   const [attempt, setAttempt] = useState<ExamAttempt | null>(null);
   const [codeOk, setCodeOk] = useState(false);
+  const roomLabel = useRoomLabel(student.id);
   const toast = useToast();
 
   // Resuming an unsubmitted attempt needs no code; starting a new one does (strict_mode, migration 0132).
@@ -2193,12 +2342,12 @@ function TakeExam({ student, session, onExit }: { student: Student; session: Ava
   if (!attempt) return <PageSpinner />;
 
   if (attempt.status === "submitted") {
-    return <AttemptResult attempt={attempt} session={session} onExit={onExit} />;
+    return <ExamReview student={student} session={session} roomLabel={roomLabel} initialAttemptId={attempt.id} onExit={onExit} />;
   }
 
   return (
     <AttemptGuard attemptId={attempt.id} onExit={onExit}>
-      <AttemptRunner attempt={attempt} session={session} onSubmitted={setAttempt} onExit={onExit} />
+      <AttemptRunner attempt={attempt} session={session} roomLabel={roomLabel} onSubmitted={setAttempt} onExit={onExit} />
     </AttemptGuard>
   );
 }
@@ -2274,11 +2423,13 @@ function AttemptGuard({ attemptId, onExit, children }: { attemptId: string; onEx
 function AttemptRunner({
   attempt,
   session,
+  roomLabel,
   onSubmitted,
   onExit,
 }: {
   attempt: ExamAttempt;
   session: AvailableExam;
+  roomLabel: string | null;
   onSubmitted: (a: ExamAttempt) => void;
   onExit: () => void;
 }) {
@@ -2336,132 +2487,179 @@ function AttemptRunner({
   const orderedQuestions = attempt.question_order
     .map((id) => data.questions.find((q) => q.id === id))
     .filter((q): q is NonNullable<typeof q> => !!q);
-  const answeredCount = orderedQuestions.filter((q) => answers?.has(q.id)).length;
-  const mins = Math.max(0, Math.floor(remainingMs / 60_000));
-  const secs = Math.max(0, Math.floor((remainingMs % 60_000) / 1000));
+  const paperQuestions: PaperQuestion[] = orderedQuestions.map((q) => {
+    const raw = data.choicesByQuestion.get(q.id) ?? [];
+    return {
+      id: q.id,
+      prompt: <QuestionPromptView value={q.prompt_json} />,
+      choices:
+        q.question_type === "short_answer"
+          ? undefined
+          : (session.shuffle_choices ? stableShuffle(raw, attempt.id) : raw).map((c) => ({
+              id: c.id,
+              label: <QuestionPromptView value={c.label_json} />,
+            })),
+    };
+  });
+  const paperAnswers = Object.fromEntries(
+    orderedQuestions.map((q) => {
+      const a = answers?.get(q.id);
+      return [q.id, { choiceId: a?.choice_id ?? null, text: a?.short_answer ?? "" }];
+    }),
+  );
 
   return (
-    <div className="mx-auto max-w-xl space-y-3 pb-4 lg:max-w-none">
-      <div className="sticky top-0 z-10 -mx-3 flex items-center justify-between bg-background/95 px-3 py-2 backdrop-blur">
-        <p className="text-xs text-muted-foreground">
-          ตอบแล้ว {answeredCount}/{orderedQuestions.length} ข้อ
-        </p>
-        {session.duration_minutes && (
-          <p className={cn("font-mono text-sm font-semibold", remainingMs < 60_000 && "text-destructive")}>
-            {mins}:{String(secs).padStart(2, "0")}
-          </p>
-        )}
-      </div>
-
-      {orderedQuestions.map((q, i) => {
-        const choices = session.shuffle_choices
-          ? [...(data.choicesByQuestion.get(q.id) ?? [])].sort(() => Math.random() - 0.5)
-          : (data.choicesByQuestion.get(q.id) ?? []);
-        const answer = answers?.get(q.id);
-        return (
-          <Card key={q.id} className="space-y-2 text-sm">
-            <div className="font-medium">
-              {i + 1}. <QuestionPromptView value={q.prompt_json} />
-            </div>
-            {q.question_type === "short_answer" ? (
-              <Input
-                value={answer?.short_answer ?? ""}
-                onChange={(e) =>
-                  saveAnswer.mutate({ attempt_id: attempt.id, question_id: q.id, choice_id: null, short_answer: e.target.value })
-                }
-                placeholder="พิมพ์คำตอบ"
-              />
-            ) : (
-              <div className="space-y-1.5">
-                {choices.map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 text-xs">
-                    <input
-                      type="radio"
-                      name={q.id}
-                      checked={answer?.choice_id === c.id}
-                      onChange={() =>
-                        saveAnswer.mutate({ attempt_id: attempt.id, question_id: q.id, choice_id: c.id, short_answer: null })
-                      }
-                    />
-                    <QuestionPromptView value={c.label_json} />
-                  </label>
-                ))}
-              </div>
-            )}
-          </Card>
-        );
-      })}
-
-      <div className="flex gap-2">
-        <Button variant="outline" className="flex-1" onClick={onExit}>
-          ออกไปก่อน (ทำต่อได้ภายหลัง)
-        </Button>
-        <Button className="flex-1" onClick={doSubmit} disabled={submit.isPending}>
-          ส่งคำตอบ
-        </Button>
-      </div>
-    </div>
+    <ExamPaper
+      header={<ExamHeader session={session} roomLabel={roomLabel} />}
+      questions={paperQuestions}
+      answers={paperAnswers}
+      onChoice={(qid, cid) => saveAnswer.mutate({ attempt_id: attempt.id, question_id: qid, choice_id: cid, short_answer: null })}
+      onText={(qid, text) => saveAnswer.mutate({ attempt_id: attempt.id, question_id: qid, choice_id: null, short_answer: text })}
+      remainingSec={session.duration_minutes ? Math.max(0, Math.ceil(remainingMs / 1000)) : null}
+      totalSec={session.duration_minutes ? session.duration_minutes * 60 : null}
+      onSubmit={doSubmit}
+      submitting={submit.isPending}
+      onLeave={onExit}
+      leaveLabel="ออกไปก่อน (ทำต่อได้ภายหลัง)"
+    />
   );
 }
 
-function AttemptResult({
-  attempt,
+/** Same order every render and on resume (sorting by a random number would reshuffle on each timer tick). */
+function stableShuffle<T extends { id: string }>(items: T[], seed: string): T[] {
+  const h = (s: string) => {
+    let x = 2166136261;
+    for (let i = 0; i < s.length; i++) x = Math.imul(x ^ s.charCodeAt(i), 16777619);
+    return x >>> 0;
+  };
+  return [...items].sort((a, b) => h(seed + a.id) - h(seed + b.id));
+}
+
+/**
+ * Read-only review of the student's own submitted attempts (a guardian sees their child's). The score is always
+ * shown; the questions, answers and the key only once the teacher turns on review_released — the database does
+ * not hand out question text before that (can_read_exam_question, 0047; the key comes from exam_review_key, 0216).
+ */
+function ExamReview({
+  student,
   session,
+  roomLabel,
+  initialAttemptId,
   onExit,
 }: {
-  attempt: ExamAttempt;
+  student: Student;
   session: AvailableExam;
+  roomLabel: string | null;
+  initialAttemptId?: string;
   onExit: () => void;
 }) {
+  const { data: mine, isLoading, isFetching } = useMyAttempts(session.id, student.id);
+  const [pickedId, setPickedId] = useState<string | null>(initialAttemptId ?? null);
+  const submitted = (mine ?? []).filter((x) => x.status === "submitted"); // newest attempt first
+  const attempt = submitted.find((x) => x.id === pickedId) ?? submitted[0] ?? null;
+  const released = session.review_released;
   const { data: sessionQuestions = [] } = useExamSessionQuestions(session.id);
-  const { data: answers } = useAttemptAnswers(attempt.id);
-  const reviewIds = session.review_released ? attempt.question_order : [];
-  const { data: reviewData } = useAttemptQuestions(reviewIds);
-  const maxPoints = sessionQuestions.reduce((s, q) => s + q.points, 0);
+  const { data: answers } = useAttemptAnswers(attempt?.id ?? null);
+  const { data: reviewData } = useAttemptQuestions(released && attempt ? attempt.question_order : []);
+  const { data: key, isError: keyError } = useExamReviewKey(attempt?.id ?? null, released);
+  const maxPoints = sessionQuestions.reduce((sum, x) => sum + x.points, 0);
+  const pointsOf = new Map(sessionQuestions.map((x) => [x.question_id, x.points]));
+  const header = <ExamHeader session={session} roomLabel={roomLabel} />;
 
+  if (isLoading || (isFetching && !attempt)) return <PageSpinner />; // right after submitting, the list is refetching
+  if (!attempt) {
+    return (
+      <div className="mx-auto w-full max-w-sm space-y-4 pt-2">
+        {header}
+        <Card className="space-y-1 p-6 text-center shadow-float">
+          <p className="font-heading text-lg font-bold">ยังไม่มีผลสอบ</p>
+          <p className="text-xs text-muted-foreground">จะมีผลให้ดูเมื่อส่งคำตอบแล้ว</p>
+        </Card>
+        <Button className="w-full" onClick={onExit}>
+          กลับหน้าสอบ
+        </Button>
+      </div>
+    );
+  }
+
+  const switcher =
+    submitted.length > 1 ? (
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="เลือกครั้งที่ทำ">
+        {[...submitted].reverse().map((x) => (
+          <button
+            key={x.id}
+            type="button"
+            onClick={() => setPickedId(x.id)}
+            aria-pressed={x.id === attempt.id}
+            className={cn(
+              "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+              x.id === attempt.id ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
+            )}
+          >
+            ครั้งที่ {x.attempt_no}
+          </button>
+        ))}
+      </div>
+    ) : null;
+  const scoreLabel = `${attempt.score ?? "—"}/${maxPoints}`;
+
+  if (!released || !reviewData || !key) {
+    const loading = released && !keyError && (!reviewData || !key);
+    return (
+      <div className="mx-auto w-full max-w-sm space-y-4 pt-2 sm:max-w-xl">
+        {header}
+        {switcher}
+        <Card className="space-y-2 p-6 text-center shadow-float">
+          <p className="text-xs text-muted-foreground">คะแนนที่ได้</p>
+          <p className="font-heading text-4xl font-bold tabular-nums">{scoreLabel}</p>
+          <p className="text-xs text-muted-foreground">{loading ? "กำลังโหลดเฉลย…" : released ? "โหลดเฉลยไม่สำเร็จ ลองใหม่อีกครั้ง" : "รอครูเปิดเฉลย — จะดูข้อสอบและคำตอบของตัวเองได้เมื่อครูเปิด"}</p>
+        </Card>
+        <Button className="w-full" onClick={onExit}>
+          กลับหน้าสอบ
+        </Button>
+      </div>
+    );
+  }
+
+  const ordered = attempt.question_order.map((id) => reviewData.questions.find((x) => x.id === id)).filter((x): x is NonNullable<typeof x> => !!x);
+  const paperQuestions: PaperQuestion[] = ordered.map((q) => {
+    const ans = answers?.get(q.id);
+    const given = !!ans && (!!ans.choice_id || !!ans.short_answer?.trim());
+    const k = key.get(q.id);
+    const raw = reviewData.choicesByQuestion.get(q.id) ?? [];
+    const max = pointsOf.get(q.id);
+    return {
+      id: q.id,
+      prompt: <QuestionPromptView value={q.prompt_json} />,
+      choices:
+        q.question_type === "short_answer"
+          ? undefined
+          : (session.shuffle_choices ? stableShuffle(raw, attempt.id) : raw).map((c) => ({
+              id: c.id,
+              label: <QuestionPromptView value={c.label_json} />,
+              correct: !!k?.correct_choice_ids.includes(c.id),
+            })),
+      verdict: !given ? "skipped" : ans?.is_correct ? "right" : "wrong",
+      correctAnswer: k?.correct_answer ?? null,
+      points: max != null ? `ได้ ${ans?.points_awarded ?? 0}/${max} คะแนน` : undefined,
+    };
+  });
+  const paperAnswers = Object.fromEntries(
+    ordered.map((q) => {
+      const ans = answers?.get(q.id);
+      return [q.id, { choiceId: ans?.choice_id ?? null, text: ans?.short_answer ?? "" }];
+    }),
+  );
   return (
-    <div className="mx-auto max-w-xl space-y-3 lg:max-w-none">
-      <Card className="text-center">
-        <p className="text-xs text-muted-foreground">คะแนนที่ได้</p>
-        <p className="font-heading text-2xl font-bold">
-          {attempt.score ?? "—"}/{maxPoints}
-        </p>
-      </Card>
-
-      {!session.review_released ? (
-        <p className="text-center text-xs text-muted-foreground">รอครูเปิดเฉลย</p>
-      ) : (
-        reviewData?.questions.map((q, i) => {
-          const answer = answers?.get(q.id);
-          const choices = reviewData.choicesByQuestion.get(q.id) ?? [];
-          return (
-            <Card key={q.id} className={cn("space-y-1 text-sm", answer?.is_correct ? "border-success/40" : "border-destructive/40")}>
-              <div className="font-medium">
-                {i + 1}. <QuestionPromptView value={q.prompt_json} />
-              </div>
-              {q.question_type === "short_answer" ? (
-                <p className="text-xs">คำตอบของคุณ: {answer?.short_answer || "—"}</p>
-              ) : (
-                <ul className="space-y-0.5 text-xs">
-                  {choices.map((c) => (
-                    <li key={c.id} className={cn(answer?.choice_id === c.id && "font-medium")}>
-                      {answer?.choice_id === c.id ? "● " : "○ "}
-                      <QuestionPromptView value={c.label_json} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className={cn("text-xs", answer?.is_correct ? "text-success" : "text-destructive")}>
-                {answer?.is_correct ? "ถูกต้อง" : "ไม่ถูกต้อง"} ({answer?.points_awarded ?? 0} คะแนน)
-              </p>
-            </Card>
-          );
-        })
-      )}
-
-      <Button variant="outline" className="w-full" onClick={onExit}>
-        กลับไปหน้ารายการสอบ
-      </Button>
-    </div>
+    <ExamPaper
+      key={attempt.id}
+      header={header}
+      questions={paperQuestions}
+      answers={paperAnswers}
+      notices={switcher}
+      review={{ scoreLabel }}
+      onLeave={onExit}
+      leaveLabel="กลับหน้าสอบ"
+    />
   );
 }
