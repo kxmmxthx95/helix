@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ViewToggle, defaultView } from "@/components/ViewToggle";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
-import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, FunnelIcon, LayersIcon, ListIcon, LocationIcon, TimeIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
+import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, FunnelIcon, LayersIcon, ListIcon, LocationIcon, PrintIcon, TimeIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { COL_TONES, ExamSeatingCard, seatLabel } from "@/components/ExamSeatingCard";
@@ -1545,6 +1546,60 @@ function QuestionBody({ q, i }: { q: ExamQuestionWithChoices; i: number }) {
   );
 }
 
+/** Full-screen preview of a room's questions on A4 paper (listed order, no shuffle), with a print button. Portals into <body>; index.css prints only the paper. */
+function PrintExamSheet({ session, questions, subjects, withKey, onDone }: { session: ExamSession; questions: ExamQuestionWithChoices[]; subjects: Subject[]; withKey: boolean; onDone: () => void }) {
+  const opens = session.opens_at ? new Date(session.opens_at) : null;
+  const when = opens ? `${opens.toLocaleDateString("th-TH", { dateStyle: "long" })} ${opens.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.` : "-";
+  return createPortal(
+    <div className="print-sheet">
+      <div className="print-toolbar">
+        <Button size="sm" variant="outline" onClick={onDone}>ปิด</Button>
+        <Button size="sm" onClick={() => window.print()}><PrintIcon className="mr-1 h-4 w-4" />พิมพ์</Button>
+      </div>
+      <div className="paper">
+      <h1 style={{ fontSize: 18, fontWeight: 700, textAlign: "center" }}>{session.title}{withKey && " (ฉบับเฉลย)"}</h1>
+      <p style={{ textAlign: "center" }}>วิชา {subjects.map((x) => `${x.code} ${x.name_th}`).join(", ") || "-"}</p>
+      <p style={{ textAlign: "center" }}>
+        วันที่สอบ {when} · เวลา {session.duration_minutes ? `${session.duration_minutes} นาที` : "-"} · {questions.length} ข้อ · {questions.reduce((n, q) => n + q.points, 0)} คะแนน
+      </p>
+      {!withKey && (
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 6, margin: "10px 0", borderBottom: "1px solid #000", paddingBottom: 6 }}>
+          {([["ชื่อ-สกุล", 5], ["เลขที่", 1], ["ห้อง", 1.5]] as const).map(([label, grow]) => (
+            <span key={label} style={{ display: "flex", alignItems: "flex-end", gap: 4, flex: grow }}>
+              {label}<span style={{ flex: 1, borderBottom: "1px dotted #000", height: "1em" }} />
+            </span>
+          ))}
+        </div>
+      )}
+      <ol style={{ listStyle: "none", padding: 0, margin: "12px 0 0" }}>
+        {questions.map((q, i) => (
+          <li key={q.id} style={{ breakInside: "avoid", marginBottom: 12, display: "flex", gap: 6 }}>
+            <span style={{ width: 22, flexShrink: 0 }}>{i + 1}.</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="print-prompt"><QuestionPromptView value={q.prompt_json} /></div>
+              {q.question_type === "short_answer" ? (
+                withKey ? <p style={{ fontWeight: 700 }}>เฉลย: {q.correct_answer}</p> : <div style={{ borderBottom: "1px solid #000", height: 24 }} />
+              ) : (
+                <ul style={{ listStyle: "none", padding: 0, margin: "4px 0 0" }}>
+                  {q.choices.map((c, ci) => (
+                    <li key={c.id} style={{ display: "flex", gap: 6, fontWeight: withKey && c.is_correct ? 700 : 400 }}>
+                      <span>{CHOICE_LETTERS[ci] ?? ci + 1}.</span>
+                      <span style={{ flex: 1 }}><QuestionPromptView value={c.label_json} /></span>
+                      {withKey && c.is_correct && <span>✓</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 /** Collapsible card listing the questions already in the room. */
 function SessionQuestionList({ session, sessionQuestions, practice }: { session: ExamSession; sessionQuestions: ExamSessionQuestionRow[]; practice?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -1561,6 +1616,8 @@ function SessionQuestionList({ session, sessionQuestions, practice }: { session:
   const { data: bank = [] } = useExamQuestionsOf(fetchBank ? (subjectIds.length > 0 ? subjectIds : [session.subject_id]) : []);
   const byId = new Map(bank.map((q) => [q.id, q]));
   const chosen = sessionQuestions.map((r) => byId.get(r.question_id)).filter((q): q is ExamQuestionWithChoices => !!q);
+  const [printing, setPrinting] = useState<"student" | "key" | null>(null);
+  const { data: printSubjects = [] } = useSubjectsByIds(printing ? subjectIds : []);
   // Every row is a stack of rich-text/math editors; mounting 20 at once stalls the opening animation. Mount a few
   // after the card starts opening, then the rest in small batches. Once mounted they stay, so reopening is instant.
   const [mounted, setMounted] = useState(0);
@@ -1585,6 +1642,12 @@ function SessionQuestionList({ session, sessionQuestions, practice }: { session:
       <Collapse open={open}>
         <div className="divide-y divide-border border-t border-border bg-card">
           {sessionQuestions.length === 0 && <p className="p-3 text-xs text-muted-foreground">{practice ? "ยังไม่มีแนวข้อสอบในห้องนี้" : "ยังไม่มีข้อสอบในห้องนี้"}</p>}
+          {chosen.length > 0 && (
+            <div className="flex flex-wrap gap-2 p-3">
+              <Button size="sm" variant="secondary" onClick={() => setPrinting("student")}><PrintIcon className="mr-1 h-4 w-4" />ดูตัวอย่าง/พิมพ์ฉบับนักเรียน</Button>
+              <Button size="sm" variant="secondary" onClick={() => setPrinting("key")}><PrintIcon className="mr-1 h-4 w-4" />ดูตัวอย่าง/พิมพ์ฉบับเฉลย</Button>
+            </div>
+          )}
           {chosen.slice(0, mounted).map((q, i) => (
             <div key={q.id} className="flex items-start gap-2 p-3 [contain-intrinsic-size:auto_260px] [content-visibility:auto]">
               <div className="min-w-0 flex-1"><QuestionBody q={q} i={i} /></div>
@@ -1623,6 +1686,7 @@ function SessionQuestionList({ session, sessionQuestions, practice }: { session:
         <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", adding && "rotate-90")} />
       </button>
       <AddSessionQuestionPanel session={session} open={adding} practice={practice} />
+      {printing && <PrintExamSheet session={session} questions={chosen} subjects={printSubjects} withKey={printing === "key"} onDone={() => setPrinting(null)} />}
       {/* Keyed so the form remounts with the picked question; its state is seeded once on mount. */}
       <QuestionSheet
         key={editingQ?.id ?? "new"}
