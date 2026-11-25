@@ -515,18 +515,15 @@ export function useAttemptAnswers(attemptId: string | null) {
   });
 }
 
-/** One question's answer, upserted on every change — autosave, no separate save button. */
-export function useSaveAnswer() {
-  const qc = useQueryClient();
+export type AnswerDraft = { question_id: string; choice_id: string | null; short_answer: string | null };
+
+/** Batch-syncs the answers kept on the device (save_exam_answers, migration 0223); the final submit sends the full set again. */
+export function useSaveAnswers() {
   return useMutation({
-    mutationFn: async (answer: { attempt_id: string; question_id: string; choice_id: string | null; short_answer: string | null }) => {
-      const { error } = await supabase
-        .from("exam_attempt_answers")
-        .upsert({ ...answer, answered_at: new Date().toISOString() }, { onConflict: "attempt_id,question_id" });
+    mutationFn: async ({ attemptId, answers }: { attemptId: string; answers: AnswerDraft[] }) => {
+      const { error } = await supabase.rpc("save_exam_answers", { p_attempt_id: attemptId, p_answers: answers });
       if (error) throw error;
     },
-    onSettled: (_data, _err, vars) =>
-      void qc.invalidateQueries({ queryKey: ["exam_attempt_answers", vars.attempt_id] }),
   });
 }
 
@@ -543,8 +540,8 @@ export function useLogAttemptEvent() {
 export function useSubmitAttempt() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (attemptId: string) => {
-      const { error } = await supabase.rpc("submit_exam_attempt", { p_attempt_id: attemptId });
+    mutationFn: async ({ attemptId, answers }: { attemptId: string; answers: AnswerDraft[] }) => {
+      const { error } = await supabase.rpc("submit_exam_attempt", { p_attempt_id: attemptId, p_answers: answers });
       if (error) throw error;
     },
     onSettled: () => {

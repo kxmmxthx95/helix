@@ -2133,7 +2133,11 @@ export type Database = {
         Returns: void;
       };
       submit_exam_attempt: {
-        Args: { p_attempt_id: string };
+        Args: { p_attempt_id: string; p_answers?: { question_id: string; choice_id: string | null; short_answer: string | null }[] };
+        Returns: void;
+      };
+      save_exam_answers: {
+        Args: { p_attempt_id: string; p_answers: { question_id: string; choice_id: string | null; short_answer: string | null }[] };
         Returns: void;
       };
       handover_teaching_assignments: {

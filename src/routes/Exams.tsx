@@ -41,7 +41,7 @@ import {
   useAllExamSessions,
   useMyExamSessions,
   useMyTopicSets,
-  useSaveAnswer,
+  useSaveAnswers,
   useSecurityEvents,
   useSessionAttempts,
   useSessionQuestionCounts,
@@ -59,6 +59,7 @@ import {
   useVerifyExamCode,
   type AvailableExam,
   type ExamSessionQuestionRow,
+  type AnswerDraft,
 } from "@/hooks/useExams";
 import { useRooms } from "@/hooks/useSchedule";
 import { useLearningAreas } from "@/hooks/useCurriculum";
@@ -2471,7 +2472,7 @@ function AttemptRunner({
 }) {
   const { data } = useAttemptQuestions(attempt.question_order);
   const { data: answers } = useAttemptAnswers(attempt.id);
-  const saveAnswer = useSaveAnswer();
+  const saveAnswers = useSaveAnswers();
   const submit = useSubmitAttempt();
   const logEvent = useLogAttemptEvent();
   const toast = useToast();
@@ -2495,7 +2496,10 @@ function AttemptRunner({
       logEvent.mutate({ attemptId: attempt.id, eventType: "blur" });
     }
     function onVisibility() {
-      if (document.hidden) logEvent.mutate({ attemptId: attempt.id, eventType: "visibility_hidden" });
+      if (document.hidden) {
+        logEvent.mutate({ attemptId: attempt.id, eventType: "visibility_hidden" });
+        void syncRef.current();
+      }
     }
     window.addEventListener("blur", onBlur);
     document.addEventListener("visibilitychange", onVisibility);
@@ -2506,9 +2510,68 @@ function AttemptRunner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attempt.id]);
 
+  // Answers live on this device and sync in batches (and with the final submit): one write per minute, not per tap.
+  const backupKey = `helix-exam-answers:${attempt.id}`;
+  const [local, setLocal] = useState<Record<string, AnswerDraft>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(backupKey) ?? "{}") as Record<string, AnswerDraft>;
+    } catch {
+      return {};
+    }
+  });
+  const pending = useRef<Record<string, AnswerDraft>>({ ...local }); // a restored backup has not reached the server yet
+  const syncing = useRef(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(backupKey, JSON.stringify(local));
+    } catch {
+      /* private mode / quota: the in-memory copy and the periodic sync still protect the answers */
+    }
+  }, [local, backupKey]);
+
+  function setAnswer(d: AnswerDraft) {
+    pending.current[d.question_id] = d;
+    setLocal((prev) => ({ ...prev, [d.question_id]: d }));
+  }
+
+  async function sync() {
+    const batch = Object.values(pending.current);
+    if (batch.length === 0 || syncing.current) return;
+    syncing.current = true;
+    try {
+      await saveAnswers.mutateAsync({ attemptId: attempt.id, answers: batch });
+      for (const d of batch) if (pending.current[d.question_id] === d) delete pending.current[d.question_id];
+    } catch {
+      /* kept in pending: the next tick (or the final submit) sends it again */
+    } finally {
+      syncing.current = false;
+    }
+  }
+  const syncRef = useRef(sync);
+  syncRef.current = sync;
+  useEffect(() => {
+    const t = window.setInterval(() => void syncRef.current(), 60_000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  const mergedAnswers = useMemo(() => {
+    const m = new Map<string, AnswerDraft>();
+    for (const [qid, a] of answers ?? []) m.set(qid, { question_id: qid, choice_id: a.choice_id, short_answer: a.short_answer });
+    for (const d of Object.values(local)) m.set(d.question_id, d);
+    return m;
+  }, [answers, local]);
+
   function doSubmit() {
-    submit.mutate(attempt.id, {
-      onSuccess: () => onSubmitted({ ...attempt, status: "submitted" }),
+    submit.mutate({ attemptId: attempt.id, answers: [...mergedAnswers.values()] }, {
+      onSuccess: () => {
+        try {
+          localStorage.removeItem(backupKey);
+        } catch {
+          /* ignore */
+        }
+        onSubmitted({ ...attempt, status: "submitted" });
+      },
       onError: () => toast("ส่งคำตอบไม่สำเร็จ", "error"),
     });
   }
@@ -2539,7 +2602,7 @@ function AttemptRunner({
   });
   const paperAnswers = Object.fromEntries(
     orderedQuestions.map((q) => {
-      const a = answers?.get(q.id);
+      const a = mergedAnswers.get(q.id);
       return [q.id, { choiceId: a?.choice_id ?? null, text: a?.short_answer ?? "" }];
     }),
   );
@@ -2549,13 +2612,16 @@ function AttemptRunner({
       header={<ExamHeader session={session} roomLabel={roomLabel} />}
       questions={paperQuestions}
       answers={paperAnswers}
-      onChoice={(qid, cid) => saveAnswer.mutate({ attempt_id: attempt.id, question_id: qid, choice_id: cid, short_answer: null })}
-      onText={(qid, text) => saveAnswer.mutate({ attempt_id: attempt.id, question_id: qid, choice_id: null, short_answer: text })}
+      onChoice={(qid, cid) => setAnswer({ question_id: qid, choice_id: cid, short_answer: null })}
+      onText={(qid, text) => setAnswer({ question_id: qid, choice_id: null, short_answer: text })}
       remainingSec={session.duration_minutes ? Math.max(0, Math.ceil(remainingMs / 1000)) : null}
       totalSec={session.duration_minutes ? session.duration_minutes * 60 : null}
       onSubmit={doSubmit}
       submitting={submit.isPending}
-      onLeave={onExit}
+      onLeave={() => {
+        void sync();
+        onExit();
+      }}
       leaveLabel="ออกไปก่อน (ทำต่อได้ภายหลัง)"
     />
   );
