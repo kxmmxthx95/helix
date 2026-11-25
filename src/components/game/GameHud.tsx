@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -34,7 +33,6 @@ import { STARTING_SCORE, summarizeBehaviorScore, useBehaviorRecords } from "@/ho
 import { profileFullName } from "@/lib/database.types";
 import { deriveBadges, expFromCounts, levelFromExp, rankFromExp } from "@/lib/exp";
 import { useMyIslands } from "@/lib/islands";
-import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { SubmitSheet } from "@/routes/Assignments";
 import { StudentPeriodAttendanceSection } from "@/routes/StudentPeriodAttendance";
@@ -69,28 +67,13 @@ const PANEL_TITLE: Record<Panel, string> = {
 };
 
 
-/** Lifetime counts for the caller only (RPC resolves the student from auth.uid()). */
-function useLifetimeExp() {
-  return useQuery({
-    queryKey: ["student_lifetime_exp"],
-    // Slow aggregate (4 table scans) that only grows slowly — don't refetch on every focus/mount.
-    staleTime: 10 * 60_000,
-    refetchOnWindowFocus: false,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("student_lifetime_exp");
-      if (error) throw error;
-      return data[0];
-    },
-  });
-}
-
 function Inventory({ badges, rank, exp }: { badges: ReturnType<typeof deriveBadges>; rank: ReturnType<typeof rankFromExp>; exp: number }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 rounded-[14px] bg-card p-3">
         <GameIcon name={`rank-${rank.id}`} fallback={RibbonIcon} className="h-12 w-12 shrink-0" />
         <div className="leading-relaxed">
-          <p className="text-xs text-muted-foreground">แรงก์สะสมตลอดการเรียน</p>
+          <p className="text-xs text-muted-foreground">แรงก์เทอมนี้</p>
           <p className="text-lg font-bold">{rank.label}</p>
           <p className="text-xs">{exp.toLocaleString()} EXP</p>
         </div>
@@ -188,7 +171,6 @@ export function GameHud() {
   const termRange = term?.start_date && term.end_date ? { start: term.start_date, end: term.end_date } : year;
   const { data: termAttendance = [] } = useAttendanceRange({ studentId: studentId ?? "", startDate: termRange.start, endDate: termRange.end });
   const { data: termBehavior = [] } = useBehaviorRecords({ studentId: studentId ?? "", startDate: termRange.start, endDate: termRange.end });
-  const { data: life } = useLifetimeExp();
   const { islands } = useMyIslands(myStudent);
 
   const counts = summarizeAttendance(attendance);
@@ -212,19 +194,11 @@ export function GameHud() {
   const behaviorRemaining = summarizeBehaviorScore(termBehavior);
   const termExp = expFromCounts({ onTime, late, present: termCounts.present, lateArrival: termCounts.late, behaviorRemaining });
   const lvl = levelFromExp(termExp);
-  const lifeExp = life
-    ? expFromCounts({
-        onTime: life.sub_on_time,
-        late: life.sub_late,
-        present: life.att_present,
-        lateArrival: life.att_late,
-        behaviorRemaining: STARTING_SCORE + life.behavior_points, // ponytail: one 100 for all years; per-year if ranks need to reward each clean year
-      })
-    : termExp;
+  const lifeExp = termExp;
   const rank = rankFromExp(lifeExp);
   const badges = deriveBadges({
-    submissions: life ? life.sub_on_time + life.sub_late : submissionsInTerm,
-    level: levelFromExp(Math.max(termExp, lifeExp)).level,
+    submissions: submissionsInTerm,
+    level: lvl.level,
     monthAttendance: counts,
     behaviorRemaining,
     behaviorStart: STARTING_SCORE,
