@@ -73,6 +73,9 @@ const PANEL_TITLE: Record<Panel, string> = {
 function useLifetimeExp() {
   return useQuery({
     queryKey: ["student_lifetime_exp"],
+    // Slow aggregate (4 table scans) that only grows slowly — don't refetch on every focus/mount.
+    staleTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("student_lifetime_exp");
       if (error) throw error;

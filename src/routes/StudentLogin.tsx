@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { clearSuspendedNotice, takeSuspendedNotice, useAuth } from "@/auth/AuthProvider";
+import { clearSuspendedNotice, SignInBusyError, takeSuspendedNotice, useAuth } from "@/auth/AuthProvider";
 import { GraduationCap } from "@/components/icons";
 import { Button, BuddhistDateSelect, Field, Input, PasswordInput, Spinner } from "@/components/ui";
 
@@ -45,7 +45,9 @@ export function StudentLogin() {
       // Sign-in stays vague on purpose — see src/routes/Login.tsx for why.
       setError(
         mode === "signin"
-          ? "รหัสนักเรียนหรือรหัสผ่านไม่ถูกต้อง"
+          ? err instanceof SignInBusyError
+            ? err.message
+            : "รหัสนักเรียนหรือรหัสผ่านไม่ถูกต้อง"
           : err instanceof Error
             ? err.message
             : "ตั้งรหัสผ่านใหม่ไม่สำเร็จ",

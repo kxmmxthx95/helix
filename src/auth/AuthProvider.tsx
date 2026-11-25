@@ -67,13 +67,41 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+/** Sign-in failed for a reason other than wrong credentials (rate limit, overload, network) — safe to show as-is. */
+export class SignInBusyError extends Error {
+  constructor() {
+    super("ระบบมีผู้ใช้งานจำนวนมาก กรุณารอสักครู่แล้วลองใหม่");
+  }
+}
+
+/** Throws a PostgREST error instead of resolving to data: null — so a timeout under load isn't read as "no row". */
+function must<T>(res: { data: T; error: unknown }): T {
+  if (res.error) throw res.error;
+  return res.data;
+}
+
+/** Retries a post-login read with jittered backoff, so a load spike doesn't leave the spinner stuck forever. */
+async function withRetry<T>(fn: () => Promise<T>, isCancelled: () => boolean): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (isCancelled() || attempt >= 5) throw err;
+      // Jitter spreads 200 clients out instead of retrying in lockstep.
+      await new Promise((r) => setTimeout(r, Math.min(8000, 500 * 2 ** attempt) * (0.5 + Math.random())));
+    }
+  }
+}
+
 /** sessionStorage flag: login pages show "บัญชีถูกระงับ" once after a forced sign-out. */
 export const SUSPENDED_KEY = "helix.suspended";
 
 /** Peeks the flag (idempotent, StrictMode-safe) — login pages use it as the initial error and call clearSuspendedNotice on mount. */
 export function takeSuspendedNotice(): string | undefined {
   try {
-    return sessionStorage.getItem(SUSPENDED_KEY) ? "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ" : undefined;
+    const v = sessionStorage.getItem(SUSPENDED_KEY);
+    // "1" = suspended; any other value is a notice to show as-is (e.g. overload sign-out).
+    return v === "1" ? "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ" : v || undefined;
   } catch {
     return undefined;
   }
@@ -167,21 +195,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOnboardingStep(missingOnboardingStep(p.must_change_password, null, 0));
         return;
       }
-      const { data: student } = await supabase
-        .from("students")
-        .select("*")
-        .eq("profile_id", p.id)
-        .maybeSingle();
-      setMyStudent(student ?? null);
-
-      let guardianCount = 0;
-      if (student) {
-        const { count } = await supabase
+      // must(): a failed read must not look like "no roster row / no guardians" and drop them into the stepper.
+      const { student, guardianCount } = await withRetry(async () => {
+        const student = must(await supabase.from("students").select("*").eq("profile_id", p.id).maybeSingle());
+        if (!student) return { student: null, guardianCount: 0 };
+        const res = await supabase
           .from("student_contacts")
           .select("id", { count: "exact", head: true })
           .eq("student_id", student.id);
-        guardianCount = count ?? 0;
-      }
+        if (res.error) throw res.error;
+        return { student, guardianCount: res.count ?? 0 };
+      }, () => false);
+      setMyStudent(student);
       setOnboardingStep(missingOnboardingStep(p.must_change_password, student ?? null, guardianCount));
     } finally {
       setOnboardingLoading(false);
@@ -189,39 +214,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Profile carries roles + department — every permission check needs it.
+  // Keyed on the user id, not the session object: supabase-js hands out a new session object on every
+  // token refresh / tab refocus, and re-running these 4 queries each time multiplied DB load ~10x.
+  const userId = session?.user.id;
   useEffect(() => {
-    if (!session) return;
+    if (!userId) return;
     let cancelled = false;
 
     // Two plain queries rather than one embedded select — the hand-written
     // Database type doesn't model Relationships, so embeds type as `never`.
-    Promise.all([
-      supabase.from("profiles").select("*").eq("id", session.user.id).single(),
-      supabase.from("profile_roles").select("role").eq("profile_id", session.user.id),
-    ]).then(([{ data: p }, { data: pr }]) => {
-      if (cancelled || !p) return;
-      if (!p.is_active) {
-        // Suspended (profiles.is_active = false): no session, back to the right login page.
-        const wasStudent = (pr ?? []).some((r) => r.role === "student");
-        try {
-          sessionStorage.setItem(SUSPENDED_KEY, "1");
-        } catch {
-          /* ignore private mode */
-        }
-        void supabase.auth.signOut().then(() => {
-          if (wasStudent) window.location.replace("/student-login");
-        });
-        return;
+    const bail = (notice: string, wasStudent: boolean) => {
+      try {
+        sessionStorage.setItem(SUSPENDED_KEY, notice);
+      } catch {
+        /* ignore private mode */
       }
-      const withRoles: ProfileWithRoles = { ...p, roles: (pr ?? []).map((r) => r.role) };
+      void supabase.auth.signOut().then(() => {
+        if (wasStudent) window.location.replace("/student-login");
+      });
+    };
+
+    (async () => {
+      const [p, pr] = await withRetry(
+        async () => {
+          const [pRes, prRes] = await Promise.all([
+            supabase.from("profiles").select("*").eq("id", userId).single(),
+            supabase.from("profile_roles").select("role").eq("profile_id", userId),
+          ]);
+          return [must(pRes)!, must(prRes) ?? []] as const; // .single() errors on no row, so data is set
+        },
+        () => cancelled,
+      );
+      if (cancelled) return;
+      const wasStudent = pr.some((r) => r.role === "student");
+      // Suspended (profiles.is_active = false): no session, back to the right login page.
+      if (!p.is_active) return bail("1", wasStudent);
+      const withRoles: ProfileWithRoles = { ...p, roles: pr.map((r) => r.role) };
       setProfile(withRoles);
-      void loadOnboarding(withRoles);
+      await loadOnboarding(withRoles);
+    })().catch(() => {
+      // Still failing after the retries: sign out with a "busy" notice rather than spin forever.
+      if (!cancelled) bail(new SignInBusyError().message, window.location.pathname === "/student-login");
     });
 
     return () => {
       cancelled = true;
     };
-  }, [session, loadOnboarding]);
+  }, [userId, loadOnboarding]);
 
   // Idle timeout. Any real interaction restarts the clock.
   useEffect(() => {
@@ -294,6 +333,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (keep === false) await supabase.auth.signOut({ scope: "others" });
             return;
           }
+          // Only a wrong-credentials answer means "try the next candidate". A 429 / 5xx / network
+          // error would just repeat against the same per-IP limit (a whole school shares one IP).
+          if (error.code !== "invalid_credentials") throw new SignInBusyError();
           lastError = error;
         }
         throw lastError;

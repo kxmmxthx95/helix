@@ -130,7 +130,11 @@ function PasswordStep({ onDone }: { onDone: () => Promise<void> }) {
     setPending(true);
     try {
       const { error: authError } = await supabase.auth.updateUser({ password });
-      if (authError) throw authError;
+      if (authError) {
+        throw authError.code === "same_password"
+          ? new Error("รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม")
+          : authError;
+      }
       if (session) {
         const { error: profileError } = await supabase
           .from("profiles")

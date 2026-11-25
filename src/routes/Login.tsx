@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { clearSuspendedNotice, takeSuspendedNotice, useAuth } from "@/auth/AuthProvider";
+import { clearSuspendedNotice, SignInBusyError, takeSuspendedNotice, useAuth } from "@/auth/AuthProvider";
 import { Button, BuddhistDateSelect, Field, Input, PasswordInput, Spinner } from "@/components/ui";
 
 const Beams = lazy(() => import("@/components/Beams/Beams"));
@@ -57,7 +57,9 @@ export function Login() {
       // pair to protect there.
       setError(
         mode === "signin"
-          ? "รหัสผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
+          ? err instanceof SignInBusyError
+            ? err.message
+            : "รหัสผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"
           : err instanceof Error
             ? err.message
             : "ตั้งรหัสผ่านใหม่ไม่สำเร็จ",
