@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
+import { DesktopIcon } from "@/components/icons";
 import { Button, Field, Input, PasswordInput, Spinner } from "@/components/ui";
 import { POS_TERMINAL_KEY, posPin } from "@/lib/posPin";
 import { tick } from "@/lib/sound";
@@ -11,7 +12,7 @@ export const POS_DENIED_KEY = "helix.posDenied";
 export const POS_DENIED_MSG = "เข้าสู่ระบบไม่ได้ — ติดต่อฝ่ายการเงิน";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"] as const;
-const inputClass = "h-14 border-white/15 bg-white/5 text-lg text-white placeholder:text-white/35 focus-visible:border-white/40";
+const inputClass = "h-16 border-2 text-xl md:text-xl";
 
 function takeDeniedMessage() {
   try {
@@ -73,15 +74,17 @@ export function PosLogin() {
   const bound = !!terminalId && info !== null;
 
   return (
-    <div className="dark fixed inset-0 flex flex-col overflow-y-auto overscroll-none bg-[#0a0a0a] text-foreground">
-      {/* Terminal bar: the one thing you'd recognise with the logo removed. */}
-      <div className="flex items-center justify-between border-b border-white/10 px-5 py-4 font-mono text-base uppercase tracking-[0.2em] text-white/70">
-        <span>Helix · POS</span>
-        <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full bg-success" aria-hidden />
+    <div className="fixed inset-0 flex flex-col overflow-y-auto overscroll-none bg-background text-foreground">
+      <header className="flex h-20 shrink-0 items-center justify-between border-b border-border bg-card px-5">
+        <span className="flex items-center gap-3">
+          <img src="/logo.webp" alt="Helix" className="h-7 w-auto dark:invert" />
+          <span className="rounded-lg bg-primary px-3 py-1 text-lg font-bold tracking-wide text-primary-foreground">POS</span>
+        </span>
+        <span className="flex h-12 items-center gap-2 rounded-full bg-success px-4 text-base font-semibold text-white">
+          <span className="size-3 rounded-full bg-white" aria-hidden />
           พร้อมใช้งาน
         </span>
-      </div>
+      </header>
 
       <div className="flex flex-1 items-center justify-center px-5 py-8">
         <motion.div
@@ -108,7 +111,7 @@ export function PosLogin() {
           ) : offline ? (
             <p className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-lg text-destructive">เชื่อมต่อไม่ได้ — ตรวจอินเทอร์เน็ตแล้วโหลดหน้าใหม่</p>
           ) : info === undefined ? (
-            <Spinner className="mx-auto size-8 text-white/60" />
+            <Spinner className="mx-auto size-8 text-muted-foreground" />
           ) : (
             <PinEntry terminalId={terminalId} info={info!} initialError={error} onRepair={() => setPairing(true)} />
           )}
@@ -142,19 +145,19 @@ function Pair({ onPaired, onCancel }: { onPaired: (id: string) => void; onCancel
 
   return (
     <>
-      <h1 className="text-center text-3xl font-semibold tracking-tight">ผูกเครื่องนี้กับเครื่อง POS</h1>
-      <p className="mt-2 text-center text-lg text-white/75">{terminals ? "เลือกเครื่องที่ตั้งอยู่ตรงนี้" : "ผู้ดูแลเข้าสู่ระบบเพื่อเลือกเครื่อง"}</p>
+      <h1 className="text-center text-3xl font-bold tracking-tight">ผูกเครื่องนี้กับเครื่อง POS</h1>
+      <p className="mt-2 text-center text-xl text-muted-foreground">{terminals ? "เลือกเครื่องที่ตั้งอยู่ตรงนี้" : "ผู้ดูแลเข้าสู่ระบบเพื่อเลือกเครื่อง"}</p>
       {terminals ? (
-        <div className="glass-panel mt-6 space-y-3 rounded-2xl p-6">
-          {terminals.length === 0 && <p className="text-center text-lg text-white/75">ยังไม่มีเครื่องที่เปิดใช้งาน — เพิ่มได้ที่เมนู บัตรเติมเงิน แท็บเครื่องขาย</p>}
+        <div className="mt-6 space-y-3 rounded-3xl border-2 border-border bg-card p-5">
+          {terminals.length === 0 && <p className="text-center text-lg text-muted-foreground">ยังไม่มีเครื่องที่เปิดใช้งาน — เพิ่มได้ที่เมนู บัตรเติมเงิน แท็บเครื่องขาย</p>}
           {terminals.map((t) => (
-            <Button key={t.id} type="button" variant="outline" className="h-16 w-full text-xl" onClick={() => onPaired(t.id)}>
+            <Button key={t.id} type="button" variant="outline" className="pos-key h-16 w-full border-2 border-border text-xl font-semibold" onClick={() => onPaired(t.id)}>
               {t.name}
             </Button>
           ))}
         </div>
       ) : (
-        <form onSubmit={submit} className="glass-panel mt-6 space-y-5 rounded-2xl p-6">
+        <form onSubmit={submit} className="mt-6 space-y-5 rounded-3xl border-2 border-border bg-card p-5">
           <Field label="รหัสผู้ใช้ผู้ดูแล">
             <Input value={loginId} onChange={(e) => setLoginId(e.target.value)} autoComplete="username" autoFocus required className={inputClass} />
           </Field>
@@ -165,7 +168,6 @@ function Pair({ onPaired, onCancel }: { onPaired: (id: string) => void; onCancel
               autoComplete="current-password"
               required
               className={inputClass}
-              iconClassName="text-white/40 hover:text-white"
             />
           </Field>
           {error && (
@@ -173,13 +175,13 @@ function Pair({ onPaired, onCancel }: { onPaired: (id: string) => void; onCancel
               {error}
             </p>
           )}
-          <Button type="submit" size="lg" className="h-16 w-full text-xl" disabled={busy}>
+          <Button type="submit" size="lg" className="pos-cta h-16 w-full text-2xl font-bold" disabled={busy}>
             {busy ? <Spinner /> : "ต่อไป"}
           </Button>
         </form>
       )}
       {onCancel && (
-        <button type="button" onClick={onCancel} className="tappable mx-auto mt-5 block text-base text-white/70 underline underline-offset-4">
+        <button type="button" onClick={onCancel} className="tappable mx-auto mt-5 block text-lg font-medium underline underline-offset-4">
           ยกเลิก
         </button>
       )}
@@ -253,10 +255,15 @@ function PinEntry({ terminalId, info, initialError, onRepair }: { terminalId: st
 
   return (
     <>
-      <h1 className="text-center text-3xl font-semibold tracking-tight">{info.name}</h1>
-      <p className="mt-2 text-center text-lg text-white/75">
-        {!info.active ? "เครื่องนี้ถูกปิดใช้งาน" : !info.has_pin ? "ยังไม่ได้ตั้ง PIN — ติดต่อผู้ดูแล" : "ใส่ PIN 6 หลักเพื่อเริ่มใช้งาน"}
-      </p>
+      <div className="flex flex-col items-center gap-3 text-center">
+        <span className={cn("flex size-16 items-center justify-center rounded-2xl", ready ? "bg-success text-white" : "bg-muted opacity-60")}>
+          <DesktopIcon className="size-10" />
+        </span>
+        <h1 className="text-3xl font-bold tracking-tight">{info.name}</h1>
+        <p className="text-xl text-muted-foreground">
+          {!info.active ? "เครื่องนี้ถูกปิดใช้งาน" : !info.has_pin ? "ยังไม่ได้ตั้ง PIN — ติดต่อผู้ดูแล" : "ใส่ PIN 6 หลักเพื่อเริ่มใช้งาน"}
+        </p>
+      </div>
 
       <motion.div
         key={shake}
@@ -271,23 +278,29 @@ function PinEntry({ terminalId, info, initialError, onRepair }: { terminalId: st
           <span
             key={i}
             className={cn(
-              "flex size-12 items-center justify-center rounded-xl border-2 transition-colors",
-              error ? "border-destructive" : i < pin.length ? "border-white bg-white" : i === pin.length && ready && !busy && !locked ? "border-white" : "border-white/20",
+              "flex size-14 items-center justify-center rounded-xl border-2 transition-colors",
+              error
+                ? "border-destructive bg-card"
+                : i < pin.length
+                  ? "border-primary bg-primary"
+                  : i === pin.length && ready && !busy && !locked
+                    ? "border-primary bg-card"
+                    : "border-border bg-card",
             )}
           >
-            {i < pin.length && <span className="size-3.5 rounded-full bg-[#0a0a0a]" />}
+            {i < pin.length && <span className="size-4 rounded-full bg-white" />}
           </span>
         ))}
       </motion.div>
 
       <div className="min-h-[4rem] pt-4" aria-live="assertive">
         {busy ? (
-          <p className="flex items-center justify-center gap-3 text-lg font-medium">
+          <p className="flex items-center justify-center gap-3 text-xl font-medium">
             <Spinner className="size-6" />
             กำลังตรวจสอบ…
           </p>
         ) : error ? (
-          <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-lg font-semibold text-destructive">
+          <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-xl font-semibold text-destructive">
             {error}
           </p>
         ) : null}
@@ -302,8 +315,10 @@ function PinEntry({ terminalId, info, initialError, onRepair }: { terminalId: st
             aria-label={k === "⌫" ? "ลบหนึ่งตัว" : k === "C" ? "ล้างทั้งหมด" : k}
             onClick={() => press(k)}
             className={cn(
-              "tappable flex h-20 items-center justify-center rounded-2xl border border-white/15 font-semibold transition-colors active:bg-white/20 disabled:opacity-40",
-              k === "C" || k === "⌫" ? "bg-white/5 text-xl" : "bg-white/10 text-4xl tabular-nums hover:bg-white/15",
+              "tappable pos-key flex h-20 items-center justify-center rounded-2xl border-2 border-border bg-card font-bold transition-colors active:bg-muted disabled:opacity-40",
+              k === "C" && "border-destructive/50 bg-destructive/10 text-xl text-destructive",
+              k === "⌫" && "bg-muted text-xl",
+              k !== "C" && k !== "⌫" && "text-4xl tabular-nums",
             )}
           >
             {k === "C" ? "ล้าง" : k === "⌫" ? "ลบ" : k}
@@ -311,7 +326,7 @@ function PinEntry({ terminalId, info, initialError, onRepair }: { terminalId: st
         ))}
       </div>
 
-      <button type="button" onClick={onRepair} className="tappable mx-auto mt-6 block text-base text-white/70 underline underline-offset-4">
+      <button type="button" onClick={onRepair} className="tappable mx-auto mt-6 block text-lg font-medium underline underline-offset-4">
         เปลี่ยนเครื่อง (ผู้ดูแล)
       </button>
     </>

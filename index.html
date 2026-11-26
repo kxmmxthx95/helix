@@ -29,5 +29,14 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Opened from the POS sign-in or the POS itself: install as its own "Helix POS" app (public/pos.webmanifest).
+      if (/^\/(pos-login|card-topup)/.test(location.pathname)) {
+        var m = document.querySelector('link[rel="manifest"]');
+        if (m) m.setAttribute("href", "/pos.webmanifest");
+        var t = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+        if (t) t.setAttribute("content", "Helix POS");
+      }
+    </script>
   </body>
 </html>
