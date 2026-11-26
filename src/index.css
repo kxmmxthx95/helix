@@ -597,3 +597,18 @@
   grid-template-columns: minmax(0, 1fr) !important;
   gap: 0 !important;
 }
+
+/* Exam paper: PrintExamSheet portals into <body> as a full-screen preview; printing shows only the paper. */
+.print-sheet { position: fixed; inset: 0; z-index: 100; overflow: auto; background: #d4d4d8; }
+.print-sheet .paper { background: #fff; max-width: 210mm; min-height: 297mm; margin: 12px auto; padding: 14mm; box-shadow: 0 2px 12px rgb(0 0 0 / 0.25); font-size: 14px; font-family: Sarabun, "TH Sarabun New", serif; }
+.print-sheet .paper, .print-sheet .paper * { color: #000 !important; }
+.print-sheet .paper h1 { font-family: inherit; }
+.print-sheet .print-prompt, .print-sheet .print-prompt :where(p, div, li, strong) { font-weight: 600; }
+.print-sheet .print-toolbar { position: sticky; top: 0; z-index: 1; display: flex; justify-content: flex-end; gap: 8px; padding: 8px 12px; background: #18181b; }
+@media print {
+  @page { size: A4; margin: 14mm; }
+  body > #root { display: none !important; }
+  .print-sheet { position: static; overflow: visible; background: #fff; }
+  .print-sheet .paper { max-width: none; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+  .print-sheet .print-toolbar { display: none; }
+}

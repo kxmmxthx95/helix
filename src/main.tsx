@@ -15,7 +15,9 @@ const updateSW = registerSW({
     if (!reg) return;
     const apply = () => void updateSW(true);
     let lastActive = Date.now();
-    const idle = () => Date.now() - lastActive;
+    // Per-client 0-10 min extra idle so a deploy doesn't make every idle device reload + re-fetch at once.
+    const spread = Math.random() * 10 * 60 * 1000;
+    const idle = () => Date.now() - lastActive - spread;
     for (const e of ["pointerdown", "keydown", "scroll", "touchstart"])
       window.addEventListener(e, () => (lastActive = Date.now()), { passive: true, capture: true });
     void applyIfIdle(reg, Infinity, apply); // cold start
