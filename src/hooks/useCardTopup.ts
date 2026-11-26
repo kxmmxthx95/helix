@@ -59,9 +59,9 @@ export function useTerminals() {
   return useQuery({
     queryKey: ["pos_terminals"],
     queryFn: async (): Promise<PosTerminal[]> => {
-      const { data, error } = await supabase.from("pos_terminals").select("*").order("name");
+      const { data, error } = await supabase.from("pos_terminals").select("*");
       if (error) throw error;
-      return data;
+      return data.sort((a, b) => a.name.localeCompare(b.name, "th", { numeric: true })); // จุดที่ 2 before จุดที่ 10
     },
   });
 }

@@ -4,6 +4,24 @@
 
 @import "katex/dist/katex.min.css";
 
+/* Self-hosted variable fonts (weights 400–700), subset to what the UI needs. */
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/Geist-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Noto Sans Thai";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/NotoSansThai-thai.woff2") format("woff2");
+  unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC;
+}
+
 @layer base {
   /* Helix design system — Vercel (Geist) × Apple iOS. Source of truth: the Helix Design System artifact
      (tokens.json). Light and dark are designed equally; ThemeProvider follows the OS by default. */
@@ -387,6 +405,40 @@
   .ui-control-compact {
     min-height: 0;
     font-size: 0.8125rem; /* 13px, same as Select and the default Button */
+  }
+
+  /* POS light theme "cash-register": warm paper ground, hard-edged controls, one deep green for the main action.
+     Ink 7:1+, secondary ink 7.9:1. Light only; dark keeps the app theme. */
+  html.pos-large:not(.dark) {
+    --shell: 43 22% 88%;
+    --background: 43 31% 94%;
+    --card: 0 0% 100%;
+    --foreground: 0 0% 7%;
+    --card-foreground: 0 0% 7%;
+    --primary: 153 79% 20%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 43 22% 90%;
+    --muted: 43 22% 90%;
+    --muted-foreground: 0 0% 29%;
+    --fill-strong: 44 20% 83%;
+    --border: 42 13% 69%;
+    --input: 42 13% 55%;
+    --success: 153 79% 20%;
+    --destructive: 0 69% 36%;
+  }
+  /* A disabled main action reads as "not yet", not as broken: solid grey, full-contrast label. */
+  html.pos-large:not(.dark) .pos-cta:disabled {
+    opacity: 1;
+    background: hsl(44 20% 83%);
+    color: hsl(0 0% 29%);
+  }
+  /* Keys feel pressable: a hard bottom edge that closes on tap. */
+  .pos-key {
+    box-shadow: 0 3px 0 hsl(var(--border));
+  }
+  .pos-key:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 hsl(var(--border));
   }
 
   /* POS (tablet, cashiers 40–60): set on <html> while the POS is open, so its modals get it too.

@@ -99,7 +99,7 @@ export function VoidTopupTab() {
 
       {/* Status + summary */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex gap-1 rounded-2xl bg-muted p-1" role="tablist" aria-label="สถานะรายการ">
+        <div className="flex w-full gap-1 rounded-2xl bg-muted p-1" role="tablist" aria-label="สถานะรายการ">
           {(
             [
               ["active", `ยังไม่ยกเลิก (${rows.length - voidedCount})`],
@@ -114,8 +114,8 @@ export function VoidTopupTab() {
               aria-selected={status === key}
               onClick={() => setStatus(key)}
               className={cn(
-                "tappable h-12 rounded-xl px-4 text-lg font-semibold transition-colors",
-                status === key ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground",
+                "tappable h-12 min-w-0 flex-1 truncate rounded-xl px-4 text-lg font-semibold transition-colors",
+                status === key ? "bg-primary text-primary-foreground shadow-card" : "text-foreground hover:bg-fill-strong",
               )}
             >
               {label}

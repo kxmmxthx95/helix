@@ -22,11 +22,10 @@ import {
   useSlipRequests,
   type PortalStudent,
 } from "@/hooks/useCardTopup";
-import { TOPUP_OPEN, TX_TYPE_LABEL } from "@/lib/cardTopup";
+import { SLIP_STATUS_LABEL, TOPUP_OPEN, TX_TYPE_LABEL } from "@/lib/cardTopup";
 import { formatBaht } from "@/lib/tuition";
 import { cn } from "@/lib/utils";
 import { TopupSlipForm, useCanTopup } from "@/routes/CardTopupForm";
-import { SLIP_STATUS_LABEL } from "@/routes/CardTopupSlips";
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "ทำรายการไม่สำเร็จ");
 const fullName = (s: PortalStudent) => `${s.prefix ?? ""}${s.first_name} ${s.last_name}`;

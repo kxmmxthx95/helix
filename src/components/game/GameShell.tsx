@@ -1,5 +1,5 @@
 import { MotionConfig } from "framer-motion";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, Suspense, useEffect, useState } from "react";
 import { FiSidebar } from "react-icons/fi";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
@@ -26,7 +26,7 @@ import { MobileHeaderProvider } from "@/components/MobileHeaderSlot";
 import { GlyphTile, SECTION_TONE } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useTheme } from "@/components/ThemeProvider";
-import { Avatar } from "@/components/ui";
+import { Avatar, PageSpinner } from "@/components/ui";
 import { avatarUrl } from "@/hooks/useAvatar";
 import { useRoleSubtitle } from "@/hooks/useProfiles";
 import { profileFullName } from "@/lib/database.types";
@@ -244,11 +244,11 @@ function GameShellInner() {
           className={cn("scrollbar-hidden min-h-0 flex-1 overflow-y-auto overscroll-contain", !isHome && "flex flex-col")}
         >
           {isHome ? (
-            <Outlet />
+            <Suspense fallback={<PageSpinner />}><Outlet /></Suspense>
           ) : (
             <div className="mx-auto flex min-h-0 w-full max-w-screen-2xl flex-1 flex-col px-shell pb-4 pt-3 lg:py-6">
               <h1 className="sr-only">{title}</h1>
-              <Outlet />
+              <Suspense fallback={<PageSpinner />}><Outlet /></Suspense>
             </div>
           )}
         </main>

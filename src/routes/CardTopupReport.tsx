@@ -21,14 +21,14 @@ const PRESETS = [
 ] as const;
 type Preset = (typeof PRESETS)[number]["key"] | "custom";
 
-type Section = "cashier" | "terminal" | "voids";
+type Section = "terminal" | "voids";
 
 /** รายงาน — drawer reconciliation: cash to hand in per cashier, totals per terminal, and every void. */
 export function ReportTab() {
   const [preset, setPreset] = useState<Preset>("today");
   const [from, setFrom] = useState(() => daysAgo(0));
   const [to, setTo] = useState(() => daysAgo(0));
-  const [section, setSection] = useState<Section>("cashier");
+  const [section, setSection] = useState<Section>("terminal");
   const { data: r, isLoading, error } = useCardReport(from, to);
 
   function pick(key: Preset) {
@@ -116,7 +116,6 @@ export function ReportTab() {
           <div className="flex gap-1 rounded-2xl bg-muted p-1" role="tablist" aria-label="รายละเอียด">
             {(
               [
-                ["cashier", `ตามแคชเชียร์ (${r.by_cashier.length})`],
                 ["terminal", `ตามเครื่องขาย (${r.by_terminal.length})`],
                 ["voids", `รายการยกเลิก (${r.voids.length})`],
               ] as const
@@ -137,24 +136,6 @@ export function ReportTab() {
               </button>
             ))}
           </div>
-
-          {section === "cashier" &&
-            (r.by_cashier.length === 0 ? (
-              <Empty text="ไม่มีรายการของแคชเชียร์ในช่วงนี้" />
-            ) : (
-              <DataTable
-                head={["แคชเชียร์", "ยอดขาย", "จำนวนครั้งที่ขาย", "เงินสดที่ต้องนำส่ง"]}
-                rows={r.by_cashier.map((c) => ({
-                  key: c.profile_id,
-                  cells: [
-                    <span key="n" className="font-semibold">{c.name}</span>,
-                    `${formatBaht(c.sales_total)} ฿`,
-                    `${c.sales_count} ครั้ง`,
-                    <span key="c" className="text-xl font-bold text-success">{formatBaht(c.cash_topup_total)} ฿</span>,
-                  ],
-                }))}
-              />
-            ))}
 
           {section === "terminal" &&
             (r.by_terminal.length === 0 ? (

@@ -1,6 +1,6 @@
 import JsBarcode from "jsbarcode";
 import { fromThaiLayout } from "@/lib/scanText";
-import { useEffect, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { FiSidebar } from "react-icons/fi";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
@@ -9,7 +9,7 @@ import { AlertTriangle, HomeIcon, BarChartIcon, BarcodeIcon, CartIcon, Checkmark
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { useTheme } from "@/components/ThemeProvider";
-import { Avatar, Button, Field, Input, Spinner } from "@/components/ui";
+import { Avatar, Button, Field, Input, PageSpinner, Spinner } from "@/components/ui";
 import {
   posLookup,
   posStudentByCode,
@@ -34,12 +34,12 @@ import { profileFullName, type PosProduct, type PosStudent } from "@/lib/databas
 import { formatBaht } from "@/lib/tuition";
 import { tick } from "@/lib/sound";
 import { cn } from "@/lib/utils";
-import { TerminalsTab } from "@/routes/CardTopupAdmin";
-import { ProductsTab } from "@/routes/CardTopupProducts";
-import { ReportTab } from "@/routes/CardTopupReport";
-import { SlipsTab } from "@/routes/CardTopupSlips";
-import { SalesHistoryTab } from "@/routes/CardTopupSales";
-import { VoidTopupTab } from "@/routes/CardTopupVoid";
+const TerminalsTab = lazy(() => import("@/routes/CardTopupAdmin").then((m) => ({ default: m.TerminalsTab })));
+const ProductsTab = lazy(() => import("@/routes/CardTopupProducts").then((m) => ({ default: m.ProductsTab })));
+const ReportTab = lazy(() => import("@/routes/CardTopupReport").then((m) => ({ default: m.ReportTab })));
+const SlipsTab = lazy(() => import("@/routes/CardTopupSlips").then((m) => ({ default: m.SlipsTab })));
+const SalesHistoryTab = lazy(() => import("@/routes/CardTopupSales").then((m) => ({ default: m.SalesHistoryTab })));
+const VoidTopupTab = lazy(() => import("@/routes/CardTopupVoid").then((m) => ({ default: m.VoidTopupTab })));
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "ทำรายการไม่สำเร็จ");
 
@@ -184,6 +184,13 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const paying = sale.isPending || saleItems.isPending;
 
   // A changed cart is a new intent, so it gets a new idempotency key.
+  // Stable identity so the memoised ProductGrid does not re-render on every keypad press.
+  const pickProduct = useCallback((pr: PosProduct) => {
+    saleKey.current = crypto.randomUUID();
+    setCart((c) => addToCart(c, pr));
+    setKeyed("");
+    setDone(null);
+  }, []);
   function editCart(next: CartLine[]) {
     saleKey.current = crypto.randomUUID();
     setCart(next);
@@ -291,7 +298,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
       type="button"
       onClick={toggleSidebar}
       aria-expanded={sidebarOpen}
-      className="tappable flex h-14 shrink-0 items-center gap-2 rounded-xl border border-border bg-card px-4 text-lg font-semibold transition-colors hover:bg-foreground/5 active:bg-foreground/10"
+      className="tappable flex h-14 shrink-0 items-center gap-2 rounded-xl border-2 border-border bg-card px-4 text-xl font-semibold transition-colors hover:bg-muted active:bg-fill-strong"
     >
       <FiSidebar className="h-5 w-5" />
       เมนู
@@ -350,7 +357,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
             <div className="flex items-center gap-2.5 rounded-xl bg-card p-2.5 shadow-card">
               {/* Connection status: pulsing ring around the photo — green online, red offline. */}
               <span className="relative flex shrink-0 rounded-full" role="status" aria-label={online ? "ออนไลน์" : "ออฟไลน์"} title={online ? "ออนไลน์" : "ออฟไลน์"}>
-                <span aria-hidden className={cn("absolute -inset-1 rounded-full border-2 motion-safe:animate-pulse", online ? "border-success" : "border-destructive")} />
+                <span aria-hidden className={cn("absolute -inset-1 rounded-full border-2", online ? "border-success" : "border-destructive")} />
                 <Avatar name={profile ? profileFullName(profile) : "Helix"} src={profile ? avatarUrl(profile) : null} className="h-12 w-12 text-sm" />
               </span>
               <div className="min-w-0 flex-1">
@@ -376,12 +383,14 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
 
   const adminView = (
     <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <Suspense fallback={<PageSpinner />}>
       {view === "slips" && <SlipsTab />}
       {view === "sales" && <SalesHistoryTab />}
       {view === "void" && <VoidTopupTab />}
       {view === "report" && <ReportTab />}
       {view === "products" && <ProductsTab />}
       {view === "terminals" && <TerminalsTab onTestScanner={() => setTestOpen(true)} onTestRfid={() => setRfidTestOpen(true)} />}
+      </Suspense>
     </div>
   );
 
@@ -394,7 +403,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
           aria-label={k === "⌫" ? "ลบ" : k === "C" ? "ล้าง" : k}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => press(k)}
-          className="tappable min-h-[4.5rem] rounded-2xl border border-border bg-background text-3xl font-semibold tabular-nums transition-colors hover:bg-foreground/5 active:bg-foreground/15"
+          className={cn("tappable pos-key min-h-[4.5rem] rounded-2xl border-2 border-border bg-card text-4xl font-bold tabular-nums transition-colors active:bg-muted", k === "C" && "border-destructive/50 bg-destructive/10 text-destructive", k === "⌫" && "bg-muted")}
         >
           {k}
         </button>
@@ -450,7 +459,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
             </div>
           ) : student && mode === "sale" ? (
             <div className="flex h-full min-h-0 w-full flex-col gap-4">
-              <ProductGrid products={products} loading={productsLoading} error={productsError} canManage={orgWide} category={category} onCategory={setCategory} onPick={(pr) => editCart(addToCart(cart, pr))} />
+              <ProductGrid products={products} loading={productsLoading} error={productsError} canManage={orgWide} category={category} onCategory={setCategory} onPick={pickProduct} />
             </div>
           ) : student ? (
             <div className="w-full max-w-xl space-y-6">
@@ -506,7 +515,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                     </svg>
                     {/* Blinking amber light = reader is waiting for the student's barcode. */}
                     <span className="relative flex size-4 shrink-0" role="status" aria-label="รอสแกนบาร์โค้ดนักเรียน">
-                      <span className="absolute inline-flex size-full rounded-full bg-amber-400 opacity-75 motion-safe:animate-ping" />
                       <span className="relative inline-flex size-4 rounded-full bg-amber-400 motion-safe:animate-pulse" />
                     </span>
                     <p className="text-left font-heading text-3xl font-semibold">สแกนบัตรนักเรียนเพื่อเติมเงิน</p>
@@ -519,20 +527,20 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                   </div>
                 </>
               )}
-              {mode === "sale" && <ProductGrid products={products} loading={productsLoading} error={productsError} canManage={orgWide} category={category} onCategory={setCategory} onPick={(pr) => editCart(addToCart(cart, pr))} />}
+              {mode === "sale" && <ProductGrid products={products} loading={productsLoading} error={productsError} canManage={orgWide} category={category} onCategory={setCategory} onPick={pickProduct} />}
             </div>
           )}
         </section>
 
         {/* Amount keypad: sale amount / cart, or the cash top-up amount while mode === "topup" */}
-        <section className="flex min-h-0 flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+        <section className="flex min-h-0 flex-col gap-3 rounded-2xl border-2 border-border bg-background p-4">
           {mode === "topup" ? (
             <>
-              <div className="rounded-xl bg-muted px-4 py-3 text-right">
-                <p className="font-heading text-6xl font-semibold tabular-nums">{topupAmount || "0"} ฿</p>
+              <div className="rounded-xl border-2 border-border bg-card px-4 py-3 text-right">
+                <p className="font-heading text-7xl font-bold tabular-nums">{topupAmount || "0"} ฿</p>
               </div>
               {keypad}
-              <Button size="lg" className="h-20 text-2xl" disabled={!student || topupValue === null || !online || topup.isPending} onClick={() => setConfirmOpen(true)}>
+              <Button size="lg" className="pos-cta h-20 text-3xl font-bold" disabled={!student || topupValue === null || !online || topup.isPending} onClick={() => setConfirmOpen(true)}>
                 {topupValue === null ? "ยืนยันเติมเงิน" : `ยืนยันเติมเงิน ${formatBaht(topupValue)} ฿`}
               </Button>
               <Button variant="outline" className="h-14 text-lg" onClick={() => (setStudent(null), setEntry(""), setTopupAmount(""))}>
@@ -545,18 +553,18 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 <CartPanel cart={cart} onQty={(id, q) => editCart(setQty(cart, id, q))} onClear={() => editCart([])} />
               ) : (
                 <>
-                  <div className="rounded-xl bg-muted px-4 py-3 text-right">
-                    <p className="font-heading text-6xl font-semibold tabular-nums">{keyed || "0"} ฿</p>
+                  <div className="rounded-xl border-2 border-border bg-card px-4 py-3 text-right">
+                    <p className="font-heading text-7xl font-bold tabular-nums">{keyed || "0"} ฿</p>
                   </div>
                   {keypad}
                 </>
               )}
               {price !== null && price > SALE_MAX && <p className="text-base font-medium text-destructive">ยอดรวมเกิน {SALE_MAX} บาทต่อรายการ — ลดสินค้า</p>}
-              <Button size="lg" className="h-20 text-2xl" disabled={!priceOk || paying || !online} onClick={() => setPayOpen(true)}>
+              <Button size="lg" className="pos-cta h-20 text-3xl font-bold" disabled={!priceOk || paying || !online} onClick={() => setPayOpen(true)}>
                 {paying ? <Spinner /> : price === null ? "ตัดเงิน" : `ยืนยันตัดเงิน ${formatBaht(price)} ฿`}
               </Button>
               {!paying && (
-                <p className="text-center text-base text-muted-foreground" aria-live="polite">
+                <p className="text-center text-lg font-medium text-muted-foreground" aria-live="polite">
                   {!online ? "ออฟไลน์ — รอเชื่อมต่ออินเทอร์เน็ต" : !priceOk ? "① เลือกสินค้า หรือกดยอดเงิน" : "② กดปุ่มด้านบน แล้วแตะบัตรนักเรียน"}
                 </p>
               )}
@@ -662,7 +670,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                           disabled={paying}
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => pinPress(k)}
-                          className="tappable h-16 rounded-2xl border border-border bg-card text-2xl font-semibold tabular-nums transition-colors hover:bg-foreground/5 active:bg-foreground/15"
+                          className="tappable pos-key h-16 rounded-2xl border-2 border-border bg-card text-3xl font-bold tabular-nums transition-colors active:bg-muted"
                         >
                           {k}
                         </button>
@@ -709,8 +717,8 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                   aria-selected={view === key}
                   onClick={() => (key === "topup" ? openTopup() : setView(key))}
                   className={cn(
-                    "tappable flex h-12 min-w-0 items-center gap-2 rounded-xl px-4 text-lg font-semibold transition-colors sm:px-6",
-                    view === key ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground",
+                    "tappable flex h-12 min-w-0 items-center gap-2 rounded-xl px-4 text-xl font-semibold transition-colors sm:px-6",
+                    view === key ? "bg-primary text-primary-foreground shadow-card" : "text-foreground hover:bg-fill-strong",
                   )}
                 >
                   <Icon className="h-6 w-6 shrink-0" />
@@ -726,17 +734,17 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               role="status"
               className={cn(
                 "hidden h-12 items-center gap-2 rounded-full px-4 text-base font-semibold md:flex",
-                online ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive",
+                online ? "bg-success text-white" : "bg-destructive text-white",
               )}
             >
-              <span className={cn("size-3 rounded-full motion-safe:animate-pulse", online ? "bg-success" : "bg-destructive")} aria-hidden />
+              <span className="size-3 rounded-full bg-white" aria-hidden />
               {online ? "ออนไลน์" : "ออฟไลน์"}
             </span>
             {onSale && (
               <button
                 type="button"
                 onClick={() => setTodayOpen(true)}
-                className="tappable flex h-14 items-center rounded-xl border border-border bg-card px-4 text-lg font-semibold transition-colors hover:bg-foreground/5"
+                className="tappable flex h-14 items-center rounded-xl border-2 border-border bg-card px-4 text-xl font-semibold transition-colors hover:bg-muted"
               >
                 รายการวันนี้
               </button>
@@ -813,7 +821,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 <span role="status" className="flex items-center gap-3">
                   {/* Blinking amber light = the top-up request is in flight. */}
                   <span className="relative flex size-4 shrink-0">
-                    <span className="absolute inline-flex size-full rounded-full bg-amber-300 opacity-75 motion-safe:animate-ping" />
                     <span className="relative inline-flex size-4 rounded-full bg-amber-300 motion-safe:animate-pulse" />
                   </span>
                   กำลังเติมเงิน…
@@ -869,7 +876,8 @@ function topupChoices(shortfall: number): number[] {
 }
 
 /** Tap-to-add tiles for the active catalogue, filtered by category chip. */
-function ProductGrid({
+const ProductGrid = memo(ProductGridImpl);
+function ProductGridImpl({
   products,
   loading,
   error,
@@ -895,7 +903,7 @@ function ProductGrid({
   const cats = [...new Set(products.map(categoryOf))].sort();
   const shown = products.filter((p) => !category || categoryOf(p) === category);
   const chip = (active: boolean) =>
-    cn("tappable flex h-12 shrink-0 items-center rounded-full border px-5 text-lg font-semibold", active ? "border-foreground bg-foreground text-background" : "border-border bg-background");
+    cn("tappable flex h-14 shrink-0 items-center rounded-full border-2 px-6 text-xl font-semibold", active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card");
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 text-left">
       <div className="scrollbar-hidden flex shrink-0 gap-2 overflow-x-auto pb-1" role="tablist" aria-label="หมวดหมู่สินค้า">
@@ -915,19 +923,19 @@ function ProductGrid({
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onPick(p)}
-            className="tappable flex flex-col overflow-hidden rounded-2xl border border-border bg-card text-left transition-colors hover:bg-foreground/5 active:scale-[0.98] active:bg-foreground/10"
+            className="tappable pos-key flex flex-col overflow-hidden rounded-2xl border-2 border-border bg-card text-left transition-colors active:bg-muted"
           >
             <div className="aspect-[3/2] w-full bg-muted">
               {productImageUrl(p) ? (
                 <img src={productImageUrl(p)!} alt="" loading="lazy" className="size-full object-cover" />
               ) : (
-                <span className="flex size-full items-center justify-center text-base text-muted-foreground">ไม่มีรูป</span>
+                <span className="flex size-full items-center justify-center text-lg text-muted-foreground">ไม่มีรูป</span>
               )}
             </div>
             <span className="flex flex-col gap-1 px-4 pb-4 pt-3">
-              <span className="line-clamp-2 text-lg font-semibold leading-snug">{p.name}</span>
-              <span className="text-2xl font-bold tabular-nums">{p.price} ฿</span>
-              <span className="truncate text-base text-muted-foreground">{categoryOf(p)}</span>
+              <span className="line-clamp-2 text-xl font-semibold leading-snug">{p.name}</span>
+              <span className="text-3xl font-bold tabular-nums text-primary">{p.price} ฿</span>
+              <span className="truncate text-lg text-muted-foreground">{categoryOf(p)}</span>
             </span>
           </button>
         ))}
@@ -938,7 +946,7 @@ function ProductGrid({
 
 /** Cart lines with quantity steppers; replaces the keypad while the cart has items. */
 function CartPanel({ cart, onQty, onClear }: { cart: CartLine[]; onQty: (productId: string, qty: number) => void; onClear: () => void }) {
-  const step = "tappable size-14 shrink-0 rounded-xl border border-border text-3xl font-semibold hover:bg-foreground/5 active:bg-foreground/10";
+  const step = "tappable pos-key size-14 shrink-0 rounded-xl border-2 border-border bg-card text-3xl font-bold active:bg-muted";
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex items-center justify-between">
@@ -966,7 +974,7 @@ function CartPanel({ cart, onQty, onClear }: { cart: CartLine[]; onQty: (product
           </li>
         ))}
       </ul>
-      <div className="rounded-xl bg-muted px-4 py-3 text-right">
+      <div className="rounded-xl border-2 border-border bg-card px-4 py-3 text-right">
         <p className="text-lg text-muted-foreground">ยอดรวม</p>
         <p className="font-heading text-5xl font-semibold tabular-nums">{cartTotal(cart)} ฿</p>
       </div>
@@ -1171,7 +1179,6 @@ function ScannerTest() {
         {!result ? (
           <>
             <span className="relative flex size-6 shrink-0" aria-hidden>
-              <span className="absolute inline-flex size-full rounded-full bg-amber-400 opacity-75 motion-safe:animate-ping" />
               <span className="relative inline-flex size-6 rounded-full bg-amber-400" />
             </span>
             <div className="min-w-0">

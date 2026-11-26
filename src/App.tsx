@@ -1,54 +1,55 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { AppShell } from "@/components/AppShell";
-import { GameHud } from "@/components/game/GameHud";
-import { GameShell } from "@/components/game/GameShell";
+const GameHud = lazy(() => import("@/components/game/GameHud").then((m) => ({ default: m.GameHud })));
+const GameShell = lazy(() => import("@/components/game/GameShell").then((m) => ({ default: m.GameShell })));
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ToastProvider } from "@/components/Toast";
 import { Spinner } from "@/components/ui";
-import { Assignments } from "@/routes/Assignments";
-import { Attendance } from "@/routes/Attendance";
-import { BehaviorScore } from "@/routes/BehaviorScore";
-import { ExamBank } from "@/routes/ExamBank";
-import { Documents } from "@/routes/Documents";
-import { Exams, ExamPractice } from "@/routes/Exams";
-import { Practice } from "@/routes/Practice";
-import { ScoreRecording } from "@/routes/ScoreRecording";
-import { Profile } from "@/routes/Profile";
-import { Dashboard } from "@/routes/Dashboard";
+const Assignments = lazy(() => import("@/routes/Assignments").then((m) => ({ default: m.Assignments })));
+const Attendance = lazy(() => import("@/routes/Attendance").then((m) => ({ default: m.Attendance })));
+const BehaviorScore = lazy(() => import("@/routes/BehaviorScore").then((m) => ({ default: m.BehaviorScore })));
+const ExamBank = lazy(() => import("@/routes/ExamBank").then((m) => ({ default: m.ExamBank })));
+const Documents = lazy(() => import("@/routes/Documents").then((m) => ({ default: m.Documents })));
+const Exams = lazy(() => import("@/routes/Exams").then((m) => ({ default: m.Exams })));
+const ExamPractice = lazy(() => import("@/routes/Exams").then((m) => ({ default: m.ExamPractice })));
+const Practice = lazy(() => import("@/routes/Practice").then((m) => ({ default: m.Practice })));
+const ScoreRecording = lazy(() => import("@/routes/ScoreRecording").then((m) => ({ default: m.ScoreRecording })));
+const Profile = lazy(() => import("@/routes/Profile").then((m) => ({ default: m.Profile })));
+const Dashboard = lazy(() => import("@/routes/Dashboard").then((m) => ({ default: m.Dashboard })));
 import { Login } from "@/routes/Login";
-import { StudentLogin } from "@/routes/StudentLogin";
-import { Onboarding } from "@/routes/Onboarding";
-import { Classrooms } from "@/routes/Classrooms";
-import { Curriculum } from "@/routes/Curriculum";
-import { CurriculumMap } from "@/routes/CurriculumMap";
-import { MyCurriculum } from "@/routes/MyCurriculum";
-import { StudyMap } from "@/routes/StudyMap";
-import { Employees } from "@/routes/Employees";
-import { Enrollment } from "@/routes/Enrollment";
-import { Roster } from "@/routes/Roster";
-import { Settings } from "@/routes/Settings";
-import { AcademicEvents } from "@/routes/AcademicEvents";
-import { StatusManagement } from "@/routes/StatusManagement";
-import { Subjects } from "@/routes/Subjects";
-import { TeachingLoad } from "@/routes/TeachingLoad";
-import { TeachingPlan } from "@/routes/TeachingPlan";
-import { TeachingPlanCalendar } from "@/routes/TeachingPlanCalendar";
-import { Timetable } from "@/routes/Timetable";
-import { TimeTracking } from "@/routes/TimeTracking";
+const StudentLogin = lazy(() => import("@/routes/StudentLogin").then((m) => ({ default: m.StudentLogin })));
+const Onboarding = lazy(() => import("@/routes/Onboarding").then((m) => ({ default: m.Onboarding })));
+const Classrooms = lazy(() => import("@/routes/Classrooms").then((m) => ({ default: m.Classrooms })));
+const Curriculum = lazy(() => import("@/routes/Curriculum").then((m) => ({ default: m.Curriculum })));
+const CurriculumMap = lazy(() => import("@/routes/CurriculumMap").then((m) => ({ default: m.CurriculumMap })));
+const MyCurriculum = lazy(() => import("@/routes/MyCurriculum").then((m) => ({ default: m.MyCurriculum })));
+const StudyMap = lazy(() => import("@/routes/StudyMap").then((m) => ({ default: m.StudyMap })));
+const Employees = lazy(() => import("@/routes/Employees").then((m) => ({ default: m.Employees })));
+const Enrollment = lazy(() => import("@/routes/Enrollment").then((m) => ({ default: m.Enrollment })));
+const Roster = lazy(() => import("@/routes/Roster").then((m) => ({ default: m.Roster })));
+const Settings = lazy(() => import("@/routes/Settings").then((m) => ({ default: m.Settings })));
+const AcademicEvents = lazy(() => import("@/routes/AcademicEvents").then((m) => ({ default: m.AcademicEvents })));
+const StatusManagement = lazy(() => import("@/routes/StatusManagement").then((m) => ({ default: m.StatusManagement })));
+const Subjects = lazy(() => import("@/routes/Subjects").then((m) => ({ default: m.Subjects })));
+const TeachingLoad = lazy(() => import("@/routes/TeachingLoad").then((m) => ({ default: m.TeachingLoad })));
+const TeachingPlan = lazy(() => import("@/routes/TeachingPlan").then((m) => ({ default: m.TeachingPlan })));
+const TeachingPlanCalendar = lazy(() => import("@/routes/TeachingPlanCalendar").then((m) => ({ default: m.TeachingPlanCalendar })));
+const Timetable = lazy(() => import("@/routes/Timetable").then((m) => ({ default: m.Timetable })));
+const TimeTracking = lazy(() => import("@/routes/TimeTracking").then((m) => ({ default: m.TimeTracking })));
 import { canUsePos, isCashierOnly } from "@/lib/roles";
 import { PosLogin, POS_DENIED_KEY } from "@/routes/PosLogin";
 import { CardTopup } from "@/routes/CardTopup";
-import { CardTopupForm } from "@/routes/CardTopupForm";
-import { StudentCards } from "@/routes/StudentCards";
-import { Tuition } from "@/routes/Tuition";
-import { Leave } from "@/routes/Leave";
-import { SubjectCovers } from "@/routes/SubjectCovers";
-import { LineNotifications } from "@/routes/LineNotifications";
-import { DutyRoster } from "@/routes/DutyRoster";
-import { PeriodAttendance } from "@/routes/PeriodAttendance";
-import { Users } from "@/routes/Users";
+const CardTopupForm = lazy(() => import("@/routes/CardTopupForm").then((m) => ({ default: m.CardTopupForm })));
+const StudentCards = lazy(() => import("@/routes/StudentCards").then((m) => ({ default: m.StudentCards })));
+const Tuition = lazy(() => import("@/routes/Tuition").then((m) => ({ default: m.Tuition })));
+const Leave = lazy(() => import("@/routes/Leave").then((m) => ({ default: m.Leave })));
+const SubjectCovers = lazy(() => import("@/routes/SubjectCovers").then((m) => ({ default: m.SubjectCovers })));
+const LineNotifications = lazy(() => import("@/routes/LineNotifications").then((m) => ({ default: m.LineNotifications })));
+const DutyRoster = lazy(() => import("@/routes/DutyRoster").then((m) => ({ default: m.DutyRoster })));
+const PeriodAttendance = lazy(() => import("@/routes/PeriodAttendance").then((m) => ({ default: m.PeriodAttendance })));
+const Users = lazy(() => import("@/routes/Users").then((m) => ({ default: m.Users })));
 
 /** A signed-in account without POS access landed on /pos-login: sign out and let PosLogin show a neutral error. */
 function PosDenied() {
@@ -149,7 +150,9 @@ export default function App() {
       <ToastProvider>
         <BrowserRouter>
           <AuthProvider>
-            <Gate />
+            <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center"><Spinner className="h-5 w-5 text-muted-foreground" /></div>}>
+              <Gate />
+            </Suspense>
           </AuthProvider>
         </BrowserRouter>
       </ToastProvider>

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { CheckmarkCircleIcon, Search } from "@/components/icons";
-import { Button, Field, Input, Spinner, Switch } from "@/components/ui";
+import { Button, Input, Spinner, Switch } from "@/components/ui";
 import { productImageUrl, usePosProducts, useSaveProduct } from "@/hooks/useCardTopup";
 import type { PosProduct } from "@/lib/database.types";
 import { downloadLabelPng, printLabels } from "@/lib/productLabel";
@@ -245,24 +245,29 @@ export function ProductsTab() {
         onOpenChange={(o) => !o && setForm(null)}
         title={form?.id ? "แก้ไขสินค้า" : "เพิ่มสินค้า"}
         footer={
-          <div className="flex gap-3">
-            <Button type="button" variant="outline" className="h-14 flex-1 text-lg" onClick={() => setForm(null)}>
-              ยกเลิก
-            </Button>
-            <Button type="submit" form="product-form" className="h-14 flex-1 text-lg" disabled={!canSave}>
-              {save.isPending ? <Spinner /> : "บันทึก"}
-            </Button>
+          <div className="space-y-2">
+            {form && !canSave && !save.isPending && (
+              <p className="text-center text-lg font-medium text-muted-foreground">กรอกชื่อสินค้าและราคาก่อนบันทึก</p>
+            )}
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" className="h-16 flex-1 border-2 text-xl font-semibold" onClick={() => setForm(null)}>
+                ยกเลิก
+              </Button>
+              <Button type="submit" form="product-form" className="pos-cta h-16 flex-[1.4] text-2xl font-bold" disabled={!canSave}>
+                {save.isPending ? <Spinner /> : "บันทึก"}
+              </Button>
+            </div>
           </div>
         }
       >
         {form && (
-          <form id="product-form" onSubmit={submit} className="space-y-4">
+          <form id="product-form" onSubmit={submit} className="space-y-6">
             <div className="flex items-center gap-4">
-              <div className="flex size-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted text-base text-muted-foreground">
+              <div className="flex size-32 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-border bg-muted text-lg text-muted-foreground">
                 {form.preview ? <img src={form.preview} alt="" className="size-full object-cover" /> : "ไม่มีรูป"}
               </div>
               <div className="flex flex-col items-start gap-3">
-                <label className="tappable inline-flex h-14 cursor-pointer items-center rounded-xl border border-border bg-muted px-5 text-lg font-medium">
+                <label className="tappable pos-key inline-flex h-16 cursor-pointer items-center rounded-xl border-2 border-primary bg-card px-6 text-xl font-semibold text-primary">
                   {form.preview ? "เปลี่ยนรูป" : "เพิ่มรูปสินค้า"}
                   <input
                     type="file"
@@ -275,28 +280,61 @@ export function ProductsTab() {
                   />
                 </label>
                 {form.preview && (
-                  <button type="button" className="tappable h-12 rounded-xl border border-border px-4 text-base font-semibold text-destructive" onClick={() => setForm({ ...form, image: null, preview: null })}>
+                  <button type="button" className="tappable h-12 rounded-xl border-2 border-destructive/40 px-4 text-lg font-semibold text-destructive" onClick={() => setForm({ ...form, image: null, preview: null })}>
                     ลบรูป
                   </button>
                 )}
               </div>
             </div>
-            <Field label="ชื่อสินค้า" required>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            </Field>
-            <Field label={`ราคา (${SALE_MIN}–${SALE_MAX} บาท)`} required>
-              <Input inputMode="numeric" autoComplete="off" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value.replace(/\D/g, "").slice(0, 3) })} />
-            </Field>
-            <Field label="หมวดหมู่">
-              <Input list="product-categories" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="เลือกหรือพิมพ์ใหม่ เช่น เครื่องดื่ม" />
-              <datalist id="product-categories">
-                {categories.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
-            </Field>
+            <label className="block space-y-2">
+              <span className="block text-xl font-semibold">
+                ชื่อสินค้า <span className="text-destructive" aria-hidden>*</span>
+              </span>
+              <Input className="h-16 border-2 text-2xl md:text-2xl" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </label>
+            <label className="block space-y-2">
+              <span className="block text-xl font-semibold">
+                ราคา <span className="text-destructive" aria-hidden>*</span>
+                <span className="ml-2 text-lg font-normal text-muted-foreground">
+                  ({SALE_MIN}–{SALE_MAX} บาท)
+                </span>
+              </span>
+              <span className="relative block">
+                <Input
+                  className="h-16 border-2 pr-14 text-right text-3xl font-bold tabular-nums md:text-3xl"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value.replace(/\D/g, "").slice(0, 3) })}
+                />
+                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-2xl font-semibold text-muted-foreground" aria-hidden>
+                  ฿
+                </span>
+              </span>
+            </label>
+            <div className="space-y-2">
+              <label className="block space-y-2">
+                <span className="block text-xl font-semibold">หมวดหมู่</span>
+                <Input className="h-16 border-2 text-2xl md:text-2xl" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="พิมพ์ใหม่ เช่น เครื่องดื่ม" />
+              </label>
+              {categories.length > 0 && (
+                <div className="flex flex-wrap gap-2" role="group" aria-label="เลือกหมวดหมู่ที่มีอยู่">
+                  {categories.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      aria-pressed={form.category === c}
+                      onClick={() => setForm({ ...form, category: c })}
+                      className={cn("tappable h-14 rounded-full border-2 px-5 text-xl font-semibold", form.category === c ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card")}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {form.id && <Switch label="เปิดขาย" checked={form.active} onChange={(active) => setForm({ ...form, active })} />}
-            {!form.id && <p className="text-base text-muted-foreground">ระบบสร้างรหัสบาร์โค้ดให้อัตโนมัติหลังบันทึก — เปิดแก้ไขอีกครั้งเพื่อพิมพ์ป้าย</p>}
+            {!form.id && <p className="rounded-xl bg-muted px-4 py-3 text-lg">ระบบสร้างรหัสบาร์โค้ดให้อัตโนมัติหลังบันทึก — เปิดแก้ไขอีกครั้งเพื่อพิมพ์ป้าย</p>}
           </form>
         )}
         {/* Barcode label lives with the product now (the per-row "ป้าย" button is gone). */}

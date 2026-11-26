@@ -148,7 +148,7 @@ export function TerminalsTab({ onTestScanner, onTestRfid }: { onTestScanner?: ()
                 aria-label={`แก้ไข ${t.name}`}
                 className="tappable flex flex-1 flex-col gap-3 p-4 text-left active:bg-foreground/5"
               >
-                <span className={cn("flex h-16 w-16 items-center justify-center rounded-2xl bg-muted", !t.active && "opacity-50")}>
+                <span className={cn("flex h-16 w-16 items-center justify-center rounded-2xl", t.active ? "bg-success text-white" : "bg-muted opacity-50")}>
                   <DesktopIcon className="h-10 w-10" />
                 </span>
                 <span className="flex flex-col gap-1">

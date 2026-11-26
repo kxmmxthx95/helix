@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { FiSidebar } from "react-icons/fi";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import {
   AirplaneIcon,
   AppsIcon,
@@ -46,7 +46,7 @@ import { MobileHeaderProvider, useMobileHeaderSlot } from "@/components/MobileHe
 import { useTheme } from "@/components/ThemeProvider";
 import { useToast } from "@/components/Toast";
 import { applyUpdate, checkForUpdate, pendingOps } from "@/lib/swUpdate";
-import { Avatar, Button, Select } from "@/components/ui";
+import { Avatar, Button, PageSpinner, Select } from "@/components/ui";
 import { avatarUrl, useUploadAvatar } from "@/hooks/useAvatar";
 import { useOutboxSync } from "@/hooks/useOutboxSync";
 import { useRoleSubtitle } from "@/hooks/useProfiles";
@@ -1026,7 +1026,7 @@ function AppShellInner() {
                   transition={navDir.current === 0 ? { duration: 0.18, ease: "easeOut" } : { duration: 0.38, ease: IOS_EASE }}
                   className="relative flex min-h-0 flex-1 flex-col bg-background pt-4"
                 >
-                  {outlet}
+                  <Suspense fallback={<PageSpinner />}>{outlet}</Suspense>
                 </motion.div>
               </AnimatePresence>
             ) : (
@@ -1037,7 +1037,7 @@ function AppShellInner() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.18, ease: "easeOut" }}
               >
-                {outlet}
+                <Suspense fallback={<PageSpinner />}>{outlet}</Suspense>
               </motion.div>
             )}
           </div>

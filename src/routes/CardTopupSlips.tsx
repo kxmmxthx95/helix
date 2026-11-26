@@ -4,13 +4,12 @@ import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { Button, Field, Input, Skeleton, Spinner } from "@/components/ui";
 import { slipImageUrl, useReviewSlip, useSlipRequests, type SlipRow } from "@/hooks/useCardTopup";
-import { findDuplicateSlips, parseAmount, TOPUP_MAX, TOPUP_MIN } from "@/lib/cardTopup";
+import { findDuplicateSlips, parseAmount, SLIP_STATUS_LABEL, TOPUP_MAX, TOPUP_MIN } from "@/lib/cardTopup";
 import { formatBaht } from "@/lib/tuition";
 import { cn } from "@/lib/utils";
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "ทำรายการไม่สำเร็จ");
 const when = (iso: string) => new Date(iso).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
-export const SLIP_STATUS_LABEL = { pending: "รออนุมัติ", approved: "อนุมัติแล้ว", rejected: "ไม่อนุมัติ", voided: "ยกเลิกแล้ว" } as const;
 const STATUS_BADGE = {
   pending: "bg-warning/15 text-[#a35a00] dark:text-warning",
   approved: "bg-success/15 text-success",

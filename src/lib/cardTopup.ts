@@ -8,6 +8,8 @@ export const TOPUP_MAX = 5000;
 export const SALE_MIN = 1;
 export const SALE_MAX = 500;
 
+/** Shared with the parent portal, so it lives here and not in the lazy Slips tab. */
+export const SLIP_STATUS_LABEL = { pending: "รออนุมัติ", approved: "อนุมัติแล้ว", rejected: "ไม่อนุมัติ", voided: "ยกเลิกแล้ว" } as const;
 export const TX_TYPE_LABEL: Record<CardTransactionType, string> = {
   topup_cash: "เติมเงินสด",
   topup_slip: "เติมผ่านสลิป",

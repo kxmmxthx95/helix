@@ -12,11 +12,17 @@
     <meta name="apple-mobile-web-app-title" content="Helix" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/pwa-192.png" />
+    <!-- Geist (Latin) and Noto Sans Thai are self-hosted: no network round-trip before first paint, and the service worker precaches them. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/Geist-latin.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/NotoSansThai-thai.woff2" />
+    <!-- Rarely used families (game, mono, print): loaded without blocking first paint. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Mali:wght@600;700&family=Noto+Sans+Thai:wght@400;500;600;700&family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Mali:wght@600;700&family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
     <title>Helix - PMV : ระบบจัดการโรงเรียนปิยมิตรวิทยา</title>
   </head>
