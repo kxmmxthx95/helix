@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ViewToggle, defaultView } from "@/components/ViewToggle";
 import { RoomsView } from "@/components/ExamRoomsView";
-import { dayKey, roomClashes } from "@/lib/examRooms";
+import { dayKey, isLive, roomClashes } from "@/lib/examRooms";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
@@ -213,7 +213,14 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
     .sort((a, b) => a.label.localeCompare(b.label, "th", { numeric: true }));
   const fmtTime = (d: string) => new Date(d).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
   // Rooms without an exam time are not listed here; set the time from the room settings.
+  // Re-render every 30 s so a live dot appears/disappears at the exact minute without a refresh.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
   const now = Date.now();
+  const liveDot = (s: ExamSession) => isLive(s, now) && <span title="กำลังสอบ" className="mr-1.5 inline-block size-2 shrink-0 animate-pulse rounded-full bg-success" />;
   const shown = sessions.filter((s) => {
     if (!s.opens_at) return false;
     if (when === "all") return true;
@@ -260,7 +267,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
       >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 space-y-2">
-            <p className="text-sm font-semibold tabular-nums">{fmtTime(s.opens_at!)}{s.closes_at ? ` – ${fmtTime(s.closes_at)}` : ""}</p>
+            <p className="flex items-center text-sm font-semibold tabular-nums">{liveDot(s)}{fmtTime(s.opens_at!)}{s.closes_at ? ` – ${fmtTime(s.closes_at)}` : ""}</p>
             {s.exam_type ? (
               <p className="flex flex-wrap items-center gap-1">
                 <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", kindTone(s.exam_type))}>{s.exam_type}</span>
@@ -394,7 +401,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
                   <tr key={s.id} onClick={() => setEditing(s)} className="h-12 cursor-pointer border-t border-border first:border-t-0">
                     <td className="whitespace-nowrap px-4 py-2">
                       <div>{s.opens_at ? new Date(s.opens_at).toLocaleDateString("th-TH", { dateStyle: "medium" }) : <span className="text-muted-foreground">ยังไม่กำหนด</span>}</div>
-                      <div className="tabular-nums text-muted-foreground">{s.opens_at ? `${fmtTime(s.opens_at)} – ${fmtTime(s.closes_at!)}` : "ตั้งเวลา"}</div>
+                      <div className="flex items-center tabular-nums text-muted-foreground">{liveDot(s)}{s.opens_at ? `${fmtTime(s.opens_at)} – ${fmtTime(s.closes_at!)}` : "ตั้งเวลา"}</div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 tabular-nums">{subjectsOf(s).map((x) => <div key={x.id} className="flex h-8 items-center"><span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(x.learning_area_id))}>{x.code}</span></div>)}</td>
                     <td className="px-4 py-3 font-medium">{subjectsOf(s).map((x) => <div key={x.id} className="flex h-8 items-center">{x.name_th}</div>)}</td>

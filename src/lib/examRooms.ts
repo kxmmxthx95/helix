@@ -3,6 +3,10 @@ type Timed = { id: string; opens_at: string | null; closes_at: string | null };
 /** End of a session in ms; one without a close time counts as a point in time. */
 export const endOf = (s: Timed) => new Date(s.closes_at ?? s.opens_at!).getTime();
 
+/** Exam is in progress at `now` (ms). Needs both ends: without a close time we cannot tell when it stops. */
+export const isLive = (s: Timed, now: number) =>
+  !!s.opens_at && !!s.closes_at && new Date(s.opens_at).getTime() <= now && now < new Date(s.closes_at).getTime();
+
 /** Ids of sessions that overlap another session in the same physical room (a room can host one exam at a time).
  *  Sessions without an opens_at are ignored; touching windows (one ends when the next starts) do not clash. */
 export function roomClashes<T extends Timed>(sessions: T[], roomIdsOf: Map<string, string[]> | undefined): Set<string> {

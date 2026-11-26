@@ -1,6 +1,6 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import type { ExamSession, Subject } from "@/lib/database.types";
-import { dayKey, endOf } from "@/lib/examRooms";
+import { dayKey, endOf, isLive } from "@/lib/examRooms";
 import { kindTone, roundTone } from "@/lib/examKinds";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +22,13 @@ export function RoomsView({
   clashing: Set<string>;
   onOpen: (s: ExamSession) => void;
 }) {
+  // Re-render every 30 s so the live dot follows the clock.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const now = Date.now();
   const days = [...new Set(sessions.map((s) => dayKey(new Date(s.opens_at!))))];
   const [picked, setPicked] = useState<string | null>(null);
   const today = dayKey(new Date());
@@ -83,7 +90,10 @@ export function RoomsView({
                       className={cn("cursor-pointer space-y-1.5 rounded-xl border bg-card p-3 text-xs hover:bg-muted", bad ? "border-destructive" : "border-border")}
                     >
                       <p className="flex items-center justify-between gap-2 text-sm font-semibold tabular-nums">
-                        <span>{hm(start)}{s.closes_at ? ` – ${hm(endOf(s))}` : ""}</span>
+                        <span className="flex items-center">
+                          {isLive(s, now) && <span title="กำลังสอบ" className="mr-1.5 inline-block size-2 shrink-0 animate-pulse rounded-full bg-success" />}
+                          {hm(start)}{s.closes_at ? ` – ${hm(endOf(s))}` : ""}
+                        </span>
                         {bad && <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-semibold text-destructive">ซ้อนเวลา</span>}
                       </p>
                       <p className="flex flex-wrap items-center gap-1">
