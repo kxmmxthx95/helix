@@ -2,13 +2,13 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import { Select, Spinner } from "@/components/ui";
 import { POS_TERMINAL_KEY, posPin } from "@/lib/posPin";
+import { POS_DENIED_KEY } from "@/lib/roles";
 import { useWakeLock } from "@/hooks/usePosDevice";
 import { buzz, tick } from "@/lib/sound";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
 /** Set by PosDenied (App.tsx) when a signed-in account has no POS access, so the redirect back here can say so. */
-export const POS_DENIED_KEY = "helix.posDenied";
 export const POS_DENIED_MSG = "เข้าสู่ระบบไม่ได้ — ติดต่อฝ่ายการเงิน";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"] as const;

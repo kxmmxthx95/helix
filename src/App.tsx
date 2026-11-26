@@ -38,9 +38,7 @@ const TeachingPlan = lazy(() => import("@/routes/TeachingPlan").then((m) => ({ d
 const TeachingPlanCalendar = lazy(() => import("@/routes/TeachingPlanCalendar").then((m) => ({ default: m.TeachingPlanCalendar })));
 const Timetable = lazy(() => import("@/routes/Timetable").then((m) => ({ default: m.Timetable })));
 const TimeTracking = lazy(() => import("@/routes/TimeTracking").then((m) => ({ default: m.TimeTracking })));
-import { canUsePos, isCashierOnly } from "@/lib/roles";
-import { PosLogin, POS_DENIED_KEY } from "@/routes/PosLogin";
-import { CardTopup } from "@/routes/CardTopup";
+import { canUsePos, isCashierOnly, POS_DENIED_KEY } from "@/lib/roles";
 const CardTopupForm = lazy(() => import("@/routes/CardTopupForm").then((m) => ({ default: m.CardTopupForm })));
 const StudentCards = lazy(() => import("@/routes/StudentCards").then((m) => ({ default: m.StudentCards })));
 const Tuition = lazy(() => import("@/routes/Tuition").then((m) => ({ default: m.Tuition })));
@@ -49,6 +47,8 @@ const SubjectCovers = lazy(() => import("@/routes/SubjectCovers").then((m) => ({
 const LineNotifications = lazy(() => import("@/routes/LineNotifications").then((m) => ({ default: m.LineNotifications })));
 const DutyRoster = lazy(() => import("@/routes/DutyRoster").then((m) => ({ default: m.DutyRoster })));
 const PeriodAttendance = lazy(() => import("@/routes/PeriodAttendance").then((m) => ({ default: m.PeriodAttendance })));
+const PosLogin = lazy(() => import("@/routes/PosLogin").then((m) => ({ default: m.PosLogin })));
+const CardTopup = lazy(() => import("@/routes/CardTopup").then((m) => ({ default: m.CardTopup })));
 const Users = lazy(() => import("@/routes/Users").then((m) => ({ default: m.Users })));
 
 /** A signed-in account without POS access landed on /pos-login: sign out and let PosLogin show a neutral error. */

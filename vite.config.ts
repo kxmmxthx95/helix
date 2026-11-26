@@ -43,6 +43,8 @@ export default defineConfig({
           "index.html",
           "assets/index-*.{js,css}",
           "assets/vendor-{react,query,supabase,motion}-*.js",
+          // POS start path, lazy so students don't download it: login, till and its shared hooks.
+          "assets/{PosLogin,CardTopup,useCardTopup}-*.js",
           "fonts/*.woff2",
           "*.{svg,png}",
         ],

@@ -92,3 +92,6 @@ export const isCashierOnly = (roles: Role[]) => roles.length > 0 && roles.every(
 
 /** May open the POS screen (บัตรเติมเงิน ขาย tab) — cashier or org-wide; mirrors the pos_* RPC checks in migration 0107. */
 export const canUsePos = (roles: Role[]) => isOrgWide(roles) || roles.includes("cashier");
+
+/** sessionStorage flag: a signed-in account without POS access was bounced to /pos-login. */
+export const POS_DENIED_KEY = "helix.posDenied";
