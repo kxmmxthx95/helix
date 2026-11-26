@@ -115,18 +115,24 @@ export function useExamSession(id: string | null) {
 export type ExamSessionQuestionRow = { question_id: string; position: number; points: number; prompt: string };
 
 /** Question count per session, for list badges. Invalidated with the per-session query (same key prefix). */
+/** Rows per session over every page: PostgREST returns at most 1000 rows per request, and a silent cut-off made later rooms count as empty. */
+export async function countBySession(page: (from: number, to: number) => PromiseLike<{ data: { session_id: string }[] | null; error: Error | null }>) {
+  const PAGE = 1000;
+  const map = new Map<string, number>();
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await page(from, from + PAGE - 1);
+    if (error) throw error;
+    for (const r of data ?? []) map.set(r.session_id, (map.get(r.session_id) ?? 0) + 1);
+    if ((data?.length ?? 0) < PAGE) return map;
+  }
+}
+
 export function useSessionQuestionCounts(sessionIds: string[]) {
   const key = [...new Set(sessionIds)].sort();
   return useQuery({
     queryKey: ["exam_session_questions", "counts", key],
     enabled: key.length > 0,
-    queryFn: async (): Promise<Map<string, number>> => {
-      const { data, error } = await supabase.from("exam_session_questions").select("session_id").in("session_id", key);
-      if (error) throw error;
-      const map = new Map<string, number>();
-      for (const r of data) map.set(r.session_id, (map.get(r.session_id) ?? 0) + 1);
-      return map;
-    },
+    queryFn: () => countBySession((from, to) => supabase.from("exam_session_questions").select("session_id").in("session_id", key).order("session_id").order("question_id").range(from, to)),
   });
 }
 
@@ -327,13 +333,7 @@ export function usePracticeCounts(sessionIds: string[]) {
   return useQuery({
     queryKey: ["exam_session_practice_counts", ...sessionIds],
     enabled: sessionIds.length > 0,
-    queryFn: async (): Promise<Map<string, number>> => {
-      const { data, error } = await supabase.from("exam_session_practice_questions").select("session_id").in("session_id", sessionIds);
-      if (error) throw error;
-      const map = new Map<string, number>();
-      for (const r of data) map.set(r.session_id, (map.get(r.session_id) ?? 0) + 1);
-      return map;
-    },
+    queryFn: () => countBySession((from, to) => supabase.from("exam_session_practice_questions").select("session_id").in("session_id", sessionIds).order("session_id").order("question_id").range(from, to)),
   });
 }
 

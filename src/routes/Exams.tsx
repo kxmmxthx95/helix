@@ -1710,7 +1710,7 @@ function SecurityPanel({ session, attempts }: { session: ExamSession; attempts: 
 
   if (pending.length + locked.length === 0) return null;
   return (
-    <div className="shrink-0 space-y-2 rounded-lg border border-border px-3 py-2 text-xs">
+    <div className={cn("shrink-0 space-y-2 rounded-lg border px-3 py-2 text-xs", locked.length > 0 ? "border-destructive/40" : "border-border")}>
       {pending.map((a) => (
         <div key={a.id} className="flex items-center justify-between gap-2 rounded-md bg-muted px-2 py-1.5">
           <span>{nameOf(a.student_id)} ขอเปลี่ยนเครื่อง</span>
@@ -1721,11 +1721,16 @@ function SecurityPanel({ session, attempts }: { session: ExamSession; attempts: 
       ))}
 
       {locked.map((l) => (
-        <div key={l.student_id} className="flex items-center justify-between gap-2 rounded-md bg-muted px-2 py-1.5">
-          <span>{nameOf(l.student_id)} ถูกล็อกรหัสสอบ</span>
-          <Button size="sm" onClick={() => unlock.mutate({ sessionId: session.id, studentId: l.student_id }, { onError })}>
+        <div key={l.student_id} role="alert" className="flex items-center justify-between gap-2 rounded-md bg-destructive/15 px-2.5 py-2 text-destructive">
+          <span className="flex min-w-0 items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span className="min-w-0"><span className="font-semibold">{nameOf(l.student_id)}</span> ถูกล็อกรหัสสอบ</span>
+          </span>
+          {/* Off = locked; switching on unlocks and the row disappears once the lock is gone. */}
+          <label className="flex shrink-0 items-center gap-2 font-medium">
             ปลดล็อก
-          </Button>
+            <Switch size="sm" label="ปลดล็อก" checked={unlock.isPending && unlock.variables?.studentId === l.student_id} disabled={unlock.isPending} onChange={(on) => on && unlock.mutate({ sessionId: session.id, studentId: l.student_id }, { onError })} />
+          </label>
         </div>
       ))}
     </div>
