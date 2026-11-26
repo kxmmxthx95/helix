@@ -176,11 +176,11 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
   const [editing, setEditing] = useState<ExamSession | null>(null);
   const [view, setView] = useState<"cards" | "table">(defaultView);
   const [when, setWhen] = useState<"active" | "past" | "all">("active");
-  const [needFix, setNeedFix] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [fGrade, setFGrade] = useState("");
   const [fRoom, setFRoom] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
-  const filterCount = [canSeeAll && scope !== defaultScope, when !== "active", needFix, fGrade, fRoom].filter(Boolean).length;
+  const filterCount = [canSeeAll && scope !== defaultScope, when !== "active", fGrade, fRoom].filter(Boolean).length;
   const colors = useSubjectColors([]);
   const { data: seatStatus } = useSeatingStatus(sessions.map((s) => s.id));
   // Physical rooms where each exam is sat (exam_session_rooms → rooms), first room first.
@@ -217,7 +217,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
     if (when === "all") return true;
     const ended = !!s.closes_at && new Date(s.closes_at).getTime() < now;
     return when === "past" ? ended : !ended;
-  }).filter((s) => !needFix || ["bad", "warn"].includes(seatStatus?.get(s.id)?.tone ?? ""))
+  })
     .filter((s) => !fRoom || classroomIdsOf(s).includes(fRoom))
     .filter((s) => !fGrade || classroomIdsOf(s).some((id) => classrooms.find((c) => c.id === id)?.grade_level_id === fGrade));
   const byDay = new Map<string, ExamSession[]>();
@@ -292,15 +292,30 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
     );
   };
   const scheduled = shown.slice().sort((a, b) => a.opens_at!.localeCompare(b.opens_at!));
+  // Every scheduled round in scope (not just the filtered ones): the print drawer has its own day/grade/room choices.
+  const printItems: ScheduleItem[] = sessions
+    .filter((s) => !!s.opens_at)
+    .map((s) => ({
+      id: s.id,
+      opens: new Date(s.opens_at!),
+      closes: s.closes_at ? new Date(s.closes_at) : null,
+      subjects: subjectsOf(s),
+      rooms: [...new Set((sessionSets?.get(s.id) ?? []).flatMap((x) => roomOfSet(x.topic_set_id) ?? []))],
+      classroomIds: classroomIdsOf(s),
+      venue: venueOf(s),
+      exam: examLabel(s) ?? "",
+    }));
+  const printGrades = gradeOptions.map((g) => ({ id: g.id, label: gradeShortLabel(g.code) }));
+  const printRooms = classrooms.map((c) => ({ id: c.id, gradeId: c.grade_level_id, label: `${gradeShortLabel(grades.find((g) => g.id === c.grade_level_id)?.code ?? "")}/${c.name}` }));
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 pt-1">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <Sheet
         open={filterOpen}
         onOpenChange={setFilterOpen}
         title="กรองตารางสอบ"
         footer={
           <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" disabled={filterCount === 0} onClick={() => { setScope(defaultScope); setWhen("active"); setNeedFix(false); setFGrade(""); setFRoom(""); }}>
+            <Button type="button" variant="outline" className="flex-1" disabled={filterCount === 0} onClick={() => { setScope(defaultScope); setWhen("active"); setFGrade(""); setFRoom(""); }}>
               ล้าง
             </Button>
             <Button type="button" className="flex-1" onClick={() => setFilterOpen(false)}>
@@ -312,11 +327,11 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
         <div className="space-y-5">
           {canSeeAll && <ChipRow label="ขอบเขต" all={null} value={scope} onChange={(v) => setScope(v as "mine" | "all")} options={[["mine", "ของฉัน"], ["all", "ทุกวิชา"]]} />}
           <ChipRow label="ช่วงเวลาสอบ" all={null} value={when} onChange={(v) => setWhen(v as typeof when)} options={[["active", "ยังไม่สิ้นสุด"], ["past", "ผ่านไปแล้ว"], ["all", "ทั้งหมด"]]} />
-          <ChipRow label="ผังที่นั่ง" value={needFix ? "fix" : ""} onChange={(v) => setNeedFix(!!v)} options={[["fix", "ที่ต้องแก้"]]} />
           <ChipRow label="ชั้น" value={fGrade} onChange={(v) => { setFGrade(v); setFRoom(""); }} options={gradeOptions.map((g) => [g.id, gradeShortLabel(g.code)])} />
           <ChipRow label="ห้อง" value={fRoom} onChange={setFRoom} options={roomOptions.map((r) => [r.id, r.label])} />
         </div>
       </Sheet>
+      {printing && <PrintScheduleDrawer items={printItems} grades={printGrades} rooms={printRooms} onClose={() => setPrinting(false)} />}
       <div className="flex shrink-0 items-center justify-end gap-2">
         <Button size="sm" variant="outline" className="ui-control-compact h-8 gap-1 px-2.5 lg:hidden" aria-label="กรองตารางสอบ" onClick={() => setFilterOpen(true)}>
           <FunnelIcon className="h-3 w-3" />{filterCount > 0 && <span className="text-xs tabular-nums">{filterCount}</span>}
@@ -341,10 +356,10 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
             <option value="">ทุกห้อง</option>
             {roomOptions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
           </Select>
-          <Button size="sm" variant="outline" className={cn("ui-control-compact h-8", needFix && "border-accent bg-accent-soft text-accent")} aria-pressed={needFix} onClick={() => setNeedFix(!needFix)}>
-            ที่ต้องแก้
-          </Button>
         </div>
+        <Button size="sm" variant="outline" className="ui-control-compact h-8 gap-1 px-2.5" aria-label="พิมพ์ตารางสอบ" disabled={isLoading || detailsLoading} onClick={() => setPrinting(true)}>
+          <PrintIcon className="h-3.5 w-3.5" />
+        </Button>
         <ViewToggle value={view} onChange={setView} />
       </div>
       {isLoading || detailsLoading ? <PageSpinner /> : shown.length === 0 ? (
@@ -522,6 +537,126 @@ function windowParts(opens: string, closes: string) {
     : { date: `${day(o)} – ${day(c)}`, time: `${time(o)} – ${time(c)}` };
 }
 
+type ScheduleItem = { id: string; opens: Date; closes: Date | null; subjects: Subject[]; rooms: string[]; classroomIds: string[]; venue: string | undefined; exam: string };
+
+const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const dayLabel = (d: Date) => d.toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+/** "พิมพ์ตารางสอบ": pick days, grade and room independently of the table's filters, then preview/print on landscape A4. */
+function PrintScheduleDrawer({ items, grades, rooms, onClose }: { items: ScheduleItem[]; grades: { id: string; label: string }[]; rooms: { id: string; gradeId: string; label: string }[]; onClose: () => void }) {
+  const [picked, setPicked] = useState<Set<string> | null>(null);
+  const [grade, setGrade] = useState("");
+  const [room, setRoom] = useState("");
+  const [preview, setPreview] = useState(false);
+  const now = Date.now();
+  const gradeOfRoom = new Map(rooms.map((r) => [r.id, r.gradeId]));
+  const matching = items.filter((i) => (!grade || i.classroomIds.some((id) => gradeOfRoom.get(id) === grade)) && (!room || i.classroomIds.includes(room)));
+  const days = [...Map.groupBy(matching.slice().sort((a, b) => a.opens.getTime() - b.opens.getTime()), (i) => dayKey(i.opens))];
+  // Default: every day not yet over; past days are listed but start unchecked.
+  const upcoming = new Set(days.filter(([, list]) => list.some((i) => !i.closes || i.closes.getTime() >= now)).map(([k]) => k));
+  const selected = picked ?? upcoming;
+  const chosen = matching.filter((i) => selected.has(dayKey(i.opens))).sort((a, b) => a.opens.getTime() - b.opens.getTime());
+  const toggle = (k: string) => setPicked((p) => { const n = new Set(p ?? upcoming); if (!n.delete(k)) n.add(k); return n; });
+  const allOn = days.length > 0 && days.every(([k]) => selected.has(k));
+  const roomOptions = rooms.filter((r) => !grade || r.gradeId === grade).sort((a, b) => a.label.localeCompare(b.label, "th", { numeric: true }));
+  return (
+    <>
+      <Sheet
+        open
+        onOpenChange={(o) => !o && onClose()}
+        title="พิมพ์ตารางสอบ"
+        footer={
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>ยกเลิก</Button>
+            <Button type="button" className="flex-1" disabled={chosen.length === 0} onClick={() => setPreview(true)}>
+              <PrintIcon className="mr-1 h-4 w-4" />ดูตัวอย่าง/พิมพ์ ({chosen.length} รอบ)
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          <section>
+            <div className="mb-1.5 flex items-center justify-between px-1">
+              <h3 className="text-[13px] font-medium">วันสอบ</h3>
+              {days.length > 0 && (
+                <button type="button" className="text-xs text-accent" onClick={() => setPicked(allOn ? new Set() : new Set(days.map(([k]) => k)))}>
+                  {allOn ? "ล้างทั้งหมด" : "เลือกทั้งหมด"}
+                </button>
+              )}
+            </div>
+            {days.length === 0 ? (
+              <p className="rounded-xl bg-muted px-4 py-3 text-xs text-muted-foreground">ไม่มีรอบสอบตามชั้น/ห้องที่เลือก</p>
+            ) : (
+              <div className="overflow-hidden rounded-xl bg-muted [&>*+*]:border-t [&>*+*]:border-border">
+                {days.map(([k, list]) => (
+                  <label key={k} className="flex min-h-11 cursor-pointer items-center gap-3 px-4 py-2 text-sm">
+                    <input type="checkbox" className="h-[18px] w-[18px] shrink-0 accent-accent" checked={selected.has(k)} onChange={() => toggle(k)} />
+                    <span className="min-w-0 flex-1">{dayLabel(list[0]!.opens)}</span>
+                    {!upcoming.has(k) && <span className="shrink-0 text-[11px] text-muted-foreground">ผ่านแล้ว</span>}
+                    <span className="shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success">{list.length} รอบ</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </section>
+          <ChipRow label="ชั้น" value={grade} onChange={(v) => { setGrade(v); setRoom(""); }} options={grades.map((g) => [g.id, g.label])} />
+          <ChipRow label="ห้อง" value={room} onChange={setRoom} options={roomOptions.map((r) => [r.id, r.label])} />
+        </div>
+      </Sheet>
+      {preview && <PrintScheduleSheet items={chosen} gradeLabel={grades.find((g) => g.id === grade)?.label} roomLabel={rooms.find((r) => r.id === room)?.label} onDone={() => setPreview(false)} />}
+    </>
+  );
+}
+
+/** Landscape A4 paper of the chosen rounds: one table per day, time-ordered (no seating status or teacher: this goes to students). */
+function PrintScheduleSheet({ items, gradeLabel, roomLabel, onDone }: { items: ScheduleItem[]; gradeLabel: string | undefined; roomLabel: string | undefined; onDone: () => void }) {
+  const days = [...Map.groupBy(items, (i) => dayKey(i.opens))];
+  const first = items[0]?.opens;
+  const last = items[items.length - 1]?.opens;
+  const short = (d: Date) => d.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
+  const range = !first || !last ? "" : dayKey(first) === dayKey(last) ? short(first) : `${short(first)} – ${short(last)}`;
+  const exams = [...new Set(items.map((i) => i.exam).filter(Boolean))].join(" / ");
+  const who = roomLabel ?? gradeLabel ?? "ทุกชั้น";
+  const hm = (d: Date) => d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+  const cell: React.CSSProperties = { border: "1px solid #000", padding: "4px 8px", verticalAlign: "top", textAlign: "left" };
+  return createPortal(
+    <div className="print-sheet landscape">
+      <div className="print-toolbar">
+        <Button size="sm" variant="outline" onClick={onDone}>ปิด</Button>
+        <Button size="sm" onClick={() => window.print()}><PrintIcon className="mr-1 h-4 w-4" />พิมพ์</Button>
+      </div>
+      <div className="paper">
+        <h1 style={{ fontSize: 20, fontWeight: 700, textAlign: "center" }}>ตารางสอบ{exams && ` ${exams}`}</h1>
+        <p style={{ textAlign: "center" }}>{who} · {range}</p>
+        {days.map(([k, list]) => (
+          <section key={k} style={{ marginTop: 14 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 4, breakAfter: "avoid" }}>{dayLabel(list[0]!.opens)}</h2>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "#eee" }}>
+                  {["เวลา", "รหัสวิชา", "วิชา", "ชั้น/ห้อง", "ห้องสอบ"].map((h) => <th key={h} style={cell}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((i) => (
+                  <tr key={i.id} style={{ breakInside: "avoid" }}>
+                    <td style={{ ...cell, whiteSpace: "nowrap" }}>{hm(i.opens)}{i.closes ? ` – ${hm(i.closes)} น.` : " น."}</td>
+                    <td style={cell}>{i.subjects.map((x) => <div key={x.id}>{x.code}</div>)}</td>
+                    <td style={cell}>{i.subjects.map((x) => <div key={x.id}>{x.name_th}</div>)}</td>
+                    <td style={cell}>{i.rooms.join(", ") || "-"}</td>
+                    <td style={cell}>{i.venue ?? "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        ))}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 /** Seating chart of one exam room from the timetable (time itself is edited in the room detail). */
 function SeatingSheet({ session, onClose }: { session: ExamSession; onClose: () => void }) {
   const { data: targetIds = [] } = useExamSessionTargets(session.id);
@@ -530,11 +665,18 @@ function SeatingSheet({ session, onClose }: { session: ExamSession; onClose: () 
   const { data: roster = [], isLoading } = useSessionRoster(targets);
   const { data: names } = useStudentNames(roster.map((r) => r.student_id));
   const { data: avatars } = useStudentAvatars(roster.map((r) => r.student_id));
+  const { data: rosterClassrooms = [] } = useClassroomsByIds([...new Set(roster.map((r) => r.classroom_id))]);
+  const { data: rosterGrades = [] } = useGradeLevelsByIds([...new Set(rosterClassrooms.map((c) => c.grade_level_id))]);
+  const classroomLabel = (classroomId: string) => {
+    const c = rosterClassrooms.find((x) => x.id === classroomId);
+    const g = rosterGrades.find((x) => x.id === c?.grade_level_id);
+    return c && g ? `${gradeShortLabel(g.code)}/${c.name}` : "";
+  };
   const students = roster
     .map((r) => {
       const full = names?.get(r.student_id) ?? "นักเรียน";
       const [code, ...rest] = full.split(" ");
-      return { student_id: r.student_id, name: rest.length > 0 ? rest.join(" ") : full, code: rest.length > 0 ? code! : "", avatar: avatars?.get(r.student_id) ?? null };
+      return { student_id: r.student_id, name: rest.length > 0 ? rest.join(" ") : full, code: rest.length > 0 ? code! : "", avatar: avatars?.get(r.student_id) ?? null, classroom: classroomLabel(r.classroom_id) };
     })
     .sort((a, b) => a.code.localeCompare(b.code, "th") || a.name.localeCompare(b.name, "th"));
   return (
@@ -697,7 +839,7 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
   }
 
   return (
-    <div className="page-fill gap-3 pt-1">
+    <div className="page-fill gap-3">
       <div className="flex shrink-0 items-center justify-end gap-2">
         {canSeeAll && teacherId && (
           <Select className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:pr-8" aria-label="ขอบเขตห้องสอบ" value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")}>
@@ -1378,7 +1520,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
       )}
       <ScheduleCard session={session} />
       <ExamSettingsCard session={session} />
-      {rosterRows.length > 0 && <ExamSeatingCard session={session} roomPicker={(room, usedRoomIds) => <ExamRoomField session={session} room={room} usedRoomIds={usedRoomIds} />} students={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "", avatar: rosterAvatars?.get(r.student_id) ?? null }))} />}
+      {rosterRows.length > 0 && <ExamSeatingCard session={session} roomPicker={(room, usedRoomIds) => <ExamRoomField session={session} room={room} usedRoomIds={usedRoomIds} />} students={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "", avatar: rosterAvatars?.get(r.student_id) ?? null, classroom: r.room !== "—" ? r.room : "" }))} />}
 
       <SessionQuestionList session={session} sessionQuestions={sessionQuestions} />
       <PracticeQuestionsCards session={session} />

@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { AlertTriangle, ChevronForward, ListIcon, PencilIcon, Plus, ShuffleIcon, TimetableIcon, TrashIcon } from "@/components/icons";
+import { ExamRoomListSheet, type RoomListEntry } from "@/components/ExamRoomListSheet";
+import { AlertTriangle, ChevronForward, ListIcon, PencilIcon, Plus, PrintIcon, ShuffleIcon, TimetableIcon, TrashIcon } from "@/components/icons";
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
@@ -28,7 +29,7 @@ import { ICON, ICON_BTN } from "@/lib/iconButton";
 import { isDeptHead, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
-type SeatStudent = { student_id: string; name: string; code: string; avatar?: string | null };
+type SeatStudent = { student_id: string; name: string; code: string; avatar?: string | null; /** ชั้น/ห้อง of the student, for the printed name list. */ classroom?: string };
 /** `room` is the exam_session_rooms row the seat is in. */
 type Seat = { student_id: string; room: string; seat_row: number; seat_col: number };
 /** `special`: id of a special seat that has a student in it. */
@@ -80,6 +81,7 @@ export function ExamSeatingCard({
   const [open, setOpen] = useState(defaultOpen);
   const [managing, setManaging] = useState(false);
   const [roomTab, setRoomTab] = useState(0);
+  const [printingRoom, setPrintingRoom] = useState<string | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
   const [clearing, setClearing] = useState<string | null>(null);
   const [removing, setRemoving] = useState<ExamSessionRoom | null>(null);
@@ -205,18 +207,32 @@ export function ExamSeatingCard({
     const gridDiffers = (takenByRoom.get(r.id) ?? []).some((t) => t.seat_rows !== rows || t.seat_cols !== cols);
     const hasSeats = seated.some((x) => x.room === r.id);
     const roomSpecials = specials.filter((x) => x.session_room_id === r.id);
+    // Name list of this room in seat order: grid seats by column then row (A1, A2, … B1), special seats last.
+    const entryOf = (seat: string, id: string): RoomListEntry[] => {
+      const st = byId.get(id);
+      return st ? [{ seat, code: st.code, name: st.name, classroom: st.classroom ?? "" }] : [];
+    };
+    const roomEntries: RoomListEntry[] = [
+      ...seated.filter((x) => x.room === r.id).sort((a, b) => a.seat_col - b.seat_col || a.seat_row - b.seat_row).flatMap((x) => entryOf(seatLabel(x.seat_row, x.seat_col), x.student_id)),
+      ...roomSpecials.slice().sort((a, b) => a.special_no - b.special_no).flatMap((x) => (x.student_id ? entryOf(`พิเศษ ${x.special_no}`, x.student_id) : [])),
+    ];
     return (
       <section key={r.id} className={cn("space-y-3", rooms.length > 1 && "rounded-lg border border-border p-3")}>
-        {rooms.length > 1 && (
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-foreground">ห้องที่ {index + 1}</span>
-            {r.position > 1 && (
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-foreground">{rooms.length > 1 ? `ห้องที่ ${index + 1}` : ""}</span>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={roomEntries.length === 0} onClick={() => setPrintingRoom(r.id)}>
+              <PrintIcon className={ICON} />
+              พิมพ์รายชื่อ
+            </Button>
+            {rooms.length > 1 && r.position > 1 && (
               <Button size="icon" variant="outline" className={ICON_BTN} aria-label="ลบห้องนี้" disabled={busy} onClick={() => setRemoving(r)}>
                 <TrashIcon className={ICON} />
               </Button>
             )}
           </div>
-        )}
+        </div>
+        {printingRoom === r.id && <ExamRoomListSheet session={session} room={r} entries={roomEntries} onDone={() => setPrintingRoom(null)} />}
         {/* One button folds the room / template / fill controls (a sheet is narrow at any viewport size); open until a template is picked. */}
         <Button size="sm" variant="outline" className="ui-control-compact h-8 w-full justify-between" aria-expanded={setupShown} onClick={() => setSetupOpen(!setupShown)}>
           ตั้งค่าและจัดผังที่นั่ง

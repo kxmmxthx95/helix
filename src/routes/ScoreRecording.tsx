@@ -40,6 +40,7 @@ import {
 import { useDepartmentSettings } from "@/hooks/useSettings";
 import { useClassroomsByDepartment } from "@/hooks/useStatusManagement";
 import type { StudentListItem } from "@/hooks/useStudents";
+import { useProfilesByIds } from "@/hooks/usePractice";
 import { useDepartmentTeachingAssignments } from "@/hooks/useTeachingLoad";
 import type {
   AssignmentSubmission,
@@ -88,6 +89,8 @@ export function ScoreRecording() {
     academicYear,
     splitsByTerm ? term : null,
   );
+  const { data: teachers = [] } = useProfilesByIds([...new Set(allAssignments.flatMap((a) => a.teacher_id ?? []))].sort());
+  const teacherById = new Map(teachers.map((t) => [t.id, t]));
   const { data: subjects = [] } = useSubjects({
     search: "",
     departmentId,
@@ -303,7 +306,26 @@ export function ScoreRecording() {
                       <td className="px-4 py-0">
                         {room ? <span className={cn("inline-flex rounded-md px-2 py-0.5 text-xs font-medium", levelTone(room))}>{room}</span> : "—"}
                       </td>
-                      {overview && <td className="px-4 py-0 text-muted-foreground">{a.teacher_id === me.id ? "ตัวเอง" : a.teacher_id === null ? "ไม่มีครู" : "—"}</td>}
+                      {overview && (
+                        <td className="px-4 py-0">
+                          {a.teacher_id === null ? (
+                            <span className="text-muted-foreground">ไม่มีครู</span>
+                          ) : (
+                            (() => {
+                              const t = teacherById.get(a.teacher_id);
+                              return t ? (
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <Avatar name={`${t.first_name} ${t.last_name}`} src={avatarUrl(t)} className="h-7 w-7 text-[10px]" />
+                                  <span className="truncate">{t.first_name} {t.last_name}</span>
+                                  {a.teacher_id === me.id && <span className="shrink-0 text-xs text-muted-foreground">(ฉัน)</span>}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              );
+                            })()
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

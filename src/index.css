@@ -661,8 +661,11 @@
 .print-sheet .paper { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .print-sheet .print-prompt, .print-sheet .print-prompt :where(p, div, li, strong) { font-weight: 600; }
 .print-sheet .print-toolbar { position: sticky; top: 0; z-index: 1; display: flex; justify-content: flex-end; gap: 8px; padding: 8px 12px; background: #18181b; }
+.print-sheet.landscape .paper { max-width: 297mm; min-height: 210mm; }
 @media print {
   @page { size: A4; margin: 14mm; }
+  @page schedule { size: A4 landscape; margin: 12mm; }
+  .print-sheet.landscape { page: schedule; }
   /* Hide every other body child: the app root and any open Sheet's portal/overlay. */
   body > :not(.print-sheet) { display: none !important; }
   .print-sheet { position: static; overflow: visible; background: #fff; }
