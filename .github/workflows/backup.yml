@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  issues: write # the failure step opens an issue (LINE push quota can run out, GitHub cannot)
 
 concurrency: backup
 
@@ -86,8 +87,23 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" -H "Content-Type: application/json" \
             -d "$(jq -nc --arg to "${{ secrets.LINE_USER_ID }}" --arg t "Helix: $WARN" '{to:$to,messages:[{type:"text",text:$t}]}')"
 
+      - name: Open a GitHub issue (backup failed)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          title="สำรองข้อมูลล้มเหลว"
+          open=$(gh issue list --repo "${{ github.repository }}" --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --repo "${{ github.repository }}" --body "ล้มเหลวอีกครั้ง: $url"
+          else
+            gh issue create --repo "${{ github.repository }}" --title "$title" --body "workflow backup ล้มเหลว ดู $url (ปิด issue นี้เมื่อแก้แล้ว)"
+          fi
+
       - name: LINE alert (backup failed)
         if: failure()
+        continue-on-error: true # LINE push quota is monthly; the issue above is the primary alert
         run: |
           curl -fsS -X POST https://api.line.me/v2/bot/message/push \
             -H "Authorization: Bearer ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" -H "Content-Type: application/json" \
