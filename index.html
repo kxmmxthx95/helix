@@ -36,6 +36,8 @@
         if (m) m.setAttribute("href", "/pos.webmanifest");
         var t = document.querySelector('meta[name="apple-mobile-web-app-title"]');
         if (t) t.setAttribute("content", "Helix POS");
+        var i = document.querySelector('link[rel="apple-touch-icon"]');
+        if (i) i.setAttribute("href", "/pos-apple-touch-icon.png");
       }
     </script>
   </body>

@@ -1,6 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
-import { DesktopIcon } from "@/components/icons";
 import { Select, Spinner } from "@/components/ui";
 import { POS_TERMINAL_KEY, posPin } from "@/lib/posPin";
 import { tick } from "@/lib/sound";
@@ -90,7 +89,7 @@ export function PosLogin() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: "easeOut" }}
-          className="w-full max-w-lg"
+          className="w-full max-w-md"
         >
           {offline ? (
             <p className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-xl text-destructive">เชื่อมต่อไม่ได้ — ตรวจอินเทอร์เน็ตแล้วโหลดหน้าใหม่</p>
@@ -169,19 +168,15 @@ function PinEntry({ terminals, selected, onPick, initialError }: { terminals: Te
     return () => window.removeEventListener("keydown", onKey);
   }, [press]);
 
-  return (
-    <>
-      <div className="flex flex-col items-center gap-3 text-center">
-        <span className={cn("flex size-16 items-center justify-center rounded-2xl", ready ? "bg-success text-white" : "bg-muted text-muted-foreground")}>
-          <DesktopIcon className="size-10" />
-        </span>
-        <h1 className="text-3xl font-bold tracking-tight">เข้าสู่ระบบ POS</h1>
-      </div>
+  const hint = terminals.length === 0 ? "ยังไม่มีเครื่องที่เปิดใช้งาน — ติดต่อผู้ดูแล" : !selected ? "เลือกเครื่องก่อน แล้วใส่ PIN" : !selected.has_pin ? "ยังไม่ได้ตั้ง PIN — ติดต่อผู้ดูแล" : "ใส่ PIN 6 หลัก";
 
-      <label className="mt-5 block space-y-2">
-        <span className="block text-xl font-semibold">เครื่อง</span>
+  // One card, one column width: terminal, status line, PIN boxes and keys all line up.
+  return (
+    <div className="space-y-4 rounded-3xl border-2 border-border bg-card p-5 shadow-card">
+      <label className="block space-y-2">
+        <span className="block text-lg font-semibold text-muted-foreground">เครื่อง</span>
         <Select
-          className="h-16 border-2 text-xl md:text-xl"
+          className="h-16 border-2 text-2xl font-semibold md:text-2xl"
           placeholder="เลือกเครื่อง"
           value={selected?.id ?? ""}
           disabled={busy}
@@ -198,16 +193,28 @@ function PinEntry({ terminals, selected, onPick, initialError }: { terminals: Te
           ))}
         </Select>
       </label>
-      <p className="mt-3 text-center text-xl text-muted-foreground">
-        {terminals.length === 0 ? "ยังไม่มีเครื่องที่เปิดใช้งาน — ติดต่อผู้ดูแล" : !selected ? "เลือกเครื่องก่อน แล้วใส่ PIN" : !selected.has_pin ? "ยังไม่ได้ตั้ง PIN — ติดต่อผู้ดูแล" : "ใส่ PIN 6 หลักเพื่อเริ่มใช้งาน"}
-      </p>
+
+      <div className="flex min-h-14 items-center justify-center" aria-live="assertive">
+        {busy ? (
+          <p className="flex items-center gap-3 text-xl font-medium">
+            <Spinner className="size-6" />
+            กำลังตรวจสอบ…
+          </p>
+        ) : error ? (
+          <p role="alert" className="w-full rounded-xl bg-destructive/10 px-4 py-3 text-center text-xl font-semibold text-destructive">
+            {error}
+          </p>
+        ) : (
+          <p className="text-center text-xl text-muted-foreground">{hint}</p>
+        )}
+      </div>
 
       <motion.div
         key={shake}
         initial={false}
         animate={shake && !reduce ? { x: [0, -14, 12, -8, 6, 0] } : { x: 0 }}
         transition={{ duration: 0.4 }}
-        className="mt-6 flex justify-center gap-2.5"
+        className="grid grid-cols-6 gap-2"
         role="status"
         aria-label={`ใส่แล้ว ${pin.length} จาก 6 หลัก`}
       >
@@ -215,14 +222,14 @@ function PinEntry({ terminals, selected, onPick, initialError }: { terminals: Te
           <span
             key={i}
             className={cn(
-              "flex size-14 items-center justify-center rounded-xl border-2 transition-colors",
+              "flex h-16 items-center justify-center rounded-xl border-2 transition-colors",
               error
-                ? "border-destructive bg-card"
+                ? "border-destructive bg-background"
                 : i < pin.length
                   ? "border-primary bg-primary"
                   : i === pin.length && ready && !busy && !locked
-                    ? "border-primary bg-card"
-                    : "border-border bg-card",
+                    ? "border-primary bg-background"
+                    : "border-border bg-background",
             )}
           >
             {i < pin.length && <span className="size-4 rounded-full bg-white" />}
@@ -230,20 +237,7 @@ function PinEntry({ terminals, selected, onPick, initialError }: { terminals: Te
         ))}
       </motion.div>
 
-      <div className="min-h-[4rem] pt-4" aria-live="assertive">
-        {busy ? (
-          <p className="flex items-center justify-center gap-3 text-xl font-medium">
-            <Spinner className="size-6" />
-            กำลังตรวจสอบ…
-          </p>
-        ) : error ? (
-          <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-xl font-semibold text-destructive">
-            {error}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="mx-auto mt-2 grid max-w-sm grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         {KEYS.map((k) => (
           <button
             key={k}
@@ -252,7 +246,7 @@ function PinEntry({ terminals, selected, onPick, initialError }: { terminals: Te
             aria-label={k === "⌫" ? "ลบหนึ่งตัว" : k === "C" ? "ล้างทั้งหมด" : k}
             onClick={() => press(k)}
             className={cn(
-              "tappable pos-key flex h-20 items-center justify-center rounded-2xl border-2 border-border bg-card font-bold transition-colors active:bg-muted disabled:opacity-40",
+              "tappable pos-key flex h-20 items-center justify-center rounded-2xl border-2 border-border bg-background font-bold transition-colors active:bg-muted disabled:opacity-40",
               k === "C" && "border-destructive/50 bg-destructive/10 text-xl text-destructive",
               k === "⌫" && "bg-muted text-xl",
               k !== "C" && k !== "⌫" && "text-4xl tabular-nums",
@@ -262,7 +256,6 @@ function PinEntry({ terminals, selected, onPick, initialError }: { terminals: Te
           </button>
         ))}
       </div>
-
-    </>
+    </div>
   );
 }
