@@ -75,7 +75,7 @@ import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { ExamApprovalTab, ExamSubmissionsTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
 import { DIFFICULTY_BADGE_CLASS, DIFFICULTY_LABEL, QuestionForm, QuestionSheet, SubjectPicker, useQuestionForm } from "@/routes/ExamBank";
-import type { PracticeCheckResult, ExamAttempt, ExamSecurityEventType, ExamSession, ExamSessionRoom, ExamTopicSet, Student, Subject } from "@/lib/database.types";
+import type { PracticeCheckResult, ExamAttempt, ExamSecurityEvent, ExamSecurityEventType, ExamSession, ExamSessionRoom, ExamTopicSet, Student, Subject } from "@/lib/database.types";
 import { EXAM_KINDS, examLabel, kindTone, roundTone } from "@/lib/examKinds";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { canApproveExams } from "@/lib/roles";
@@ -1932,23 +1932,97 @@ function PracticeQuestionsCards({ session }: { session: ExamSession }) {
 }
 
 /** Anti-impersonation event trail for one room (migration 0132). */
+/** Severity of each event: red = someone may be impersonating or the student is locked out, amber = a failed/blocked attempt, green = the teacher resolved it. */
+const SECURITY_EVENT_TONE: Record<ExamSecurityEventType, { dot: string; text: string }> = {
+  login_blocked: { dot: "bg-destructive", text: "text-destructive" },
+  code_locked: { dot: "bg-destructive", text: "text-destructive" },
+  code_failed: { dot: "bg-warning", text: "text-warning" },
+  reset_blocked: { dot: "bg-warning", text: "text-warning" },
+  strict_disabled: { dot: "bg-warning", text: "text-warning" },
+  takeover_requested: { dot: "bg-accent", text: "text-accent" },
+  takeover_approved: { dot: "bg-success", text: "text-success" },
+  code_unlocked: { dot: "bg-success", text: "text-success" },
+};
+
+/** "Android · Chrome" from a user agent; calls from our own edge functions show as the system. */
+function deviceLabel(ua: string | null): string | null {
+  if (!ua) return null;
+  if (/SupabaseEdgeRuntime|^Deno\//.test(ua)) return "ระบบ (เซิร์ฟเวอร์)";
+  const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows" : /Macintosh/.test(ua) ? "Mac" : /Linux/.test(ua) ? "Linux" : null;
+  const browser = /Edg\//.test(ua) ? "Edge" : /CriOS|Chrome\//.test(ua) ? "Chrome" : /Firefox|FxiOS/.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : null;
+  return [os, browser].filter(Boolean).join(" · ") || "อุปกรณ์ไม่ทราบชนิด";
+}
+
+/** Event trail of a room, newest first: grouped by day, repeats of the same student + event folded into ×N, filterable by type. */
 function SecurityEventsSheet({ sessionId, open, onOpenChange }: { sessionId: string; open: boolean; onOpenChange: (o: boolean) => void }) {
   const { data: events = [] } = useSecurityEvents(sessionId);
   const names = useStudentNames(events.flatMap((e) => (e.student_id ? [e.student_id] : []))).data;
+  const [type, setType] = useState("");
+  const typeCounts = new Map<string, number>();
+  for (const e of events) typeCounts.set(e.event_type, (typeCounts.get(e.event_type) ?? 0) + 1);
+  const shown = events.filter((e) => !type || e.event_type === type);
+  // Fold consecutive identical (student, event) rows; `at` of the newest row is kept, the oldest gives the range start.
+  const rows: { head: ExamSecurityEvent; count: number; first: string }[] = [];
+  for (const e of shown) {
+    const last = rows[rows.length - 1];
+    if (last && last.head.student_id === e.student_id && last.head.event_type === e.event_type && last.head.device === e.device) {
+      last.count++;
+      last.first = e.at;
+    } else rows.push({ head: e, count: 1, first: e.at });
+  }
+  const byDay = [...Map.groupBy(rows, (r) => new Date(r.head.at).toLocaleDateString("th-TH", { dateStyle: "long" }))];
+  const hms = (d: string) => new Date(d).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title="เหตุการณ์ผิดปกติ" description={`${events.length} รายการ`}>
-      <ul className="space-y-3 text-sm">
-        {events.map((e) => (
-          <li key={e.id}>
-            <p>{e.student_id ? (names?.get(e.student_id) ?? "นักเรียน") : "—"} · {SECURITY_EVENT_LABEL[e.event_type]}</p>
-            <p className="text-xs text-muted-foreground">
-              {new Date(e.at).toLocaleString("th-TH")}
-              {e.device && ` · ${e.device}`}
-              {e.ip && ` · ${e.ip}`}
-            </p>
-          </li>
-        ))}
-      </ul>
+      {events.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">ยังไม่มีเหตุการณ์ผิดปกติ</p>
+      ) : (
+        <div className="space-y-5">
+          <ChipRow
+            label="ประเภท"
+            value={type}
+            onChange={setType}
+            options={[...typeCounts].map(([t, n]) => [t, `${SECURITY_EVENT_LABEL[t as ExamSecurityEventType]} ${n}`])}
+          />
+          {byDay.map(([day, items]) => (
+            <section key={day}>
+              <h3 className="mb-1.5 px-1 text-xs font-semibold text-muted-foreground">{day}</h3>
+              <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+                {items.map(({ head: e, count, first }) => {
+                  const tone = SECURITY_EVENT_TONE[e.event_type];
+                  const full = e.student_id ? names?.get(e.student_id) : undefined;
+                  const [code, ...rest] = (full ?? "").split(" ");
+                  const device = deviceLabel(e.device);
+                  const fromSystem = device === "ระบบ (เซิร์ฟเวอร์)";
+                  return (
+                    <li key={e.id} className="flex gap-3 px-3.5 py-3">
+                      <span aria-hidden className={cn("mt-2 size-2 shrink-0 rounded-full", tone.dot)} />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p className="min-w-0 truncate text-sm font-semibold">
+                            {full ? (rest.length > 0 ? rest.join(" ") : full) : e.student_id ? "นักเรียน" : "—"}
+                            {full && rest.length > 0 && <span className="ml-2 text-xs font-normal tabular-nums text-muted-foreground">{code}</span>}
+                          </p>
+                          <time dateTime={e.at} className="shrink-0 text-xs tabular-nums text-muted-foreground">{count > 1 ? `${hms(first)}–${hms(e.at)}` : hms(e.at)}</time>
+                        </div>
+                        <p className={cn("text-[13px] font-medium", tone.text)}>
+                          {SECURITY_EVENT_LABEL[e.event_type]}
+                          {count > 1 && <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">×{count}</span>}
+                        </p>
+                        <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                          {device && <span title={e.device ?? undefined}>{device}</span>}
+                          {e.ip && !fromSystem && <span className="font-mono tabular-nums">{e.ip}</span>}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+          {events.length >= 100 && <p className="px-1 text-center text-xs text-muted-foreground">แสดง 100 รายการล่าสุด</p>}
+        </div>
+      )}
     </Sheet>
   );
 }
