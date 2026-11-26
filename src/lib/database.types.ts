@@ -922,6 +922,10 @@ export type ExamAttempt = {
   /** Set when another session asked to take over after the holder went silent; teacher approves. */
   takeover_session: string | null;
   takeover_requested_at: string | null;
+  /** Teacher-entered score for a broken exam (migration 0231): attempt_no 0, never counts toward max_attempts. */
+  is_manual: boolean;
+  manual_note: string | null;
+  manual_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -2019,6 +2023,9 @@ export type Database = {
           | "holder_seen_at"
           | "takeover_session"
           | "takeover_requested_at"
+          | "is_manual"
+          | "manual_note"
+          | "manual_by"
         >
       >;
       exam_security_events: Table<ExamSecurityEvent, InsertOf<ExamSecurityEvent, "attempt_id" | "student_id" | "device" | "ip" | "actor" | "at">>;
@@ -2138,6 +2145,10 @@ export type Database = {
       submit_exam_attempt: {
         Args: { p_attempt_id: string; p_answers?: { question_id: string; choice_id: string | null; short_answer: string | null }[] };
         Returns: void;
+      };
+      set_exam_attempt_manual_score: {
+        Args: { p_session_id: string; p_student_id: string; p_score: number; p_note: string };
+        Returns: "synced" | "off" | "not_synced";
       };
       grant_exam_retake: {
         Args: { p_session_id: string; p_student_ids: string[] };

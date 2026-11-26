@@ -380,7 +380,7 @@ export function useDeleteExamSession() {
 
 /** Students only ever get scheduled rooms (opens_at/closes_at set). */
 /** subject_ids: every subject the room covers (merged rooms show under each). */
-export type AvailableExam = ExamSession & { opens_at: string; closes_at: string; /** Submitted attempts only — an unfinished one must stay resumable. */ my_attempts: number; subject_ids: string[] };
+export type AvailableExam = ExamSession & { opens_at: string; closes_at: string; /** Submitted attempts only — an unfinished one must stay resumable. */ my_attempts: number; /** The teacher entered a score for this student (migration 0231). */ has_manual_score: boolean; subject_ids: string[] };
 
 /** Sessions targeting the student's current classroom, whole window (not just currently-open) — the UI splits into upcoming/open/closed by opens_at/closes_at itself. */
 export function useAvailableExams(studentId: string | null, classroomId: string | null, academicYear: number | null) {
@@ -399,7 +399,7 @@ export function useAvailableExams(studentId: string | null, classroomId: string 
 
       const [{ data: sessions, error: sessionsError }, { data: attempts, error: attemptsError }, { data: sets, error: setsError }, { data: grants, error: grantsError }] = await Promise.all([
         supabase.from("exam_sessions").select("*").in("id", sessionIds).not("opens_at", "is", null).not("closes_at", "is", null).order("opens_at", { ascending: false }),
-        supabase.from("exam_attempts").select("session_id").eq("student_id", studentId!).eq("status", "submitted").in("session_id", sessionIds),
+        supabase.from("exam_attempts").select("session_id, is_manual").eq("student_id", studentId!).eq("status", "submitted").in("session_id", sessionIds),
         supabase.from("exam_session_sets").select("session_id, subject_id").in("session_id", sessionIds),
         supabase.from("exam_attempt_grants").select("session_id, extra").eq("student_id", studentId!).in("session_id", sessionIds),
       ]);
@@ -411,15 +411,38 @@ export function useAvailableExams(studentId: string | null, classroomId: string 
       for (const r of sets) subjectIdsOf.set(r.session_id, [...(subjectIdsOf.get(r.session_id) ?? []), r.subject_id]);
 
       const attemptCounts = new Map<string, number>();
-      for (const a of attempts) attemptCounts.set(a.session_id, (attemptCounts.get(a.session_id) ?? 0) + 1);
+      const manualOf = new Set<string>();
+      for (const a of attempts) {
+        if (a.is_manual) manualOf.add(a.session_id);
+        else attemptCounts.set(a.session_id, (attemptCounts.get(a.session_id) ?? 0) + 1);
+      }
       const extraOf = new Map(grants.map((g) => [g.session_id, g.extra]));
       // Teacher-granted retakes fold into max_attempts so every "attempts left" check stays as is.
-      return sessions.map((s) => ({ ...s, max_attempts: s.max_attempts + (extraOf.get(s.id) ?? 0), my_attempts: attemptCounts.get(s.id) ?? 0, subject_ids: [...new Set(subjectIdsOf.get(s.id) ?? [s.subject_id])] }) as AvailableExam);
+      return sessions.map((s) => ({ ...s, max_attempts: s.max_attempts + (extraOf.get(s.id) ?? 0), my_attempts: attemptCounts.get(s.id) ?? 0, has_manual_score: manualOf.has(s.id), subject_ids: [...new Set(subjectIdsOf.get(s.id) ?? [s.subject_id])] }) as AvailableExam);
     },
   });
 }
 
 // ------------------------------------------------------------------- attempts
+
+/** When an attempt's score last reached the gradebook: a manual one at its last edit, a graded one when submitted. */
+export const attemptScoreTime = (a: ExamAttempt) => new Date(a.is_manual ? a.updated_at : (a.submitted_at ?? a.created_at)).getTime();
+
+/** Teacher-entered score for one student (closes a round still in progress). Resolves to where the score landed. */
+export function useSetManualScore() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { sessionId: string; studentId: string; score: number; note: string }) => {
+      const { data, error } = await supabase.rpc("set_exam_attempt_manual_score", { p_session_id: v.sessionId, p_student_id: v.studentId, p_score: v.score, p_note: v.note });
+      if (error) throw error;
+      return data;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["exam_attempts"] });
+      void qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).includes("score") });
+    },
+  });
+}
 
 /** The student's own attempts on one session, most recent first. */
 export function useMyAttempts(sessionId: string | null, studentId: string | null) {
@@ -468,7 +491,8 @@ export function useStartOrResumeAttempt() {
         .from("exam_attempts")
         .select("id", { count: "exact", head: true })
         .eq("session_id", sessionId)
-        .eq("student_id", studentId);
+        .eq("student_id", studentId)
+        .eq("is_manual", false); // a teacher-entered score has attempt_no 0 and is not a real attempt
       if (countError) throw countError;
 
       const order = shuffle ? [...questionIds].sort(() => Math.random() - 0.5) : questionIds;

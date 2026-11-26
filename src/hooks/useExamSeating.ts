@@ -278,23 +278,27 @@ export function useMyExamSeats(studentId: string | null, sessionIds: string[]) {
   return useQuery({
     queryKey: ["exam_session_seats", "mine", studentId, key],
     enabled: !!studentId && key.length > 0,
-    queryFn: async (): Promise<Map<string, { room: string; seat: { row: number; col: number } | null }>> => {
-      const [{ data: seats, error: e1 }, { data: srooms, error: e2 }] = await Promise.all([
+    queryFn: async (): Promise<Map<string, { room: string; seat: { row: number; col: number } | null; /** พิเศษ N, when the student sits in a special seat instead of the grid. */ special: number | null }>> => {
+      const [{ data: seats, error: e1 }, { data: srooms, error: e2 }, { data: specials, error: e4 }] = await Promise.all([
         supabase.from("exam_session_seats").select("session_id, session_room_id, seat_row, seat_col").eq("student_id", studentId!).in("session_id", key),
         supabase.from("exam_session_rooms").select("id, session_id, room_id").in("session_id", key).order("position"),
+        supabase.from("exam_session_special_seats").select("session_id, session_room_id, special_no").eq("student_id", studentId!).in("session_id", key),
       ]);
       if (e1) throw e1;
       if (e2) throw e2;
+      if (e4) throw e4;
       const ids = [...new Set(srooms.flatMap((r) => r.room_id ?? []))];
       const { data: rooms, error: e3 } = ids.length > 0 ? await supabase.from("rooms").select("id, name").in("id", ids) : { data: [], error: null };
       if (e3) throw e3;
       const name = (roomId: string | null) => rooms.find((r) => r.id === roomId)?.name;
-      const out = new Map<string, { room: string; seat: { row: number; col: number } | null }>();
+      const out = new Map<string, { room: string; seat: { row: number; col: number } | null; special: number | null }>();
       for (const sid of key) {
         const mine = seats.find((s) => s.session_id === sid);
-        const own = mine ? name(srooms.find((r) => r.id === mine.session_room_id)?.room_id ?? null) : undefined;
+        const special = specials.find((s) => s.session_id === sid);
+        const placed = mine?.session_room_id ?? special?.session_room_id;
+        const own = placed ? name(srooms.find((r) => r.id === placed)?.room_id ?? null) : undefined;
         const room = own ?? srooms.filter((r) => r.session_id === sid).flatMap((r) => name(r.room_id) ?? []).join(", ");
-        out.set(sid, { room, seat: mine ? { row: mine.seat_row, col: mine.seat_col } : null });
+        out.set(sid, { room, seat: mine ? { row: mine.seat_row, col: mine.seat_col } : null, special: special?.special_no ?? null });
       }
       return out;
     },

@@ -58,6 +58,8 @@ import {
   useTopicSetsInUse,
   useTopicSetsTopics,
   useSetTopicSetTopics,
+  useSetManualScore,
+  attemptScoreTime,
   useUnlockExamCode,
   useUpdateExamSession,
   useVerifyExamCode,
@@ -161,7 +163,8 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
 
 /** Exam timetable: scheduled rooms by opening day, plus rooms still waiting for a time. Tap a row to set/change its window. */
 function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: boolean }) {
-  const [scope, setScope] = useState<"mine" | "all">("mine");
+  const defaultScope = canSeeAll ? "all" : "mine";
+  const [scope, setScope] = useState<"mine" | "all">(defaultScope);
   const mine = useMyExamSessions(teacherId);
   const all = useAllExamSessions(canSeeAll && scope === "all");
   const { data: sessions = [], isLoading } = scope === "all" && canSeeAll ? all : mine;
@@ -176,6 +179,8 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
   const [needFix, setNeedFix] = useState(false);
   const [fGrade, setFGrade] = useState("");
   const [fRoom, setFRoom] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterCount = [canSeeAll && scope !== defaultScope, when !== "active", needFix, fGrade, fRoom].filter(Boolean).length;
   const colors = useSubjectColors([]);
   const { data: seatStatus } = useSeatingStatus(sessions.map((s) => s.id));
   // Physical rooms where each exam is sat (exam_session_rooms → rooms), first room first.
@@ -289,29 +294,57 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
   const scheduled = shown.slice().sort((a, b) => a.opens_at!.localeCompare(b.opens_at!));
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 pt-1">
+      <Sheet
+        open={filterOpen}
+        onOpenChange={setFilterOpen}
+        title="กรองตารางสอบ"
+        footer={
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" disabled={filterCount === 0} onClick={() => { setScope(defaultScope); setWhen("active"); setNeedFix(false); setFGrade(""); setFRoom(""); }}>
+              ล้าง
+            </Button>
+            <Button type="button" className="flex-1" onClick={() => setFilterOpen(false)}>
+              ดู {shown.length} รายการ
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          {canSeeAll && <ChipRow label="ขอบเขต" all={null} value={scope} onChange={(v) => setScope(v as "mine" | "all")} options={[["mine", "ของฉัน"], ["all", "ทุกวิชา"]]} />}
+          <ChipRow label="ช่วงเวลาสอบ" all={null} value={when} onChange={(v) => setWhen(v as typeof when)} options={[["active", "ยังไม่สิ้นสุด"], ["past", "ผ่านไปแล้ว"], ["all", "ทั้งหมด"]]} />
+          <ChipRow label="ผังที่นั่ง" value={needFix ? "fix" : ""} onChange={(v) => setNeedFix(!!v)} options={[["fix", "ที่ต้องแก้"]]} />
+          <ChipRow label="ชั้น" value={fGrade} onChange={(v) => { setFGrade(v); setFRoom(""); }} options={gradeOptions.map((g) => [g.id, gradeShortLabel(g.code)])} />
+          <ChipRow label="ห้อง" value={fRoom} onChange={setFRoom} options={roomOptions.map((r) => [r.id, r.label])} />
+        </div>
+      </Sheet>
       <div className="flex shrink-0 items-center justify-end gap-2">
-        {canSeeAll && (
-          <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:pr-8 min-w-0 flex-1" aria-label="ขอบเขตตารางสอบ" value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")}>
-            <option value="mine">ของฉัน</option>
-            <option value="all">ทุกวิชา</option>
-          </Select>
-        )}
-        <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:pr-8 min-w-0 flex-1" aria-label="ช่วงเวลาสอบ" value={when} onChange={(e) => setWhen(e.target.value as typeof when)}>
-          <option value="active">ยังไม่สิ้นสุด</option>
-          <option value="past">ผ่านไปแล้ว</option>
-          <option value="all">ทั้งหมด</option>
-        </Select>
-        <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:pr-8 min-w-0 flex-1" aria-label="ชั้น" value={fGrade} onChange={(e) => { setFGrade(e.target.value); setFRoom(""); }}>
-          <option value="">ทุกชั้น</option>
-          {gradeOptions.map((g) => <option key={g.id} value={g.id}>{gradeShortLabel(g.code)}</option>)}
-        </Select>
-        <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:pr-8 min-w-0 flex-1" aria-label="ห้อง" value={fRoom} onChange={(e) => setFRoom(e.target.value)}>
-          <option value="">ทุกห้อง</option>
-          {roomOptions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
-        </Select>
-        <Button size="sm" variant="outline" className={cn("ui-control-compact h-8", needFix && "border-accent bg-accent-soft text-accent")} aria-pressed={needFix} onClick={() => setNeedFix(!needFix)}>
-          ที่ต้องแก้
+        <Button size="sm" variant="outline" className="ui-control-compact h-8 gap-1 px-2.5 lg:hidden" aria-label="กรองตารางสอบ" onClick={() => setFilterOpen(true)}>
+          <FunnelIcon className="h-3 w-3" />{filterCount > 0 && <span className="text-xs tabular-nums">{filterCount}</span>}
         </Button>
+        <div className="contents max-lg:hidden">
+          {canSeeAll && (
+            <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:pr-8 min-w-0 flex-1" aria-label="ขอบเขตตารางสอบ" value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")}>
+              <option value="mine">ของฉัน</option>
+              <option value="all">ทุกวิชา</option>
+            </Select>
+          )}
+          <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:pr-8 min-w-0 flex-1" aria-label="ช่วงเวลาสอบ" value={when} onChange={(e) => setWhen(e.target.value as typeof when)}>
+            <option value="active">ยังไม่สิ้นสุด</option>
+            <option value="past">ผ่านไปแล้ว</option>
+            <option value="all">ทั้งหมด</option>
+          </Select>
+          <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:pr-8 min-w-0 flex-1" aria-label="ชั้น" value={fGrade} onChange={(e) => { setFGrade(e.target.value); setFRoom(""); }}>
+            <option value="">ทุกชั้น</option>
+            {gradeOptions.map((g) => <option key={g.id} value={g.id}>{gradeShortLabel(g.code)}</option>)}
+          </Select>
+          <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:pr-8 min-w-0 flex-1" aria-label="ห้อง" value={fRoom} onChange={(e) => setFRoom(e.target.value)}>
+            <option value="">ทุกห้อง</option>
+            {roomOptions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+          </Select>
+          <Button size="sm" variant="outline" className={cn("ui-control-compact h-8", needFix && "border-accent bg-accent-soft text-accent")} aria-pressed={needFix} onClick={() => setNeedFix(!needFix)}>
+            ที่ต้องแก้
+          </Button>
+        </div>
         <ViewToggle value={view} onChange={setView} />
       </div>
       {isLoading || detailsLoading ? <PageSpinner /> : shown.length === 0 ? (
@@ -561,7 +594,7 @@ function PrintExamCard({ session }: { session: ExamSession }) {
 const ownerName = (o: { first_name: string; last_name: string } | undefined) => (o ? `${o.first_name} ${o.last_name}` : "—");
 
 /** Wrapping pill row with "ทั้งหมด" first — same look as the student exam filters. */
-function ChipRow({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
+function ChipRow({ label, value, onChange, options, all = "ทั้งหมด" }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][]; /** Label of the empty option; null hides it (every option is a real choice). */ all?: string | null }) {
   const chip = (active: boolean) =>
     cn(
       "tappable rounded-full border px-3 py-1 text-[13px] font-medium",
@@ -571,7 +604,7 @@ function ChipRow({ label, value, onChange, options }: { label: string; value: st
     <div className="space-y-2">
       <p className="text-[13px] font-medium">{label}</p>
       <div className="flex flex-wrap gap-1.5">
-        <button type="button" aria-pressed={!value} onClick={() => onChange("")} className={chip(!value)}>ทั้งหมด</button>
+        {all !== null && <button type="button" aria-pressed={!value} onClick={() => onChange("")} className={chip(!value)}>{all}</button>}
         {options.map(([id, name]) => (
           <button key={id} type="button" aria-pressed={value === id} onClick={() => onChange(id)} className={chip(value === id)}>{name}</button>
         ))}
@@ -667,13 +700,27 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
     <div className="page-fill gap-3 pt-1">
       <div className="flex shrink-0 items-center justify-end gap-2">
         {canSeeAll && teacherId && (
-          <Select className="ui-control-compact mr-auto h-8 px-2.5 pr-7 text-[13px] sm:w-64 sm:pr-8" aria-label="ขอบเขตห้องสอบ" value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")}>
+          <Select className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:pr-8" aria-label="ขอบเขตห้องสอบ" value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")}>
             <option value="mine">ของฉัน</option>
             <option value="all">ทุกวิชา</option>
           </Select>
         )}
-        <Button size="sm" variant="outline" className="ui-control-compact h-8 gap-1 px-2.5 sm:px-3" onClick={() => setFilterOpen(true)}>
-          <FunnelIcon className="h-3 w-3" /> กรอง{filterCount > 0 && ` (${filterCount})`}
+        <div className="contents max-lg:hidden">
+          <Select className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:pr-8" aria-label="กลุ่มสาระ" value={fArea} onChange={(e) => setFArea(e.target.value)}>
+            <option value="">ทุกกลุ่มสาระ</option>
+            {areaOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+          </Select>
+          <Select className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:pr-8" aria-label="ชั้น" value={fGrade} onChange={(e) => { setFGrade(e.target.value); setFRoom(""); }}>
+            <option value="">ทุกชั้น</option>
+            {gradeOptions.map((g) => <option key={g.id} value={g.id}>{gradeShortLabel(g.code)}</option>)}
+          </Select>
+          <Select className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:pr-8" aria-label="ห้อง" value={fRoom} onChange={(e) => setFRoom(e.target.value)}>
+            <option value="">ทุกห้อง</option>
+            {roomOptions.map((c) => <option key={c.id} value={c.id}>{roomOf(sessions.find((x) => classroomIdOf(x) === c.id)?.topic_set_id ?? "") ?? c.name}</option>)}
+          </Select>
+        </div>
+        <Button size="sm" variant="outline" className="ui-control-compact h-8 gap-1 px-2.5 lg:hidden" aria-label="กรองห้องสอบ" onClick={() => setFilterOpen(true)}>
+          <FunnelIcon className="h-3 w-3" />{filterCount > 0 && <span className="text-xs tabular-nums">{filterCount}</span>}
         </Button>
         <Button size="sm" className="ui-control-compact h-8 gap-1 px-2.5 sm:px-3" onClick={() => setCreating(true)} disabled={!teacherId || assignments.length === 0}>
           <Plus className="h-3 w-3" /> เปิดสอบใหม่
@@ -1103,6 +1150,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   const [eventsOpen, setEventsOpen] = useState(false);
   const [rosterOpen, setRosterOpen] = useState(false);
   const [retakeIds, setRetakeIds] = useState<string[] | null>(null);
+  const [scoring, setScoring] = useState<string | null>(null); // student_id whose score the teacher is entering
   const { data: grants } = useSessionGrants(session.id);
   const grantRetake = useGrantRetake();
   const eventCount = useSecurityEvents(session.id).data?.length ?? 0;
@@ -1147,8 +1195,13 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   const rosterRows = roster
     .map((r) => {
       const mine = attempts.filter((a) => a.student_id === r.student_id);
-      const latest = mine.reduce<ExamAttempt | null>((best, a) => (!best || a.attempt_no > best.attempt_no ? a : best), null);
-      const best = mine.reduce<number | null>((m, a) => (a.status !== "submitted" || a.score == null ? m : m == null || a.score > m ? a.score : m), null);
+      const real = mine.filter((a) => !a.is_manual);
+      const manual = mine.find((a) => a.is_manual) ?? null;
+      // Newest by when its score last reached the gradebook, so a teacher-entered score after the last real attempt wins.
+      const latest = mine.reduce<ExamAttempt | null>((best, a) => (!best || attemptScoreTime(a) > attemptScoreTime(best) ? a : best), null);
+      const best = latest?.is_manual
+        ? latest.score
+        : real.reduce<number | null>((m, a) => (a.status !== "submitted" || a.score == null ? m : m == null || a.score > m ? a.score : m), null);
       const status: "locked" | "submitted" | "in_progress" | "none" = lockedIds.has(r.student_id)
         ? "locked"
         : !latest
@@ -1160,7 +1213,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
       const [code, ...rest] = full.split(" ");
       return {
         // Submitted and every attempt (max_attempts + granted extra) used up → teacher can grant one more.
-        canRetake: status === "submitted" && mine.length >= session.max_attempts + (grants?.get(r.student_id) ?? 0),
+        canRetake: status === "submitted" && real.length >= session.max_attempts + (grants?.get(r.student_id) ?? 0),
         student_id: r.student_id,
         room: roomOfClassroom.get(r.classroom_id) ?? "—",
         code: rest.length > 0 ? code : "",
@@ -1168,10 +1221,14 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         full,
         status,
         best,
+        manual,
+        isManual: !!latest?.is_manual,
       };
     })
     .sort((a, b) => a.room.localeCompare(b.room, "th") || a.full.localeCompare(b.full, "th"));
   const retakeable = rosterRows.filter((r) => r.canRetake);
+  const canScore = !!session.opens_at && new Date(session.opens_at) <= new Date(); // the server also checks the role and the roster
+  const scoringRow = rosterRows.find((r) => r.student_id === scoring) ?? null;
   const count = (st: string) => rosterRows.filter((r) => r.status === st).length;
   const STATUS_LABEL = { locked: "ถูกล็อก", submitted: "ส่งแล้ว", in_progress: "กำลังทำ", none: "ยังไม่เข้าสอบ" } as const;
   const STATUS_CLASS = { locked: "text-destructive", submitted: "text-success", in_progress: "text-foreground", none: "text-muted-foreground" } as const;
@@ -1269,9 +1326,9 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
           </button>
           <Collapse open={rosterOpen}>
             {retakeable.length > 0 && (
-              <div className="flex justify-end border-t border-border bg-muted/40 px-2 pt-2">
+              <div className="flex justify-end border-t border-border bg-muted/40 p-2">
                 <Button variant="outline" className="ui-control-compact h-7 sm:h-8" onClick={() => setRetakeIds(retakeable.map((r) => r.student_id))}>
-                  ให้ทั้งห้องสอบใหม่ ({retakeable.length})
+                  สอบใหม่ทั้งหมด ({retakeable.length})
                 </Button>
               </div>
             )}
@@ -1291,13 +1348,21 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
                       <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
                         {r.code && <span className="text-xs tabular-nums text-muted-foreground">{r.code}</span>}
                         {r.room !== "—" && <span className={cn("inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium", levelTone(r.room))}>{r.room}</span>}
-                        <span className="ml-auto text-xs tabular-nums text-muted-foreground">{r.best != null ? `${r.best}/${maxPoints}` : "—"}</span>
+                        {r.isManual && <span title={r.manual?.manual_note ?? undefined} className="ml-auto rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-semibold text-warning">ครูกรอก</span>}
+                        <span className={cn("text-xs tabular-nums text-muted-foreground", !r.isManual && "ml-auto")}>{r.best != null ? `${r.best}/${maxPoints}` : "—"}</span>
                       </div>
-                      {r.canRetake && (
-                        <Button variant="outline" className="ui-control-compact mt-2 h-7" onClick={() => setRetakeIds([r.student_id])}>
-                          สอบใหม่
-                        </Button>
-                      )}
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {r.canRetake && (
+                          <Button variant="outline" className="ui-control-compact h-7" onClick={() => setRetakeIds([r.student_id])}>
+                            สอบใหม่
+                          </Button>
+                        )}
+                        {canScore && (
+                          <Button variant="outline" className="ui-control-compact h-7" onClick={() => setScoring(r.student_id)}>
+                            {r.manual ? "แก้คะแนน" : "กรอกคะแนน"}
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -1332,7 +1397,64 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         onConfirm={() => retakeIds && grantRetake.mutate({ sessionId: session.id, studentIds: retakeIds }, { onSuccess: () => { setRetakeIds(null); toast("เพิ่มสิทธิ์สอบใหม่แล้ว"); }, onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
       />
       <SecurityEventsSheet sessionId={session.id} open={eventsOpen} onOpenChange={setEventsOpen} />
+      {scoringRow && <ManualScoreSheet session={session} row={scoringRow} maxPoints={maxPoints} onClose={() => setScoring(null)} />}
     </div>
+  );
+}
+
+/** Teacher enters (or edits) a student's score when the exam broke. A round still in progress is closed first (migration 0231). */
+function ManualScoreSheet({ session, row, maxPoints, onClose }: { session: ExamSession; row: { student_id: string; full: string; status: string; manual: ExamAttempt | null }; maxPoints: number; onClose: () => void }) {
+  const [score, setScore] = useState(row.manual?.score?.toString() ?? "");
+  const [note, setNote] = useState(row.manual?.manual_note ?? "");
+  const save = useSetManualScore();
+  const toast = useToast();
+  const n = Number(score);
+  const valid = score.trim() !== "" && Number.isFinite(n) && n >= 0 && n <= maxPoints && Math.round(n * 100) === n * 100 && note.trim() !== "";
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!valid) return;
+    save.mutate(
+      { sessionId: session.id, studentId: row.student_id, score: n, note: note.trim() },
+      {
+        onSuccess: (r) => {
+          if (r === "not_synced") toast("บันทึกที่ห้องสอบแล้ว แต่ยังไม่เข้าสมุดคะแนน (ภาคเรียนอาจถูกล็อก)", "error");
+          else toast(r === "off" ? "บันทึกคะแนนแล้ว (ห้องนี้ไม่ซิงก์สมุดคะแนน)" : "บันทึกคะแนนแล้ว เข้าสมุดคะแนนแล้ว");
+          onClose();
+        },
+        onError: (err) => toast(err instanceof Error ? err.message : "บันทึกไม่สำเร็จ", "error"),
+      },
+    );
+  }
+  return (
+    <Sheet
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={row.manual ? "แก้คะแนน" : "กรอกคะแนน"}
+      description={row.full}
+      footer={
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>ยกเลิก</Button>
+          <Button type="submit" form="manual-score" className="flex-1" disabled={!valid || save.isPending}>
+            {row.status === "in_progress" ? "ปิดรอบและบันทึก" : "บันทึก"}
+          </Button>
+        </div>
+      }
+    >
+      <form id="manual-score" onSubmit={submit} className="space-y-4">
+        {row.status === "in_progress" && (
+          <p className="rounded-lg bg-warning/15 px-3 py-2 text-xs text-warning">นักเรียนกำลังทำข้อสอบอยู่ รอบนี้จะถูกปิดเป็น “ส่งแล้ว” ด้วยคำตอบเท่าที่ตอบไว้ และนักเรียนจะส่งซ้ำไม่ได้</p>
+        )}
+        {!session.sync_to_gradebook && (
+          <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">ห้องนี้ไม่ได้ซิงก์สมุดคะแนน คะแนนจะบันทึกที่ห้องสอบเท่านั้น</p>
+        )}
+        <Field label={`คะแนน (เต็ม ${maxPoints})`} required>
+          <Input type="number" inputMode="decimal" min={0} max={maxPoints} step="0.01" value={score} onChange={(e) => setScore(e.target.value)} autoFocus />
+        </Field>
+        <Field label="เหตุผล" required>
+          <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="เช่น ระบบขัดข้อง เครือข่ายหลุดระหว่างสอบ" maxLength={200} />
+        </Field>
+      </form>
+    </Sheet>
   );
 }
 
@@ -1651,6 +1773,8 @@ function QuestionBody({ q, i }: { q: ExamQuestionWithChoices; i: number }) {
 function PrintExamSheet({ session, questions, subjects, withKey, onDone }: { session: ExamSession; questions: ExamQuestionWithChoices[]; subjects: Subject[]; withKey: boolean; onDone: () => void }) {
   const opens = session.opens_at ? new Date(session.opens_at) : null;
   const when = opens ? `${opens.toLocaleDateString("th-TH", { dateStyle: "long" })} ${opens.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.` : "-";
+  // The title already names the subjects (line 2 lists them), so drop them from line 1 and keep exam type, round and room.
+  const heading = subjects.reduce((t, x) => t.replace(`${x.code} ${x.name_th}`, ""), session.title).replace(/(^|\s)·(?=\s|$)/g, " ").replace(/\s+/g, " ").trim() || session.title;
   return createPortal(
     <div className="print-sheet">
       <div className="print-toolbar">
@@ -1658,10 +1782,10 @@ function PrintExamSheet({ session, questions, subjects, withKey, onDone }: { ses
         <Button size="sm" onClick={() => window.print()}><PrintIcon className="mr-1 h-4 w-4" />พิมพ์</Button>
       </div>
       <div className="paper">
-      <h1 style={{ fontSize: 18, fontWeight: 700, textAlign: "center" }}>{session.title}{withKey && " (ฉบับเฉลย)"}</h1>
+      <h1 style={{ fontSize: 18, fontWeight: 700, textAlign: "center" }}>{heading}{withKey && " (ฉบับเฉลย)"}</h1>
       <p style={{ textAlign: "center" }}>วิชา {subjects.map((x) => `${x.code} ${x.name_th}`).join(", ") || "-"}</p>
       <p style={{ textAlign: "center" }}>
-        วันที่สอบ {when} · เวลา {session.duration_minutes ? `${session.duration_minutes} นาที` : "-"} · {questions.length} ข้อ · {questions.reduce((n, q) => n + q.points, 0)} คะแนน
+        {[`วันที่สอบ ${when}`, `เวลา ${session.duration_minutes ? `${session.duration_minutes} นาที` : "-"}`, `${questions.length} ข้อ`, `${questions.reduce((n, q) => n + q.points, 0)} คะแนน`].join("\u2003")}
       </p>
       {!withKey && (
         <div style={{ display: "flex", alignItems: "flex-end", gap: 6, margin: "10px 0", borderBottom: "1px solid #000", paddingBottom: 6 }}>
@@ -1679,14 +1803,13 @@ function PrintExamSheet({ session, questions, subjects, withKey, onDone }: { ses
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="print-prompt"><QuestionPromptView value={q.prompt_json} /></div>
               {q.question_type === "short_answer" ? (
-                withKey ? <p style={{ fontWeight: 700 }}>เฉลย: {q.correct_answer}</p> : <div style={{ borderBottom: "1px solid #000", height: 24 }} />
+                withKey ? <p className="key-correct" style={{ fontWeight: 700 }}>เฉลย: {q.correct_answer}</p> : <div style={{ borderBottom: "1px solid #000", height: 24 }} />
               ) : (
                 <ul style={{ listStyle: "none", padding: 0, margin: "4px 0 0" }}>
                   {q.choices.map((c, ci) => (
-                    <li key={c.id} style={{ display: "flex", gap: 6, fontWeight: withKey && c.is_correct ? 700 : 400 }}>
-                      <span>{CHOICE_LETTERS[ci] ?? ci + 1}.</span>
+                    <li key={c.id} className={withKey && c.is_correct ? "key-correct" : undefined} style={{ display: "flex", gap: 6, fontWeight: withKey && c.is_correct ? 700 : 400 }}>
+                      <span className="key-letter">{CHOICE_LETTERS[ci] ?? ci + 1}.</span>
                       <span style={{ flex: 1 }}><QuestionPromptView value={c.label_json} /></span>
-                      {withKey && c.is_correct && <span>✓</span>}
                     </li>
                   ))}
                 </ul>
@@ -2098,6 +2221,8 @@ function ExamList({ student, onOpen, onRehearse, onReview }: { student: Student;
                       <td className="px-4 py-2">
                         {seat?.seat ? (
                           <span className={cn("inline-flex rounded-lg px-2.5 py-1 text-sm font-bold tabular-nums", COL_TONES[(seat.seat.col - 1) % COL_TONES.length])}>{seatLabel(seat.seat.row, seat.seat.col)}</span>
+                        ) : seat?.special ? (
+                          <span className="inline-flex rounded-lg bg-warning/15 px-2.5 py-1 text-sm font-bold tabular-nums text-warning">พิเศษ {seat.special}</span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
@@ -2115,6 +2240,11 @@ function ExamList({ student, onOpen, onRehearse, onReview }: { student: Student;
                           {seat && now <= closes && (
                             <Button size="sm" variant="ghost" onClick={() => onRehearse(e)}>
                               ทดลองเข้าห้อง
+                            </Button>
+                          )}
+                          {e.has_manual_score && !usedUp && (
+                            <Button size="sm" variant="outline" onClick={() => onReview(e)}>
+                              ดูผลสอบ
                             </Button>
                           )}
                           {usedUp ? (
@@ -2161,7 +2291,7 @@ function ExamList({ student, onOpen, onRehearse, onReview }: { student: Student;
                     {roomLabel && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabel))}>{roomLabel}</span>}
                   </div>
                 </div>
-                {e.my_attempts > 0 ? (
+                {e.my_attempts > 0 || e.has_manual_score ? (
                   /* span, not <button>: this sits inside the card's topic button */
                   <span
                     role="button"
@@ -2171,7 +2301,7 @@ function ExamList({ student, onOpen, onRehearse, onReview }: { student: Student;
                     onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); onReview(e); } }}
                     className="tappable shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   >
-                    ทำแล้ว {e.my_attempts}/{e.max_attempts} ›
+                    {e.my_attempts > 0 ? `ทำแล้ว ${e.my_attempts}/${e.max_attempts}` : "ครูกรอกคะแนน"} ›
                   </span>
                 ) : (
                   <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
@@ -2210,6 +2340,11 @@ function ExamList({ student, onOpen, onRehearse, onReview }: { student: Student;
                       <div className={cn("flex flex-col items-center justify-center rounded-xl px-4 py-2", COL_TONES[(seat.seat.col - 1) % COL_TONES.length])}>
                         <span className="text-[10px] font-medium opacity-80">ที่นั่ง</span>
                         <span className="text-2xl font-bold leading-none tabular-nums">{seatLabel(seat.seat.row, seat.seat.col)}</span>
+                      </div>
+                    ) : seat.special ? (
+                      <div className="flex flex-col items-center justify-center rounded-xl bg-warning/15 px-4 py-2 text-warning">
+                        <span className="text-[10px] font-medium opacity-80">ที่นั่งพิเศษ</span>
+                        <span className="text-2xl font-bold leading-none tabular-nums">{seat.special}</span>
                       </div>
                     ) : (
                       <span className="w-16 text-center text-muted-foreground">ยังไม่กำหนดที่นั่ง</span>
@@ -2890,7 +3025,7 @@ function ExamReview({
 }) {
   const { data: mine, isLoading, isFetching } = useMyAttempts(session.id, student.id);
   const [pickedId, setPickedId] = useState<string | null>(initialAttemptId ?? null);
-  const submitted = (mine ?? []).filter((x) => x.status === "submitted"); // newest attempt first
+  const submitted = (mine ?? []).filter((x) => x.status === "submitted").sort((a, b) => attemptScoreTime(b) - attemptScoreTime(a)); // newest score first
   const attempt = submitted.find((x) => x.id === pickedId) ?? submitted[0] ?? null;
   const released = session.review_released;
   const { data: sessionQuestions = [] } = useExamSessionQuestions(session.id);
@@ -2931,12 +3066,31 @@ function ExamReview({
               x.id === attempt.id ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
             )}
           >
-            ครั้งที่ {x.attempt_no}
+            {x.is_manual ? "ครูกรอก" : `ครั้งที่ ${x.attempt_no}`}
           </button>
         ))}
       </div>
     ) : null;
   const scoreLabel = `${attempt.score ?? "—"}/${maxPoints}`;
+
+  // A teacher-entered score has no answers to review.
+  if (attempt.is_manual) {
+    return (
+      <div className="mx-auto w-full max-w-sm space-y-4 pt-2 sm:max-w-xl">
+        {header}
+        {switcher}
+        <Card className="space-y-2 p-6 text-center shadow-float">
+          <p className="text-xs text-muted-foreground">คะแนนที่ได้</p>
+          <p className="font-heading text-4xl font-bold tabular-nums">{scoreLabel}</p>
+          <p className="text-xs font-semibold text-warning">ครูกรอกคะแนน</p>
+          {attempt.manual_note && <p className="text-xs text-muted-foreground">เหตุผล: {attempt.manual_note}</p>}
+        </Card>
+        <Button className="w-full" onClick={onExit}>
+          กลับหน้าสอบ
+        </Button>
+      </div>
+    );
+  }
 
   if (!released || !reviewData || !key) {
     const loading = released && !keyError && (!reviewData || !key);

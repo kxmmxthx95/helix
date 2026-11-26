@@ -599,17 +599,20 @@
 }
 
 /* Exam paper: PrintExamSheet portals into <body> as a full-screen preview; printing shows only the paper. */
-.print-sheet { position: fixed; inset: 0; z-index: 100; overflow: auto; background: #d4d4d8; }
+.print-sheet { position: fixed; inset: 0; z-index: 100; overflow: auto; background: #d4d4d8; pointer-events: auto; } /* auto: an open Sheet sets body pointer-events:none */
 .print-sheet .paper { background: #fff; max-width: 210mm; min-height: 297mm; margin: 12px auto; padding: 14mm; box-shadow: 0 2px 12px rgb(0 0 0 / 0.25); font-size: 14px; font-family: Sarabun, "TH Sarabun New", serif; }
 .print-sheet .paper, .print-sheet .paper * { color: #000 !important; }
 .print-sheet .paper h1 { font-family: inherit; }
+/* Answer key: the correct choice is red with its letter circled. */
+.print-sheet .paper .key-correct, .print-sheet .paper .key-correct * { color: #dc2626 !important; }
+.print-sheet .paper .key-correct .key-letter { box-sizing: border-box; display: inline-block; min-width: 1.6em; height: 1.6em; line-height: calc(1.6em - 2px); margin-top: -1px; text-align: center; border: 1px solid #dc2626; border-radius: 9999px; }
+.print-sheet .paper { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .print-sheet .print-prompt, .print-sheet .print-prompt :where(p, div, li, strong) { font-weight: 600; }
 .print-sheet .print-toolbar { position: sticky; top: 0; z-index: 1; display: flex; justify-content: flex-end; gap: 8px; padding: 8px 12px; background: #18181b; }
 @media print {
   @page { size: A4; margin: 14mm; }
-  /* Hide every other body child (the app root and any open Sheet's portal/overlay) and undo the Sheet's body scroll-lock, or only a clipped first page prints. */
+  /* Hide every other body child: the app root and any open Sheet's portal/overlay. */
   body > :not(.print-sheet) { display: none !important; }
-  html, body { position: static !important; height: auto !important; overflow: visible !important; }
   .print-sheet { position: static; overflow: visible; background: #fff; }
   .print-sheet .paper { max-width: none; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
   .print-sheet .print-toolbar { display: none; }
