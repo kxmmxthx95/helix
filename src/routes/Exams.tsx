@@ -505,7 +505,7 @@ function SeatingSheet({ session, onClose }: { session: ExamSession; onClose: () 
     })
     .sort((a, b) => a.code.localeCompare(b.code, "th") || a.name.localeCompare(b.name, "th"));
   return (
-    <Sheet open onOpenChange={(o) => !o && onClose()} title="ผังที่นั่ง" description={session.title}>
+    <Sheet open onOpenChange={(o) => !o && onClose()} title="รายละเอียด" description={session.title}>
       <div className="space-y-3">
         <ScheduleCard session={session} defaultOpen />
         <PrintExamCard session={session} />

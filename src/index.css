@@ -607,7 +607,9 @@
 .print-sheet .print-toolbar { position: sticky; top: 0; z-index: 1; display: flex; justify-content: flex-end; gap: 8px; padding: 8px 12px; background: #18181b; }
 @media print {
   @page { size: A4; margin: 14mm; }
-  body > #root { display: none !important; }
+  /* Hide every other body child (the app root and any open Sheet's portal/overlay) and undo the Sheet's body scroll-lock, or only a clipped first page prints. */
+  body > :not(.print-sheet) { display: none !important; }
+  html, body { position: static !important; height: auto !important; overflow: visible !important; }
   .print-sheet { position: static; overflow: visible; background: #fff; }
   .print-sheet .paper { max-width: none; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
   .print-sheet .print-toolbar { display: none; }
