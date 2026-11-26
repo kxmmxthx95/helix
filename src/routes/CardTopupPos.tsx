@@ -930,7 +930,7 @@ function ProductGridImpl({
           </button>
         ))}
       </div>
-      <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-2 content-start gap-3 overflow-y-auto lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-3 content-start gap-2 overflow-y-auto lg:grid-cols-4 xl:grid-cols-5">
         {shown.map((p) => (
           <button
             key={p.id}
@@ -939,17 +939,17 @@ function ProductGridImpl({
             onClick={() => onPick(p)}
             className="tappable pos-key flex flex-col overflow-hidden rounded-2xl border-2 border-border bg-card text-left transition-colors active:bg-muted"
           >
-            <div className="aspect-[3/2] w-full bg-muted">
+            <div className="aspect-[2/1] w-full bg-muted">
               {productImageUrl(p) ? (
                 <img src={productImageUrl(p)!} alt="" loading="lazy" className="size-full object-cover" />
               ) : (
-                <span className="flex size-full items-center justify-center text-lg text-muted-foreground">ไม่มีรูป</span>
+                <span className="flex size-full items-center justify-center text-base text-muted-foreground">ไม่มีรูป</span>
               )}
             </div>
-            <span className="flex flex-col gap-1 px-4 pb-4 pt-3">
-              <span className="line-clamp-2 text-xl font-semibold leading-snug">{p.name}</span>
-              <span className="text-3xl font-bold tabular-nums text-primary">{p.price} ฿</span>
-              <span className="truncate text-lg text-muted-foreground">{categoryOf(p)}</span>
+            <span className="flex flex-col px-3 pb-2.5 pt-2">
+              <span className="line-clamp-2 text-lg font-semibold leading-snug">{p.name}</span>
+              <span className="text-2xl font-bold tabular-nums text-primary">{p.price} ฿</span>
+              <span className="truncate text-base text-muted-foreground">{categoryOf(p)}</span>
             </span>
           </button>
         ))}
