@@ -20,3 +20,8 @@ export function tick(hz = 1000) {
     /* no audio device / blocked: the keypad just stays silent */
   }
 }
+
+/** 10 ms haptic tap on a button press. Android only: iOS has no Vibration API, so this is a silent no-op there. */
+export function buzz() {
+  navigator.vibrate?.(10);
+}

@@ -2,7 +2,8 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import { Select, Spinner } from "@/components/ui";
 import { POS_TERMINAL_KEY, posPin } from "@/lib/posPin";
-import { tick } from "@/lib/sound";
+import { useWakeLock } from "@/hooks/usePosDevice";
+import { buzz, tick } from "@/lib/sound";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,7 @@ export function PosLogin() {
   const [offline, setOffline] = useState(false);
   const [error] = useState<string | undefined>(takeDeniedMessage);
 
+  useWakeLock();
   useEffect(() => {
     document.documentElement.classList.add("pos-large");
     return () => document.documentElement.classList.remove("pos-large");
@@ -84,12 +86,12 @@ export function PosLogin() {
         </span>
       </header>
 
-      <div className="flex flex-1 items-center justify-center px-5 py-8">
+      <div className="flex min-h-0 flex-1 items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: "easeOut" }}
-          className="w-full max-w-md"
+          className="flex h-full max-h-[46rem] w-full max-w-md items-center landscape:max-w-3xl"
         >
           {offline ? (
             <p className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-xl text-destructive">เชื่อมต่อไม่ได้ — ตรวจอินเทอร์เน็ตแล้วโหลดหน้าใหม่</p>
@@ -148,6 +150,7 @@ function PinEntry({ terminals, selected, onPick, initialError }: { terminals: Te
     (k: (typeof KEYS)[number]) => {
       if (busy || locked || !ready) return;
       tick(k === "C" || k === "⌫" ? 700 : 1000);
+      buzz();
       setError(undefined);
       if (k === "C") return setPin("");
       if (k === "⌫") return setPin((p) => p.slice(0, -1));
@@ -170,9 +173,11 @@ function PinEntry({ terminals, selected, onPick, initialError }: { terminals: Te
 
   const hint = terminals.length === 0 ? "ยังไม่มีเครื่องที่เปิดใช้งาน — ติดต่อผู้ดูแล" : !selected ? "เลือกเครื่องก่อน แล้วใส่ PIN" : !selected.has_pin ? "ยังไม่ได้ตั้ง PIN — ติดต่อผู้ดูแล" : "ใส่ PIN 6 หลัก";
 
-  // One card, one column width: terminal, status line, PIN boxes and keys all line up.
+  // One card that always fits the screen: portrait = one column whose keys stretch to the height left over,
+  // landscape = form on the left, key pad on the right. Nothing scrolls.
   return (
-    <div className="space-y-4 rounded-3xl border-2 border-border bg-card p-5 shadow-card">
+    <div className="flex h-full min-h-0 w-full flex-col gap-4 rounded-3xl border-2 border-border bg-card p-4 shadow-card landscape:flex-row landscape:gap-5">
+      <div className="flex flex-col justify-center gap-3 landscape:flex-1">
       <label className="block space-y-2">
         <span className="block text-lg font-semibold text-muted-foreground">เครื่อง</span>
         <Select
@@ -194,7 +199,7 @@ function PinEntry({ terminals, selected, onPick, initialError }: { terminals: Te
         </Select>
       </label>
 
-      <div className="flex min-h-14 items-center justify-center" aria-live="assertive">
+      <div className="flex min-h-12 items-center justify-center" aria-live="assertive">
         {busy ? (
           <p className="flex items-center gap-3 text-xl font-medium">
             <Spinner className="size-6" />
@@ -222,7 +227,7 @@ function PinEntry({ terminals, selected, onPick, initialError }: { terminals: Te
           <span
             key={i}
             className={cn(
-              "flex h-16 items-center justify-center rounded-xl border-2 transition-colors",
+              "flex h-14 items-center justify-center rounded-xl border-2 transition-colors",
               error
                 ? "border-destructive bg-background"
                 : i < pin.length
@@ -236,8 +241,9 @@ function PinEntry({ terminals, selected, onPick, initialError }: { terminals: Te
           </span>
         ))}
       </motion.div>
+      </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid min-h-0 flex-1 grid-cols-3 grid-rows-[repeat(4,minmax(0,1fr))] gap-3 landscape:flex-1">
         {KEYS.map((k) => (
           <button
             key={k}
@@ -246,7 +252,7 @@ function PinEntry({ terminals, selected, onPick, initialError }: { terminals: Te
             aria-label={k === "⌫" ? "ลบหนึ่งตัว" : k === "C" ? "ล้างทั้งหมด" : k}
             onClick={() => press(k)}
             className={cn(
-              "tappable pos-key flex h-20 items-center justify-center rounded-2xl border-2 border-border bg-background font-bold transition-colors active:bg-muted disabled:opacity-40",
+              "tappable pos-key flex h-full min-h-12 items-center justify-center rounded-2xl border-2 border-border bg-background font-bold transition-colors active:bg-muted disabled:opacity-40",
               k === "C" && "border-destructive/50 bg-destructive/10 text-xl text-destructive",
               k === "⌫" && "bg-muted text-xl",
               k !== "C" && k !== "⌫" && "text-4xl tabular-nums",

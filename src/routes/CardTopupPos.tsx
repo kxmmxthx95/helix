@@ -32,7 +32,8 @@ import { addToCart, cartTotal, categoryOf, isProductCode, setQty, type CartLine 
 import { parseAmount, SALE_MAX, SALE_MIN, TOPUP_MAX, TOPUP_MIN, TX_TYPE_LABEL } from "@/lib/cardTopup";
 import { profileFullName, type PosProduct, type PosStudent } from "@/lib/database.types";
 import { formatBaht } from "@/lib/tuition";
-import { tick } from "@/lib/sound";
+import { useBackLock, useWakeLock } from "@/hooks/usePosDevice";
+import { buzz, tick } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 const TerminalsTab = lazy(() => import("@/routes/CardTopupAdmin").then((m) => ({ default: m.TerminalsTab })));
 const ProductsTab = lazy(() => import("@/routes/CardTopupProducts").then((m) => ({ default: m.ProductsTab })));
@@ -91,6 +92,8 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const topupKey = useRef(crypto.randomUUID());
   const topup = usePosTopupCash();
+  useWakeLock();
+  useBackLock();
   const [todayOpen, setTodayOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
@@ -187,6 +190,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   // A changed cart is a new intent, so it gets a new idempotency key.
   // Stable identity so the memoised ProductGrid does not re-render on every keypad press.
   const pickProduct = useCallback((pr: PosProduct) => {
+    buzz();
     saleKey.current = crypto.randomUUID();
     setCart((c) => addToCart(c, pr));
     setKeyed("");
@@ -237,6 +241,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   function pinPress(k: (typeof KEYS)[number]) {
     if (paying || pinGate?.status === "locked") return;
     tick(k === "C" || k === "⌫" ? 700 : 1000);
+    buzz();
     if (k === "C") return setPinDigits("");
     if (k === "⌫") return setPinDigits((p) => p.slice(0, -1));
     if (pinDigits.length >= 4) return;
@@ -279,6 +284,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
 
   function press(k: (typeof KEYS)[number]) {
     tick(k === "C" || k === "⌫" ? 700 : 1000);
+    buzz();
     if (mode === "topup") {
       topupKey.current = crypto.randomUUID();
       return setTopupAmount((p) => (k === "C" ? "" : k === "⌫" ? p.slice(0, -1) : /^\d{0,3}$/.test(p) ? p + k : p));
