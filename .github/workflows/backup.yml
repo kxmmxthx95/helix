@@ -41,10 +41,8 @@ jobs:
           echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH" # the Ubuntu wrapper in /usr/bin picks v16
           echo "DATE=$(TZ=Asia/Bangkok date +%F)" >> "$GITHUB_ENV"
 
-      - name: Keep-alive (any API request counts as activity)
-        run: |
-          curl -fsS -o /dev/null "${{ secrets.SUPABASE_URL }}/rest/v1/school_settings?select=id&limit=1" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}"
+      - name: Keep-alive (a direct DB query counts as activity; anon has no table grants since migration 0194)
+        run: psql "${{ secrets.SUPABASE_DB_URL }}" -Atc "select 1"
 
       - name: Dump database (public + auth + storage metadata)
         run: |
