@@ -7,6 +7,7 @@
 // wrong tries per terminal (migration 0212: 5 wrong -> 15 min lock).
 //
 // Actions (JSON body { action, ... }):
+//   terminal_list {}                         anon  -> { terminals: [{ id, name, has_pin }] }  (active ones; names only)
 //   terminal_info {terminal_id}              anon  -> { name, has_pin, active }
 //   login         {terminal_id, pin}         anon  -> { status: "ok", session } | { status: "bad"|"locked", ... }
 //   pair_list     {loginId, password}        admin credentials -> { terminals }  (no session is kept)
@@ -71,6 +72,11 @@ Deno.serve(async (req) => {
   const uuid = /^[0-9a-f-]{36}$/i;
 
   switch (body.action) {
+    case "terminal_list": {
+      const { data } = await admin.from("pos_terminals").select("id, name, profile_id").eq("active", true);
+      return json({ terminals: (data ?? []).map((t) => ({ id: t.id, name: t.name, has_pin: !!t.profile_id })) });
+    }
+
     case "terminal_info": {
       if (!uuid.test(terminalId)) return json({ error: "not found" }, 404);
       const { data: t } = await admin.from("pos_terminals").select("name, active, profile_id").eq("id", terminalId).maybeSingle();

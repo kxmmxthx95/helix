@@ -1,7 +1,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
 import { DesktopIcon } from "@/components/icons";
-import { Button, Field, Input, PasswordInput, Spinner } from "@/components/ui";
+import { Select, Spinner } from "@/components/ui";
 import { POS_TERMINAL_KEY, posPin } from "@/lib/posPin";
 import { tick } from "@/lib/sound";
 import { supabase } from "@/lib/supabase";
@@ -12,7 +12,6 @@ export const POS_DENIED_KEY = "helix.posDenied";
 export const POS_DENIED_MSG = "เข้าสู่ระบบไม่ได้ — ติดต่อฝ่ายการเงิน";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"] as const;
-const inputClass = "h-16 border-2 text-xl md:text-xl";
 
 function takeDeniedMessage() {
   try {
@@ -32,20 +31,19 @@ function readTerminal(): string {
   }
 }
 
-type Info = { name: string; active: boolean; has_pin: boolean };
+type Terminal = { id: string; name: string; has_pin: boolean };
 type PinResult =
   | { status: "ok"; session: { access_token: string; refresh_token: string } }
   | { status: "bad"; attempts_left?: number }
   | { status: "locked"; locked_until?: string };
 
-/** Dedicated sign-in for a POS terminal (/pos-login): a 6-digit PIN, no username. Gate sends the signed-in terminal account to /card-topup.
- *  A device is bound to one terminal once (an admin signs in here and picks it); the choice lives in localStorage. */
+/** Dedicated sign-in for a POS terminal (/pos-login): pick the terminal, then its 6-digit PIN. Gate sends the signed-in terminal account to /card-topup.
+ *  The pick is remembered in localStorage so the next sign-in on this device starts on the same terminal. */
 export function PosLogin() {
+  const [terminals, setTerminals] = useState<Terminal[] | undefined>(undefined); // undefined = loading
   const [terminalId, setTerminalId] = useState(readTerminal);
-  const [pairing, setPairing] = useState(false);
-  const [info, setInfo] = useState<Info | null | undefined>(undefined); // undefined = loading, null = unknown terminal
   const [offline, setOffline] = useState(false);
-  const [error, setError] = useState<string | undefined>(takeDeniedMessage);
+  const [error] = useState<string | undefined>(takeDeniedMessage);
 
   useEffect(() => {
     document.documentElement.classList.add("pos-large");
@@ -53,25 +51,26 @@ export function PosLogin() {
   }, []);
 
   useEffect(() => {
-    if (!terminalId) return setInfo(null);
     let live = true;
-    setInfo(undefined);
-    setOffline(false);
-    posPin<Info>({ action: "terminal_info", terminal_id: terminalId }).then(
-      (r) => live && setInfo(r),
-      (e: Error) => {
-        // "not found" = this terminal no longer exists; anything else is a network problem — keep the binding.
-        if (!live) return;
-        if (e.message === "not found") setInfo(null);
-        else setOffline(true);
-      },
+    posPin<{ terminals: Terminal[] }>({ action: "terminal_list" }).then(
+      (r) => live && setTerminals(r.terminals.sort((a, b) => a.name.localeCompare(b.name, "th", { numeric: true }))),
+      () => live && setOffline(true),
     );
     return () => {
       live = false;
     };
-  }, [terminalId]);
+  }, []);
 
-  const bound = !!terminalId && info !== null;
+  function pick(id: string) {
+    setTerminalId(id);
+    try {
+      localStorage.setItem(POS_TERMINAL_KEY, id);
+    } catch {
+      /* private mode: the pick lasts until reload */
+    }
+  }
+
+  const selected = terminals?.find((t) => t.id === terminalId) ?? null;
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-y-auto overscroll-none bg-background text-foreground">
@@ -93,27 +92,12 @@ export function PosLogin() {
           transition={{ duration: 0.35, ease: "easeOut" }}
           className="w-full max-w-lg"
         >
-
-          {pairing || !bound ? (
-            <Pair
-              onPaired={(id) => {
-                try {
-                  localStorage.setItem(POS_TERMINAL_KEY, id);
-                } catch {
-                  /* private mode: the binding lasts until reload */
-                }
-                setError(undefined);
-                setTerminalId(id);
-                setPairing(false);
-              }}
-              onCancel={bound ? () => setPairing(false) : undefined}
-            />
-          ) : offline ? (
-            <p className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-lg text-destructive">เชื่อมต่อไม่ได้ — ตรวจอินเทอร์เน็ตแล้วโหลดหน้าใหม่</p>
-          ) : info === undefined ? (
+          {offline ? (
+            <p className="rounded-xl bg-destructive/10 px-4 py-3 text-center text-xl text-destructive">เชื่อมต่อไม่ได้ — ตรวจอินเทอร์เน็ตแล้วโหลดหน้าใหม่</p>
+          ) : terminals === undefined ? (
             <Spinner className="mx-auto size-8 text-muted-foreground" />
           ) : (
-            <PinEntry terminalId={terminalId} info={info!} initialError={error} onRepair={() => setPairing(true)} />
+            <PinEntry terminals={terminals} selected={selected} onPick={pick} initialError={error} />
           )}
         </motion.div>
       </div>
@@ -121,76 +105,8 @@ export function PosLogin() {
   );
 }
 
-/** Admin pairing: sign in with an admin account (nothing is kept on this device), then pick which terminal this device is. */
-function Pair({ onPaired, onCancel }: { onPaired: (id: string) => void; onCancel?: () => void }) {
-  const [loginId, setLoginId] = useState("");
-  const [password, setPassword] = useState("");
-  const [terminals, setTerminals] = useState<{ id: string; name: string }[] | null>(null);
-  const [error, setError] = useState<string>();
-  const [busy, setBusy] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(undefined);
-    setBusy(true);
-    try {
-      const r = await posPin<{ terminals: { id: string; name: string }[] }>({ action: "pair_list", loginId, password });
-      setTerminals(r.terminals);
-    } catch {
-      setError("เข้าสู่ระบบแอดมินไม่ได้");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <>
-      <h1 className="text-center text-3xl font-bold tracking-tight">ผูกเครื่องนี้กับเครื่อง POS</h1>
-      <p className="mt-2 text-center text-xl text-muted-foreground">{terminals ? "เลือกเครื่องที่ตั้งอยู่ตรงนี้" : "ผู้ดูแลเข้าสู่ระบบเพื่อเลือกเครื่อง"}</p>
-      {terminals ? (
-        <div className="mt-6 space-y-3 rounded-3xl border-2 border-border bg-card p-5">
-          {terminals.length === 0 && <p className="text-center text-lg text-muted-foreground">ยังไม่มีเครื่องที่เปิดใช้งาน — เพิ่มได้ที่เมนู บัตรเติมเงิน แท็บเครื่องขาย</p>}
-          {terminals.map((t) => (
-            <Button key={t.id} type="button" variant="outline" className="pos-key h-16 w-full border-2 border-border text-xl font-semibold" onClick={() => onPaired(t.id)}>
-              {t.name}
-            </Button>
-          ))}
-        </div>
-      ) : (
-        <form onSubmit={submit} className="mt-6 space-y-5 rounded-3xl border-2 border-border bg-card p-5">
-          <Field label="รหัสผู้ใช้ผู้ดูแล">
-            <Input value={loginId} onChange={(e) => setLoginId(e.target.value)} autoComplete="username" autoFocus required className={inputClass} />
-          </Field>
-          <Field label="รหัสผ่าน">
-            <PasswordInput
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-              required
-              className={inputClass}
-            />
-          </Field>
-          {error && (
-            <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-lg text-destructive">
-              {error}
-            </p>
-          )}
-          <Button type="submit" size="lg" className="pos-cta h-16 w-full text-2xl font-bold" disabled={busy}>
-            {busy ? <Spinner /> : "ต่อไป"}
-          </Button>
-        </form>
-      )}
-      {onCancel && (
-        <button type="button" onClick={onCancel} className="tappable mx-auto mt-5 block text-lg font-medium underline underline-offset-4">
-          ยกเลิก
-        </button>
-      )}
-    </>
-  );
-}
-
 /** Six boxes + on-screen pad (a physical keyboard works too). Six digits submit by themselves. */
-function PinEntry({ terminalId, info, initialError, onRepair }: { terminalId: string; info: Info; initialError?: string; onRepair: () => void }) {
+function PinEntry({ terminals, selected, onPick, initialError }: { terminals: Terminal[]; selected: Terminal | null; onPick: (id: string) => void; initialError?: string }) {
   const reduce = useReducedMotion();
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
@@ -198,14 +114,14 @@ function PinEntry({ terminalId, info, initialError, onRepair }: { terminalId: st
   const [shake, setShake] = useState(0);
   const [lockedUntil, setLockedUntil] = useState<number>(0);
   const locked = lockedUntil > Date.now();
-  const ready = info.active && info.has_pin;
+  const ready = !!selected?.has_pin;
 
   const submit = useCallback(
     async (full: string) => {
       setBusy(true);
       setError(undefined);
       try {
-        const r = await posPin<PinResult>({ action: "login", terminal_id: terminalId, pin: full });
+        const r = await posPin<PinResult>({ action: "login", terminal_id: selected!.id, pin: full });
         if (r.status === "ok") {
           // Gate redirects to /card-topup once the auth listener sees the session.
           await supabase.auth.setSession(r.session);
@@ -226,7 +142,7 @@ function PinEntry({ terminalId, info, initialError, onRepair }: { terminalId: st
         setBusy(false);
       }
     },
-    [terminalId],
+    [selected],
   );
 
   const press = useCallback(
@@ -256,14 +172,35 @@ function PinEntry({ terminalId, info, initialError, onRepair }: { terminalId: st
   return (
     <>
       <div className="flex flex-col items-center gap-3 text-center">
-        <span className={cn("flex size-16 items-center justify-center rounded-2xl", ready ? "bg-success text-white" : "bg-muted opacity-60")}>
+        <span className={cn("flex size-16 items-center justify-center rounded-2xl", ready ? "bg-success text-white" : "bg-muted text-muted-foreground")}>
           <DesktopIcon className="size-10" />
         </span>
-        <h1 className="text-3xl font-bold tracking-tight">{info.name}</h1>
-        <p className="text-xl text-muted-foreground">
-          {!info.active ? "เครื่องนี้ถูกปิดใช้งาน" : !info.has_pin ? "ยังไม่ได้ตั้ง PIN — ติดต่อผู้ดูแล" : "ใส่ PIN 6 หลักเพื่อเริ่มใช้งาน"}
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">เข้าสู่ระบบ POS</h1>
       </div>
+
+      <label className="mt-5 block space-y-2">
+        <span className="block text-xl font-semibold">เครื่อง</span>
+        <Select
+          className="h-16 border-2 text-xl md:text-xl"
+          placeholder="เลือกเครื่อง"
+          value={selected?.id ?? ""}
+          disabled={busy}
+          onChange={(e) => {
+            setPin("");
+            setError(undefined);
+            onPick(e.target.value);
+          }}
+        >
+          {terminals.map((t) => (
+            <option key={t.id} value={t.id} disabled={!t.has_pin}>
+              {t.has_pin ? t.name : `${t.name} (ยังไม่ตั้ง PIN)`}
+            </option>
+          ))}
+        </Select>
+      </label>
+      <p className="mt-3 text-center text-xl text-muted-foreground">
+        {terminals.length === 0 ? "ยังไม่มีเครื่องที่เปิดใช้งาน — ติดต่อผู้ดูแล" : !selected ? "เลือกเครื่องก่อน แล้วใส่ PIN" : !selected.has_pin ? "ยังไม่ได้ตั้ง PIN — ติดต่อผู้ดูแล" : "ใส่ PIN 6 หลักเพื่อเริ่มใช้งาน"}
+      </p>
 
       <motion.div
         key={shake}
@@ -326,9 +263,6 @@ function PinEntry({ terminalId, info, initialError, onRepair }: { terminalId: st
         ))}
       </div>
 
-      <button type="button" onClick={onRepair} className="tappable mx-auto mt-6 block text-lg font-medium underline underline-offset-4">
-        เปลี่ยนเครื่อง (ผู้ดูแล)
-      </button>
     </>
   );
 }
