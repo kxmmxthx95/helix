@@ -82,6 +82,7 @@ jobs:
 
       - name: LINE warning (near the free-plan limit)
         if: env.WARN != ''
+        continue-on-error: true # a spent LINE quota must not fail a backup that already succeeded
         run: |
           curl -fsS -X POST https://api.line.me/v2/bot/message/push \
             -H "Authorization: Bearer ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" -H "Content-Type: application/json" \
