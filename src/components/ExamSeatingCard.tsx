@@ -2,10 +2,11 @@ import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { useAllExamSessions, useMyExamSessions } from "@/hooks/useExams";
 import { planCopy } from "@/lib/examSeatCopy";
+import { planFillAll } from "@/lib/examSeatFill";
 import { examLabel } from "@/lib/examKinds";
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { ExamRoomListSheet, type RoomListEntry } from "@/components/ExamRoomListSheet";
+import { ExamSeatingPrintSheet, type PrintRoom } from "@/components/ExamSeatingPrint";
 import { AlertTriangle, ChevronForward, CopyIcon, ListIcon, PencilIcon, Plus, PrintIcon, ShuffleIcon, TimetableIcon, TrashIcon } from "@/components/icons";
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
@@ -85,7 +86,7 @@ export function ExamSeatingCard({
   const [open, setOpen] = useState(defaultOpen);
   const [managing, setManaging] = useState(false);
   const [roomTab, setRoomTab] = useState(0);
-  const [printingRoom, setPrintingRoom] = useState<string | null>(null);
+  const [printing, setPrinting] = useState<string[] | null>(null);
   const [copying, setCopying] = useState<ExamSessionRoom | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
   const [clearing, setClearing] = useState<string | null>(null);
@@ -195,6 +196,31 @@ export function ExamSeatingCard({
     setPicked(null);
   }
 
+  // จัดทั้งรอบ: seat only the students without a seat, room 1 first; seated ones, special seats and cells other sessions hold stay as they are.
+  const gridRooms = rooms.filter((x) => x.seat_rows != null);
+  const arrangeAll = (order: "code" | "shuffle") => {
+    const plan = planFillAll({
+      rooms: gridRooms.map((x) => ({ id: x.id, rows: x.seat_rows!, cols: x.seat_cols!, held: new Set(heldOf(x).keys()) })),
+      seats: seated,
+      specialIds,
+      students,
+      order,
+      shuffle: shuffled,
+    });
+    if (plan.placed > 0) write(plan.seats);
+    if (plan.left > 0) toast(`ที่นั่งไม่พอ จัดได้ ${plan.placed} คน เหลืออีก ${plan.left} คนยังไม่มีที่นั่ง`, "error");
+    else if (plan.placed === 0) toast("ทุกคนมีที่นั่งแล้ว");
+    setPicked(null);
+  };
+  const printRoomOf = (x: ExamSessionRoom): PrintRoom => ({
+    id: x.id,
+    position: x.position,
+    physicalRoomId: x.room_id,
+    rows: x.seat_rows ?? 0,
+    cols: x.seat_cols ?? 0,
+    seats: seated.filter((y) => y.room === x.id).flatMap((y) => { const st = byId.get(y.student_id); return st ? [{ label: seatLabel(y.seat_row, y.seat_col), row: y.seat_row, col: y.seat_col, code: st.code, name: st.name }] : []; }),
+    specials: specials.filter((y) => y.session_room_id === x.id && y.student_id).flatMap((y) => { const st = byId.get(y.student_id!); return st ? [{ no: y.special_no, code: st.code, name: st.name }] : []; }),
+  });
   const pickedStudent = picked
     ? picked.kind === "student"
       ? byId.get(picked.id)
@@ -212,15 +238,6 @@ export function ExamSeatingCard({
     const gridDiffers = (takenByRoom.get(r.id) ?? []).some((t) => t.seat_rows !== rows || t.seat_cols !== cols);
     const hasSeats = seated.some((x) => x.room === r.id);
     const roomSpecials = specials.filter((x) => x.session_room_id === r.id);
-    // Name list of this room in seat order: grid seats by column then row (A1, A2, … B1), special seats last.
-    const entryOf = (seat: string, id: string): RoomListEntry[] => {
-      const st = byId.get(id);
-      return st ? [{ seat, code: st.code, name: st.name, classroom: st.classroom ?? "" }] : [];
-    };
-    const roomEntries: RoomListEntry[] = [
-      ...seated.filter((x) => x.room === r.id).sort((a, b) => a.seat_col - b.seat_col || a.seat_row - b.seat_row).flatMap((x) => entryOf(seatLabel(x.seat_row, x.seat_col), x.student_id)),
-      ...roomSpecials.slice().sort((a, b) => a.special_no - b.special_no).flatMap((x) => (x.student_id ? entryOf(`พิเศษ ${x.special_no}`, x.student_id) : [])),
-    ];
     return (
       <section key={r.id} className={cn("space-y-3", rooms.length > 1 && "rounded-lg border border-border p-3")}>
         <div className="flex items-center justify-between gap-2">
@@ -230,9 +247,9 @@ export function ExamSeatingCard({
               <CopyIcon className={ICON} />
               คัดลอกผังจาก…
             </Button>
-            <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={roomEntries.length === 0} onClick={() => setPrintingRoom(r.id)}>
+            <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={r.seat_rows == null || (!hasSeats && roomSpecials.every((x) => !x.student_id))} onClick={() => setPrinting([r.id])}>
               <PrintIcon className={ICON} />
-              พิมพ์รายชื่อ
+              พิมพ์ผัง
             </Button>
             {rooms.length > 1 && r.position > 1 && (
               <Button size="icon" variant="outline" className={ICON_BTN} aria-label="ลบห้องนี้" disabled={busy} onClick={() => setRemoving(r)}>
@@ -241,7 +258,6 @@ export function ExamSeatingCard({
             )}
           </div>
         </div>
-        {printingRoom === r.id && <ExamRoomListSheet session={session} room={r} entries={roomEntries} onDone={() => setPrintingRoom(null)} />}
         {/* One button folds the room / template / fill controls (a sheet is narrow at any viewport size); open until a template is picked. */}
         <Button size="sm" variant="outline" className="ui-control-compact h-8 w-full justify-between" aria-expanded={setupShown} onClick={() => setSetupOpen(!setupShown)}>
           ตั้งค่าและจัดผังที่นั่ง
@@ -484,6 +500,24 @@ export function ExamSeatingCard({
             </div>
           )}
 
+          {anyGrid && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-foreground">จัดทั้งรอบ</span>
+              <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || unseated.length === 0} onClick={() => arrangeAll("code")}>
+                <ListIcon className={ICON} />
+                เรียงตามรหัส
+              </Button>
+              <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || unseated.length === 0} onClick={() => arrangeAll("shuffle")}>
+                <ShuffleIcon className={ICON} />
+                สุ่ม
+              </Button>
+              <Button size="sm" variant="outline" className="ml-auto ui-control-compact h-7" disabled={placed === 0} onClick={() => setPrinting(gridRooms.map((x) => x.id))}>
+                <PrintIcon className={ICON} />
+                พิมพ์ทั้งรอบ
+              </Button>
+            </div>
+          )}
+
           {rooms.length > 1 && (
             <div className="flex w-full border-b border-border" role="tablist">
               {rooms.map((r, i) => (
@@ -584,6 +618,7 @@ export function ExamSeatingCard({
           setPicked(null);
         }}
       />
+      {printing && <ExamSeatingPrintSheet session={session} rooms={gridRooms.filter((x) => printing.includes(x.id)).map(printRoomOf)} onDone={() => setPrinting(null)} />}
       {copying && (
         <CopySeatingSheet
           session={session}

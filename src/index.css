@@ -670,5 +670,8 @@
   body > :not(.print-sheet) { display: none !important; }
   .print-sheet { position: static; overflow: visible; background: #fff; }
   .print-sheet .paper { max-width: none; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+  .print-sheet.landscape .paper { max-width: none; min-height: 0; } /* the screen-only 210mm height would spill every landscape paper onto a blank extra page */
   .print-sheet .print-toolbar { display: none; }
+  /* Several papers in one sheet (seat plans: plan page then roster, per room): each starts a new page. */
+  .print-sheet .paper + .paper { break-before: page; }
 }
