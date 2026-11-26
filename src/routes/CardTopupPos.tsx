@@ -92,6 +92,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   const topupKey = useRef(crypto.randomUUID());
   const topup = usePosTopupCash();
   const [todayOpen, setTodayOpen] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   // Sale confirm popup: "tap the card" until a student with a card is on screen, then the student + amount to confirm.
@@ -732,6 +733,14 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 รายการวันนี้
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setLeaveOpen(true)}
+              className="tappable flex h-14 items-center gap-2 rounded-xl border-2 border-border bg-card px-4 text-xl font-semibold transition-colors hover:bg-muted"
+            >
+              <LogOut className="h-5 w-5" />
+              {profile && isCashierOnly(profile.roles) ? "เปลี่ยนเครื่อง" : "ออกจากระบบ"}
+            </button>
           </div>
         </header>
         {!online && onSale && (
@@ -743,6 +752,28 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         {!onSale ? adminView : terminalsLoading ? <Spinner className="m-auto size-8" /> : saleBody}
       </div>
 
+      <Modal
+        open={leaveOpen}
+        onOpenChange={setLeaveOpen}
+        title={profile && isCashierOnly(profile.roles) ? "เปลี่ยนเครื่อง" : "ออกจากระบบ"}
+        className="max-w-md"
+        centered
+        footer={
+          <div className="flex gap-3">
+            <Button type="button" variant="outline" className="h-14 flex-1 border-2 text-xl font-semibold" onClick={() => setLeaveOpen(false)}>
+              ยกเลิก
+            </Button>
+            <Button type="button" className="h-14 flex-1 text-xl font-bold" onClick={() => void signOut()}>
+              ออกจากระบบ
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-xl">
+          {cart.length ? "ตะกร้าที่ยังไม่ได้ตัดเงินจะหายไป " : ""}
+          ออกจากระบบแล้วกลับไปหน้า PIN เพื่อเลือกเครื่อง
+        </p>
+      </Modal>
       <Modal open={todayOpen} onOpenChange={setTodayOpen} title="รายการวันนี้" className="max-w-2xl" centered>
         <TodayPanel />
       </Modal>
