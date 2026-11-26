@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { useAuth } from "@/auth/AuthProvider";
+import { useAllExamSessions, useMyExamSessions } from "@/hooks/useExams";
+import { planCopy } from "@/lib/examSeatCopy";
+import { examLabel } from "@/lib/examKinds";
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ExamRoomListSheet, type RoomListEntry } from "@/components/ExamRoomListSheet";
-import { AlertTriangle, ChevronForward, ListIcon, PencilIcon, Plus, PrintIcon, ShuffleIcon, TimetableIcon, TrashIcon } from "@/components/icons";
+import { AlertTriangle, ChevronForward, CopyIcon, ListIcon, PencilIcon, Plus, PrintIcon, ShuffleIcon, TimetableIcon, TrashIcon } from "@/components/icons";
 import { IconTile } from "@/components/IconTile";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, Field, FormSection, Input, Select } from "@/components/ui";
 import {
   useAddSessionRoom,
+  useCopyRoomSeating,
   useAddSpecialSeat,
   useDeleteSeatTemplate,
   useDeleteSpecialSeat,
@@ -82,6 +86,7 @@ export function ExamSeatingCard({
   const [managing, setManaging] = useState(false);
   const [roomTab, setRoomTab] = useState(0);
   const [printingRoom, setPrintingRoom] = useState<string | null>(null);
+  const [copying, setCopying] = useState<ExamSessionRoom | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
   const [clearing, setClearing] = useState<string | null>(null);
   const [removing, setRemoving] = useState<ExamSessionRoom | null>(null);
@@ -221,6 +226,10 @@ export function ExamSeatingCard({
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs font-semibold text-foreground">{rooms.length > 1 ? `ห้องที่ ${index + 1}` : ""}</span>
           <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || templates.length === 0} onClick={() => setCopying(r)}>
+              <CopyIcon className={ICON} />
+              คัดลอกผังจาก…
+            </Button>
             <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={roomEntries.length === 0} onClick={() => setPrintingRoom(r.id)}>
               <PrintIcon className={ICON} />
               พิมพ์รายชื่อ
@@ -575,8 +584,145 @@ export function ExamSeatingCard({
           setPicked(null);
         }}
       />
+      {copying && (
+        <CopySeatingSheet
+          session={session}
+          room={copying}
+          templates={templates}
+          rosterIds={new Set(students.map((x) => x.student_id))}
+          studentCount={students.length}
+          keep={seated.filter((x) => x.room !== copying.id)}
+          held={new Set(heldOf(copying).keys())}
+          hasExisting={copying.template_id != null || seated.some((x) => x.room === copying.id) || specials.some((x) => x.session_room_id === copying.id)}
+          onClose={() => setCopying(null)}
+        />
+      )}
       {managing && <SeatTemplatesSheet onClose={() => setManaging(false)} />}
     </div>
+  );
+}
+
+/** "คัดลอกผังจาก…": pick another exam round (and its room) and copy its template, seats of students on this roster, and special seats into this room. The physical room is not copied. */
+export function CopySeatingSheet({
+  session,
+  room,
+  templates,
+  rosterIds,
+  studentCount,
+  keep,
+  held,
+  hasExisting,
+  onClose,
+}: {
+  session: ExamSession;
+  room: ExamSessionRoom;
+  templates: ExamSeatTemplate[];
+  rosterIds: Set<string>;
+  studentCount: number;
+  keep: Seat[];
+  held: Set<string>;
+  hasExisting: boolean;
+  onClose: () => void;
+}) {
+  const { profile } = useAuth();
+  const toast = useToast();
+  const wide = !!profile && (isOrgWide(profile.roles) || isDeptHead(profile.roles));
+  const mine = useMyExamSessions(profile?.id ?? null);
+  const all = useAllExamSessions(wide);
+  const candidates = ((wide ? all.data : mine.data) ?? []).filter((s) => s.id !== session.id);
+  const [srcId, setSrcId] = useState("");
+  const [srcRoomId, setSrcRoomId] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const { data: srcRooms = [] } = useSessionRooms(srcId || null);
+  const { data: srcSeats = [] } = useSessionSeats(srcId || null);
+  const { data: srcSpecials = [] } = useSpecialSeats(srcId || null);
+  const copy = useCopyRoomSeating();
+  const usable = srcRooms.filter((x) => x.template_id != null && x.seat_rows != null);
+  const srcRoom = usable.find((x) => x.id === srcRoomId) ?? usable[0];
+  const template = templates.find((t) => t.id === srcRoom?.template_id);
+  const plan =
+    srcRoom && template
+      ? planCopy({
+          roomId: room.id,
+          rows: template.seat_rows,
+          cols: template.seat_cols,
+          srcSeats: srcSeats.filter((x) => x.session_room_id === srcRoom.id),
+          srcSpecials: srcSpecials.filter((x) => x.session_room_id === srcRoom.id),
+          roster: rosterIds,
+          keep,
+          held,
+        })
+      : null;
+  const when = (s: ExamSession) => (s.opens_at ? new Date(s.opens_at).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" }) : "ยังไม่กำหนดเวลา");
+  const run = () => {
+    if (!plan || !template) return;
+    copy.mutate(
+      { sessionId: session.id, roomRowId: room.id, template, seats: plan.seats, specials: plan.specials },
+      {
+        onSuccess: () => {
+          toast(`คัดลอกผังแล้ว ${plan.copied} คน`);
+          onClose();
+        },
+        onError: (e) => toast((e as { message?: string }).message?.includes("ถูกใช้ในรอบสอบอื่น") ? "ที่นั่งบางช่องถูกใช้ในรอบสอบอื่นที่เวลาทับกัน" : "คัดลอกผังไม่สำเร็จ ตรวจผังแล้วลองใหม่", "error"),
+      },
+    );
+  };
+  return (
+    <Sheet
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title="คัดลอกผังจาก…"
+      footer={
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>ยกเลิก</Button>
+          <Button type="button" className="flex-1" disabled={!plan || copy.isPending} onClick={() => (hasExisting ? setConfirming(true) : run())}>
+            คัดลอก
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <Field label="รอบสอบต้นทาง">
+          <Select placeholder="เลือกรอบสอบ" value={srcId} onChange={(e) => { setSrcId(e.target.value); setSrcRoomId(""); }}>
+            {candidates.map((s) => (
+              <option key={s.id} value={s.id}>{examLabel(s) ?? s.title} · {when(s)}</option>
+            ))}
+          </Select>
+        </Field>
+        {srcId && usable.length === 0 && <p className="text-xs text-muted-foreground">รอบสอบนี้ยังไม่มีผังที่เลือก template ไว้</p>}
+        {usable.length > 1 && (
+          <Field label="ห้อง">
+            <Select value={srcRoom?.id ?? ""} onChange={(e) => setSrcRoomId(e.target.value)}>
+              {usable.map((x) => (
+                <option key={x.id} value={x.id}>ห้องที่ {x.position} ({x.seat_cols}×{x.seat_rows})</option>
+              ))}
+            </Select>
+          </Field>
+        )}
+        {srcRoom && !template && <p role="alert" className="text-xs text-destructive">ไม่พบ template ของผังต้นทาง คัดลอกไม่ได้</p>}
+        {plan && template && (
+          <div className="space-y-1.5 rounded-xl bg-muted px-3 py-2 text-xs">
+            <p>ผัง {template.name} ({template.seat_cols}×{template.seat_rows}) · ที่นั่งพิเศษ {plan.specials.length}</p>
+            <p>นักเรียนที่จะได้ที่นั่ง {plan.copied} จาก {studentCount} คน</p>
+            {plan.skipped > 0 && <p className="text-warning">ข้าม {plan.skipped} คน (ไม่อยู่ในรายชื่อรอบนี้ ที่นั่งถูกรอบอื่นจอง หรือนั่งห้องอื่นของรอบนี้แล้ว)</p>}
+            {studentCount - plan.copied - keep.length > 0 && <p>นักเรียนใหม่ {Math.max(0, studentCount - plan.copied - keep.length)} คน จะยังไม่มีที่นั่ง</p>}
+            <p className="text-muted-foreground">ไม่คัดลอกห้องจริง ใช้ห้องของรอบนี้ตามเดิม</p>
+          </div>
+        )}
+      </div>
+      <ConfirmDialog
+        open={confirming}
+        title="แทนที่ผังเดิมของห้องนี้?"
+        description="template ที่นั่ง และที่นั่งพิเศษของห้องนี้จะถูกแทนที่ด้วยผังที่คัดลอก ผังอื่นของรอบนี้ไม่เปลี่ยน"
+        confirmLabel="คัดลอก"
+        pending={copy.isPending}
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => {
+          setConfirming(false);
+          run();
+        }}
+      />
+    </Sheet>
   );
 }
 

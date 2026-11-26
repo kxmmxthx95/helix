@@ -152,6 +152,37 @@ export function useSetSessionSeats() {
   });
 }
 
+/** "คัดลอกผังจาก…": the room takes the source's template, the session's seats become `seats`, and the room's special seats are
+ *  recreated (one per entry of `specials`, holding that student or empty). Runs step by step, so a failure can leave it half done. */
+export function useCopyRoomSeating() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (a: { sessionId: string; roomRowId: string; template: ExamSeatTemplate; seats: { student_id: string; room: string; seat_row: number; seat_col: number }[]; specials: (string | null)[] }) => {
+      const room = await supabase.from("exam_session_rooms").update({ seat_rows: a.template.seat_rows, seat_cols: a.template.seat_cols, template_id: a.template.id }).eq("id", a.roomRowId);
+      if (room.error) throw room.error;
+      const del = await supabase.from("exam_session_special_seats").delete().eq("session_room_id", a.roomRowId);
+      if (del.error) throw del.error;
+      const set = await supabase.rpc("set_exam_session_seats", { p_session: a.sessionId, p_seats: a.seats });
+      if (set.error) throw set.error;
+      for (let i = 0; i < a.specials.length; i++) {
+        const add = await supabase.rpc("add_exam_special_seat", { p_room_row: a.roomRowId });
+        if (add.error) throw add.error;
+      }
+      if (a.specials.some(Boolean)) {
+        const made = await supabase.from("exam_session_special_seats").select("id, special_no").eq("session_room_id", a.roomRowId).order("special_no");
+        if (made.error) throw made.error;
+        for (const [i, studentId] of a.specials.entries()) {
+          const seat = made.data[i];
+          if (!studentId || !seat) continue;
+          const put = await supabase.rpc("set_exam_special_seat", { p_seat: seat.id, p_student: studentId });
+          if (put.error) throw put.error;
+        }
+      }
+    },
+    onSettled: (_d, _e, v) => refreshRooms(qc, v.sessionId),
+  });
+}
+
 /** Ids (of the given sessions) with at least one room that has a seating template chosen. */
 export function useSessionsWithSeating(sessionIds: string[]) {
   const key = [...sessionIds].sort();
