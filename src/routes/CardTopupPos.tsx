@@ -248,11 +248,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   function openTopup() {
     setView("topup");
   }
-  // Sale popup, balance too low: quick top-up amounts; the confirm popup follows.
-  function startSaleTopup(amount: number) {
-    setTopupAmount(String(amount));
-    setConfirmOpen(true);
-  }
   async function confirmTopup() {
     if (!student || topupValue === null) return;
     try {
@@ -575,19 +570,19 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
 
       {mode === "sale" && (payOpen || !!student) && (
         <div role="dialog" aria-modal="true" aria-label="ตัดเงิน" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-6">
-          <div className="max-h-full w-full max-w-2xl space-y-6 overflow-y-auto rounded-3xl bg-card p-8 text-center shadow-2xl">
+          <div className="max-h-full w-full max-w-xl space-y-4 overflow-y-auto rounded-3xl bg-card p-5 text-center shadow-2xl">
             {student ? (
               <>
-                <div className="flex flex-col items-center gap-4">
+                <div className="flex items-center gap-4 text-left">
                   <Avatar
                     name={student.name}
                     src={studentAvatarUrl({ avatar_path: student.avatar_path, updated_at: student.avatar_updated_at })}
-                    className="size-40 text-5xl"
+                    className="size-20 shrink-0 text-3xl"
                   />
-                  <div className="space-y-2">
-                    <p className="font-heading text-4xl font-semibold leading-snug">{student.name}</p>
-                    <p className="flex flex-wrap items-center justify-center gap-x-3 text-xl text-muted-foreground">
-                      {student.department && <span className="rounded-full bg-primary/10 px-3 py-1 text-lg font-medium text-primary">{student.department}</span>}
+                  <div className="min-w-0 space-y-1">
+                    <p className="font-heading text-2xl font-semibold leading-snug">{student.name}</p>
+                    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-lg text-muted-foreground">
+                      {student.department && <span className="rounded-full bg-primary/10 px-3 py-0.5 text-base font-medium text-primary">{student.department}</span>}
                       <span>
                         {student.student_code}
                         {student.classroom ? ` · ${student.classroom}` : ""}
@@ -595,9 +590,9 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                     </p>
                   </div>
                 </div>
-                <div className="rounded-2xl bg-muted px-6 py-4">
-                  <p className="text-xl text-muted-foreground">ยอดคงเหลือ</p>
-                  <p className="font-heading text-7xl font-semibold tabular-nums">{formatBaht(student.balance)} ฿</p>
+                <div className="rounded-2xl bg-muted px-4 py-3">
+                  <p className="text-lg text-muted-foreground">ยอดคงเหลือ</p>
+                  <p className="font-heading text-5xl font-semibold tabular-nums">{formatBaht(student.balance)} ฿</p>
                   {student.daily_limit !== null && (
                     <p className="mt-1 text-lg text-muted-foreground">
                       วงเงินต่อวัน {formatBaht(student.daily_limit)} · ใช้ไปแล้ววันนี้ {formatBaht(student.spent_today)}
@@ -607,7 +602,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 {price !== null && (
                   <div className="space-y-1">
                     <p className="text-xl text-muted-foreground">ยอดที่จะตัด</p>
-                    <p className="font-heading text-6xl font-semibold tabular-nums text-destructive">{formatBaht(price)} ฿</p>
+                    <p className="font-heading text-5xl font-semibold tabular-nums text-destructive">{formatBaht(price)} ฿</p>
                     {canSell && !over && <p className="text-xl text-muted-foreground">คงเหลือหลังตัด {formatBaht(student.balance - price)} ฿</p>}
                   </div>
                 )}
@@ -615,18 +610,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                   <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-xl font-semibold text-destructive">
                     {price > student.balance ? "ยอดคงเหลือไม่พอ" : "เกินวงเงินต่อวัน"}
                   </p>
-                )}
-                {price !== null && price > student.balance && (
-                  <div className="space-y-2">
-                    <p className="text-xl text-muted-foreground">เติมเงินสด</p>
-                    <div className="flex flex-wrap justify-center gap-3">
-                      {topupChoices(price - student.balance).map((v) => (
-                        <Button key={v} variant="outline" className="h-16 px-6 text-2xl font-bold tabular-nums text-success" disabled={!online || topup.isPending} onClick={() => startSaleTopup(v)}>
-                          +{formatBaht(v)} ฿
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
                 )}
                 {student.card_status === "frozen" && <p className="rounded-xl bg-destructive/10 px-4 py-3 text-xl font-semibold text-destructive">บัตรนี้ถูกระงับ — ขายไม่ได้</p>}
                 {student.card_status === null && <p className="rounded-xl bg-warning/15 px-4 py-3 text-lg font-medium">นักเรียนยังไม่ได้ผูกบัตร — ขายไม่ได้</p>}
@@ -681,11 +664,11 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
               </div>
             )}
             <div className="flex gap-3">
-              <Button variant="outline" className="h-16 flex-1 text-xl font-bold text-destructive" onClick={() => (setPayOpen(false), setStudent(null), setEntry(""))}>
+              <Button variant="outline" className="h-14 flex-1 text-xl font-bold text-destructive" onClick={() => (setPayOpen(false), setStudent(null), setEntry(""))}>
                 {price !== null ? "ยกเลิก" : "ปิด"}
               </Button>
               {price !== null && !pinGate && (
-                <Button className="h-16 flex-1 text-xl" disabled={!canSell || !priceOk || over || paying || !online} onClick={() => void charge()}>
+                <Button className="h-14 flex-1 text-xl" disabled={!canSell || !priceOk || over || paying || !online} onClick={() => void charge()}>
                   {paying ? <Spinner /> : "ยืนยัน"}
                 </Button>
               )}
@@ -867,12 +850,6 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
     </div>,
     document.body,
   );
-}
-
-/** Quick top-up amounts: the shortfall (never below the minimum), then 50 / 100 / 200 that still cover it. */
-function topupChoices(shortfall: number): number[] {
-  const exact = Math.min(TOPUP_MAX, Math.max(TOPUP_MIN, Math.ceil(shortfall)));
-  return [...new Set([exact, ...[50, 100, 200].filter((v) => v >= exact)])];
 }
 
 /** Tap-to-add tiles for the active catalogue, filtered by category chip. */
