@@ -508,9 +508,53 @@ function SeatingSheet({ session, onClose }: { session: ExamSession; onClose: () 
     <Sheet open onOpenChange={(o) => !o && onClose()} title="ผังที่นั่ง" description={session.title}>
       <div className="space-y-3">
         <ScheduleCard session={session} defaultOpen />
+        <PrintExamCard session={session} />
         {isLoading ? <PageSpinner /> : <ExamSeatingCard defaultOpen session={session} roomPicker={(room, usedRoomIds) => <ExamRoomField session={session} room={room} usedRoomIds={usedRoomIds} />} students={students} />}
       </div>
     </Sheet>
+  );
+}
+
+/** Print card in the seating drawer: student copy and answer key of the room's questions (the same A4 sheet as the question list). */
+function PrintExamCard({ session }: { session: ExamSession }) {
+  const [open, setOpen] = useState(false);
+  const [printing, setPrinting] = useState<"student" | "key" | null>(null);
+  const { data: sessionQuestions = [] } = useExamSessionQuestions(session.id);
+  const { data: roomSets } = useSessionSets([session.id]);
+  const subjectIds = (roomSets?.get(session.id) ?? []).map((x) => x.subject_id);
+  const { data: bank = [], isLoading } = useExamQuestionsOf(open || printing ? (subjectIds.length > 0 ? subjectIds : [session.subject_id]) : []);
+  const { data: subjects = [] } = useSubjectsByIds(printing ? subjectIds : []);
+  const byId = new Map(bank.map((q) => [q.id, q]));
+  const chosen = sessionQuestions.map((r) => byId.get(r.question_id)).filter((q): q is ExamQuestionWithChoices => !!q);
+  return (
+    <div className="shrink-0 overflow-hidden rounded-lg border border-border">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
+      >
+        <span className="flex shrink-0 items-center gap-2">
+          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><PrintIcon className="h-4 w-4" /></IconTile>
+          <span className="font-semibold text-foreground">พิมพ์ข้อสอบ</span>
+        </span>
+        <span className="ml-auto rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success">{sessionQuestions.length} ข้อ</span>
+        <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
+      </button>
+      <Collapse open={open}>
+        <div className="flex flex-wrap gap-2 border-t border-border bg-card p-3">
+          {sessionQuestions.length === 0 ? (
+            <p className="text-xs text-muted-foreground">ยังไม่มีข้อสอบในห้องนี้</p>
+          ) : (
+            <>
+              <Button size="sm" variant="secondary" disabled={isLoading} onClick={() => setPrinting("student")}><PrintIcon className="mr-1 h-4 w-4" />ดูตัวอย่าง/พิมพ์ฉบับนักเรียน</Button>
+              <Button size="sm" variant="secondary" disabled={isLoading} onClick={() => setPrinting("key")}><PrintIcon className="mr-1 h-4 w-4" />ดูตัวอย่าง/พิมพ์ฉบับเฉลย</Button>
+            </>
+          )}
+        </div>
+      </Collapse>
+      {printing && <PrintExamSheet session={session} questions={chosen} subjects={subjects} withKey={printing === "key"} onDone={() => setPrinting(null)} />}
+    </div>
   );
 }
 
