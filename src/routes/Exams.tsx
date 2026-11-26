@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ViewToggle, defaultView } from "@/components/ViewToggle";
+import { RoomsView } from "@/components/ExamRoomsView";
+import { dayKey, roomClashes } from "@/lib/examRooms";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
@@ -174,7 +176,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
   const { data: owners = [], isLoading: ownersLoading } = useProfilesByIds([...new Set(sessions.map((s) => s.teacher_id))]);
   const ownerById = new Map(owners.map((o) => [o.id, o]));
   const [editing, setEditing] = useState<ExamSession | null>(null);
-  const [view, setView] = useState<"cards" | "table">(defaultView);
+  const [view, setView] = useState<"cards" | "table" | "rooms">(defaultView);
   const [when, setWhen] = useState<"active" | "past" | "all">("active");
   const [printing, setPrinting] = useState(false);
   const [fGrade, setFGrade] = useState("");
@@ -292,6 +294,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
     );
   };
   const scheduled = shown.slice().sort((a, b) => a.opens_at!.localeCompare(b.opens_at!));
+  const clashingIds = roomClashes(scheduled, roomIdsOf);
   // Every scheduled round in scope (not just the filtered ones): the print drawer has its own day/grade/room choices.
   const printItems: ScheduleItem[] = sessions
     .filter((s) => !!s.opens_at)
@@ -360,7 +363,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
         <Button size="sm" variant="outline" className="ui-control-compact h-8 gap-1 px-2.5" aria-label="พิมพ์ตารางสอบ" disabled={isLoading || detailsLoading} onClick={() => setPrinting(true)}>
           <PrintIcon className="h-3.5 w-3.5" />
         </Button>
-        <ViewToggle value={view} onChange={setView} />
+        <ViewToggle value={view} onChange={setView} views={["cards", "table", "rooms"]} />
       </div>
       {isLoading || detailsLoading ? <PageSpinner /> : shown.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
@@ -421,6 +424,16 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
             </table>
           </div>
         </div>
+      ) : view === "rooms" ? (
+        <RoomsView
+          sessions={scheduled}
+          roomIdsOf={roomIdsOf}
+          venues={venues}
+          subjectsOf={subjectsOf}
+          seatBadge={seatBadge}
+          clashing={clashingIds}
+          onOpen={setEditing}
+        />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
           {[...byDay].map(([day, list]) => (
@@ -539,7 +552,6 @@ function windowParts(opens: string, closes: string) {
 
 type ScheduleItem = { id: string; opens: Date; closes: Date | null; subjects: Subject[]; rooms: string[]; classroomIds: string[]; venue: string | undefined; exam: string };
 
-const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const dayLabel = (d: Date) => d.toLocaleDateString("th-TH", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
 /** "พิมพ์ตารางสอบ": pick days, grade and room independently of the table's filters, then preview/print on landscape A4. */
