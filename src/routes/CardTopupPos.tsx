@@ -397,7 +397,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
   );
 
   const keypad = (
-    <div className="grid flex-1 grid-cols-3 gap-3">
+    <div className="grid min-h-0 flex-1 grid-cols-3 grid-rows-[repeat(4,minmax(0,1fr))] gap-2 tall:gap-3">
       {KEYS.map((k) => (
         <button
           key={k}
@@ -405,7 +405,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
           aria-label={k === "⌫" ? "ลบ" : k === "C" ? "ล้าง" : k}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => press(k)}
-          className={cn("tappable pos-key min-h-[4.5rem] rounded-2xl border-2 border-border bg-card text-4xl font-bold tabular-nums transition-colors active:bg-muted", k === "C" && "border-destructive/50 bg-destructive/10 text-destructive", k === "⌫" && "bg-muted")}
+          className={cn("tappable pos-key min-h-0 rounded-2xl border-2 border-border bg-card text-3xl font-bold tall:text-4xl tabular-nums transition-colors active:bg-muted", k === "C" && "border-destructive/50 bg-destructive/10 text-destructive", k === "⌫" && "bg-muted")}
         >
           {k}
         </button>
@@ -441,7 +441,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         }}
       />
 
-      <div className="grid min-h-0 flex-1 gap-4 p-4 md:grid-cols-[minmax(0,1fr)_21rem] lg:grid-cols-[minmax(0,1fr)_25rem]">
+      <div className="grid min-h-0 flex-1 gap-3 p-3 tall:gap-4 tall:p-4 md:grid-cols-[minmax(0,1fr)_21rem] lg:grid-cols-[minmax(0,1fr)_25rem]">
         {/* Customer panel */}
         <section className={cn("flex min-h-0 flex-col items-center justify-center overflow-y-auto rounded-2xl border p-6 text-center", done ? "border-success/40 bg-success/10" : "border-border bg-card")}>
           {looking ? (
@@ -535,14 +535,14 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
         </section>
 
         {/* Amount keypad: sale amount / cart, or the cash top-up amount while mode === "topup" */}
-        <section className="flex min-h-0 flex-col gap-3 rounded-2xl border-2 border-border bg-background p-4">
+        <section className="flex min-h-0 flex-col gap-2 overflow-hidden rounded-2xl border-2 border-border bg-background p-3 tall:gap-3 tall:p-4">
           {mode === "topup" ? (
             <>
-              <div className="rounded-xl border-2 border-border bg-card px-4 py-3 text-right">
-                <p className="font-heading text-7xl font-bold tabular-nums">{topupAmount || "0"} ฿</p>
+              <div className="rounded-xl border-2 border-border bg-card px-4 py-1 text-right tall:py-3">
+                <p className="font-heading text-5xl font-bold tabular-nums tall:text-7xl">{topupAmount || "0"} ฿</p>
               </div>
               {keypad}
-              <Button size="lg" className="pos-cta h-20 text-3xl font-bold" disabled={!student || topupValue === null || !online || topup.isPending} onClick={() => setConfirmOpen(true)}>
+              <Button size="lg" className="pos-cta h-14 text-2xl font-bold tall:h-20 tall:text-3xl" disabled={!student || topupValue === null || !online || topup.isPending} onClick={() => setConfirmOpen(true)}>
                 {topupValue === null ? "ยืนยันเติมเงิน" : `ยืนยันเติมเงิน ${formatBaht(topupValue)} ฿`}
               </Button>
               <Button variant="outline" className="h-14 text-lg" onClick={() => (setStudent(null), setEntry(""), setTopupAmount(""))}>
@@ -555,18 +555,18 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
                 <CartPanel cart={cart} onQty={(id, q) => editCart(setQty(cart, id, q))} onClear={() => editCart([])} />
               ) : (
                 <>
-                  <div className="rounded-xl border-2 border-border bg-card px-4 py-3 text-right">
-                    <p className="font-heading text-7xl font-bold tabular-nums">{keyed || "0"} ฿</p>
+                  <div className="rounded-xl border-2 border-border bg-card px-4 py-1 text-right tall:py-3">
+                    <p className="font-heading text-5xl font-bold tabular-nums tall:text-7xl">{keyed || "0"} ฿</p>
                   </div>
                   {keypad}
                 </>
               )}
               {price !== null && price > SALE_MAX && <p className="text-base font-medium text-destructive">ยอดรวมเกิน {SALE_MAX} บาทต่อรายการ — ลดสินค้า</p>}
-              <Button size="lg" className="pos-cta h-20 text-3xl font-bold" disabled={!priceOk || paying || !online} onClick={() => setPayOpen(true)}>
+              <Button size="lg" className="pos-cta h-14 text-2xl font-bold tall:h-20 tall:text-3xl" disabled={!priceOk || paying || !online} onClick={() => setPayOpen(true)}>
                 {paying ? <Spinner /> : price === null ? "ตัดเงิน" : `ยืนยันตัดเงิน ${formatBaht(price)} ฿`}
               </Button>
               {!paying && (
-                <p className="text-center text-lg font-medium text-muted-foreground" aria-live="polite">
+                <p className="text-center text-base font-medium text-muted-foreground tall:text-lg" aria-live="polite">
                   {!online ? "ออฟไลน์ — รอเชื่อมต่ออินเทอร์เน็ต" : !priceOk ? "① เลือกสินค้า หรือกดยอดเงิน" : "② กดปุ่มด้านบน แล้วแตะบัตรนักเรียน"}
                 </p>
               )}
@@ -695,7 +695,7 @@ export function PosTab({ orgWide }: { orgWide: boolean }) {
       <div className="absolute inset-0 z-0 bg-shell" aria-hidden />
       {sidebar}
       <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-        <header className="relative flex h-[5rem] shrink-0 items-center gap-3 border-b border-border bg-card px-4 pt-safe">
+        <header className="relative flex h-16 shrink-0 tall:h-[5rem] items-center gap-3 border-b border-border bg-card px-4 pt-safe">
           {toggleButton}
           {onSale ? (
             <div role="tablist" aria-label="งานหน้าเคาน์เตอร์" className="flex min-w-0 gap-1 rounded-2xl bg-muted p-1 lg:absolute lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2">
@@ -917,7 +917,7 @@ function ProductGridImpl({
   const cats = [...new Set(products.map(categoryOf))].sort();
   const shown = products.filter((p) => !category || categoryOf(p) === category);
   const chip = (active: boolean) =>
-    cn("tappable flex h-14 shrink-0 items-center rounded-full border-2 px-6 text-xl font-semibold", active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card");
+    cn("tappable flex h-12 shrink-0 items-center rounded-full border-2 px-6 text-xl font-semibold tall:h-14", active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card");
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 text-left">
       <div className="scrollbar-hidden flex shrink-0 gap-2 overflow-x-auto pb-1" role="tablist" aria-label="หมวดหมู่สินค้า">
@@ -988,7 +988,7 @@ function CartPanel({ cart, onQty, onClear }: { cart: CartLine[]; onQty: (product
           </li>
         ))}
       </ul>
-      <div className="rounded-xl border-2 border-border bg-card px-4 py-3 text-right">
+      <div className="rounded-xl border-2 border-border bg-card px-4 py-1 text-right tall:py-3">
         <p className="text-lg text-muted-foreground">ยอดรวม</p>
         <p className="font-heading text-5xl font-semibold tabular-nums">{cartTotal(cart)} ฿</p>
       </div>

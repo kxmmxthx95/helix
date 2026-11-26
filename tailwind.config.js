@@ -4,6 +4,8 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      // Short tablets (landscape ~600px tall): POS sizes drop a step unless the screen is at least this tall.
+      screens: { tall: { raw: "(min-height: 700px)" } },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
