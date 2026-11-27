@@ -54,7 +54,7 @@ type AuthState = {
   /** No-ops for anyone whose actualRoles doesn't include super_admin. */
   setViewAsRole: (role: Role | null) => void;
   /** loginId is a student_code or a phone number — never a real email. */
-  signIn: (loginId: string, password: string) => Promise<void>;
+  signIn: (loginId: string, password: string, opts?: { studentOnly?: boolean }) => Promise<void>;
   signOut: () => Promise<void>;
   /** Self-service recovery via the reset-password Edge Function — no inbox involved. */
   resetPassword: (
@@ -84,7 +84,8 @@ function must<T>(res: { data: T; error: unknown }): T {
 async function withRetry<T>(fn: () => Promise<T>, isCancelled: () => boolean): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await fn();
+      // A request stuck on an overloaded DB never errors, so without a deadline the spinner never ends.
+      return await Promise.race([fn(), new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 10_000))]);
     } catch (err) {
       if (isCancelled() || attempt >= 5) throw err;
       // Jitter spreads 200 clients out instead of retrying in lockstep.
@@ -316,25 +317,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Auth identity is a synthetic email under the hood — try student, then
       // staff, then the raw input as a literal email (covers the original
       // super_admin bootstrap account, which was created with a real inbox).
-      signIn: async (loginId, password) => {
+      signIn: async (loginId, password, opts) => {
         const id = loginId.trim();
-        const candidates = [
-          `${id}@students.helix.internal`,
-          `${id}@staff.helix.internal`,
-          id,
-        ];
+        // The student login page only ever has students: one password hash per attempt instead of three.
+        const candidates = opts?.studentOnly ? [`${id}@students.helix.internal`] : [`${id}@students.helix.internal`, `${id}@staff.helix.internal`, id];
 
         let lastError: Error | null = null;
         for (const email of candidates) {
-          const { error } = await supabase.auth.signInWithPassword({ email, password });
+          // A whole class logging in at once overloads auth (504 / 5xx). Retry with random jitter so the
+          // retries spread out instead of arriving together; manual re-clicks would make the pile-up worse.
+          let result = await supabase.auth.signInWithPassword({ email, password });
+          for (let i = 1; i <= 3 && result.error && result.error.code !== "invalid_credentials"; i++) {
+            await new Promise((r) => setTimeout(r, i * 1000 + Math.random() * 2000));
+            result = await supabase.auth.signInWithPassword({ email, password });
+          }
+          const { error } = result;
           if (!error) {
             // Students: newest login wins, unless a strict exam is live on another session (migration 0132).
             const { data: keep } = await supabase.rpc("keep_other_sessions");
             if (keep === false) await supabase.auth.signOut({ scope: "others" });
             return;
           }
-          // Only a wrong-credentials answer means "try the next candidate". A 429 / 5xx / network
-          // error would just repeat against the same per-IP limit (a whole school shares one IP).
+          // Only a wrong-credentials answer means "try the next candidate"; anything else still failing after the retries is busy.
           if (error.code !== "invalid_credentials") throw new SignInBusyError();
           lastError = error;
         }

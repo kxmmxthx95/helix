@@ -35,7 +35,7 @@ export function StudentLogin() {
     setBusy(true);
     try {
       if (mode === "signin") {
-        await signIn(loginId.trim(), password);
+        await signIn(loginId.trim(), password, { studentOnly: true });
       } else {
         await resetPassword(loginId.trim(), nationalId.trim(), dateOfBirth, password);
         setNotice("ตั้งรหัสผ่านใหม่สำเร็จ เข้าสู่ระบบด้วยรหัสผ่านใหม่ได้เลย");
