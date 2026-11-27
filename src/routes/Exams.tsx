@@ -47,7 +47,6 @@ import {
   useMyCurrentClassroom,
   useAllExamSessions,
   useMyExamSessions,
-  useMyTopicSets,
   useSaveAnswers,
   useSecurityEvents,
   useSessionAttempts,
@@ -61,7 +60,6 @@ import {
   useStudentNames,
   useSubmitAttempt,
   useTopicSetsByIds,
-  useTopicSetsInUse,
   useTopicSetsTopics,
   useSetTopicSetTopics,
   useSetManualScore,
@@ -80,7 +78,7 @@ import { topArea } from "@/lib/subjectColor";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import { ExamApprovalTab, ExamSubmissionsTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
-import { DIFFICULTY_BADGE_CLASS, DIFFICULTY_LABEL, QuestionForm, QuestionSheet, SubjectPicker, useQuestionForm } from "@/routes/ExamBank";
+import { DIFFICULTY_BADGE_CLASS, DIFFICULTY_LABEL, QuestionForm, QuestionSheet, useQuestionForm } from "@/routes/ExamBank";
 import type { PracticeCheckResult, ExamAttempt, ExamSecurityEvent, ExamSecurityEventType, ExamSession, ExamSessionRoom, ExamTopicSet, Student, Subject } from "@/lib/database.types";
 import { EXAM_KINDS, examLabel, kindTone, roundTone } from "@/lib/examKinds";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
@@ -763,7 +761,6 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
   const mine = useMyExamSessions(teacherId);
   const all = useAllExamSessions(canSeeAll && scope === "all");
   const { data: sessions = [], isLoading } = scope === "all" && canSeeAll ? all : mine;
-  const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<ExamSession | null>(null);
   const [view, setView] = useState<"cards" | "table">(defaultView);
   // Phones always get the card list: the table and room grid are desktop-only, so the switch is hidden there too.
@@ -1050,7 +1047,6 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
         </div>
       )}
 
-      {teacherId && <CreateSessionSheet open={creating} onOpenChange={setCreating} teacherId={teacherId} />}
       <ConfirmDialog
         open={!!deleting}
         title="ลบห้องสอบ?"
@@ -1083,17 +1079,12 @@ function CreateSessionSheet({
   /** Owner of the room — the set's teacher when a head creates it for them. */
   teacherId: string;
   /** Approved topic sets (one per subject, same room) a room is created for: subject, room and set are fixed. */
-  presetSets?: ExamTopicSet[];
+  presetSets: ExamTopicSet[];
 }) {
   const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
   const subjectIds = [...new Set(assignments.map((a) => a.subject_id))];
   const { data: subjects = [] } = useSubjectsByIds(subjectIds);
-  const gradeLevelIds = [...new Set(subjects.map((s) => s.suggested_grade_level_id).filter((id): id is string => !!id))];
-  const { data: gradeLevels = [] } = useGradeLevelsByIds(gradeLevelIds);
-  const gradeLevelById = new Map(gradeLevels.map((g) => [g.id, g]));
 
-  const [pickedSubjectId, setSubjectId] = useState("");
-  const subjectId = pickedSubjectId;
   const [kind, setKind] = useState("");
   const [round, setRound] = useState("");
   const [duration, setDuration] = useState("");
@@ -1101,21 +1092,6 @@ function CreateSessionSheet({
   const [shuffleQuestions, setShuffleQuestions] = useState(true);
   const [shuffleChoices, setShuffleChoices] = useState(true);
   const [syncGradebook, setSyncGradebook] = useState(false);
-  const [pickedTopicSetId, setTopicSetId] = useState("");
-  const topicSetId = pickedTopicSetId;
-
-  const { data: mySets = [] } = useMyTopicSets(teacherId);
-  const { data: usedSets } = useTopicSetsInUse(mySets.map((s) => s.id));
-  // One room per approved set — sets a room already uses are not offered again.
-  const approvedSets = mySets.filter(
-    (s) => s.approval_status === "approved" && !s.no_exam && s.teaching_assignment_id && s.subject_id === subjectId && !!usedSets && !usedSets.has(s.id),
-  );
-  const { data: setTopics } = useTopicSetsTopics(approvedSets.map((s) => s.id));
-  const setLabel = (set: ExamTopicSet) => {
-    const names = (setTopics?.get(set.id) ?? []).map((t) => t.topic);
-    const topics = names.length === 0 ? "ไม่ระบุหัวข้อ" : `${names.slice(0, 2).join(", ")}${names.length > 2 ? ` +${names.length - 2}` : ""}`;
-    return [examLabel(set), topics].filter(Boolean).join(" · ");
-  };
 
   const classroomIds = [...new Set(assignments.map((a) => a.classroom_id))];
   const { data: classrooms = [] } = useClassroomsByIds(classroomIds);
@@ -1127,16 +1103,14 @@ function CreateSessionSheet({
   const toast = useToast();
 
   function reset() {
-    setSubjectId("");
     setKind("");
     setRound("");
     setDuration("");
     setMaxAttempts("1");
-    setTopicSetId("");
   }
 
   // A set belongs to one room, so each session opens for exactly that room.
-  const targets = presetSets ?? approvedSets.filter((x) => x.id === topicSetId);
+  const targets = presetSets;
   // Same shape for every room — "ประเภท [ครั้งที่ n] รหัสวิชา ชื่อวิชา ห้อง" — so many exams across subjects stay tellable apart.
   // A set made with its exam (type + round) fixes them; older sets still ask here.
   const kindOf = (set: ExamTopicSet) => set.exam_type ?? kind;
@@ -1194,7 +1168,7 @@ function CreateSessionSheet({
     <Sheet
       open={open}
       onOpenChange={(next) => !next && close()}
-      title={presetSets ? "สร้างห้องสอบ" : "เปิดสอบใหม่"}
+      title="สร้างห้องสอบ"
       footer={
         <div className="flex gap-2">
           <Button type="button" variant="outline" className="flex-1" onClick={close}>
@@ -1207,38 +1181,6 @@ function CreateSessionSheet({
       }
     >
       <form id="create-session" onSubmit={submit} className="space-y-3">
-        {!presetSets && (
-        <Field label="วิชา" required>
-          <SubjectPicker
-            subjects={subjects}
-            gradeLevelById={gradeLevelById}
-            value={subjectId}
-            onChange={(id) => {
-              setSubjectId(id);
-              setTopicSetId("");
-            }}
-          />
-        </Field>
-        )}
-        {!presetSets && subjectId && (
-          <Field label="ห้อง / ชุดหัวข้อการสอบ" required>
-            <select
-              className="h-10 w-full rounded-lg border border-border bg-background px-2 text-sm"
-              value={topicSetId}
-              onChange={(e) => setTopicSetId(e.target.value)}
-            >
-              <option value="">{approvedSets.length === 0 ? "ยังไม่มีชุดหัวข้อที่อนุมัติ" : "เลือกห้อง"}</option>
-              {approvedSets.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {classroomById.get(assignments.find((a) => a.id === s.teaching_assignment_id)?.classroom_id ?? "")?.name ?? "—"} · {setLabel(s)}
-                </option>
-              ))}
-            </select>
-            {approvedSets.length === 0 && (
-              <p className="mt-1 text-xs text-muted-foreground">ส่งชุดหัวข้อขออนุมัติที่แท็บ “หัวข้อการสอบ” ก่อน</p>
-            )}
-          </Field>
-        )}
         {askExam && (
         <FormSection>
           <Field label="ประเภทการสอบ" required>
