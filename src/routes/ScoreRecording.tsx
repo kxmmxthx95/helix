@@ -14,6 +14,7 @@ import {
   useReopenSubmission,
 } from "@/hooks/useAssignments";
 import { useClassroomRoster } from "@/hooks/useAttendance";
+import { attemptScoreTime, useAssignmentExams } from "@/hooks/useExams";
 import { useLearningAreas, useSubjects } from "@/hooks/useCurriculum";
 import { useGradeLevels } from "@/hooks/useCurriculumStructure";
 import { useDepartments } from "@/hooks/useProfiles";
@@ -43,6 +44,8 @@ import type { StudentListItem } from "@/hooks/useStudents";
 import { useProfilesByIds } from "@/hooks/usePractice";
 import { useDepartmentTeachingAssignments } from "@/hooks/useTeachingLoad";
 import type {
+  ExamAttempt,
+  ExamSession,
   AssignmentSubmission,
   GradeStatusCode,
   ScoreItem,
@@ -52,6 +55,7 @@ import type {
   Subject,
   TeachingAssignment,
 } from "@/lib/database.types";
+import { kindTone, roundTone } from "@/lib/examKinds";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { canManage, isOrgWide } from "@/lib/roles";
@@ -414,40 +418,40 @@ function AssignmentPanel({
 
       {isLoading ? (
         <div className="table-panel flex-1" role="status" aria-label="กำลังโหลด">
-          <div className="table-panel-scroll">
-            <table className="w-full min-w-[36rem] text-xs">
-              <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+          <div className="table-panel-scroll scrollbar-hidden">
+            <table className="w-full min-w-[36rem] text-[13px]">
+              <thead className="sticky top-0 z-10 text-left text-xs">
                 <tr>
-                  <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
-                  <th className="px-3 py-2 font-medium">รายชื่อ</th>
-                  <th className="px-3 py-2 text-right font-medium">เก็บ</th>
-                  <th className="px-3 py-2 text-right font-medium">สอบ</th>
-                  <th className="px-3 py-2 text-right font-medium">รวม</th>
-                  <th className="px-3 py-2 text-center font-medium">เกรด</th>
+                  <th className="px-4 py-3">รหัสนักเรียน</th>
+                  <th className="px-4 py-3">รายชื่อ</th>
+                  <th className="px-4 py-3 text-right">เก็บ</th>
+                  <th className="px-4 py-3 text-right">สอบ</th>
+                  <th className="px-4 py-3 text-right">รวม</th>
+                  <th className="px-4 py-3 text-center">เกรด</th>
                 </tr>
               </thead>
               <tbody>
                 {[0, 1, 2, 3].map((i) => (
-                  <tr key={i} className="border-t border-border">
-                    <td className="px-3 py-2">
+                  <tr key={i} className="h-14 border-t border-border first:border-t-0">
+                    <td className="px-4 py-0">
                       <Skeleton className="h-3 w-10" />
                     </td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <Skeleton className="h-7 w-7 shrink-0 rounded-full" />
+                    <td className="px-4 py-0">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
                         <Skeleton className="h-3 w-24" />
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-4 py-0 text-right">
                       <Skeleton className="ml-auto h-3 w-8" />
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-4 py-0 text-right">
                       <Skeleton className="ml-auto h-3 w-8" />
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-4 py-0 text-right">
                       <Skeleton className="ml-auto h-3 w-8" />
                     </td>
-                    <td className="px-3 py-2 text-center">
+                    <td className="px-4 py-0 text-center">
                       <Skeleton className="mx-auto h-4 w-6 rounded-full" />
                     </td>
                   </tr>
@@ -487,33 +491,33 @@ function PassFailPanel({ assignment, roster }: { assignment: TeachingAssignment;
   const [avatarStudent, setAvatarStudent] = useState<StudentListItem | null>(null);
 
   return (
-    <div className="table-panel flex-1">
-      <div className="table-panel-scroll">
-        <table className="w-full min-w-[24rem] text-xs">
-          <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+    <div className="table-panel flex-1 rounded-none border-t border-border shadow-none">
+      <div className="table-panel-scroll scrollbar-hidden">
+        <table className="w-full min-w-[24rem] text-[13px]">
+          <thead className="sticky top-0 z-10 text-left text-xs">
             <tr>
-              <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
-              <th className="px-3 py-2 font-medium">รายชื่อ</th>
-              <th className="px-3 py-2 text-center font-medium">ผลการเรียน</th>
+              <th className="px-4 py-3">รหัสนักเรียน</th>
+              <th className="px-4 py-3">รายชื่อ</th>
+              <th className="px-4 py-3 text-center">ผลการเรียน</th>
             </tr>
           </thead>
           <tbody>
             {roster.map((s) => {
               const passed = byStudent.get(s.id);
               return (
-                <tr key={s.id} className="border-t border-border">
-                  <td className="px-3 py-2">{s.student_code}</td>
-                  <td className="px-3 py-2 font-medium">
+                <tr key={s.id} className="h-14 border-t border-border first:border-t-0">
+                  <td className="px-4 py-0">{s.student_code}</td>
+                  <td className="px-4 py-0">
                     <button
                       type="button"
                       onClick={() => setAvatarStudent(s)}
-                      className="tappable flex items-center gap-2"
+                      className="tappable flex items-center gap-3"
                     >
-                      <Avatar name={`${s.first_name} ${s.last_name}`} src={s.profile ? avatarUrl(s.profile) : null} className="h-7 w-7 text-[10px]" />
+                      <Avatar name={`${s.first_name} ${s.last_name}`} src={s.profile ? avatarUrl(s.profile) : null} className="h-9 w-9 text-xs" />
                       {s.first_name} {s.last_name}
                     </button>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-4 py-0">
                     <div className="flex justify-center gap-2">
                       {[true, false].map((v) => (
                         <button
@@ -583,17 +587,17 @@ function GradedPanel({
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       {tab === "score" ? (
         <div className="flex min-h-0 flex-1 flex-col gap-2">
-          <div className="table-panel flex-1">
-            <div className="table-panel-scroll">
-              <table className="w-full min-w-[36rem] text-xs">
-                <thead className="sticky top-0 z-10 bg-muted text-left text-xs text-muted-foreground">
+          <div className="table-panel flex-1 rounded-none border-t border-border shadow-none">
+            <div className="table-panel-scroll scrollbar-hidden">
+              <table className="w-full min-w-[36rem] text-[13px]">
+                <thead className="sticky top-0 z-10 text-left text-xs">
                   <tr>
-                    <th className="px-3 py-2 font-medium">รหัสนักเรียน</th>
-                    <th className="px-3 py-2 font-medium">รายชื่อ</th>
-                    <th className="px-3 py-2 text-right font-medium">เก็บ</th>
-                    <th className="px-3 py-2 text-right font-medium">สอบ</th>
-                    <th className="px-3 py-2 text-right font-medium">รวม</th>
-                    <th className="px-3 py-2 text-center font-medium">เกรด</th>
+                    <th className="px-4 py-3">รหัสนักเรียน</th>
+                    <th className="px-4 py-3">รายชื่อ</th>
+                    <th className="px-4 py-3 text-right">เก็บ</th>
+                    <th className="px-4 py-3 text-right">สอบ</th>
+                    <th className="px-4 py-3 text-right">รวม</th>
+                    <th className="px-4 py-3 text-center">เกรด</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -603,28 +607,28 @@ function GradedPanel({
                     const total = collect.score + exam.score;
                     const status = statusByStudent.get(s.id);
                     return (
-                      <tr key={s.id} className="border-t border-border">
-                        <td className="px-3 py-2">{s.student_code}</td>
-                        <td className="px-3 py-2 font-medium">
+                      <tr key={s.id} className="h-14 border-t border-border first:border-t-0">
+                        <td className="px-4 py-0">{s.student_code}</td>
+                        <td className="px-4 py-0">
                           <button
                             type="button"
                             onClick={() => setAvatarStudent(s)}
-                            className="tappable flex items-center gap-2"
+                            className="tappable flex items-center gap-3"
                           >
-                            <Avatar name={`${s.first_name} ${s.last_name}`} src={s.profile ? avatarUrl(s.profile) : null} className="h-7 w-7 text-[10px]" />
+                            <Avatar name={`${s.first_name} ${s.last_name}`} src={s.profile ? avatarUrl(s.profile) : null} className="h-9 w-9 text-xs" />
                             {s.first_name} {s.last_name}
                           </button>
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="px-4 py-0 text-right">
                           {collect.score}
                           <span className="text-muted-foreground">/{collect.max}</span>
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="px-4 py-0 text-right">
                           {exam.score}
                           <span className="text-muted-foreground">/{exam.max}</span>
                         </td>
-                        <td className="px-3 py-2 text-right font-semibold">{total}</td>
-                        <td className="px-3 py-2 text-center">
+                        <td className="px-4 py-0 text-right font-semibold">{total}</td>
+                        <td className="px-4 py-0 text-center">
                           <button
                             type="button"
                             onClick={() => setStatusStudent(s)}
@@ -857,7 +861,7 @@ function AssignmentKindPanel({
   kind: ScoreItemKind;
   assignmentId: string;
   items: ScoreItem[];
-  roster: Student[];
+  roster: StudentListItem[];
   creating: boolean;
   onCreatingChange: (v: boolean) => void;
 }) {
@@ -865,14 +869,80 @@ function AssignmentKindPanel({
   const [gradingItem, setGradingItem] = useState<ScoreItem | null>(null);
   const title = kind === "exam" ? "การสอบ" : "ใบงาน";
   const posted = items.filter((i) => i.kind === kind && i.description);
+  const { data: exams } = useAssignmentExams(kind === "exam" ? assignmentId : null);
+  const [viewingExam, setViewingExam] = useState<ExamSession | null>(null);
+  // One list, newest first: teacher-posted items + online exam sessions of this room.
+  const entries = [
+    ...posted.map((i) => ({ at: i.created_at, item: i, exam: null as ExamSession | null })),
+    ...(exams?.sessions ?? []).map((e) => ({ at: e.opens_at ?? e.created_at, item: null as ScoreItem | null, exam: e })),
+  ].sort((a, b) => b.at.localeCompare(a.at));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {posted.length === 0 ? (
+      {entries.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState title={`ยังไม่มี${title}`} description={`กด "+ สร้าง${title}ใหม่" เพื่อเริ่มโพสต์`} />
         </div>
       ) : (
+        kind === "exam" ? (
+          <div className="table-panel flex-1 rounded-none border-t border-border shadow-none">
+            <div className="table-panel-scroll scrollbar-hidden">
+              <table className="w-full min-w-[36rem] text-[13px]">
+                <thead className="sticky top-0 z-10 text-left text-xs">
+                  <tr>
+                    <th className="px-4 py-3">วันที่และเวลา</th>
+                    <th className="px-4 py-3">ประเภทการสอบ</th>
+                    <th className="px-4 py-3">ครั้งที่</th>
+                    <th className="px-4 py-3">ประเภท</th>
+                    <th className="px-4 py-3">คะแนนเต็ม</th>
+                    <th className="px-4 py-3">ส่งแล้ว</th>
+                    <th className="px-4 py-3">นับเข้าเกรด</th>
+                    <th className="w-14 px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map(({ item, exam }) =>
+                    item ? (
+                      <tr key={item.id} onClick={() => setGradingItem(item)} className="h-14 cursor-pointer border-t border-border first:border-t-0">
+                        <td className="whitespace-nowrap px-4 py-2">{item.due_date ? fmtDate(item.due_date) : "—"}</td>
+                        <td className="px-4 py-0 font-medium">{item.label}</td>
+                        <td className="px-4 py-0 text-muted-foreground">—</td>
+                        <td className="px-4 py-0">{item.requires_submission ? "ส่งออนไลน์" : "บันทึกเอง"}</td>
+                        <td className="px-4 py-0 tabular-nums">{item.max_score}</td>
+                        <td className="px-4 py-0 text-muted-foreground">—</td>
+                        <td className="px-4 py-0">
+                          <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-medium text-success">นับ</span>
+                        </td>
+                        <td className="px-4 py-0 text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              del.mutate(item.id);
+                            }}
+                          >
+                            ลบ
+                          </Button>
+                        </td>
+                      </tr>
+                    ) : (
+                      <OnlineExamRow
+                        key={exam!.id}
+                        session={exam!}
+                        max={exams?.maxBySession.get(exam!.id) ?? 0}
+                        submitted={new Set((exams?.attempts ?? []).filter((a) => a.session_id === exam!.id && (a.is_manual || a.status === "submitted")).map((a) => a.student_id)).size}
+                        total={roster.length}
+                        onOpen={() => setViewingExam(exam!)}
+                      />
+                    ),
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
         <div className="table-panel flex-1">
           <div className="table-panel-scroll">
             <table className="w-full min-w-[26rem] text-xs">
@@ -885,23 +955,163 @@ function AssignmentKindPanel({
                 </tr>
               </thead>
               <tbody>
-                {posted.map((i) => (
-                  <AssignmentTableRow
-                    key={i.id}
-                    item={i}
-                    onDelete={() => del.mutate(i.id)}
-                    onGrade={() => setGradingItem(i)}
-                  />
+                {entries.map(({ item }) => (
+                  <AssignmentTableRow key={item!.id} item={item!} onDelete={() => del.mutate(item!.id)} onGrade={() => setGradingItem(item!)} />
                 ))}
               </tbody>
             </table>
           </div>
         </div>
+        )
       )}
 
       <AssignmentPostSheet kind={creating ? kind : null} assignmentId={assignmentId} onClose={() => onCreatingChange(false)} />
       <SubmissionsSheet item={gradingItem} roster={roster} onClose={() => setGradingItem(null)} />
+      <ExamResultsSheet
+        session={viewingExam}
+        roster={roster}
+        attempts={(exams?.attempts ?? []).filter((a) => a.session_id === viewingExam?.id)}
+        max={viewingExam ? (exams?.maxBySession.get(viewingExam.id) ?? 0) : 0}
+        onClose={() => setViewingExam(null)}
+      />
     </div>
+  );
+}
+
+const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+const fmtDate = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" }) : "—";
+
+function OnlineExamRow({ session, max, submitted, total, onOpen }: { session: ExamSession; max: number; submitted: number; total: number; onOpen: () => void }) {
+  return (
+    <tr onClick={onOpen} className="h-14 cursor-pointer border-t border-border first:border-t-0">
+      <td className="whitespace-nowrap px-4 py-2">
+        {session.opens_at ? (
+          <>
+            <div>{new Date(session.opens_at).toLocaleDateString("th-TH", { dateStyle: "medium" })}</div>
+            <div className="tabular-nums text-muted-foreground">
+              {fmtTime(session.opens_at)}–{fmtTime(session.closes_at!)} น.
+            </div>
+          </>
+        ) : (
+          <span className="text-muted-foreground">ยังไม่กำหนด</span>
+        )}
+      </td>
+      <td className="px-4 py-0">
+        {session.exam_type ? (
+          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", kindTone(session.exam_type))}>{session.exam_type}</span>
+        ) : (
+          <span className="text-muted-foreground">{session.title}</span>
+        )}
+      </td>
+      <td className="px-4 py-0">
+        {session.round ? (
+          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums", roundTone(session.round))}>{session.round}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </td>
+      <td className="px-4 py-0">
+        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">ออนไลน์</span>
+      </td>
+      <td className="px-4 py-0 tabular-nums">{max}</td>
+      <td className="px-4 py-0">
+        <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", submitted > 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive")}>
+          {submitted}/{total}
+        </span>
+      </td>
+      <td className="px-4 py-0">
+        {session.sync_to_gradebook ? (
+          <span className="rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-medium text-success">นับ</span>
+        ) : (
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground" title="เปิด “บันทึกคะแนนเข้าสมุดคะแนน” ที่หน้าสอบออนไลน์เพื่อนับเข้าเกรด">
+            ไม่นับ
+          </span>
+        )}
+      </td>
+      <td className="px-4 py-0" />
+    </tr>
+  );
+}
+
+/** Read-only: latest score per student of one online exam (same "latest wins" rule as the gradebook sync). Edit scores on the online-exam page. */
+function ExamResultsSheet({ session, roster, attempts, max, onClose }: { session: ExamSession | null; roster: StudentListItem[]; attempts: ExamAttempt[]; max: number; onClose: () => void }) {
+  const latest = new Map<string, ExamAttempt>();
+  for (const a of attempts) {
+    if (!a.is_manual && a.status !== "submitted") continue;
+    const cur = latest.get(a.student_id);
+    if (!cur || attemptScoreTime(a) > attemptScoreTime(cur)) latest.set(a.student_id, a);
+  }
+  const scores = roster.flatMap((s) => {
+    const v = latest.get(s.id)?.score;
+    return v == null ? [] : [Number(v)];
+  });
+  const top = scores.length ? Math.max(...scores) : null;
+  const stats = [
+    { label: "ส่งแล้ว", value: `${latest.size}/${roster.length}` },
+    { label: "เฉลี่ย", value: scores.length ? (scores.reduce((x, y) => x + y, 0) / scores.length).toFixed(1) : "—" },
+    { label: "สูงสุด", value: scores.length ? String(Math.max(...scores)) : "—" },
+    { label: "ต่ำสุด", value: scores.length ? String(Math.min(...scores)) : "—" },
+  ];
+  return (
+    <Sheet
+      open={session !== null}
+      onOpenChange={(o) => !o && onClose()}
+      title="คะแนนสอบออนไลน์"
+      description={session?.title}
+      headerEnd={
+        session && (
+          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", session.sync_to_gradebook ? "bg-success/15 text-success" : "bg-secondary text-muted-foreground")}>
+            {session.sync_to_gradebook ? "นับเข้าเกรด" : "ไม่นับเข้าเกรด"}
+          </span>
+        )
+      }
+    >
+      <dl className="grid grid-cols-4 divide-x divide-border rounded-xl bg-card">
+        {stats.map((x) => (
+          <div key={x.label} className="px-3 py-2.5">
+            <dt className="text-[11px] text-muted-foreground">{x.label}</dt>
+            <dd className="mt-0.5 text-xl font-semibold tabular-nums leading-6 tracking-tight">{x.value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <ul className="mt-3 divide-y divide-border overflow-hidden rounded-xl bg-card">
+        {roster.map((s) => {
+          const a = latest.get(s.id);
+          const score = a?.score == null ? null : Number(a.score);
+          const name = `${s.first_name} ${s.last_name}`;
+          return (
+            <li key={s.id} className="flex h-14 items-center gap-3 px-3">
+              <Avatar name={name} src={s.profile ? avatarUrl(s.profile) : null} className="h-9 w-9 text-xs" />
+              <div className="min-w-0 flex-1">
+                <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
+                  <span className="truncate">{name}</span>
+                  {top != null && score === top && (
+                    <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent">สูงสุด</span>
+                  )}
+                </p>
+                <p className="text-xs tabular-nums text-muted-foreground">{s.student_code}</p>
+              </div>
+              {score != null ? (
+                <div className="w-20 shrink-0 text-right">
+                  <p className="tabular-nums leading-5">
+                    <span className="text-base font-semibold">{score}</span>
+                    <span className="text-xs text-muted-foreground">/{max}</span>
+                  </p>
+                  <div className="mt-1 ml-auto h-1 w-full overflow-hidden rounded-full bg-secondary" aria-hidden>
+                    <div className="h-full rounded-full bg-accent" style={{ width: `${max > 0 ? Math.min(100, (score / max) * 100) : 0}%` }} />
+                  </div>
+                </div>
+              ) : (
+                <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{a ? "รอตรวจ" : "ยังไม่สอบ"}</span>
+              )}
+            </li>
+          );
+        })}
+        {roster.length === 0 && <li className="px-3 py-6 text-center text-xs text-muted-foreground">ไม่มีนักเรียน</li>}
+      </ul>
+    </Sheet>
   );
 }
 

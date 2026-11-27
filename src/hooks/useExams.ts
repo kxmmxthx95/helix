@@ -654,6 +654,37 @@ export function useSubmitAttempt() {
   });
 }
 
+// ------------------------------------------------------- gradebook: exams of one assignment
+
+/** Online exam sessions run for one subject × room (via its topic sets), with their attempts and full marks — read by the score-recording "การสอบ" tab. */
+export function useAssignmentExams(assignmentId: string | null) {
+  return useQuery({
+    queryKey: ["exam_sessions", "by_assignment", assignmentId],
+    enabled: !!assignmentId,
+    queryFn: async () => {
+      const { data: sets, error: e1 } = await supabase.from("exam_topic_sets").select("id").eq("teaching_assignment_id", assignmentId!);
+      if (e1) throw e1;
+      const setIds = sets.map((t) => t.id);
+      if (setIds.length === 0) return { sessions: [] as ExamSession[], attempts: [] as ExamAttempt[], maxBySession: new Map<string, number>() };
+      const { data: links, error: e2 } = await supabase.from("exam_session_sets").select("session_id").in("topic_set_id", setIds);
+      if (e2) throw e2;
+      const ids = [...new Set(links.map((l) => l.session_id))];
+      if (ids.length === 0) return { sessions: [] as ExamSession[], attempts: [] as ExamAttempt[], maxBySession: new Map<string, number>() };
+      const [sessions, attempts, questions] = await Promise.all([
+        supabase.from("exam_sessions").select("*").in("id", ids).order("created_at", { ascending: false }),
+        supabase.from("exam_attempts").select("*").in("session_id", ids),
+        supabase.from("exam_session_questions").select("session_id, points").in("session_id", ids),
+      ]);
+      if (sessions.error) throw sessions.error;
+      if (attempts.error) throw attempts.error;
+      if (questions.error) throw questions.error;
+      const maxBySession = new Map<string, number>();
+      for (const q of questions.data) maxBySession.set(q.session_id, (maxBySession.get(q.session_id) ?? 0) + Number(q.points));
+      return { sessions: sessions.data as ExamSession[], attempts: attempts.data as ExamAttempt[], maxBySession };
+    },
+  });
+}
+
 // ------------------------------------------------------------- teacher: grading view
 
 /** Every attempt on one session, for the teacher's results list. */
