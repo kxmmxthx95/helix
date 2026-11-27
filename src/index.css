@@ -172,6 +172,12 @@
   html {
     background-color: hsl(var(--shell));
   }
+  /* Phones have no floating frame: the strips by the status bar and home indicator take the page colour instead of the grey shell. */
+  @media (max-width: 1023px) {
+    html {
+      background-color: hsl(var(--background));
+    }
+  }
 
   body {
     @apply bg-background text-foreground antialiased;

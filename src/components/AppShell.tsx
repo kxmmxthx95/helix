@@ -741,7 +741,7 @@ function AppShellInner() {
         collapsed ? "lg:gap-0" : "lg:gap-2",
       )}
     >
-      <div className="absolute inset-0 z-0 bg-shell" aria-hidden />
+      <div className="absolute inset-0 z-0 bg-background lg:bg-shell" aria-hidden />
 
       {/* Desktop sidebar toggle — fixed at header slot (p-2 + px-3) whether expanded or collapsed */}
       <div className="pointer-events-none absolute left-3 top-4 z-20 hidden lg:block [@media(pointer:coarse)]:top-[calc(1rem+env(safe-area-inset-top,0px))]">
