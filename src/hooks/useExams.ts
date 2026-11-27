@@ -675,15 +675,17 @@ export function useVerifyExamCode() {
 }
 
 /**
- * Open + heartbeat for one attempt: only 'ok' means this browser session may answer. Polls every 30s while
- * ok, every 10s otherwise so a teacher approval lands quickly. A failed poll keeps the last status.
+ * Open + heartbeat for one attempt: only 'ok' means this browser session may answer. Polls about every 60s while
+ * ok (the server treats a holder as gone after 3 minutes, migration 0132, so there are still 3 pings of margin),
+ * every 15s otherwise so a teacher approval lands quickly. Each wait gets random jitter so hundreds of students who
+ * started together do not hit the database in the same second. A failed poll keeps the last status.
  */
 export function useClaimAttempt(attemptId: string | null) {
   return useQuery({
     queryKey: ["exam_claim", attemptId],
     enabled: !!attemptId,
     gcTime: 0,
-    refetchInterval: (q) => (q.state.data === "ok" ? 30_000 : 10_000),
+    refetchInterval: (q) => (q.state.data === "ok" ? 60_000 : 15_000) + Math.random() * 10_000,
     refetchIntervalInBackground: true, // a hidden tab must keep the heartbeat or the lock goes stale
     queryFn: async (): Promise<ExamClaimStatus> => {
       const { data, error } = await supabase.rpc("claim_exam_attempt", { p_attempt_id: attemptId! });
