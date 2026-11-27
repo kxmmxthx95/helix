@@ -8,7 +8,7 @@ import { dayKey, isLive, roomClashes } from "@/lib/examRooms";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { preloadQuestionPromptView, QuestionPromptView } from "@/components/editor/LazyQuestionPromptView";
-import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, LocationIcon, PrintIcon, Search, TimeIcon, PencilIcon, PeopleIcon, StarIcon, TrashIcon } from "@/components/icons";
+import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, ListIcon, LocationIcon, PrintIcon, Search, TimeIcon, PencilIcon, PeopleIcon, TrashIcon } from "@/components/icons";
 import { AnswerSheetCard } from "@/components/AnswerSheetCard";
 import { AnswerSheetScanCard } from "@/components/AnswerSheetScanCard";
 import { Collapse } from "@/components/Collapse";
@@ -689,67 +689,12 @@ function PrintScheduleSheet({ items, gradeLabel, roomLabel, onDone }: { items: S
   );
 }
 
-/** Seating chart of one exam room from the timetable (time itself is edited in the room detail). */
+/** Drawer of one exam room from the timetable: the same cards as the room page (time itself is edited here too). */
 function SeatingSheet({ session, onClose }: { session: ExamSession; onClose: () => void }) {
-  const { data: targetIds = [] } = useExamSessionTargets(session.id);
-  const { data: assignments = [] } = useMyTeachingAssignments(session.teacher_id);
-  const targets = assignments.filter((a) => targetIds.includes(a.id)).map((a) => ({ classroom_id: a.classroom_id, academic_year: a.academic_year }));
-  const { data: roster = [], isLoading } = useSessionRoster(targets);
-  const { data: names } = useStudentNames(roster.map((r) => r.student_id));
-  const { data: avatars } = useStudentAvatars(roster.map((r) => r.student_id));
-  const { data: rosterClassrooms = [] } = useClassroomsByIds([...new Set(roster.map((r) => r.classroom_id))]);
-  const { data: rosterGrades = [] } = useGradeLevelsByIds([...new Set(rosterClassrooms.map((c) => c.grade_level_id))]);
-  const classroomLabel = (classroomId: string) => {
-    const c = rosterClassrooms.find((x) => x.id === classroomId);
-    const g = rosterGrades.find((x) => x.id === c?.grade_level_id);
-    return c && g ? `${gradeShortLabel(g.code)}/${c.name}` : "";
-  };
-  const students = roster
-    .map((r) => {
-      const full = names?.get(r.student_id) ?? "นักเรียน";
-      const [code, ...rest] = full.split(" ");
-      return { student_id: r.student_id, name: rest.length > 0 ? rest.join(" ") : full, code: rest.length > 0 ? code! : "", avatar: avatars?.get(r.student_id) ?? null, classroom: classroomLabel(r.classroom_id) };
-    })
-    .sort((a, b) => a.code.localeCompare(b.code, "th") || a.name.localeCompare(b.name, "th"));
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()} title="รายละเอียด" description={session.title}>
-      <div className="space-y-3">
-        <ScheduleCard session={session} defaultOpen />
-        <PrintExamCard session={session} />
-        {isLoading ? <PageSpinner /> : <ExamSeatingCard defaultOpen session={session} roomPicker={(room, usedRoomIds) => <ExamRoomField session={session} room={room} usedRoomIds={usedRoomIds} />} students={students} />}
-      </div>
+      <SessionDetail session={session} onBack={onClose} embedded />
     </Sheet>
-  );
-}
-
-/** Print card in the seating drawer: student copy and answer key of the room's questions (the same A4 sheet as the question list). */
-function PrintExamCard({ session }: { session: ExamSession }) {
-  const [open, setOpen] = useState(false);
-  const [printing, setPrinting] = useState<"student" | "key" | null>(null);
-  const { data: sessionQuestions = [] } = useExamSessionQuestions(session.id);
-  const { data: roomSets } = useSessionSets([session.id]);
-  const subjectIds = (roomSets?.get(session.id) ?? []).map((x) => x.subject_id);
-  const { data: bank = [], isLoading } = useExamQuestionsOf(open || printing ? (subjectIds.length > 0 ? subjectIds : [session.subject_id]) : []);
-  const { data: subjects = [] } = useSubjectsByIds(printing ? subjectIds : []);
-  const byId = new Map(bank.map((q) => [q.id, q]));
-  const chosen = sessionQuestions.map((r) => byId.get(r.question_id)).filter((q): q is ExamQuestionWithChoices => !!q);
-  return (
-    <div className="shrink-0 overflow-hidden rounded-xl border border-border bg-card">
-      <DetailRow icon={PrintIcon} tone="content" title="พิมพ์ข้อสอบ" open={open} onClick={() => setOpen((v) => !v)} summary={`${sessionQuestions.length} ข้อ`} />
-      <Collapse open={open}>
-        <div className="flex flex-wrap gap-2 border-t border-border bg-card p-3">
-          {sessionQuestions.length === 0 ? (
-            <p className="text-xs text-muted-foreground">ยังไม่มีข้อสอบในห้องนี้</p>
-          ) : (
-            <>
-              <Button size="sm" variant="secondary" disabled={isLoading} onClick={() => setPrinting("student")}><PrintIcon className="mr-1 h-4 w-4" />ดูตัวอย่าง/พิมพ์ฉบับนักเรียน</Button>
-              <Button size="sm" variant="secondary" disabled={isLoading} onClick={() => setPrinting("key")}><PrintIcon className="mr-1 h-4 w-4" />ดูตัวอย่าง/พิมพ์ฉบับเฉลย</Button>
-            </>
-          )}
-        </div>
-      </Collapse>
-      {printing && <PrintExamSheet session={session} questions={chosen} subjects={subjects} withKey={printing === "key"} onDone={() => setPrinting(null)} />}
-    </div>
   );
 }
 
@@ -1253,7 +1198,8 @@ function CreateSessionSheet({
   );
 }
 
-function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () => void }) {
+/** `embedded`: inside a drawer — no page chrome (back/title toolbar, full-height fill), just the status strip and cards. */
+function SessionDetail({ session, onBack, embedded = false }: { session: ExamSession; onBack: () => void; embedded?: boolean }) {
   const { data: attempts = [], isLoading } = useSessionAttempts(session.id);
   const { data: targetIds = [], isLoading: targetsLoading } = useExamSessionTargets(session.id);
   const { data: sessionQuestions = [], isLoading: questionsLoading } = useExamSessionQuestions(session.id);
@@ -1361,7 +1307,8 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         : { label: "ปิดสอบแล้ว", dot: "bg-muted-foreground" };
 
   return (
-    <div className="page-fill gap-3 pt-1">
+    <div className={embedded ? "flex flex-col gap-3" : "page-fill gap-3 pt-1"}>
+      {!embedded && (
       <div className="toolbar shrink-0">
         <Button size="icon" variant="outline" className={ICON_BTN} onClick={onBack} aria-label="ย้อนกลับ">
           <ChevronBack className={ICON} />
@@ -1386,32 +1333,43 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
           </Button>
         )}
       </div>
+      )}
 
       {!ready ? (
         <PageSpinner />
       ) : (
         <>
-      <div className="flex min-h-11 shrink-0 items-center gap-3 rounded-lg border border-border bg-muted/60 px-3 py-2 text-xs">
-        <span className="flex items-center gap-2"><LayersIcon className="h-3.5 w-3.5 text-muted-foreground" />{roomCountLabel} ห้องเรียน</span>
-        <span className="h-5 w-px bg-border" aria-hidden />
-        <span className="flex items-center gap-2"><DocumentTextIcon className="h-3.5 w-3.5 text-muted-foreground" />{sessionQuestions.length} ข้อ</span>
-        <span className="h-5 w-px bg-border" aria-hidden />
-        <span className="flex items-center gap-2"><StarIcon className="h-3.5 w-3.5 text-muted-foreground" />เต็ม {maxPoints} คะแนน</span>
-        <span className="ml-auto flex items-center gap-3">
-          {canEnable && (
-            <Switch
-              size="xs"
-              label="เปิดห้องสอบ"
-              checked={session.is_enabled}
-              disabled={updateSession.isPending}
-              onChange={(on) => updateSession.mutate({ id: session.id, is_enabled: on }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
-            />
-          )}
-          <span className="flex items-center gap-1.5 rounded-full bg-card px-2.5 py-0.5 text-[11px] font-medium">
-            <span className={cn("h-1.5 w-1.5 rounded-full", status.dot)} />
+      <div className="shrink-0 overflow-hidden rounded-xl border border-border bg-card">
+        <div className="flex min-h-12 items-center justify-between gap-3 px-3.5 py-2">
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            <span className={cn("size-2 rounded-full", status.dot)} />
             {status.label}
           </span>
-        </span>
+          {canEnable && (
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span aria-hidden>เปิดห้องสอบ</span>
+              <Switch
+                size="xs"
+                label="เปิดห้องสอบ"
+                checked={session.is_enabled}
+                disabled={updateSession.isPending}
+                onChange={(on) => updateSession.mutate({ id: session.id, is_enabled: on }, { onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
+              />
+            </span>
+          )}
+        </div>
+        <dl className="grid grid-cols-3 divide-x divide-border border-t border-border bg-muted/40">
+          {[
+            [roomCountLabel, "ห้องเรียน"],
+            [sessionQuestions.length, "ข้อ"],
+            [maxPoints, "คะแนนเต็ม"],
+          ].map(([value, label]) => (
+            <div key={label} className="px-3.5 py-2.5">
+              <dd className="text-lg font-semibold leading-6 tabular-nums">{value}</dd>
+              <dt className="text-xs text-muted-foreground">{label}</dt>
+            </div>
+          ))}
+        </dl>
       </div>
 
       <DetailGroup label="ผู้เข้าสอบ">
@@ -1484,10 +1442,10 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
             {shownRoster.length === 0 ? (
               <p className="border-t border-border bg-card px-3 py-6 text-center text-xs text-muted-foreground">ไม่มีนักเรียนในสถานะนี้</p>
             ) : (
-              <ul className="grid max-h-[60vh] gap-2 overflow-y-auto border-t border-border bg-muted/40 p-2 sm:grid-cols-2 xl:grid-cols-3">
+              <ul className="scrollbar-hidden max-h-[60vh] divide-y divide-border overflow-y-auto border-t border-border bg-card">
                 {shownRoster.map((r) => (
-                  <li key={r.student_id} className="flex flex-col rounded-xl border border-border bg-card p-3">
-                    <div className="flex items-start gap-3">
+                  <li key={r.student_id} className="px-3 py-2.5">
+                    <div className="flex items-center gap-3">
                       <Avatar
                         name={r.name}
                         src={rosterAvatars?.get(r.student_id) ?? null}
@@ -1497,21 +1455,22 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
                         <p className="truncate text-sm font-semibold leading-5">{r.name}</p>
                         <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                           {r.code && <span className="tabular-nums">{r.code}</span>}
-                          {r.room !== "—" && <span className={cn("rounded-full px-1.5 py-px text-[10px] font-semibold", levelTone(r.room))}>{r.room}</span>}
+                          {r.room !== "—" && <span className={cn("rounded-full px-1.5 py-px text-[11px] font-semibold", levelTone(r.room))}>{r.room}</span>}
                         </p>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <p className={cn("text-base tabular-nums leading-5", r.best != null ? "font-semibold text-foreground" : "text-muted-foreground")}>{r.best != null ? r.best : "—"}</p>
-                        <p className="text-[10px] tabular-nums text-muted-foreground">/{maxPoints}</p>
-                      </div>
+                      <p className="shrink-0 whitespace-nowrap text-right tabular-nums">
+                        <span className={cn("text-base leading-5", r.best != null ? "font-semibold text-foreground" : "text-muted-foreground")}>{r.best != null ? r.best : "—"}</span>
+                        <span className="text-xs text-muted-foreground">/{maxPoints}</span>
+                      </p>
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2.5">
-                      <span className={cn("flex items-center gap-1.5 text-[11px] font-medium", STATUS_CLASS[r.status])}>
+                    {/* Indented under the name so status and actions line up with the text, not the avatar. */}
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pl-[3.25rem]">
+                      <span className={cn("flex flex-wrap items-center gap-1.5 text-xs font-medium", STATUS_CLASS[r.status])}>
                         <span className={cn("size-1.5 rounded-full", STATUS_DOT[r.status])} />
                         {STATUS_LABEL[r.status]}
-                        {r.isManual && <span title={r.manual?.manual_note ?? undefined} className="ml-1 rounded-full bg-warning/15 px-1.5 py-px text-[10px] font-semibold text-warning">{r.isScan ? "สแกนแล้ว" : "ครูกรอก"}</span>}
+                        {r.isManual && <span title={r.manual?.manual_note ?? undefined} className="rounded-full bg-warning/15 px-1.5 py-px text-[11px] font-semibold text-warning">{r.isScan ? "สแกนแล้ว" : "ครูกรอก"}</span>}
                         {r.leaves > 0 && (
-                          <span title="ตรวจพบการสลับแอปหรือหน้าจอระหว่างสอบ เป็นสัญญาณให้ตรวจดู ไม่ใช่หลักฐานว่าทุจริต" className="ml-1 rounded-full bg-warning/15 px-1.5 py-px text-[10px] font-semibold tabular-nums text-warning">
+                          <span title="ตรวจพบการสลับแอปหรือหน้าจอระหว่างสอบ เป็นสัญญาณให้ตรวจดู ไม่ใช่หลักฐานว่าทุจริต" className="rounded-full bg-warning/15 px-1.5 py-px text-[11px] font-semibold tabular-nums text-warning">
                             ออกจากหน้าสอบ {r.leaves} ครั้ง
                           </span>
                         )}

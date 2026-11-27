@@ -96,8 +96,9 @@ export const canUsePos = (roles: Role[]) => isOrgWide(roles) || roles.includes("
 /** sessionStorage flag: a signed-in account without POS access was bounced to /pos-login. */
 export const POS_DENIED_KEY = "helix.posDenied";
 
-/** Name without its title (นาย / นางสาว / เด็กชาย …) for compact displays such as seat cells. */
+/** Name without its title (นาย / นางสาว / เด็กชาย …) for compact displays such as seat cells. The title may be glued to the first name ("เด็กหญิงปิยฉัตร"); longest title first so "นางสาว" is not cut as "นาง". */
+const TITLES_LONGEST_FIRST = [...new Set([...STUDENT_PREFIXES, ...PREFIXES])].sort((a, b) => b.length - a.length);
 export const stripTitle = (name: string) => {
-  for (const p of [...STUDENT_PREFIXES, ...PREFIXES]) if (name.startsWith(p + " ")) return name.slice(p.length + 1);
-  return name;
+  const p = TITLES_LONGEST_FIRST.find((t) => name.startsWith(t) && name.length > t.length);
+  return p ? name.slice(p.length).trimStart() : name;
 };

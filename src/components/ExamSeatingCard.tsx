@@ -322,10 +322,10 @@ export function ExamSeatingCard({
               </Button>
             </div>
             {/* Front of the room: the top row of the grid is the one nearest the board. */}
-            <div aria-hidden className="mx-auto w-1/2 min-w-32 rounded-full bg-muted py-1 text-center text-[11px] font-medium tracking-wide text-muted-foreground">หน้าห้อง</div>
-            <div className="-mx-1 overflow-x-auto px-1 py-1">
+            <div aria-hidden className="flex items-center gap-3 text-[11px] font-medium tracking-wide text-muted-foreground"><span className="h-px flex-1 bg-border" />หน้าห้อง<span className="h-px flex-1 bg-border" /></div>
+            <div className="scrollbar-hidden -mx-1 overflow-x-auto px-1 py-1">
               <div
-                className="grid grid-cols-[repeat(var(--cols),minmax(4.75rem,1fr))] gap-1.5 sm:grid-cols-[repeat(var(--cols),minmax(6.5rem,1fr))]"
+                className="grid grid-cols-[repeat(var(--cols),minmax(6.75rem,1fr))] gap-2"
                 style={{ "--cols": cols } as React.CSSProperties}
               >
                 {Array.from({ length: rows * cols }, (_, i) => {
@@ -349,8 +349,8 @@ export function ExamSeatingCard({
                       }
                       onClick={() => tapSeat(r.id, row, col)}
                       className={cn(
-                        "relative flex min-h-[4.75rem] min-w-0 flex-col gap-1 rounded-lg border p-2 text-left text-[11px] leading-tight sm:h-14 sm:min-h-0 sm:flex-row sm:items-center sm:gap-2 sm:px-2 sm:py-0",
-                        !st && "items-center justify-center sm:justify-start",
+                        "relative flex min-h-[6.25rem] min-w-0 flex-col gap-2 rounded-xl border p-2.5 text-left text-xs leading-snug",
+                        !st && "items-center justify-center",
                         other && !x ? "border-border bg-muted/60 text-muted-foreground [background-image:repeating-linear-gradient(135deg,transparent_0_6px,hsl(var(--border))_6px_7px)]" : st ? "border-border bg-card" : "border-dashed border-border text-muted-foreground",
                         other && x && "border-destructive ring-1 ring-destructive",
                         isPicked && "ring-2 ring-primary",
@@ -363,12 +363,12 @@ export function ExamSeatingCard({
                         </span>
                       ) : st ? (
                         <>
-                          <span className="flex items-start justify-between gap-1 sm:contents">
-                            <Avatar name={st.name} src={st.avatar} className="h-7 w-7 shrink-0" />
-                            <span className={cn("rounded-full px-1.5 py-px text-[10px] font-semibold tabular-nums sm:absolute sm:right-1 sm:top-1", COL_TONES[(col - 1) % COL_TONES.length])}>{seatLabel(row, col)}</span>
+                          <span className="flex items-center justify-between gap-1.5">
+                            <Avatar name={st.name} src={st.avatar} className="h-9 w-9 shrink-0 text-xs" />
+                            <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", COL_TONES[(col - 1) % COL_TONES.length])}>{seatLabel(row, col)}</span>
                           </span>
-                          <span className="min-w-0 sm:flex-1 sm:pr-6">
-                            <span className="line-clamp-2 font-medium text-foreground sm:line-clamp-1">{stripTitle(st.name)}</span>
+                          <span className="min-w-0">
+                            <span className="line-clamp-2 text-[13px] font-medium leading-4 text-foreground">{stripTitle(st.name)}</span>
                             <span className="block truncate tabular-nums text-muted-foreground">{st.code}</span>
                           </span>
                         </>
@@ -412,8 +412,8 @@ export function ExamSeatingCard({
                 </Button>
               </div>
               {roomSpecials.length > 0 && (
-                <div className="-mx-1 overflow-x-auto px-1 py-1">
-                  <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.max(cols, 1)}, minmax(6.5rem, 1fr))` }}>
+                <div>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
                     {roomSpecials.map((x) => {
                       const st = x.student_id ? byId.get(x.student_id) : undefined;
                       const isPicked = picked?.kind === "special" && picked.id === x.id;
