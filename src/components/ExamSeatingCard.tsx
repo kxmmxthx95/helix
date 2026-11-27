@@ -487,7 +487,7 @@ export function ExamSeatingCard({
         alert={!anyGrid || !(students.length > 0 && placed >= students.length)}
         summary={anyGrid ? `จัดแล้ว ${placed}/${students.length} · ${rooms.length > 1 ? `${rooms.length} ห้อง` : `ผัง ${first?.seat_cols}×${first?.seat_rows}`}` : "ยังไม่ได้เลือก template"}
       />
-      <Collapse open={open}>
+      <Collapse lazy open={open}>
         <div className="space-y-3 border-t border-border bg-card p-3">
           {noTime && (
             <p role="alert" className="rounded-xl bg-[hsl(var(--warning)/0.12)] px-3 py-2 text-xs text-warning">

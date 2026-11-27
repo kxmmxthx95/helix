@@ -12,7 +12,7 @@ import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, Ch
 import { AnswerSheetCard } from "@/components/AnswerSheetCard";
 import { AnswerSheetScanCard } from "@/components/AnswerSheetScanCard";
 import { Collapse } from "@/components/Collapse";
-import { DetailAddRow, DetailGroup, DetailRow } from "@/components/DetailRow";
+import { DetailAddRow, DetailGroup, DetailRow, TONE } from "@/components/DetailRow";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { COL_TONES, ExamSeatingCard, seatLabel } from "@/components/ExamSeatingCard";
 import { useMyExamSeats, useSeatTemplates, useSessionRoomIds, useSessionRooms, useSessionSeats, useSeatingStatus, useSessionsWithSeating, useSetRoomPhysical, useSpecialSeats } from "@/hooks/useExamSeating";
@@ -1397,7 +1397,7 @@ function SessionDetail({ session, onBack, embedded = false }: { session: ExamSes
               </>
             }
           />
-          <Collapse open={rosterOpen}>
+          <Collapse lazy open={rosterOpen}>
             {retakeable.length > 0 && (
               <div className="flex justify-end border-t border-border bg-muted/40 p-2">
                 <Button variant="outline" className="ui-control-compact h-7 sm:h-8" onClick={() => setRetakeIds(retakeable.map((r) => r.student_id))}>
@@ -1512,8 +1512,17 @@ function SessionDetail({ session, onBack, embedded = false }: { session: ExamSes
 
       <DetailGroup label="เนื้อหาข้อสอบ">
       <SessionTopicsCard session={session} />
-      <SessionQuestionList session={session} sessionQuestions={sessionQuestions} />
-      <PracticeQuestionsCards session={session} />
+      {embedded ? (
+        <>
+          <QuestionPrintCard session={session} questions={sessionQuestions} title="พิมพ์ข้อสอบ" />
+          <PracticePrintCard session={session} />
+        </>
+      ) : (
+        <>
+          <SessionQuestionList session={session} sessionQuestions={sessionQuestions} />
+          <PracticeQuestionsCards session={session} />
+        </>
+      )}
       </DetailGroup>
 
       <DetailGroup label="กระดาษคำตอบ">
@@ -2051,6 +2060,42 @@ function SessionQuestionList({ session, sessionQuestions, practice }: { session:
 }
 
 /** แนวข้อสอบ: practice questions students can try from their exam card (not graded, not stored). */
+/** Print-only card of a question set (drawer): student copy and answer key, none of the editing UI. */
+function QuestionPrintCard({ session, questions, title }: { session: ExamSession; questions: { question_id: string }[]; title: string }) {
+  const [warm, setWarm] = useState(false); // fetch the bank on hover/focus so a click opens the preview straight away
+  const [printing, setPrinting] = useState<"student" | "key" | null>(null);
+  const { data: roomSets } = useSessionSets(warm || printing ? [session.id] : []);
+  const subjectIds = (roomSets?.get(session.id) ?? []).map((x) => x.subject_id);
+  const { data: bank = [], isLoading } = useExamQuestionsOf(warm || printing ? (subjectIds.length > 0 ? subjectIds : [session.subject_id]) : []);
+  const { data: subjects = [] } = useSubjectsByIds(printing ? subjectIds : []);
+  const byId = new Map(bank.map((q) => [q.id, q]));
+  const chosen = questions.map((r) => byId.get(r.question_id)).filter((q): q is ExamQuestionWithChoices => !!q);
+  const empty = questions.length === 0;
+  return (
+    <div className="shrink-0 rounded-xl border border-border bg-card p-3.5" onPointerEnter={() => setWarm(true)} onFocus={() => setWarm(true)}>
+      <div className="flex items-center gap-3">
+        <GlyphTile icon={PrintIcon} tone={TONE.content} className="size-9" iconSize={18} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold leading-5">{title}</p>
+          <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">{empty ? "ยังไม่มีข้อสอบในห้องนี้" : `${questions.length} ข้อ`}</p>
+        </div>
+      </div>
+      {!empty && (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Button size="sm" variant="secondary" disabled={isLoading} onClick={() => setPrinting("student")}><PrintIcon className="mr-1 h-4 w-4" />ฉบับนักเรียน</Button>
+          <Button size="sm" variant="secondary" disabled={isLoading} onClick={() => setPrinting("key")}><PrintIcon className="mr-1 h-4 w-4" />ฉบับเฉลย</Button>
+        </div>
+      )}
+      {printing && <PrintExamSheet session={session} questions={chosen} subjects={subjects} withKey={printing === "key"} onDone={() => setPrinting(null)} />}
+    </div>
+  );
+}
+
+function PracticePrintCard({ session }: { session: ExamSession }) {
+  const { data: practiceQuestions = [] } = usePracticeQuestions(session.id);
+  return practiceQuestions.length > 0 ? <QuestionPrintCard session={session} questions={practiceQuestions} title="พิมพ์แนวข้อสอบ" /> : null;
+}
+
 function PracticeQuestionsCards({ session }: { session: ExamSession }) {
   const { data: practiceQuestions = [] } = usePracticeQuestions(session.id);
   return <SessionQuestionList session={session} sessionQuestions={practiceQuestions} practice />;

@@ -3,7 +3,7 @@ import { GlyphTile } from "@/components/IconTile";
 import { cn } from "@/lib/utils";
 
 /** One hue per group of rows, so a long list of collapsible cards reads as a few distinct sections. */
-const TONE = {
+export const TONE = {
   people: "bg-gradient-to-b from-green-400 to-green-600",
   setup: "bg-gradient-to-b from-orange-400 to-orange-600",
   content: "bg-gradient-to-b from-indigo-400 to-indigo-600",
