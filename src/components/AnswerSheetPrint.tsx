@@ -9,9 +9,9 @@ import { examLabel } from "@/lib/examKinds";
 /** One sheet: a student, or `null` fields for a spare sheet filled in by hand. */
 export type SheetStudent = { id: string | null; name: string; code: string; classroom: string; seat: string | null };
 
-const QR_X = 160;
-const QR_Y = 14;
-const QR_SIZE = 32;
+const QR_X = SHEET.qrX;
+const QR_Y = SHEET.qrY;
+const QR_SIZE = SHEET.qrSize;
 
 /** QR as one path of module squares, in sheet millimetres. */
 function qrPath(text: string): string {

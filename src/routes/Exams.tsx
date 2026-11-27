@@ -10,6 +10,7 @@ import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
 import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, LocationIcon, PrintIcon, Search, TimeIcon, PencilIcon, PeopleIcon, StarIcon, TrashIcon } from "@/components/icons";
 import { AnswerSheetCard } from "@/components/AnswerSheetCard";
+import { AnswerSheetScanCard } from "@/components/AnswerSheetScanCard";
 import { Collapse } from "@/components/Collapse";
 import { DetailAddRow, DetailGroup, DetailRow } from "@/components/DetailRow";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -1543,6 +1544,12 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
           session={session}
           roster={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "", room: r.room }))}
           questionIds={sessionQuestions.map((q) => q.question_id)}
+          subjects={subjectList}
+        />
+        <AnswerSheetScanCard
+          session={session}
+          roster={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "", room: r.room }))}
+          sessionQuestions={sessionQuestions}
           subjects={subjectList}
         />
       </DetailGroup>

@@ -16,6 +16,10 @@ export const SHEET = {
   gridTop: 94,
   headerH: 7,
   gridBottom: 262,
+  /** QR code box (the sheet identifier), top right. */
+  qrX: 160,
+  qrY: 14,
+  qrSize: 32,
   columns: 3,
   maxRowsPerColumn: 20,
   minRowsPerColumn: 5,

@@ -6,10 +6,9 @@ import { seatLabel } from "@/components/ExamSeatingCard";
 import { CheckmarkCircleIcon } from "@/components/icons";
 import { Button, Input } from "@/components/ui";
 import { useAuth } from "@/auth/AuthProvider";
-import { useExamQuestionsOf } from "@/hooks/useExamBank";
+import { useAnswerSheetData } from "@/hooks/useAnswerSheetData";
 import { useSessionRooms, useSessionSeats } from "@/hooks/useExamSeating";
 import { useRooms } from "@/hooks/useSchedule";
-import { sheetProblems, sheetRows } from "@/lib/answerSheet";
 import type { ExamSession, Subject } from "@/lib/database.types";
 import { cn } from "@/lib/utils";
 
@@ -33,17 +32,11 @@ export function AnswerSheetCard({
   const [spares, setSpares] = useState("2");
   const [picked, setPicked] = useState<Set<string> | null>(null); // null = everyone
   const { profile } = useAuth();
-  const { data: bank = [], isLoading } = useExamQuestionsOf(open || printing ? [...new Set(subjects.map((s) => s.id))] : []);
+  const subjectIds = useMemo(() => subjects.map((x) => x.id), [subjects]);
+  const { rows, manualNumbers, loaded, problems } = useAnswerSheetData(questionIds, subjectIds, open || printing);
   const { data: seats = [] } = useSessionSeats(open || printing ? session.id : null);
   const { data: sessionRooms = [] } = useSessionRooms(open || printing ? session.id : null);
   const { data: venues = [] } = useRooms(profile?.department_id ?? null);
-
-  const byId = useMemo(() => new Map(bank.map((q) => [q.id, q])), [bank]);
-  const ordered = useMemo(() => questionIds.map((id) => byId.get(id)).filter((q): q is NonNullable<typeof q> => !!q), [questionIds, byId]);
-  const rows = useMemo(() => sheetRows(ordered), [ordered]);
-  const manualNumbers = ordered.flatMap((q, i) => (q.question_type === "short_answer" ? [i + 1] : []));
-  const loaded = !isLoading && ordered.length === questionIds.length;
-  const problems = loaded ? sheetProblems(rows) : [];
 
   const seatOf = useMemo(() => {
     const venueOfRoom = new Map(sessionRooms.map((r) => [r.id, venues.find((v) => v.id === r.room_id)?.name ?? null]));

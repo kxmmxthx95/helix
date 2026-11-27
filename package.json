@@ -26,6 +26,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^11.15.0",
     "jsbarcode": "^3.12.3",
+    "jsqr": "^1.4.0",
     "mathlive": "^0.110.0",
     "motion": "^12.43.0",
     "pdfmake": "^0.3.11",
