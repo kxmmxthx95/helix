@@ -1319,6 +1319,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         best,
         manual,
         isManual: !!latest?.is_manual,
+        isScan: !!latest?.is_scan,
       };
     })
     .sort((a, b) => a.room.localeCompare(b.room, "th") || a.full.localeCompare(b.full, "th"));
@@ -1491,7 +1492,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
                       <span className={cn("flex items-center gap-1.5 text-[11px] font-medium", STATUS_CLASS[r.status])}>
                         <span className={cn("size-1.5 rounded-full", STATUS_DOT[r.status])} />
                         {STATUS_LABEL[r.status]}
-                        {r.isManual && <span title={r.manual?.manual_note ?? undefined} className="ml-1 rounded-full bg-warning/15 px-1.5 py-px text-[10px] font-semibold text-warning">ครูกรอก</span>}
+                        {r.isManual && <span title={r.manual?.manual_note ?? undefined} className="ml-1 rounded-full bg-warning/15 px-1.5 py-px text-[10px] font-semibold text-warning">{r.isScan ? "สแกนแล้ว" : "ครูกรอก"}</span>}
                         {r.leaves > 0 && (
                           <span title="ตรวจพบการสลับแอปหรือหน้าจอระหว่างสอบ เป็นสัญญาณให้ตรวจดู ไม่ใช่หลักฐานว่าทุจริต" className="ml-1 rounded-full bg-warning/15 px-1.5 py-px text-[10px] font-semibold tabular-nums text-warning">
                             ออกจากหน้าสอบ {r.leaves} ครั้ง
@@ -1549,6 +1550,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         <AnswerSheetScanCard
           session={session}
           roster={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "", room: r.room }))}
+          attempts={attempts}
           sessionQuestions={sessionQuestions}
           subjects={subjectList}
         />
@@ -3294,7 +3296,7 @@ function ExamReview({
               x.id === attempt.id ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70",
             )}
           >
-            {x.is_manual ? "ครูกรอก" : `ครั้งที่ ${x.attempt_no}`}
+            {x.is_scan ? "สแกนกระดาษ" : x.is_manual ? "ครูกรอก" : `ครั้งที่ ${x.attempt_no}`}
           </button>
         ))}
       </div>
@@ -3310,8 +3312,8 @@ function ExamReview({
         <Card className="space-y-2 p-6 text-center shadow-float">
           <p className="text-xs text-muted-foreground">คะแนนที่ได้</p>
           <p className="font-heading text-4xl font-bold tabular-nums">{scoreLabel}</p>
-          <p className="text-xs font-semibold text-warning">ครูกรอกคะแนน</p>
-          {attempt.manual_note && <p className="text-xs text-muted-foreground">เหตุผล: {attempt.manual_note}</p>}
+          <p className="text-xs font-semibold text-warning">{attempt.is_scan ? "ตรวจจากกระดาษคำตอบ" : "ครูกรอกคะแนน"}</p>
+          {attempt.manual_note && !attempt.is_scan && <p className="text-xs text-muted-foreground">เหตุผล: {attempt.manual_note}</p>}
         </Card>
         <Button className="w-full" onClick={onExit}>
           กลับหน้าสอบ

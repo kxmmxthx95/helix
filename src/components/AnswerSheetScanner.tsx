@@ -9,8 +9,9 @@ import type { RawImage } from "@/lib/omr/image";
 import type { ReadAnswer, SheetCodeInfo } from "@/lib/omr/readSheet";
 import { cn } from "@/lib/utils";
 
-/** A confirmed scan. Phase 2 keeps these on the page only; they are not sent to the server yet. */
-export type ScanRecord = { studentId: string; answers: Record<number, number | null>; score: number; max: number; at: number };
+/** The score a student already has in this room (latest write wins), so a save can warn before replacing it. */
+export type ExistingScore = { score: number | null; kind: "scan" | "manual" | "online"; label: string; /** teacher's short-answer points of the earlier scan */ extra: number | null };
+export type SaveStatus = "synced" | "off" | "not_synced";
 
 type Review = {
   url: string;
@@ -87,7 +88,11 @@ export default function AnswerSheetScanner({
   ordered,
   pointsOf,
   roster,
-  scans,
+  existing,
+  scannedCount,
+  totalMax,
+  extraMax,
+  manualNumbers,
   onSave,
   onClose,
   initialImage,
@@ -97,8 +102,16 @@ export default function AnswerSheetScanner({
   ordered: ExamQuestionWithChoices[];
   pointsOf: Map<string, number>;
   roster: SheetRosterStudent[];
-  scans: Map<string, ScanRecord>;
-  onSave: (r: ScanRecord) => void;
+  existing: Map<string, ExistingScore>;
+  scannedCount: number;
+  /** Full marks of the room, short-answer questions included. */
+  totalMax: number;
+  /** Points of the short-answer questions together (the most the teacher can add). */
+  extraMax: number;
+  /** Printed numbers of the short-answer questions. */
+  manualNumbers: number[];
+  /** Saves one sheet on the server; rejects with a message to show. */
+  onSave: (v: { studentId: string; answers: Record<number, number | null>; extra: number }) => Promise<SaveStatus>;
   onClose: () => void;
   /** Reads this photo right away (skips the camera): used by tests and screenshots. */
   initialImage?: RawImage;
@@ -109,6 +122,11 @@ export default function AnswerSheetScanner({
   const [camError, setCamError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [changing, setChanging] = useState(false);
+  const [extra, setExtra] = useState("0");
+  const [confirmReplace, setConfirmReplace] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastSaved, setLastSaved] = useState<{ text: string; warn: boolean } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const layout = useMemo(() => answerSheetLayout(rows), [rows]);
   const fp = useMemo(() => sheetFingerprint(rows), [rows]);
@@ -174,6 +192,9 @@ export default function AnswerSheetScanner({
       });
       setShowAll(false);
       setChanging(false);
+      setConfirmReplace(false);
+      setSaveError(null);
+      setExtra("0");
       setPhase("review");
     } catch {
       setError("อ่านภาพไม่สำเร็จ ลองถ่ายใหม่");
@@ -211,36 +232,50 @@ export default function AnswerSheetScanner({
     setReview((r) => (r ? { ...r, answers: { ...r.answers, [number]: choice }, touched: new Set(r.touched).add(number) } : r));
 
   const score = useMemo(() => {
-    if (!review) return { got: 0, max: 0 };
+    if (!review) return { got: 0 };
     let got = 0;
-    let max = 0;
     for (const row of rows) {
       const q = ordered[row.number - 1];
       if (!q) continue;
-      const pts = pointsOf.get(q.id) ?? q.points;
-      max += pts;
       const correct = q.choices.findIndex((c) => c.is_correct);
-      if (correct >= 0 && review.answers[row.number] === correct) got += pts;
+      if (correct >= 0 && review.answers[row.number] === correct) got += pointsOf.get(q.id) ?? q.points;
     }
-    return { got, max };
+    return { got };
   }, [review, rows, ordered, pointsOf]);
 
   const student = review?.studentId ? rosterById.get(review.studentId) : null;
-  const canSave = !!review && !!student && pending.length === 0 && !blocking;
+  const prior = student ? existing.get(student.student_id) : undefined;
+  const extraNum = Number(extra);
+  const extraOk = extra.trim() !== "" && Number.isFinite(extraNum) && extraNum >= 0 && extraNum <= extraMax && Math.round(extraNum * 100) === extraNum * 100;
+  const needsConfirm = !!prior && prior.kind !== "scan";
+  const canSave = !!review && !!student && pending.length === 0 && !blocking && extraOk && (!needsConfirm || confirmReplace) && !saving;
   const choicesOf = (n: number) => rows.find((r) => r.number === n)?.choices ?? 0;
 
-  function save() {
+  async function save() {
     if (!review || !student) return;
-    onSave({ studentId: student.student_id, answers: review.answers, score: score.got, max: score.max, at: Date.now() });
-    setReview(null);
-    setPhase("capture");
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const status = await onSave({ studentId: student.student_id, answers: review.answers, extra: extraNum });
+      const total = score.got + extraNum;
+      setLastSaved({
+        text: `บันทึกแล้ว ${student.name} ได้ ${total}/${totalMax}${status === "not_synced" ? " (ยังไม่เข้าสมุดคะแนน เช่น ภาคเรียนถูกล็อก)" : ""}`,
+        warn: status === "not_synced",
+      });
+      setReview(null);
+      setPhase("capture");
+    } catch (e) {
+      setSaveError((e as { message?: string } | null)?.message || "บันทึกไม่สำเร็จ ลองใหม่");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return createPortal(
     <div className="fixed inset-0 z-[110] flex flex-col bg-background" style={{ pointerEvents: "auto" }}>
       <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
         <h2 className="font-heading min-w-0 flex-1 truncate text-base font-semibold">สแกนกระดาษคำตอบ</h2>
-        <span className="text-xs tabular-nums text-muted-foreground">สแกนแล้ว {scans.size}/{roster.length}</span>
+        <span className="text-xs tabular-nums text-muted-foreground">สแกนแล้ว {scannedCount}/{roster.length}</span>
         <CloseButton onClick={onClose} />
       </header>
 
@@ -254,6 +289,7 @@ export default function AnswerSheetScanner({
             {camError && <p role="alert" className="absolute inset-x-4 top-4 rounded-lg bg-black/70 px-3 py-2 text-sm text-white">{camError}</p>}
           </div>
           <div className="shrink-0 space-y-2 border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {lastSaved && <p role="status" className={cn("rounded-lg px-3 py-2 text-xs", lastSaved.warn ? "bg-warning/15 text-warning" : "bg-success/15 text-success")}>{lastSaved.text}</p>}
             {error && <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
             <p className="text-center text-xs text-muted-foreground">วางกระดาษให้เห็นทั้งใบ มุมสี่จุดและ QR ต้องอยู่ในภาพ แสงสม่ำเสมอ ไม่เงา</p>
             <Button type="button" className="h-12 w-full text-base" disabled={!!camError} onClick={() => void capture()}>ถ่าย</Button>
@@ -300,13 +336,17 @@ export default function AnswerSheetScanner({
                 >
                   <option value="">— เลือก —</option>
                   {roster.map((r) => (
-                    <option key={r.student_id} value={r.student_id}>{r.code} {r.name}{scans.has(r.student_id) ? " (สแกนแล้ว)" : ""}</option>
+                    <option key={r.student_id} value={r.student_id}>{r.code} {r.name}{existing.get(r.student_id)?.kind === "scan" ? " (สแกนแล้ว)" : ""}</option>
                   ))}
                 </select>
               ) : (
                 <button type="button" className="tappable mt-1 text-xs font-medium text-accent" onClick={() => setChanging(true)}>เปลี่ยนนักเรียน</button>
               )}
-              {student && scans.has(student.student_id) && <p className="mt-2 text-xs text-warning">สแกนแล้วได้ {scans.get(student.student_id)!.score}/{scans.get(student.student_id)!.max} การบันทึกนี้จะแทนที่ผลเดิม</p>}
+              {prior && (
+                <p className={cn("mt-2 text-xs", needsConfirm ? "text-warning" : "text-muted-foreground")}>
+                  มีคะแนน {prior.score ?? "—"}/{totalMax} อยู่แล้ว ({prior.label}) การบันทึกนี้จะเป็นคะแนนล่าสุด{prior.kind === "scan" ? " และแทนที่ผลสแกนเดิม" : ""}
+                </p>
+              )}
             </section>
 
             {review.warnings.map((w) => (
@@ -319,9 +359,20 @@ export default function AnswerSheetScanner({
                 <span className="ml-2 text-xs font-normal text-muted-foreground">จากทั้งหมด {rows.length} ข้อ</span>
               </p>
               <p className="text-xs tabular-nums text-muted-foreground">
-                ได้ {score.got}/{score.max} คะแนนจากข้อกาฝน (ประมาณการ ยังไม่รวมข้อเติมคำตอบ)
+                ข้อกาฝนได้ {score.got} คะแนน{extraMax > 0 ? ` · รวมข้อเติมคำตอบ ${extraOk ? score.got + extraNum : "—"}/${totalMax}` : `/${totalMax}`} (เซิร์ฟเวอร์ตรวจอีกครั้งตอนบันทึก)
               </p>
             </section>
+
+            {extraMax > 0 && (
+              <section className="space-y-1.5 rounded-xl border border-border bg-card p-3.5">
+                <label htmlFor="scan-extra" className="text-sm font-semibold">คะแนนข้อเติมคำตอบ (ครูตรวจเอง ข้อที่ {manualNumbers.join(", ")})</label>
+                <div className="flex items-center gap-2">
+                  <input id="scan-extra" type="number" inputMode="decimal" min={0} max={extraMax} step="0.5" value={extra} onChange={(e) => setExtra(e.target.value)} className="h-11 w-28 rounded-lg border border-border bg-background px-3 text-base tabular-nums" />
+                  <span className="text-sm text-muted-foreground">เต็ม {extraMax}</span>
+                </div>
+                {!extraOk && <p role="alert" className="text-xs text-destructive">ใส่คะแนนตั้งแต่ 0 ถึง {extraMax} (ทศนิยมไม่เกิน 2 ตำแหน่ง)</p>}
+              </section>
+            )}
 
             {flagged.map((a) => (
               <section key={a.number} className={cn("space-y-2 rounded-xl border p-3", review.touched.has(a.number) ? "border-border bg-card" : "border-warning bg-warning/5")}>
@@ -351,15 +402,21 @@ export default function AnswerSheetScanner({
             </section>
           </div>
           <footer className="shrink-0 space-y-2 border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            {!canSave && (
+            {needsConfirm && (
+              <label className="flex items-start gap-2 text-xs text-warning">
+                <input type="checkbox" checked={confirmReplace} onChange={(e) => setConfirmReplace(e.target.checked)} className="mt-0.5 size-4" />
+                ยืนยันว่าให้ผลจากกระดาษนี้เป็นคะแนนล่าสุดแทน {prior?.label}
+              </label>
+            )}
+            {saveError && <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{saveError}</p>}
+            {!canSave && !saving && (
               <p className="text-center text-xs text-muted-foreground">
-                {blocking ? "บันทึกไม่ได้: ดูคำเตือนด้านบน" : !student ? "เลือกนักเรียนก่อนบันทึก" : `ตรวจอีก ${pending.length} ข้อก่อนบันทึก`}
+                {blocking ? "บันทึกไม่ได้: ดูคำเตือนด้านบน" : !student ? "เลือกนักเรียนก่อนบันทึก" : pending.length > 0 ? `ตรวจอีก ${pending.length} ข้อก่อนบันทึก` : !extraOk ? "ใส่คะแนนข้อเติมคำตอบให้ถูกต้อง" : "ติ๊กยืนยันการแทนที่คะแนนเดิม"}
               </p>
             )}
-            <p className="text-center text-xs text-muted-foreground">ทดลอง: ผลนี้เก็บไว้ชั่วคราวในหน้านี้ ยังไม่ถูกบันทึกเป็นคะแนนในระบบ</p>
             <div className="grid grid-cols-2 gap-2">
               <Button type="button" variant="outline" className="h-12" onClick={() => { setReview(null); setPhase("capture"); }}>ถ่ายใหม่</Button>
-              <Button type="button" className="h-12" disabled={!canSave} onClick={save}>บันทึกใบนี้</Button>
+              <Button type="button" className="h-12" disabled={!canSave} onClick={() => void save()}>{saving ? "กำลังบันทึก…" : "บันทึกใบนี้"}</Button>
             </div>
           </footer>
         </>

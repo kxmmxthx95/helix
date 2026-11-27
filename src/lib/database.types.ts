@@ -929,6 +929,9 @@ export type ExamAttempt = {
   is_manual: boolean;
   manual_note: string | null;
   manual_by: string | null;
+  /** A scanned bubble sheet (migration 0235): a manual row that keeps per-question answers; scan_extra = the teacher's short-answer points. */
+  is_scan: boolean;
+  scan_extra: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -2029,6 +2032,8 @@ export type Database = {
           | "is_manual"
           | "manual_note"
           | "manual_by"
+          | "is_scan"
+          | "scan_extra"
         >
       >;
       exam_security_events: Table<ExamSecurityEvent, InsertOf<ExamSecurityEvent, "attempt_id" | "student_id" | "device" | "ip" | "actor" | "at">>;
@@ -2181,6 +2186,7 @@ export type Database = {
       decide_exam_topic_set: { Args: { p_id: string; p_approve: boolean; p_note?: string | null }; Returns: undefined };
       exam_review_key: { Args: { p_attempt: string }; Returns: ExamReviewKeyRow[] };
       exam_attempt_paper: { Args: { p_attempt_id: string }; Returns: ExamAttemptPaper };
+      save_exam_scan: { Args: { p_session_id: string; p_student_id: string; p_answers: { question_id: string; choice_id: string | null }[]; p_extra: number }; Returns: "synced" | "off" | "not_synced" };
       practice_check: { Args: { p_session: string; p_question: string; p_choice?: string | null; p_text?: string | null }; Returns: PracticeCheckResult };
       verify_exam_code: { Args: { p_session_id: string; p_code: string }; Returns: "ok" | "wrong" | "locked" };
       unlock_exam_code: { Args: { p_session_id: string; p_student_id: string }; Returns: void };

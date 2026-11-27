@@ -430,6 +430,25 @@ export function useAvailableExams(studentId: string | null, classroomId: string 
 export const attemptScoreTime = (a: ExamAttempt) => new Date(a.is_manual ? a.updated_at : (a.submitted_at ?? a.created_at)).getTime();
 
 /** Teacher-entered score for one student (closes a round still in progress). Resolves to where the score landed. */
+/** Saves one scanned answer sheet (save_exam_scan, migration 0235): the server grades it from the answer key. Resolves to 'synced' | 'off' | 'not_synced'. */
+export function useSaveExamScan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { sessionId: string; studentId: string; answers: { question_id: string; choice_id: string | null }[]; extra: number }) => {
+      const { data, error } = await supabase.rpc("save_exam_scan", { p_session_id: v.sessionId, p_student_id: v.studentId, p_answers: v.answers, p_extra: v.extra });
+      if (error) {
+        if (error.code === "PGRST202" || error.code === "42883") throw new Error("ระบบยังไม่พร้อมบันทึกผลสแกน (ฐานข้อมูลยังไม่ได้อัปเดต)"); // migration 0235 not applied yet
+        throw error;
+      }
+      return data;
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["exam_attempts"] });
+      void qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).includes("score") });
+    },
+  });
+}
+
 export function useSetManualScore() {
   const qc = useQueryClient();
   return useMutation({
