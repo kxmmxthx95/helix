@@ -29,6 +29,7 @@ import {
   usePracticeQuestions,
   useRemoveSessionQuestion,
   useAttemptAnswers,
+  useAttemptPaper,
   useAttemptQuestions,
   useExamReviewKey,
   useApproveTakeover,
@@ -3031,7 +3032,7 @@ function AttemptRunner({
   onSubmitted: (a: ExamAttempt) => void;
   onExit: () => void;
 }) {
-  const { data } = useAttemptQuestions(attempt.question_order);
+  const { data } = useAttemptPaper(attempt.id, attempt.question_order);
   const { data: answers } = useAttemptAnswers(attempt.id);
   const saveAnswers = useSaveAnswers();
   const submit = useSubmitAttempt();

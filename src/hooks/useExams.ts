@@ -509,25 +509,52 @@ export function useStartOrResumeAttempt() {
   });
 }
 
+type AttemptPaper = { questions: ExamQuestionForAttempt[]; choicesByQuestion: Map<string, ExamQuestionChoiceForAttempt[]> };
+
+function groupChoices(choices: ExamQuestionChoiceForAttempt[]): Map<string, ExamQuestionChoiceForAttempt[]> {
+  const out = new Map<string, ExamQuestionChoiceForAttempt[]>();
+  for (const c of choices) out.set(c.question_id, [...(out.get(c.question_id) ?? []), c]);
+  return out;
+}
+
+/** Answer-safe reads through the *_for_attempt views (RLS checks every row: slow with many students at once). Used for review and as the fallback of useAttemptPaper. */
+async function fetchPaperFromViews(questionIds: string[]): Promise<AttemptPaper> {
+  const [{ data: questions, error: qError }, { data: choices, error: cError }] = await Promise.all([
+    supabase.from("exam_questions_for_attempt").select("*").in("id", questionIds),
+    supabase.from("exam_question_choices_for_attempt").select("*").in("question_id", questionIds).order("position"),
+  ]);
+  if (qError) throw qError;
+  if (cError) throw cError;
+  return { questions: questions as unknown as ExamQuestionForAttempt[], choicesByQuestion: groupChoices(choices as unknown as ExamQuestionChoiceForAttempt[]) };
+}
+
 /** Answer-safe reads while an attempt is in progress — no correct_answer/is_correct in the payload (see exam_questions_for_attempt/exam_question_choices_for_attempt views, migration 0047). */
 export function useAttemptQuestions(questionIds: string[]) {
   return useQuery({
     queryKey: ["exam_questions_for_attempt", ...questionIds],
     enabled: questionIds.length > 0,
-    queryFn: async (): Promise<{ questions: ExamQuestionForAttempt[]; choicesByQuestion: Map<string, ExamQuestionChoiceForAttempt[]> }> => {
-      const [{ data: questions, error: qError }, { data: choices, error: cError }] = await Promise.all([
-        supabase.from("exam_questions_for_attempt").select("*").in("id", questionIds),
-        supabase.from("exam_question_choices_for_attempt").select("*").in("question_id", questionIds).order("position"),
-      ]);
-      if (qError) throw qError;
-      if (cError) throw cError;
-      const choicesByQuestion = new Map<string, ExamQuestionChoiceForAttempt[]>();
-      for (const c of choices as unknown as ExamQuestionChoiceForAttempt[]) {
-        const list = choicesByQuestion.get(c.question_id) ?? [];
-        list.push(c);
-        choicesByQuestion.set(c.question_id, list);
+    queryFn: () => fetchPaperFromViews(questionIds),
+  });
+}
+
+/**
+ * The paper of the attempt being taken, in one answer-safe call (exam_attempt_paper, migration 0234): one access
+ * check instead of one per question and choice row. It never changes while the attempt is open, so it is fetched
+ * once and not again on tab focus. Falls back to the views while the function is not deployed yet.
+ */
+export function useAttemptPaper(attemptId: string | null, questionIds: string[]) {
+  return useQuery({
+    queryKey: ["exam_attempt_paper", attemptId],
+    enabled: !!attemptId && questionIds.length > 0,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    queryFn: async (): Promise<AttemptPaper> => {
+      const { data, error } = await supabase.rpc("exam_attempt_paper", { p_attempt_id: attemptId! });
+      if (error) {
+        if (error.code === "PGRST202" || error.code === "42883") return fetchPaperFromViews(questionIds); // function not deployed yet
+        throw error;
       }
-      return { questions: questions as unknown as ExamQuestionForAttempt[], choicesByQuestion };
+      return { questions: data.questions, choicesByQuestion: groupChoices(data.choices) };
     },
   });
 }
