@@ -1565,7 +1565,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         confirmLabel="ให้สอบใหม่"
         pending={grantRetake.isPending}
         onCancel={() => setRetakeIds(null)}
-        onConfirm={() => retakeIds && grantRetake.mutate({ sessionId: session.id, studentIds: retakeIds }, { onSuccess: () => { setRetakeIds(null); toast("เพิ่มสิทธิ์สอบใหม่แล้ว"); }, onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
+        onConfirm={() => retakeIds && grantRetake.mutate({ sessionId: session.id, studentIds: retakeIds }, { onSuccess: (n) => { setRetakeIds(null); if (n > 0) toast(`เพิ่มสิทธิ์สอบใหม่ ${n} คนแล้ว`); else toast("ไม่มีนักเรียนที่ให้สอบใหม่ได้ (กำลังทำอยู่ หรือยังมีสิทธิ์สอบเหลือ)", "error"); }, onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
       />
       <SecurityEventsSheet sessionId={session.id} open={eventsOpen} onOpenChange={setEventsOpen} />
       {scoringRow && <ManualScoreSheet session={session} row={scoringRow} maxPoints={maxPoints} onClose={() => setScoring(null)} />}
