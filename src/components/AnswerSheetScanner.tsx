@@ -82,6 +82,17 @@ function ChoiceButtons({ choices, value, onPick }: { choices: number; value: num
   );
 }
 
+const glyph = { width: 22, height: 22, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
+const GalleryGlyph = () => (
+  <svg {...glyph}><rect x="3" y="4" width="18" height="16" rx="3" /><circle cx="9" cy="10" r="1.6" /><path d="m4 18 5-5 4 4 3-3 4 4" /></svg>
+);
+const CameraGlyph = () => (
+  <svg {...glyph}><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.1-1.6A1 1 0 0 1 9.6 4h4.8a1 1 0 0 1 .8.4L16.3 6h1.2A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" /><circle cx="12" cy="12.5" r="3.4" /></svg>
+);
+const CloseGlyph = () => (
+  <svg {...glyph} width={18} height={18}><path d="M6 6l12 12M18 6 6 18" /></svg>
+);
+
 export default function AnswerSheetScanner({
   session,
   rows,
@@ -128,6 +139,19 @@ export default function AnswerSheetScanner({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<{ text: string; warn: boolean } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  // Size of the camera stage, to fit an A4-shaped viewfinder inside it.
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stage, setStage] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    if (phase !== "capture") return;
+    const el = stageRef.current;
+    if (!el) return;
+    const measure = () => setStage({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [phase]);
   const layout = useMemo(() => answerSheetLayout(rows), [rows]);
   const fp = useMemo(() => sheetFingerprint(rows), [rows]);
   const rosterById = useMemo(() => new Map(roster.map((r) => [r.student_id, r])), [roster]);
@@ -271,37 +295,69 @@ export default function AnswerSheetScanner({
     }
   }
 
+  const padTop = 52;
+  const padBottom = 20;
+  const availW = Math.max(0, stage.w - 40);
+  const availH = Math.max(0, stage.h - padTop - padBottom);
+  const frameH = Math.min(availH, (availW * 297) / 210);
+  const frameW = (frameH * 210) / 297;
+  const frameTop = padTop + (availH - frameH) / 2;
+  const corner = "absolute size-8 border-white";
+  const chip = "absolute inset-x-4 bottom-4 rounded-xl px-3 py-2 text-center text-xs font-medium backdrop-blur-md";
+
   return createPortal(
-    <div className="fixed inset-0 z-[110] flex flex-col bg-background" style={{ pointerEvents: "auto" }}>
-      <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <h2 className="font-heading min-w-0 flex-1 truncate text-base font-semibold">สแกนกระดาษคำตอบ</h2>
-        <span className="text-xs tabular-nums text-muted-foreground">สแกนแล้ว {scannedCount}/{roster.length}</span>
-        <CloseButton onClick={onClose} />
-      </header>
+    <div className={cn("fixed inset-0 z-[110] flex flex-col", phase === "capture" ? "bg-black text-white" : "bg-background")} style={{ pointerEvents: "auto" }}>
+      <div aria-hidden className="shrink-0" style={{ height: "env(safe-area-inset-top)" }} />
 
       {phase === "capture" && (
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="relative min-h-0 flex-1 bg-black">
-            <video ref={videoRef} playsInline muted className="size-full object-contain" />
-            <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="h-[92%] max-w-[92%] rounded-lg border-2 border-dashed border-white/70" style={{ aspectRatio: "210 / 297" }} />
+          <div ref={stageRef} className="relative min-h-0 flex-1 overflow-hidden bg-neutral-900">
+            <video ref={videoRef} playsInline muted className="absolute inset-0 size-full object-cover" />
+            {/* Viewfinder: the page is A4, the dark outside shows where to aim; corner brackets, nothing decorative. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-2xl shadow-[0_0_0_100vmax_rgba(0,0,0,0.5)]"
+              style={{ width: frameW, height: frameH, top: frameTop }}
+            >
+              <span className={cn(corner, "left-0 top-0 rounded-tl-2xl border-l-[3px] border-t-[3px]")} />
+              <span className={cn(corner, "right-0 top-0 rounded-tr-2xl border-r-[3px] border-t-[3px]")} />
+              <span className={cn(corner, "bottom-0 left-0 rounded-bl-2xl border-b-[3px] border-l-[3px]")} />
+              <span className={cn(corner, "bottom-0 right-0 rounded-br-2xl border-b-[3px] border-r-[3px]")} />
             </div>
-            {camError && <p role="alert" className="absolute inset-x-4 top-4 rounded-lg bg-black/70 px-3 py-2 text-sm text-white">{camError}</p>}
+            <p className="pointer-events-none absolute inset-x-0 top-3 mx-auto w-fit max-w-[92%] rounded-full bg-black/55 px-4 py-1.5 text-center text-xs font-medium backdrop-blur-md">
+              วางกระดาษให้ตรงกรอบ เห็นมุมสี่จุดและ QR
+            </p>
+            {camError && <p role="alert" className={cn(chip, "bg-black/70")}>{camError}</p>}
+            {!camError && error && <p role="alert" className={cn(chip, "bg-destructive/85")}>{error}</p>}
+            {!camError && !error && lastSaved && <p role="status" className={cn(chip, lastSaved.warn ? "bg-warning/90 text-black" : "bg-success/85")}>{lastSaved.text}</p>}
           </div>
-          <div className="shrink-0 space-y-2 border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            {lastSaved && <p role="status" className={cn("rounded-lg px-3 py-2 text-xs", lastSaved.warn ? "bg-warning/15 text-warning" : "bg-success/15 text-success")}>{lastSaved.text}</p>}
-            {error && <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
-            <p className="text-center text-xs text-muted-foreground">วางกระดาษให้เห็นทั้งใบ มุมสี่จุดและ QR ต้องอยู่ในภาพ แสงสม่ำเสมอ ไม่เงา</p>
-            <Button type="button" className="h-12 w-full text-base" disabled={!!camError} onClick={() => void capture()}>ถ่าย</Button>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="tappable flex h-11 cursor-pointer items-center justify-center rounded-xl border border-border bg-card text-sm font-medium">
-                ถ่ายด้วยกล้องของเครื่อง
-                <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => void onFile(e)} />
-              </label>
-              <label className="tappable flex h-11 cursor-pointer items-center justify-center rounded-xl border border-border bg-card text-sm font-medium">
-                เลือกไฟล์ภาพ
+
+          <div className="shrink-0 bg-black px-5 pt-4">
+            <div className="grid grid-cols-3 items-center">
+              <label className="tappable flex cursor-pointer flex-col items-center gap-1 justify-self-start text-[11px] font-medium text-white/80">
+                <span className="flex size-12 items-center justify-center rounded-full bg-white/15"><GalleryGlyph /></span>
+                ไฟล์ภาพ
                 <input type="file" accept="image/*" className="sr-only" onChange={(e) => void onFile(e)} />
               </label>
+              <button
+                type="button"
+                aria-label="ถ่ายภาพ"
+                disabled={!!camError}
+                onClick={() => void capture()}
+                className="tappable size-[76px] justify-self-center rounded-full border-4 border-white p-1 transition-transform active:scale-95 disabled:opacity-35"
+              >
+                <span className="block size-full rounded-full bg-white" />
+              </button>
+              <label className="tappable flex cursor-pointer flex-col items-center gap-1 justify-self-end text-[11px] font-medium text-white/80">
+                <span className="flex size-12 items-center justify-center rounded-full bg-white/15"><CameraGlyph /></span>
+                กล้องเครื่อง
+                <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => void onFile(e)} />
+              </label>
+            </div>
+            <div className="mt-4 flex items-center gap-3 border-t border-white/10 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5">
+              <span className="font-heading min-w-0 flex-1 truncate text-sm font-semibold">สแกนกระดาษคำตอบ</span>
+              <span className="text-xs tabular-nums text-white/60">สแกนแล้ว {scannedCount}/{roster.length}</span>
+              <button type="button" aria-label="ปิด" onClick={onClose} className="tappable flex size-9 items-center justify-center rounded-full bg-white/15"><CloseGlyph /></button>
             </div>
           </div>
         </div>
@@ -401,7 +457,7 @@ export default function AnswerSheetScanner({
               )}
             </section>
           </div>
-          <footer className="shrink-0 space-y-2 border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <footer className="shrink-0 space-y-2 border-t border-border p-3">
             {needsConfirm && (
               <label className="flex items-start gap-2 text-xs text-warning">
                 <input type="checkbox" checked={confirmReplace} onChange={(e) => setConfirmReplace(e.target.checked)} className="mt-0.5 size-4" />
@@ -420,6 +476,13 @@ export default function AnswerSheetScanner({
             </div>
           </footer>
         </>
+      )}
+      {phase !== "capture" && (
+        <header className="flex shrink-0 items-center gap-3 border-t border-border px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5">
+          <h2 className="font-heading min-w-0 flex-1 truncate text-base font-semibold">สแกนกระดาษคำตอบ</h2>
+          <span className="text-xs tabular-nums text-muted-foreground">สแกนแล้ว {scannedCount}/{roster.length}</span>
+          <CloseButton onClick={onClose} />
+        </header>
       )}
     </div>,
     document.body,
