@@ -31,7 +31,7 @@ import {
 } from "@/hooks/useExamSeating";
 import type { ExamSeatTemplate, ExamSession, ExamSessionRoom, ExamSessionSpecialSeat } from "@/lib/database.types";
 import { ICON, ICON_BTN } from "@/lib/iconButton";
-import { isDeptHead, isOrgWide } from "@/lib/roles";
+import { isDeptHead, isOrgWide, stripTitle } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 type SeatStudent = { student_id: string; name: string; code: string; avatar?: string | null; /** ชั้น/ห้อง of the student, for the printed name list. */ classroom?: string };
@@ -324,7 +324,10 @@ export function ExamSeatingCard({
             {/* Front of the room: the top row of the grid is the one nearest the board. */}
             <div aria-hidden className="mx-auto w-1/2 min-w-32 rounded-full bg-muted py-1 text-center text-[11px] font-medium tracking-wide text-muted-foreground">หน้าห้อง</div>
             <div className="-mx-1 overflow-x-auto px-1 py-1">
-              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(6.5rem, 1fr))` }}>
+              <div
+                className="grid grid-cols-[repeat(var(--cols),minmax(4.75rem,1fr))] gap-1.5 sm:grid-cols-[repeat(var(--cols),minmax(6.5rem,1fr))]"
+                style={{ "--cols": cols } as React.CSSProperties}
+              >
                 {Array.from({ length: rows * cols }, (_, i) => {
                   const row = Math.floor(i / cols) + 1;
                   const col = (i % cols) + 1;
@@ -346,7 +349,8 @@ export function ExamSeatingCard({
                       }
                       onClick={() => tapSeat(r.id, row, col)}
                       className={cn(
-                        "relative flex h-14 min-w-0 items-center gap-2 rounded-lg border px-2 text-left text-[11px] leading-tight",
+                        "relative flex min-h-[4.75rem] min-w-0 flex-col gap-1 rounded-lg border p-2 text-left text-[11px] leading-tight sm:h-14 sm:min-h-0 sm:flex-row sm:items-center sm:gap-2 sm:px-2 sm:py-0",
+                        !st && "items-center justify-center sm:justify-start",
                         other && !x ? "border-border bg-muted/60 text-muted-foreground [background-image:repeating-linear-gradient(135deg,transparent_0_6px,hsl(var(--border))_6px_7px)]" : st ? "border-border bg-card" : "border-dashed border-border text-muted-foreground",
                         other && x && "border-destructive ring-1 ring-destructive",
                         isPicked && "ring-2 ring-primary",
@@ -359,12 +363,14 @@ export function ExamSeatingCard({
                         </span>
                       ) : st ? (
                         <>
-                          <Avatar name={st.name} src={st.avatar} className="h-7 w-7" />
-                          <span className="min-w-0 flex-1 pr-6">
-                            <span className="block truncate font-medium text-foreground">{st.name}</span>
+                          <span className="flex items-start justify-between gap-1 sm:contents">
+                            <Avatar name={st.name} src={st.avatar} className="h-7 w-7 shrink-0" />
+                            <span className={cn("rounded-full px-1.5 py-px text-[10px] font-semibold tabular-nums sm:absolute sm:right-1 sm:top-1", COL_TONES[(col - 1) % COL_TONES.length])}>{seatLabel(row, col)}</span>
+                          </span>
+                          <span className="min-w-0 sm:flex-1 sm:pr-6">
+                            <span className="line-clamp-2 font-medium text-foreground sm:line-clamp-1">{stripTitle(st.name)}</span>
                             <span className="block truncate tabular-nums text-muted-foreground">{st.code}</span>
                           </span>
-                          <span className={cn("absolute right-1 top-1 rounded-full px-1.5 py-px text-[10px] font-semibold tabular-nums", COL_TONES[(col - 1) % COL_TONES.length])}>{seatLabel(row, col)}</span>
                         </>
                       ) : (
                         <span className="tabular-nums">
@@ -428,7 +434,7 @@ export function ExamSeatingCard({
                               <>
                                 <Avatar name={st.name} src={st.avatar} className="h-7 w-7" />
                           <span className="min-w-0 flex-1 pr-6">
-                            <span className="block truncate font-medium text-foreground">{st.name}</span>
+                            <span className="block truncate font-medium text-foreground">{stripTitle(st.name)}</span>
                             <span className="block truncate tabular-nums text-muted-foreground">{st.code}</span>
                           </span>
                               </>

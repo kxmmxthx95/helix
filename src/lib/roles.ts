@@ -95,3 +95,9 @@ export const canUsePos = (roles: Role[]) => isOrgWide(roles) || roles.includes("
 
 /** sessionStorage flag: a signed-in account without POS access was bounced to /pos-login. */
 export const POS_DENIED_KEY = "helix.posDenied";
+
+/** Name without its title (นาย / นางสาว / เด็กชาย …) for compact displays such as seat cells. */
+export const stripTitle = (name: string) => {
+  for (const p of [...STUDENT_PREFIXES, ...PREFIXES]) if (name.startsWith(p + " ")) return name.slice(p.length + 1);
+  return name;
+};
