@@ -660,7 +660,7 @@
 .print-sheet .paper .key-correct .key-letter { box-sizing: border-box; display: inline-block; min-width: 1.6em; height: 1.6em; line-height: calc(1.6em - 2px); margin-top: -1px; text-align: center; border: 1px solid #dc2626; border-radius: 9999px; }
 .print-sheet .paper { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .print-sheet .print-prompt, .print-sheet .print-prompt :where(p, div, li, strong) { font-weight: 600; }
-.print-sheet .print-toolbar { position: sticky; top: 0; z-index: 1; display: flex; justify-content: flex-end; gap: 8px; padding: 8px 12px; background: #18181b; }
+.print-sheet .print-toolbar { position: sticky; top: 0; z-index: 1; display: flex; justify-content: flex-end; gap: 8px; padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top)); background: #18181b; } /* PWA: keep the buttons below the phone status bar */
 .print-sheet.landscape .paper { max-width: 297mm; min-height: 210mm; }
 @media print {
   @page { size: A4; margin: 14mm; }

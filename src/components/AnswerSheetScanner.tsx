@@ -273,7 +273,7 @@ export default function AnswerSheetScanner({
 
   return createPortal(
     <div className="fixed inset-0 z-[110] flex flex-col bg-background" style={{ pointerEvents: "auto" }}>
-      <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
+      <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <h2 className="font-heading min-w-0 flex-1 truncate text-base font-semibold">สแกนกระดาษคำตอบ</h2>
         <span className="text-xs tabular-nums text-muted-foreground">สแกนแล้ว {scannedCount}/{roster.length}</span>
         <CloseButton onClick={onClose} />
