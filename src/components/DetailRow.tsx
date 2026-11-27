@@ -7,6 +7,7 @@ const TONE = {
   people: "bg-gradient-to-b from-green-400 to-green-600",
   setup: "bg-gradient-to-b from-orange-400 to-orange-600",
   content: "bg-gradient-to-b from-indigo-400 to-indigo-600",
+  check: "bg-gradient-to-b from-pink-400 to-pink-600",
 } as const;
 export type DetailTone = keyof typeof TONE;
 

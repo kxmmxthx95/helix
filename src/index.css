@@ -675,3 +675,11 @@
   /* Several papers in one sheet (seat plans: plan page then roster, per room): each starts a new page. */
   .print-sheet .paper + .paper { break-before: page; }
 }
+
+/* Bubble answer sheets: zero page margin so the millimetre layout (src/lib/answerSheet.ts) lands exactly; one sheet per page. */
+.print-sheet.answer-sheets .paper { position: relative; width: 210mm; max-width: none; height: 296mm; min-height: 0; padding: 0; overflow: hidden; box-sizing: border-box; }
+@media print {
+  @page answer { size: A4 portrait; margin: 0; }
+  .print-sheet.answer-sheets { page: answer; }
+  .print-sheet.answer-sheets .paper { margin: 0; width: 210mm; height: 296mm; }
+}
