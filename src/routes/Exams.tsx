@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ViewToggle, defaultView } from "@/components/ViewToggle";
 import { RoomsView } from "@/components/ExamRoomsView";
@@ -7,7 +7,7 @@ import { LEAVE_WINDOW_MS } from "@/lib/examLeaves";
 import { dayKey, isLive, roomClashes } from "@/lib/examRooms";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
-import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
+import { preloadQuestionPromptView, QuestionPromptView } from "@/components/editor/LazyQuestionPromptView";
 import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, LocationIcon, PrintIcon, Search, TimeIcon, PencilIcon, PeopleIcon, StarIcon, TrashIcon } from "@/components/icons";
 import { AnswerSheetCard } from "@/components/AnswerSheetCard";
 import { AnswerSheetScanCard } from "@/components/AnswerSheetScanCard";
@@ -25,7 +25,6 @@ import { avatarUrl } from "@/hooks/useAvatar";
 import { useProfilesByIds } from "@/hooks/usePractice";
 import { useClassroomsByIds, useExamQuestionsOf, useGradeLevelsByIds, useSubjectsByIds, type ExamQuestionWithChoices } from "@/hooks/useExamBank";
 import {
-  useAddSessionQuestion,
   usePracticeCheck,
   usePracticeCounts,
   usePracticeQuestions,
@@ -46,6 +45,7 @@ import {
   useLockedCodeStudents,
   useLogAttemptEvent,
   useSessionLeaveCounts,
+  useTopicSetQueue,
   useMyAttempts,
   useMyCurrentClassroom,
   useAllExamSessions,
@@ -80,8 +80,7 @@ import { useLearningAreas } from "@/hooks/useCurriculum";
 import { topArea } from "@/lib/subjectColor";
 import { useSubjectColors } from "@/hooks/useSubjectColors";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
-import { ExamApprovalTab, ExamSubmissionsTab, ExamTopicsTab, useExamApprovalPendingCount } from "@/routes/ExamApproval";
-import { DIFFICULTY_BADGE_CLASS, DIFFICULTY_LABEL, QuestionForm, QuestionSheet, useQuestionForm } from "@/routes/ExamBank";
+import { DIFFICULTY_BADGE_CLASS, DIFFICULTY_LABEL } from "@/lib/examDifficulty";
 import type { PracticeCheckResult, ExamAttempt, ExamSecurityEvent, ExamSecurityEventType, ExamSession, ExamSessionRoom, ExamTopicSet, Student, Subject } from "@/lib/database.types";
 import { EXAM_KINDS, examLabel, kindTone, roundTone } from "@/lib/examKinds";
 import { gradeShortLabel, levelTone } from "@/lib/gradeLevels";
@@ -105,6 +104,22 @@ export function Exams() {
 // ============================================================== teacher side
 
 type StaffTab = "rooms" | "schedule" | "topics" | "list" | "approve";
+
+// The question editor (rich text, formulas) is ~480 KB gzip: load it only when a teacher edits or adds a question.
+const AddSessionQuestionPanel = lazy(() => import("@/components/AddSessionQuestionPanel"));
+const QuestionSheet = lazy(() => import("@/routes/ExamBank").then((m) => ({ default: m.QuestionSheet })));
+
+// The three approval-related tabs load when their tab is opened.
+const ExamTopicsTab = lazy(() => import("@/routes/ExamApproval").then((m) => ({ default: m.ExamTopicsTab })));
+const ExamSubmissionsTab = lazy(() => import("@/routes/ExamApproval").then((m) => ({ default: m.ExamSubmissionsTab })));
+const ExamApprovalTab = lazy(() => import("@/routes/ExamApproval").then((m) => ({ default: m.ExamApprovalTab })));
+
+/** Number of topic sets waiting for this approver (badge on the อนุมัติสอบ tab); lives here so the tab code itself can stay lazy. */
+function useExamApprovalPendingCount(enabled: boolean) {
+  const { profile } = useAuth();
+  const { data = [] } = useTopicSetQueue(enabled, profile?.id ?? null);
+  return data.filter((s) => s.approval_status === "pending").length;
+}
 
 const TAB_ICON = { rooms: ClipboardIcon, schedule: CalendarIcon, topics: ListIcon, list: DocumentTextIcon, approve: CheckmarkCircleIcon } as const;
 
@@ -158,9 +173,11 @@ function StaffExams({ teacherId, canApprove }: { teacherId: string | null; canAp
       )}
       {(tab === "topics" || tab === "list" || tab === "approve") && (
         <div className="-mx-1 flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pt-1">
-          {tab === "topics" && teacherId && <ExamTopicsTab teacherId={teacherId} canSeeAll={canApprove} />}
-          {tab === "list" && teacherId && <ExamSubmissionsTab teacherId={teacherId} onCreateRoom={setRoomFor} />}
-          {tab === "approve" && canApprove && <ExamApprovalTab onCreateRoom={setRoomFor} />}
+          <Suspense fallback={<PageSpinner />}>
+            {tab === "topics" && teacherId && <ExamTopicsTab teacherId={teacherId} canSeeAll={canApprove} />}
+            {tab === "list" && teacherId && <ExamSubmissionsTab teacherId={teacherId} onCreateRoom={setRoomFor} />}
+            {tab === "approve" && canApprove && <ExamApprovalTab onCreateRoom={setRoomFor} />}
+          </Suspense>
         </div>
       )}
       {roomFor && <CreateSessionSheet open onOpenChange={() => setRoomFor(null)} teacherId={roomFor[0]!.teacher_id} presetSets={roomFor} />}
@@ -1978,6 +1995,8 @@ function PrintExamSheet({ session, questions, subjects, withKey, onDone }: { ses
 function SessionQuestionList({ session, sessionQuestions, practice }: { session: ExamSession; sessionQuestions: ExamSessionQuestionRow[]; practice?: boolean }) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [addedOnce, setAddedOnce] = useState(false); // mount the add form only after the first open, so its chunk loads on demand
+  const [sheetWarm, setSheetWarm] = useState(false); // keeps the edit sheet mounted after its first use (close animation)
   // Start fetching on hover/focus so the data is already there when the card opens.
   const [warm, setWarm] = useState(false);
   const [editingQ, setEditingQ] = useState<ExamQuestionWithChoices | null>(null);
@@ -2007,8 +2026,8 @@ function SessionQuestionList({ session, sessionQuestions, practice }: { session:
         tone="content"
         title={practice ? "แนวข้อสอบ" : "รายการข้อสอบ"}
         open={open}
-        onPointerEnter={() => setWarm(true)}
-        onFocus={() => setWarm(true)}
+        onPointerEnter={() => { setWarm(true); preloadQuestionPromptView(); }}
+        onFocus={() => { setWarm(true); preloadQuestionPromptView(); }}
         onClick={() => setOpen((v) => !v)}
         summary={sessionQuestions.length === 0 ? (practice ? "ยังไม่มีแนวข้อสอบ" : "ยังไม่มีข้อสอบ") : `${sessionQuestions.length} ข้อ`}
         alert={sessionQuestions.length === 0 && !practice}
@@ -2026,7 +2045,7 @@ function SessionQuestionList({ session, sessionQuestions, practice }: { session:
             <div key={q.id} className="flex items-start gap-2 p-3 [contain-intrinsic-size:auto_260px] [content-visibility:auto]">
               <div className="min-w-0 flex-1"><QuestionBody q={q} i={i} /></div>
               <div className="flex shrink-0 items-center gap-1.5">
-              <Button size="icon" variant="ghost" className={ICON_BTN} aria-label="แก้ไขข้อสอบ" title="แก้ไขข้อสอบ" onClick={() => setEditingQ(q)}>
+              <Button size="icon" variant="ghost" className={ICON_BTN} aria-label="แก้ไขข้อสอบ" title="แก้ไขข้อสอบ" onClick={() => { setSheetWarm(true); setEditingQ(q); }}>
                 <PencilIcon className={ICON} />
               </Button>
               <Button
@@ -2047,19 +2066,27 @@ function SessionQuestionList({ session, sessionQuestions, practice }: { session:
           ))}
         </div>
       </Collapse>
-      <DetailAddRow label={practice ? "เพิ่มแนวข้อสอบ" : "เพิ่มข้อสอบ"} open={adding} onClick={() => setAdding((v) => !v)} />
-      <AddSessionQuestionPanel session={session} open={adding} practice={practice} />
+      <DetailAddRow label={practice ? "เพิ่มแนวข้อสอบ" : "เพิ่มข้อสอบ"} open={adding} onClick={() => { setAddedOnce(true); setAdding((v) => !v); }} />
+      {addedOnce && (
+        <Suspense fallback={null}>
+          <AddSessionQuestionPanel session={session} open={adding} practice={practice} />
+        </Suspense>
+      )}
       {printing && <PrintExamSheet session={session} questions={chosen} subjects={printSubjects} withKey={printing === "key"} onDone={() => setPrinting(null)} />}
       {/* Keyed so the form remounts with the picked question; its state is seeded once on mount. */}
-      <QuestionSheet
-        key={editingQ?.id ?? "new"}
-        open={!!editingQ}
-        onOpenChange={(v) => !v && setEditingQ(null)}
-        subjectId={editingQ?.subject_id ?? null}
-        planTopicId={editingQ?.plan_topic_id ?? null}
-        teacherId={profile?.id ?? session.teacher_id}
-        question={editingQ}
-      />
+      {(editingQ || sheetWarm) && (
+        <Suspense fallback={null}>
+          <QuestionSheet
+            key={editingQ?.id ?? "new"}
+            open={!!editingQ}
+            onOpenChange={(v) => !v && setEditingQ(null)}
+            subjectId={editingQ?.subject_id ?? null}
+            planTopicId={editingQ?.plan_topic_id ?? null}
+            teacherId={profile?.id ?? session.teacher_id}
+            question={editingQ}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
@@ -2167,59 +2194,11 @@ function SecurityEventsSheet({ sessionId, open, onOpenChange }: { sessionId: str
 }
 
 /** "เพิ่มข้อสอบ": a new question written here goes straight into the room. */
-function AddSessionQuestionPanel({ session, open, practice }: { session: ExamSession; open: boolean; practice?: boolean }) {
-  const { profile } = useAuth();
-  const add = useAddSessionQuestion();
-  const toast = useToast();
-  // The DB only accepts room questions tagged with a topic of the room's sets (check_exam_session_question_topic).
-  const { data: roomSets } = useSessionSets([session.id]);
-  const { data: topicsBySet } = useTopicSetsTopics((roomSets?.get(session.id) ?? []).map((x) => x.topic_set_id));
-  const topics = [...new Map([...(topicsBySet?.values() ?? [])].flat().map((t) => [t.topic_id, t])).values()];
-  const [pickedLesson, setPickedLesson] = useState("");
-  const [picked, setPicked] = useState("");
-  const lessons = [...new Set(topics.map((t) => t.lesson))];
-  const lesson = lessons.includes(pickedLesson) ? pickedLesson : "";
-  const lessonTopics = topics.filter((t) => t.lesson === lesson);
-  // Nothing is preselected when there is a choice; a lone topic is used as is.
-  const topicId = lessonTopics.some((t) => t.topic_id === picked) ? picked : topics.length === 1 ? (topics[0]?.topic_id ?? null) : null;
-  const form = useQuestionForm({
-    subjectId: session.subject_id,
-    planTopicId: topicId,
-    teacherId: profile?.id ?? session.teacher_id,
-    question: null,
-    onSaved: (questionId) => add.mutate({ sessionId: session.id, questionId, practice }, { onError: (e) => toast(e.message || "เพิ่มข้อสอบเข้าห้องไม่สำเร็จ", "error") }),
-  });
-  return (
-    <Collapse open={open}>
-      <div className="border-t border-border bg-card p-3">
-        {topics.length > 1 && (
-          <div className="mb-3 grid gap-3 sm:grid-cols-2">
-            <Field label="บทเรียน">
-              <Select value={lesson} placeholder="เลือกบทเรียน" onChange={(e) => setPickedLesson(e.target.value)}>
-                {lessons.map((l) => (
-                  <option key={l} value={l}>{l}</option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="หัวข้อ">
-              <Select value={topicId ?? ""} placeholder="เลือกหัวข้อ" disabled={!lesson} onChange={(e) => setPicked(e.target.value)}>
-                {lessonTopics.map((t) => (
-                  <option key={t.topic_id} value={t.topic_id}>{t.topic}</option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-        )}
-        {topicId ? <QuestionForm form={form} hideTopic /> : <p className="text-xs text-muted-foreground">เลือกบทเรียนและหัวข้อก่อนเพิ่มข้อสอบ</p>}
-      </div>
-    </Collapse>
-  );
-}
-
 // ============================================================== student side
 
 /** Same self/child picker shape as Assignments.tsx. */
 function StudentExams() {
+  useEffect(() => preloadQuestionPromptView(), []); // ready before the first question is drawn
   const { profile, myStudent } = useAuth();
   const isParent = profile?.roles.includes("parent") ?? false;
   const { data: children = [] } = useMyChildren(isParent ? (profile?.id ?? null) : null);

@@ -402,12 +402,6 @@ function TopicPickerPage({
 type Filter = ExamApprovalStatus;
 const FILTERS: Filter[] = ["pending", "approved", "rejected"];
 
-export function useExamApprovalPendingCount(enabled: boolean) {
-  const { profile } = useAuth();
-  const { data = [] } = useTopicSetQueue(enabled, profile?.id ?? null);
-  return data.filter((s) => s.approval_status === "pending").length;
-}
-
 /** The teacher's own submitted sets: same list as อนุมัติสอบ, over their own sets (withdraw instead of decide). */
 export function ExamSubmissionsTab({ teacherId, onCreateRoom }: { teacherId: string; onCreateRoom: (sets: ExamTopicSet[]) => void }) {
   return <ExamApprovalTab mineOf={teacherId} onCreateRoom={onCreateRoom} />;

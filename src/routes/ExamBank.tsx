@@ -25,6 +25,7 @@ import {
 import { useDepartments } from "@/hooks/useProfiles";
 import { useMyTeachingAssignments } from "@/hooks/useTeachingPlan";
 import type { ExamQuestionDifficulty, ExamQuestionType } from "@/lib/database.types";
+import { DIFFICULTY_BADGE_CLASS, DIFFICULTY_LABEL } from "@/lib/examDifficulty";
 import { gradeShortLabel } from "@/lib/gradeLevels";
 import { canManage, isOrgWide } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -45,18 +46,6 @@ function promptToPlainText(value: Value): string {
 function emptyLabelJson(): Value {
   return [{ type: "p", children: [{ text: "" }] }];
 }
-
-export const DIFFICULTY_LABEL: Record<ExamQuestionDifficulty, string> = {
-  easy: "ง่าย",
-  medium: "ปานกลาง",
-  hard: "ยาก",
-};
-
-export const DIFFICULTY_BADGE_CLASS: Record<ExamQuestionDifficulty, string> = {
-  easy: "bg-success/15 text-success",
-  medium: "bg-accent/15 text-accent",
-  hard: "bg-destructive/15 text-destructive",
-};
 
 /**
  * role="teacher" sees the bank for subjects they teach; a manager
