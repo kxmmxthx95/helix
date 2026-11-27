@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 import { ViewToggle, defaultView } from "@/components/ViewToggle";
 import { RoomsView } from "@/components/ExamRoomsView";
 import { ChipFilter, FilterButton, FilterSheet, SegmentedFilter } from "@/components/FilterSheet";
@@ -1208,6 +1210,7 @@ function SessionDetail({ session, onBack, embedded = false }: { session: ExamSes
   const [rosterFilter, setRosterFilter] = useState<"all" | "submitted" | "in_progress" | "none" | "locked">("all");
   const [retakeIds, setRetakeIds] = useState<string[] | null>(null);
   const [scoring, setScoring] = useState<string | null>(null); // student_id whose score the teacher is entering
+  const [viewing, setViewing] = useState<string | null>(null); // student_id whose answers the teacher is reading
   const { data: grants } = useSessionGrants(session.id);
   const { data: leaveCounts } = useSessionLeaveCounts(attempts.filter((a) => !a.is_manual).map((a) => ({ id: a.id, student_id: a.student_id })), rosterOpen);
   const grantRetake = useGrantRetake();
@@ -1283,12 +1286,15 @@ function SessionDetail({ session, onBack, embedded = false }: { session: ExamSes
         manual,
         isManual: !!latest?.is_manual,
         isScan: !!latest?.is_scan,
+        // Newest submitted attempt that has answers to look at (a teacher-typed score has none).
+        viewAttempt: mine.filter((a) => a.status === "submitted" && (!a.is_manual || a.is_scan)).sort((a, b) => attemptScoreTime(b) - attemptScoreTime(a))[0] ?? null,
       };
     })
     .sort((a, b) => a.room.localeCompare(b.room, "th") || a.full.localeCompare(b.full, "th"));
   const retakeable = rosterRows.filter((r) => r.canRetake);
   const canScore = !!session.opens_at && new Date(session.opens_at) <= new Date(); // the server also checks the role and the roster
   const scoringRow = rosterRows.find((r) => r.student_id === scoring) ?? null;
+  const viewingRow = rosterRows.find((r) => r.student_id === viewing) ?? null;
   const count = (st: string) => rosterRows.filter((r) => r.status === st).length;
   const STATUS_LABEL = { locked: "ถูกล็อก", submitted: "ส่งแล้ว", in_progress: "กำลังทำ", none: "ยังไม่เข้าสอบ" } as const;
   const STATUS_CLASS = { locked: "text-destructive", submitted: "text-success", in_progress: "text-foreground", none: "text-muted-foreground" } as const;
@@ -1445,7 +1451,10 @@ function SessionDetail({ session, onBack, embedded = false }: { session: ExamSes
               <ul className="scrollbar-hidden max-h-[60vh] divide-y divide-border overflow-y-auto border-t border-border bg-card">
                 {shownRoster.map((r) => (
                   <li key={r.student_id} className="px-3 py-2.5">
-                    <div className="flex items-center gap-3">
+                    <div
+                      className={cn("flex items-center gap-3", r.viewAttempt && "cursor-pointer")}
+                      {...(r.viewAttempt ? { role: "button", tabIndex: 0, onClick: () => setViewing(r.student_id), onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setViewing(r.student_id); } } } : {})}
+                    >
                       <Avatar
                         name={r.name}
                         src={rosterAvatars?.get(r.student_id) ?? null}
@@ -1553,8 +1562,43 @@ function SessionDetail({ session, onBack, embedded = false }: { session: ExamSes
         onConfirm={() => retakeIds && grantRetake.mutate({ sessionId: session.id, studentIds: retakeIds }, { onSuccess: (n) => { setRetakeIds(null); if (n > 0) toast(`เพิ่มสิทธิ์สอบใหม่ ${n} คนแล้ว`); else toast("ไม่มีนักเรียนที่ให้สอบใหม่ได้ (กำลังทำอยู่ หรือยังมีสิทธิ์สอบเหลือ)", "error"); }, onError: () => toast("บันทึกไม่สำเร็จ", "error") })}
       />
       <SecurityEventsSheet sessionId={session.id} open={eventsOpen} onOpenChange={setEventsOpen} />
+      {viewingRow?.viewAttempt && <AttemptAnswersSheet session={session} attempt={viewingRow.viewAttempt} name={viewingRow.full} maxPoints={maxPoints} sessionQuestions={sessionQuestions} onClose={() => setViewing(null)} />}
       {scoringRow && <ManualScoreSheet session={session} row={scoringRow} maxPoints={maxPoints} onClose={() => setScoring(null)} />}
     </div>
+  );
+}
+
+/** Teacher's read-only view of one student's submitted answers, with the key (the teacher reads the bank directly; students go through exam_review_key). */
+function AttemptAnswersSheet({ session, attempt, name, maxPoints, sessionQuestions, onClose }: { session: ExamSession; attempt: ExamAttempt; name: string; maxPoints: number; sessionQuestions: { question_id: string; points: number }[]; onClose: () => void }) {
+  const { data: answers } = useAttemptAnswers(attempt.id);
+  const { data: bank } = useQuery({
+    queryKey: ["exam_attempt_bank", attempt.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("exam_questions").select("*, choices:exam_question_choices(*)").in("id", attempt.question_order);
+      if (error) throw error;
+      return new Map((data as unknown as ExamQuestionWithChoices[]).map((q) => [q.id, { ...q, choices: [...q.choices].sort((a, b) => a.position - b.position) }]));
+    },
+  });
+  const pointsOf = new Map(sessionQuestions.map((x) => [x.question_id, x.points]));
+  const ordered = bank ? attempt.question_order.map((id) => bank.get(id)).filter((q): q is NonNullable<typeof q> => !!q) : [];
+  const paperQuestions: PaperQuestion[] = ordered.map((q) => {
+    const ans = answers?.get(q.id);
+    const given = !!ans && (!!ans.choice_id || !!ans.short_answer?.trim());
+    const max = pointsOf.get(q.id);
+    return {
+      id: q.id,
+      prompt: <QuestionPromptView value={q.prompt_json} />,
+      choices: q.question_type === "short_answer" ? undefined : (session.shuffle_choices ? stableShuffle(q.choices, attempt.id) : q.choices).map((c) => ({ id: c.id, label: <QuestionPromptView value={c.label_json} />, correct: c.is_correct })),
+      verdict: !given ? "skipped" : ans?.is_correct ? "right" : "wrong",
+      correctAnswer: q.correct_answer,
+      points: max != null ? `ได้ ${ans?.points_awarded ?? 0}/${max} คะแนน` : undefined,
+    };
+  });
+  const paperAnswers = Object.fromEntries(ordered.map((q) => [q.id, { choiceId: answers?.get(q.id)?.choice_id ?? null, text: answers?.get(q.id)?.short_answer ?? "" }]));
+  return (
+    <Sheet open onOpenChange={(o) => !o && onClose()} title="คำตอบของนักเรียน" description={name} wide>
+      {!bank || !answers ? <PageSpinner /> : <ExamPaper questions={paperQuestions} answers={paperAnswers} review={{ scoreLabel: `${attempt.score ?? "—"}/${maxPoints}` }} onLeave={onClose} leaveLabel="ปิด" />}
+    </Sheet>
   );
 }
 
