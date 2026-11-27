@@ -26,7 +26,7 @@ it("one column per used room, hides empty rooms, shows gaps and clashes, switche
         venues={[{ id: "r1", name: "101" }, { id: "r2", name: "202" }, { id: "r3", name: "303" }]}
         subjectsOf={() => []}
         seatBadge={() => null}
-        clashing={new Set(["a", "b"])}
+        clashing={new Set(["r1|a", "r1|b"])}
         onOpen={(s) => opened.push(s.id)}
       />,
     ),

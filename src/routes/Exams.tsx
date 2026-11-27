@@ -2,17 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ViewToggle, defaultView } from "@/components/ViewToggle";
 import { RoomsView } from "@/components/ExamRoomsView";
+import { ChipFilter, FilterButton, FilterSheet, SegmentedFilter } from "@/components/FilterSheet";
+import { LEAVE_WINDOW_MS } from "@/lib/examLeaves";
 import { dayKey, isLive, roomClashes } from "@/lib/examRooms";
 import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth, usePauseIdleSignOut } from "@/auth/AuthProvider";
 import { QuestionPromptView } from "@/components/editor/QuestionPromptView";
-import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, FunnelIcon, LayersIcon, ListIcon, LocationIcon, PrintIcon, TimeIcon, PencilIcon, PeopleIcon, Plus, StarIcon, TrashIcon } from "@/components/icons";
+import { AlertTriangle, BookIcon, CalendarIcon, ChevronForward, SettingsIcon, CheckmarkCircleIcon, ChevronBack, ClipboardIcon, DocumentTextIcon, LayersIcon, ListIcon, LocationIcon, PrintIcon, Search, TimeIcon, PencilIcon, PeopleIcon, StarIcon, TrashIcon } from "@/components/icons";
 import { Collapse } from "@/components/Collapse";
+import { DetailAddRow, DetailGroup, DetailRow } from "@/components/DetailRow";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { COL_TONES, ExamSeatingCard, seatLabel } from "@/components/ExamSeatingCard";
 import { useMyExamSeats, useSeatTemplates, useSessionRoomIds, useSessionRooms, useSessionSeats, useSeatingStatus, useSessionsWithSeating, useSetRoomPhysical, useSpecialSeats } from "@/hooks/useExamSeating";
 import { GlyphTile, IconTile } from "@/components/IconTile";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, usePhone } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, Card, EmptyState, Field, FormSection, Input, PageSpinner, Select, Switch } from "@/components/ui";
 import { useMyChildren } from "@/hooks/useAttendance";
@@ -39,6 +42,7 @@ import {
   useExamSessionTargets,
   useLockedCodeStudents,
   useLogAttemptEvent,
+  useSessionLeaveCounts,
   useMyAttempts,
   useMyCurrentClassroom,
   useAllExamSessions,
@@ -177,10 +181,14 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
   const ownerById = new Map(owners.map((o) => [o.id, o]));
   const [editing, setEditing] = useState<ExamSession | null>(null);
   const [view, setView] = useState<"cards" | "table" | "rooms">(defaultView);
+  // Phones get cards or the room grid (table is desktop-only); the phone switch writes the same `view` state.
+  const phone = usePhone();
+  const mode = phone && view === "table" ? "cards" : view;
   const [when, setWhen] = useState<"active" | "past" | "all">("active");
   const [printing, setPrinting] = useState(false);
   const [fGrade, setFGrade] = useState("");
   const [fRoom, setFRoom] = useState("");
+  const [query, setQuery] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const filterCount = [canSeeAll && scope !== defaultScope, when !== "active", fGrade, fRoom].filter(Boolean).length;
   const colors = useSubjectColors([]);
@@ -228,12 +236,21 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
     return when === "past" ? ended : !ended;
   })
     .filter((s) => !fRoom || classroomIdsOf(s).includes(fRoom))
-    .filter((s) => !fGrade || classroomIdsOf(s).some((id) => classrooms.find((c) => c.id === id)?.grade_level_id === fGrade));
-  const byDay = new Map<string, ExamSession[]>();
-  for (const s of shown.slice().sort((a, b) => a.opens_at!.localeCompare(b.opens_at!))) {
-    const day = new Date(s.opens_at!).toLocaleDateString("th-TH", { dateStyle: "full" });
-    byDay.set(day, [...(byDay.get(day) ?? []), s]);
-  }
+    .filter((s) => !fGrade || classroomIdsOf(s).some((id) => classrooms.find((c) => c.id === id)?.grade_level_id === fGrade))
+    .filter((s) => {
+      // Search: subject name/code, exam type or title, room, venue, teacher.
+      const needle = query.trim().toLowerCase();
+      if (!needle) return true;
+      const texts = [
+        s.title,
+        s.exam_type,
+        venueOf(s),
+        ownerName(ownerById.get(s.teacher_id)),
+        ...(sessionSets?.get(s.id) ?? []).flatMap((x) => roomOfSet(x.topic_set_id) ?? []),
+        ...subjectsOf(s).flatMap((x) => [x.name_th, x.code]),
+      ];
+      return texts.some((t) => t?.toLowerCase().includes(needle));
+    });
 
   if (sessions.length === 0) {
     return (
@@ -256,6 +273,9 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
   };
   const row = (s: ExamSession) => {
     const sets = sessionSets?.get(s.id) ?? [{ subject_id: s.subject_id, topic_set_id: "" }];
+    const owner = ownerById.get(s.teacher_id);
+    const venue = venueOf(s);
+    // Only two things carry a colour: the seating status (top right) and each subject's class. The rest is plain text, so the badges don't line up in a row.
     return (
       <div
         key={s.id}
@@ -263,39 +283,42 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
         tabIndex={0}
         onClick={() => setEditing(s)}
         onKeyDown={(e) => e.key === "Enter" && setEditing(s)}
-        className="cursor-pointer rounded-xl border border-border bg-card p-3 text-xs hover:bg-muted active:bg-muted"
+        className={cn("cursor-pointer rounded-xl border bg-card p-3.5 text-xs hover:bg-muted active:bg-muted", isLive(s, now) ? "border-success/50" : "border-border")}
       >
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0 space-y-2">
-            <p className="flex items-center text-sm font-semibold tabular-nums">{liveDot(s)}{fmtTime(s.opens_at!)}{s.closes_at ? ` – ${fmtTime(s.closes_at)}` : ""}</p>
-            {s.exam_type ? (
-              <p className="flex flex-wrap items-center gap-1">
-                <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", kindTone(s.exam_type))}>{s.exam_type}</span>
-                {s.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(s.round))}>ครั้งที่ {s.round}</span>}
-                {venueOf(s) && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">ห้องสอบ {venueOf(s)}</span>}
-                {seatBadge(s)}
-              </p>
-            ) : (
-              <p className="truncate text-muted-foreground">{s.title}</p>
-            )}
-            {sets.map((x) => {
-              const subject = subjectById.get(x.subject_id);
-              const room = roomOfSet(x.topic_set_id);
-              return subject ? (
-                <div key={x.subject_id + x.topic_set_id}>
-                  <p className="truncate text-sm font-medium">{subject.name_th}</p>
-                  <p className="mt-1 flex flex-wrap items-center gap-1">
-                    <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(subject.learning_area_id))}>{subject.code}</span>
-                    {room && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(room))}>{room}</span>}
-                  </p>
-                </div>
-              ) : null;
-            })}
-            <div className="flex min-w-0 items-center gap-2 pt-1 text-muted-foreground">
-              <Avatar name={ownerName(ownerById.get(s.teacher_id))} src={ownerById.get(s.teacher_id) ? avatarUrl(ownerById.get(s.teacher_id)!) : null} className="h-6 w-6 text-[9px]" />
-              <span className="truncate">{ownerName(ownerById.get(s.teacher_id))}</span>
-            </div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-medium text-muted-foreground">{new Date(s.opens_at!).toLocaleDateString("th-TH", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}</p>
+            <p className="mt-0.5 flex items-center text-base font-semibold tabular-nums leading-6">{liveDot(s)}{fmtTime(s.opens_at!)}{s.closes_at ? ` – ${fmtTime(s.closes_at)}` : ""}</p>
+            <p className="mt-0.5 truncate text-muted-foreground">
+              {s.exam_type ? <><span className="font-medium text-foreground">{s.exam_type}</span>{s.round ? ` · ครั้งที่ ${s.round}` : ""}</> : s.title}
+            </p>
           </div>
+          <div className="shrink-0">{seatBadge(s)}</div>
+        </div>
+        <ul className="mt-3 divide-y divide-border border-y border-border">
+          {sets.map((x) => {
+            const subject = subjectById.get(x.subject_id);
+            const room = roomOfSet(x.topic_set_id);
+            return subject ? (
+              <li key={x.subject_id + x.topic_set_id} className="flex items-center gap-2.5 py-2">
+                <span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(subject.learning_area_id))}>{subject.code}</span>
+                <p className="min-w-0 flex-1 text-sm font-medium leading-5">{subject.name_th}</p>
+                {room && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(room))}>{room}</span>}
+              </li>
+            ) : null;
+          })}
+        </ul>
+        <div className="mt-3 flex items-center justify-between gap-3 text-muted-foreground">
+          <div className="flex min-w-0 items-center gap-2">
+            <Avatar name={ownerName(owner)} src={owner ? avatarUrl(owner) : null} className="h-6 w-6 shrink-0 text-[9px]" />
+            <span className="truncate font-medium text-foreground">{ownerName(owner)}</span>
+          </div>
+          {venue && (
+            <span className="flex min-w-0 max-w-[55%] items-center gap-1 text-foreground" title="ห้องสอบ">
+              <LocationIcon className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate font-medium tabular-nums">{venue}</span>
+            </span>
+          )}
         </div>
       </div>
     );
@@ -319,34 +342,27 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
   const printRooms = classrooms.map((c) => ({ id: c.id, gradeId: c.grade_level_id, label: `${gradeShortLabel(grades.find((g) => g.id === c.grade_level_id)?.code ?? "")}/${c.name}` }));
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <Sheet
+      <FilterSheet
         open={filterOpen}
         onOpenChange={setFilterOpen}
         title="กรองตารางสอบ"
-        footer={
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" disabled={filterCount === 0} onClick={() => { setScope(defaultScope); setWhen("active"); setFGrade(""); setFRoom(""); }}>
-              ล้าง
-            </Button>
-            <Button type="button" className="flex-1" onClick={() => setFilterOpen(false)}>
-              ดู {shown.length} รายการ
-            </Button>
-          </div>
-        }
+        activeCount={filterCount}
+        resultText={`ดู ${shown.length} รายการ`}
+        onClear={() => { setScope(defaultScope); setWhen("active"); setFGrade(""); setFRoom(""); }}
       >
-        <div className="space-y-5">
-          {canSeeAll && <ChipRow label="ขอบเขต" all={null} value={scope} onChange={(v) => setScope(v as "mine" | "all")} options={[["mine", "ของฉัน"], ["all", "ทุกวิชา"]]} />}
-          <ChipRow label="ช่วงเวลาสอบ" all={null} value={when} onChange={(v) => setWhen(v as typeof when)} options={[["active", "ยังไม่สิ้นสุด"], ["past", "ผ่านไปแล้ว"], ["all", "ทั้งหมด"]]} />
-          <ChipRow label="ชั้น" value={fGrade} onChange={(v) => { setFGrade(v); setFRoom(""); }} options={gradeOptions.map((g) => [g.id, gradeShortLabel(g.code)])} />
-          <ChipRow label="ห้อง" value={fRoom} onChange={setFRoom} options={roomOptions.map((r) => [r.id, r.label])} />
-        </div>
-      </Sheet>
+        {canSeeAll && <SegmentedFilter label="ขอบเขต" value={scope} onChange={(v) => setScope(v as "mine" | "all")} options={[["mine", "ของฉัน"], ["all", "ทุกวิชา"]]} />}
+        <SegmentedFilter label="ช่วงเวลาสอบ" value={when} onChange={(v) => setWhen(v as typeof when)} options={[["active", "ยังไม่สิ้นสุด"], ["past", "ผ่านไปแล้ว"], ["all", "ทั้งหมด"]]} />
+        <ChipFilter label="ชั้น" value={fGrade} onChange={(v) => { setFGrade(v); setFRoom(""); }} options={gradeOptions.map((g) => [g.id, gradeShortLabel(g.code)])} />
+        <ChipFilter label="ห้อง" value={fRoom} onChange={setFRoom} options={roomOptions.map((r) => [r.id, r.label])} />
+      </FilterSheet>
       {printing && <PrintScheduleDrawer items={printItems} grades={printGrades} rooms={printRooms} onClose={() => setPrinting(false)} />}
       <div className="flex shrink-0 items-center justify-end gap-2">
-        <Button size="sm" variant="outline" className="ui-control-compact h-8 gap-1 px-2.5 lg:hidden" aria-label="กรองตารางสอบ" onClick={() => setFilterOpen(true)}>
-          <FunnelIcon className="h-3 w-3" />{filterCount > 0 && <span className="text-xs tabular-nums">{filterCount}</span>}
-        </Button>
-        <div className="contents max-lg:hidden">
+        <div className="relative min-w-0 flex-1 lg:flex-[1.3]">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+          <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ค้นหาวิชา ครู ห้อง" aria-label="ค้นหาตารางสอบ" className="ui-control-compact h-8 pl-8 text-[13px]" />
+        </div>
+        <FilterButton count={filterCount} label="กรองตารางสอบ" onClick={() => setFilterOpen(true)} />
+        <div className="hidden lg:contents">
           {canSeeAll && (
             <Select className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:pr-8 min-w-0 flex-1" aria-label="ขอบเขตตารางสอบ" value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")}>
               <option value="mine">ของฉัน</option>
@@ -370,7 +386,8 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
         <Button size="sm" variant="outline" className="ui-control-compact h-8 gap-1 px-2.5" aria-label="พิมพ์ตารางสอบ" disabled={isLoading || detailsLoading} onClick={() => setPrinting(true)}>
           <PrintIcon className="h-3.5 w-3.5" />
         </Button>
-        <ViewToggle value={view} onChange={setView} views={["cards", "table", "rooms"]} />
+        <ViewToggle value={view} onChange={setView} views={["cards", "table", "rooms"]} className="hidden lg:flex" />
+        <ViewToggle value={mode === "rooms" ? "rooms" : "cards"} onChange={setView} views={["cards", "rooms"]} className="flex lg:hidden" />
       </div>
       {isLoading || detailsLoading ? <PageSpinner /> : shown.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
@@ -379,7 +396,7 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
             description={when === "past" ? "เลือก 'ทั้งหมด' เพื่อดูทุกการสอบ" : "เลือก 'ทั้งหมด' เพื่อดูการสอบที่ผ่านไปแล้ว"}
           />
         </div>
-      ) : view === "table" ? (
+      ) : mode === "table" ? (
         <div className="table-panel flex rounded-none border-t border-border shadow-none">
           <div className="table-panel-scroll scrollbar-hidden">
             <table className="w-full min-w-[36rem] text-[13px]">
@@ -431,24 +448,21 @@ function ExamSchedule({ teacherId, canSeeAll }: { teacherId: string; canSeeAll: 
             </table>
           </div>
         </div>
-      ) : view === "rooms" ? (
+      ) : mode === "rooms" ? (
         <RoomsView
           sessions={scheduled}
           roomIdsOf={roomIdsOf}
           venues={venues}
           subjectsOf={subjectsOf}
+          subjectTone={(x) => colors.shade(x.learning_area_id)}
+          levelsOf={(s) => [...new Set((sessionSets?.get(s.id) ?? []).flatMap((x) => roomOfSet(x.topic_set_id) ?? []))]}
           seatBadge={seatBadge}
           clashing={clashingIds}
           onOpen={setEditing}
         />
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-          {[...byDay].map(([day, list]) => (
-            <section key={day} className="space-y-2">
-              <h3 className="text-xs font-semibold text-muted-foreground">{day}</h3>
-              {list.map((s) => row(s))}
-            </section>
-          ))}
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+          {scheduled.map((s) => row(s))}
         </div>
       )}
       {editing && <SeatingSheet session={sessions.find((x) => x.id === editing.id) ?? editing} onClose={() => setEditing(null)} />}
@@ -489,35 +503,16 @@ function ScheduleCard({ session, defaultOpen = false }: { session: ExamSession; 
   }
 
   return (
-    <div className="shrink-0 overflow-hidden rounded-lg border border-border">
-      <button
-        type="button"
-        aria-expanded={open}
+    <div className="shrink-0 overflow-hidden rounded-xl border border-border bg-card">
+      <DetailRow
+        icon={CalendarIcon}
+        tone="setup"
+        title="เวลาสอบ"
+        open={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
-      >
-        <span className="flex shrink-0 items-center gap-2">
-          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><CalendarIcon className="h-4 w-4" /></IconTile>
-          <span className="font-semibold text-foreground">เวลาสอบ</span>
-        </span>
-        <span className="flex min-w-0 items-center gap-2 text-right text-foreground">
-          {session.opens_at && session.closes_at ? (
-            (() => {
-              const w = windowParts(session.opens_at, session.closes_at);
-              return (
-                <>
-                  <span className="shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">{w.date}</span>
-                  <span className="shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success">{w.time}</span>
-                </>
-              );
-            })()
-          ) : (
-            <span className="truncate rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-semibold text-destructive">ยังไม่ได้ตั้งเวลา</span>
-          )}
-          {!(session.opens_at && session.closes_at) && <span className="flex shrink-0 text-destructive" role="img" aria-label="ยังไม่ได้ตั้งค่า"><AlertTriangle className="h-4 w-4" /></span>}
-          <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
-        </span>
-      </button>
+        alert={!(session.opens_at && session.closes_at)}
+        summary={session.opens_at && session.closes_at ? (() => { const w = windowParts(session.opens_at, session.closes_at); return `${w.date} · ${w.time}`; })() : "ยังไม่ได้ตั้งเวลา"}
+      />
       <Collapse open={open}>
         <div className="space-y-3 border-t border-border bg-muted/40 p-3 [&_.text-sm]:text-xs [&_input]:!h-6 [&_input]:!text-xs">
           <FormSection>
@@ -721,20 +716,8 @@ function PrintExamCard({ session }: { session: ExamSession }) {
   const byId = new Map(bank.map((q) => [q.id, q]));
   const chosen = sessionQuestions.map((r) => byId.get(r.question_id)).filter((q): q is ExamQuestionWithChoices => !!q);
   return (
-    <div className="shrink-0 overflow-hidden rounded-lg border border-border">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
-      >
-        <span className="flex shrink-0 items-center gap-2">
-          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><PrintIcon className="h-4 w-4" /></IconTile>
-          <span className="font-semibold text-foreground">พิมพ์ข้อสอบ</span>
-        </span>
-        <span className="ml-auto rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success">{sessionQuestions.length} ข้อ</span>
-        <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
-      </button>
+    <div className="shrink-0 overflow-hidden rounded-xl border border-border bg-card">
+      <DetailRow icon={PrintIcon} tone="content" title="พิมพ์ข้อสอบ" open={open} onClick={() => setOpen((v) => !v)} summary={`${sessionQuestions.length} ข้อ`} />
       <Collapse open={open}>
         <div className="flex flex-wrap gap-2 border-t border-border bg-card p-3">
           {sessionQuestions.length === 0 ? (
@@ -776,7 +759,6 @@ function ChipRow({ label, value, onChange, options, all = "ทั้งหมด
 
 /** canSeeAll: heads/approvers may switch to every room RLS shows them (their department; all for org-wide). A head with no teaching load has no "mine". */
 function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canSeeAll: boolean }) {
-  const { data: assignments = [] } = useMyTeachingAssignments(teacherId);
   const [scope, setScope] = useState<"mine" | "all">(teacherId ? "mine" : "all");
   const mine = useMyExamSessions(teacherId);
   const all = useAllExamSessions(canSeeAll && scope === "all");
@@ -784,6 +766,8 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<ExamSession | null>(null);
   const [view, setView] = useState<"cards" | "table">(defaultView);
+  // Phones always get the card list: the table and room grid are desktop-only, so the switch is hidden there too.
+  const mode = usePhone() ? "cards" : view;
   const [deleting, setDeleting] = useState<ExamSession | null>(null);
   const colors = useSubjectColors([]);
   const { data: questionCounts, isLoading: countsLoading } = useSessionQuestionCounts(sessions.map((s) => s.id));
@@ -818,17 +802,30 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
   const [fArea, setFArea] = useState("");
   const [fGrade, setFGrade] = useState("");
   const [fRoom, setFRoom] = useState("");
+  const [query, setQuery] = useState("");
   const classroomIdOf = (s: ExamSession) => classroomOfAssignment?.get(assignmentOfSet.get(s.topic_set_id) ?? "") ?? "";
   const areaIdsOf = (s: ExamSession) =>
     (sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]).map((id) => topArea(subjectById.get(id)?.learning_area_id, areaById)?.id ?? "");
   const gradeIdOf = (s: ExamSession) => roomClassrooms.find((c) => c.id === classroomIdOf(s))?.grade_level_id ?? "";
+  // Search: subject name/code, exam type, class (ม.2/1) or teacher.
+  const needle = query.trim().toLowerCase();
+  const matches = (s: ExamSession) =>
+    !needle ||
+    [
+      s.title,
+      s.exam_type,
+      roomOf(s.topic_set_id),
+      ownerName(ownerById.get(s.teacher_id)),
+      ...(sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]).flatMap((id) => [subjectById.get(id)?.name_th, subjectById.get(id)?.code]),
+    ].some((t) => t?.toLowerCase().includes(needle));
   const shown = sessions.filter(
-    (s) => (!fArea || areaIdsOf(s).includes(fArea)) && (!fGrade || gradeIdOf(s) === fGrade) && (!fRoom || classroomIdOf(s) === fRoom),
+    (s) => matches(s) && (!fArea || areaIdsOf(s).includes(fArea)) && (!fGrade || gradeIdOf(s) === fGrade) && (!fRoom || classroomIdOf(s) === fRoom),
   );
   const areaOptions = [...new Map(sessions.flatMap(areaIdsOf).filter(Boolean).map((id) => [id, areaById.get(id)?.name ?? id])).entries()];
   const gradeOptions = [...roomGrades].sort((a, b) => a.code.localeCompare(b.code));
   const roomOptions = roomClassrooms.filter((c) => !fGrade || c.grade_level_id === fGrade).sort((a, b) => a.name.localeCompare(b.name, "th", { numeric: true }));
-  const filterCount = [fArea, fGrade, fRoom].filter(Boolean).length;
+  const defaultScope = teacherId ? "mine" : "all";
+  const filterCount = [canSeeAll && teacherId && scope !== defaultScope, fArea, fGrade, fRoom].filter(Boolean).length;
 
   // A room can only be switched on once time, questions and seating are set (switching off is always allowed).
   const { data: seatedIds } = useSessionsWithSeating(sessions.map((s) => s.id));
@@ -860,13 +857,17 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
   return (
     <div className="page-fill gap-3">
       <div className="flex shrink-0 items-center justify-end gap-2">
-        {canSeeAll && teacherId && (
-          <Select className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:pr-8" aria-label="ขอบเขตห้องสอบ" value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")}>
-            <option value="mine">ของฉัน</option>
-            <option value="all">ทุกวิชา</option>
-          </Select>
-        )}
-        <div className="contents max-lg:hidden">
+        <div className="relative min-w-0 flex-1 lg:flex-[1.3]">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+          <Input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ค้นหาวิชา ครู ห้อง" aria-label="ค้นหาห้องสอบ" className="ui-control-compact h-8 pl-8 text-[13px]" />
+        </div>
+        <div className="hidden lg:contents">
+          {canSeeAll && teacherId && (
+            <Select className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:pr-8" aria-label="ขอบเขตห้องสอบ" value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")}>
+              <option value="mine">ของฉัน</option>
+              <option value="all">ทุกวิชา</option>
+            </Select>
+          )}
           <Select className="ui-control-compact h-8 min-w-0 flex-1 px-2.5 pr-7 text-[13px] sm:pr-8" aria-label="กลุ่มสาระ" value={fArea} onChange={(e) => setFArea(e.target.value)}>
             <option value="">ทุกกลุ่มสาระ</option>
             {areaOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
@@ -880,42 +881,29 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
             {roomOptions.map((c) => <option key={c.id} value={c.id}>{roomOf(sessions.find((x) => classroomIdOf(x) === c.id)?.topic_set_id ?? "") ?? c.name}</option>)}
           </Select>
         </div>
-        <Button size="sm" variant="outline" className="ui-control-compact h-8 gap-1 px-2.5 lg:hidden" aria-label="กรองห้องสอบ" onClick={() => setFilterOpen(true)}>
-          <FunnelIcon className="h-3 w-3" />{filterCount > 0 && <span className="text-xs tabular-nums">{filterCount}</span>}
-        </Button>
-        <Button size="sm" className="ui-control-compact h-8 gap-1 px-2.5 sm:px-3" onClick={() => setCreating(true)} disabled={!teacherId || assignments.length === 0}>
-          <Plus className="h-3 w-3" /> เปิดสอบใหม่
-        </Button>
-        <ViewToggle value={view} onChange={setView} />
+        <FilterButton count={filterCount} label="กรองห้องสอบ" onClick={() => setFilterOpen(true)} />
+        <ViewToggle value={view} onChange={setView} className="hidden lg:flex" />
       </div>
 
-      <Sheet
+      <FilterSheet
         open={filterOpen}
         onOpenChange={setFilterOpen}
         title="กรองห้องสอบ"
-        footer={
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" className="flex-1" disabled={filterCount === 0} onClick={() => { setFArea(""); setFGrade(""); setFRoom(""); }}>
-              ล้าง
-            </Button>
-            <Button type="button" className="flex-1" onClick={() => setFilterOpen(false)}>
-              ดู {shown.length} ห้อง
-            </Button>
-          </div>
-        }
+        activeCount={filterCount}
+        resultText={`ดู ${shown.length} ห้อง`}
+        onClear={() => { setScope(defaultScope); setFArea(""); setFGrade(""); setFRoom(""); }}
       >
-        <div className="space-y-5">
-          <ChipRow label="กลุ่มสาระ" value={fArea} onChange={setFArea} options={areaOptions.map(([id, name]) => [id, name])} />
-          <ChipRow label="ชั้น" value={fGrade} onChange={(v) => { setFGrade(v); setFRoom(""); }} options={gradeOptions.map((g) => [g.id, gradeShortLabel(g.code)])} />
-          <ChipRow label="ห้อง" value={fRoom} onChange={setFRoom} options={roomOptions.map((c) => [c.id, roomOf(sessions.find((x) => classroomIdOf(x) === c.id)?.topic_set_id ?? "") ?? c.name])} />
-        </div>
-      </Sheet>
+        {canSeeAll && teacherId && <SegmentedFilter label="ขอบเขต" value={scope} onChange={(v) => setScope(v as "mine" | "all")} options={[["mine", "ของฉัน"], ["all", "ทุกวิชา"]]} />}
+        <ChipFilter label="กลุ่มสาระ" value={fArea} onChange={setFArea} options={areaOptions.map(([id, name]) => [id, name])} />
+        <ChipFilter label="ชั้น" value={fGrade} onChange={(v) => { setFGrade(v); setFRoom(""); }} options={gradeOptions.map((g) => [g.id, gradeShortLabel(g.code)])} />
+        <ChipFilter label="ห้อง" value={fRoom} onChange={setFRoom} options={roomOptions.map((c) => [c.id, roomOf(sessions.find((x) => classroomIdOf(x) === c.id)?.topic_set_id ?? "") ?? c.name])} />
+      </FilterSheet>
 
       {isLoading || detailsLoading ? <PageSpinner /> : shown.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState title={sessions.length === 0 ? "ยังไม่มีการเปิดสอบ" : "ไม่พบห้องสอบตามตัวกรอง"} description={sessions.length === 0 ? "กด “เปิดสอบใหม่” เพื่อเลือกข้อสอบจากคลังมาจัดสอบ" : "ลองล้างตัวกรอง"} />
+          <EmptyState title={sessions.length === 0 ? "ยังไม่มีการเปิดสอบ" : "ไม่พบห้องสอบตามตัวกรอง"} description={sessions.length === 0 ? "เปิดสอบจากชุดหัวข้อที่อนุมัติแล้ว" : "ลองล้างตัวกรองหรือเปลี่ยนคำค้นหา"} />
         </div>
-      ) : view === "cards" ? (
+      ) : mode === "cards" ? (
         <ul className="-mx-1 -mt-1 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-1 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-1">
           {shown.map((s) => {
             const roomSubjects = (sessionSets?.get(s.id)?.map((x) => x.subject_id) ?? [s.subject_id]).map((id) => subjectById.get(id)).filter((x): x is Subject => !!x);
@@ -933,32 +921,31 @@ function TeacherExams({ teacherId, canSeeAll }: { teacherId: string | null; canS
                       setSelected(s);
                     }
                   }}
-                  className="cursor-pointer rounded-xl border border-border bg-card p-3 text-xs hover:bg-muted active:bg-muted"
+                  className="cursor-pointer rounded-xl border border-border bg-card p-3.5 text-xs hover:bg-muted active:bg-muted"
                 >
-                  <div className="flex flex-wrap items-center gap-1">
-                    {s.exam_type && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", kindTone(s.exam_type))}>{s.exam_type}</span>}
-                    {s.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(s.round))}>ครั้งที่ {s.round}</span>}
-                    {room && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(room))}>{room}</span>}
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 truncate text-sm leading-6 text-muted-foreground">
+                      {s.exam_type ? <><span className="font-semibold text-foreground">{s.exam_type}</span>{s.round ? ` · ครั้งที่ ${s.round}` : ""}</> : s.title}
+                    </p>
                     {(questionCounts?.get(s.id) ?? 0) > 0 ? (
-                      <span className="ml-auto rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">มีข้อสอบ {questionCounts?.get(s.id)} ข้อ</span>
+                      <span className="shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">มีข้อสอบ {questionCounts?.get(s.id)} ข้อ</span>
                     ) : (
-                      <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">ยังไม่มีข้อสอบ</span>
+                      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">ยังไม่มีข้อสอบ</span>
                     )}
                   </div>
-                  <div className="mt-2 space-y-2">
+                  <ul className="mt-2.5 divide-y divide-border border-y border-border">
                     {roomSubjects.map((x) => (
-                      <div key={x.id} className="min-w-0">
-                        <p className="truncate text-sm font-medium">{x.name_th}</p>
-                        <p className="mt-1">
-                          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(x.learning_area_id))}>{x.code}</span>
-                        </p>
-                      </div>
+                      <li key={x.id} className="flex items-center gap-2.5 py-2">
+                        <span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(x.learning_area_id))}>{x.code}</span>
+                        <p className="min-w-0 flex-1 text-sm font-medium leading-5">{x.name_th}</p>
+                        {room && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(room))}>{room}</span>}
+                      </li>
                     ))}
-                  </div>
-                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
+                  </ul>
+                  <div className="mt-3 flex items-center justify-between gap-2 text-muted-foreground">
                     <div className="flex min-w-0 items-center gap-2">
                       <Avatar name={ownerName(owner)} src={owner ? avatarUrl(owner) : null} className="h-6 w-6 text-[9px]" />
-                      <span className="truncate">{ownerName(owner)}</span>
+                      <span className="truncate font-medium text-foreground">{ownerName(owner)}</span>
                     </div>
                     <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
                       {enableSwitch(s)}
@@ -1310,9 +1297,11 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   const { data: sessionQuestions = [], isLoading: questionsLoading } = useExamSessionQuestions(session.id);
   const [eventsOpen, setEventsOpen] = useState(false);
   const [rosterOpen, setRosterOpen] = useState(false);
+  const [rosterFilter, setRosterFilter] = useState<"all" | "submitted" | "in_progress" | "none" | "locked">("all");
   const [retakeIds, setRetakeIds] = useState<string[] | null>(null);
   const [scoring, setScoring] = useState<string | null>(null); // student_id whose score the teacher is entering
   const { data: grants } = useSessionGrants(session.id);
+  const { data: leaveCounts } = useSessionLeaveCounts(attempts.filter((a) => !a.is_manual).map((a) => ({ id: a.id, student_id: a.student_id })), rosterOpen);
   const grantRetake = useGrantRetake();
   const eventCount = useSecurityEvents(session.id).data?.length ?? 0;
   const toast = useToast();
@@ -1376,6 +1365,7 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         // Submitted and every attempt (max_attempts + granted extra) used up → teacher can grant one more.
         canRetake: status === "submitted" && real.length >= session.max_attempts + (grants?.get(r.student_id) ?? 0),
         student_id: r.student_id,
+        leaves: leaveCounts?.get(r.student_id) ?? 0,
         room: roomOfClassroom.get(r.classroom_id) ?? "—",
         code: rest.length > 0 ? code : "",
         name: rest.length > 0 ? rest.join(" ") : full,
@@ -1393,6 +1383,8 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
   const count = (st: string) => rosterRows.filter((r) => r.status === st).length;
   const STATUS_LABEL = { locked: "ถูกล็อก", submitted: "ส่งแล้ว", in_progress: "กำลังทำ", none: "ยังไม่เข้าสอบ" } as const;
   const STATUS_CLASS = { locked: "text-destructive", submitted: "text-success", in_progress: "text-foreground", none: "text-muted-foreground" } as const;
+  const STATUS_RING = { locked: "ring-destructive", submitted: "ring-success", in_progress: "ring-warning", none: "ring-transparent" } as const;
+  const shownRoster = rosterFilter === "all" ? rosterRows : rosterRows.filter((r) => r.status === rosterFilter);
   const STATUS_DOT = { locked: "bg-destructive", submitted: "bg-success", in_progress: "bg-primary", none: "bg-muted-foreground" } as const;
   const now = new Date();
   const status = !session.opens_at
@@ -1459,32 +1451,31 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
         </span>
       </div>
 
-      <SessionTopicsCard session={session} />
-
+      <DetailGroup label="ผู้เข้าสอบ">
+      <SecurityPanel session={session} attempts={attempts} />
       {rosterRows.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center">
+        <div className="rounded-xl border border-border bg-card px-3 py-6">
           <EmptyState title="ยังไม่มีนักเรียนในห้องนี้" description="ตรวจสอบการลงทะเบียนนักเรียนของห้องเรียน" />
         </div>
       ) : (
-        <div className="shrink-0 overflow-hidden rounded-lg border border-border">
-          <button
-            type="button"
-            aria-expanded={rosterOpen}
+        <div className="shrink-0 overflow-hidden rounded-xl border border-border bg-card">
+              <DetailRow
+            icon={PeopleIcon}
+            tone="people"
+            title={`นักเรียน ${rosterRows.length} คน`}
+            open={rosterOpen}
             onClick={() => setRosterOpen((v) => !v)}
-            className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
-          >
-            <span className="flex shrink-0 items-center gap-2">
-              <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><PeopleIcon className="h-4 w-4" /></IconTile>
-              <span className="font-semibold text-foreground">นักเรียน {rosterRows.length} คน</span>
-            </span>
-            <span className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-right">
-              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-success/15 text-success">ส่งแล้ว {count("submitted")}</span>
-              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-warning/15 text-warning">กำลังทำ {count("in_progress")}</span>
-              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-muted text-muted-foreground">ยังไม่เข้าสอบ {count("none")}</span>
-              {count("locked") > 0 && <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold bg-destructive/15 text-destructive">ถูกล็อก {count("locked")}</span>}
-            </span>
-            <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", rosterOpen && "rotate-90")} />
-          </button>
+            summary={
+              <>
+                <span className={count("submitted") > 0 ? "text-success" : undefined}>ส่งแล้ว {count("submitted")}</span>
+                {" · "}
+                <span className={count("in_progress") > 0 ? "text-warning" : undefined}>กำลังทำ {count("in_progress")}</span>
+                {" · "}
+                <span>ยังไม่เข้าสอบ {count("none")}</span>
+                {count("locked") > 0 && <span className="text-destructive"> · ถูกล็อก {count("locked")}</span>}
+              </>
+            }
+          />
           <Collapse open={rosterOpen}>
             {retakeable.length > 0 && (
               <div className="flex justify-end border-t border-border bg-muted/40 p-2">
@@ -1493,42 +1484,94 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
                 </Button>
               </div>
             )}
-            <ul className="max-h-[60vh] space-y-2 overflow-y-auto border-t border-border bg-muted/40 p-2">
-              {rosterRows.map((r) => (
-                <li key={r.student_id} className="rounded-xl bg-card p-3.5 shadow-card">
-                  <div className="flex items-start gap-3">
-                    <Avatar name={r.name} src={rosterAvatars?.get(r.student_id) ?? null} className="h-11 w-11 text-sm" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="truncate text-sm font-semibold">{r.name}</p>
-                        <span className={cn("mt-0.5 flex shrink-0 items-center gap-1 text-[11px]", STATUS_CLASS[r.status])}>
-                          <span className={cn("size-1.5 rounded-full", STATUS_DOT[r.status])} />
-                          {STATUS_LABEL[r.status]}
-                        </span>
+            {/* Progress of the room at a glance: submitted / in progress / not started. */}
+            <div
+              role="img"
+              aria-label={`ส่งแล้ว ${count("submitted")} กำลังทำ ${count("in_progress")} จาก ${rosterRows.length} คน`}
+              className="flex h-1.5 border-t border-border bg-muted"
+            >
+              <span className="bg-success" style={{ width: `${(count("submitted") / rosterRows.length) * 100}%` }} />
+              <span className="bg-warning" style={{ width: `${(count("in_progress") / rosterRows.length) * 100}%` }} />
+            </div>
+            {/* Counts double as filters, so a big room can be narrowed to "who has not started". */}
+            <div role="group" aria-label="กรองตามสถานะ" className="flex flex-wrap gap-1.5 border-t border-border bg-card px-3 py-2.5">
+              {(
+                [
+                  ["all", "ทั้งหมด", rosterRows.length],
+                  ["submitted", STATUS_LABEL.submitted, count("submitted")],
+                  ["in_progress", STATUS_LABEL.in_progress, count("in_progress")],
+                  ["none", STATUS_LABEL.none, count("none")],
+                  ...(count("locked") > 0 ? ([["locked", STATUS_LABEL.locked, count("locked")]] as const) : []),
+                ] as const
+              ).map(([key, label, n]) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={rosterFilter === key}
+                  onClick={() => setRosterFilter(key)}
+                  className={cn(
+                    "tappable rounded-full border px-3 py-1 text-xs font-medium tabular-nums transition-colors",
+                    rosterFilter === key ? "border-accent bg-accent-soft text-accent" : "border-border bg-card text-foreground hover:bg-muted",
+                  )}
+                >
+                  {label} {n}
+                </button>
+              ))}
+            </div>
+            {shownRoster.length === 0 ? (
+              <p className="border-t border-border bg-card px-3 py-6 text-center text-xs text-muted-foreground">ไม่มีนักเรียนในสถานะนี้</p>
+            ) : (
+              <ul className="grid max-h-[60vh] gap-2 overflow-y-auto border-t border-border bg-muted/40 p-2 sm:grid-cols-2 xl:grid-cols-3">
+                {shownRoster.map((r) => (
+                  <li key={r.student_id} className="flex flex-col rounded-xl border border-border bg-card p-3">
+                    <div className="flex items-start gap-3">
+                      <Avatar
+                        name={r.name}
+                        src={rosterAvatars?.get(r.student_id) ?? null}
+                        className={cn("h-10 w-10 shrink-0 text-xs ring-2 ring-offset-2 ring-offset-card", STATUS_RING[r.status])}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold leading-5">{r.name}</p>
+                        <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                          {r.code && <span className="tabular-nums">{r.code}</span>}
+                          {r.room !== "—" && <span className={cn("rounded-full px-1.5 py-px text-[10px] font-semibold", levelTone(r.room))}>{r.room}</span>}
+                        </p>
                       </div>
-                      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-                        {r.code && <span className="text-xs tabular-nums text-muted-foreground">{r.code}</span>}
-                        {r.room !== "—" && <span className={cn("inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium", levelTone(r.room))}>{r.room}</span>}
-                        {r.isManual && <span title={r.manual?.manual_note ?? undefined} className="ml-auto rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-semibold text-warning">ครูกรอก</span>}
-                        <span className={cn("text-xs tabular-nums text-muted-foreground", !r.isManual && "ml-auto")}>{r.best != null ? `${r.best}/${maxPoints}` : "—"}</span>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {r.canRetake && (
-                          <Button variant="outline" className="ui-control-compact h-7" onClick={() => setRetakeIds([r.student_id])}>
-                            สอบใหม่
-                          </Button>
-                        )}
-                        {canScore && (
-                          <Button variant="outline" className="ui-control-compact h-7" onClick={() => setScoring(r.student_id)}>
-                            {r.manual ? "แก้คะแนน" : "กรอกคะแนน"}
-                          </Button>
-                        )}
+                      <div className="shrink-0 text-right">
+                        <p className={cn("text-base tabular-nums leading-5", r.best != null ? "font-semibold text-foreground" : "text-muted-foreground")}>{r.best != null ? r.best : "—"}</p>
+                        <p className="text-[10px] tabular-nums text-muted-foreground">/{maxPoints}</p>
                       </div>
                     </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2.5">
+                      <span className={cn("flex items-center gap-1.5 text-[11px] font-medium", STATUS_CLASS[r.status])}>
+                        <span className={cn("size-1.5 rounded-full", STATUS_DOT[r.status])} />
+                        {STATUS_LABEL[r.status]}
+                        {r.isManual && <span title={r.manual?.manual_note ?? undefined} className="ml-1 rounded-full bg-warning/15 px-1.5 py-px text-[10px] font-semibold text-warning">ครูกรอก</span>}
+                        {r.leaves > 0 && (
+                          <span title="ตรวจพบการสลับแอปหรือหน้าจอระหว่างสอบ เป็นสัญญาณให้ตรวจดู ไม่ใช่หลักฐานว่าทุจริต" className="ml-1 rounded-full bg-warning/15 px-1.5 py-px text-[10px] font-semibold tabular-nums text-warning">
+                            ออกจากหน้าสอบ {r.leaves} ครั้ง
+                          </span>
+                        )}
+                      </span>
+                      {(r.canRetake || canScore) && (
+                        <span className="flex gap-1.5">
+                          {r.canRetake && (
+                            <Button variant="outline" className="ui-control-compact h-7" onClick={() => setRetakeIds([r.student_id])}>
+                              สอบใหม่
+                            </Button>
+                          )}
+                          {canScore && (
+                            <Button variant="outline" className="ui-control-compact h-7" onClick={() => setScoring(r.student_id)}>
+                              {r.manual ? "แก้คะแนน" : "กรอกคะแนน"}
+                            </Button>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
             {submitted.length > 0 && (
               <p className="border-t border-border bg-card px-3 py-2 text-xs text-muted-foreground">
                 ค่าเฉลี่ย: {(submitted.reduce((s, a) => s + (a.score ?? 0), 0) / submitted.length).toFixed(1)}/{maxPoints}
@@ -1537,14 +1580,19 @@ function SessionDetail({ session, onBack }: { session: ExamSession; onBack: () =
           </Collapse>
         </div>
       )}
+      </DetailGroup>
+
+      <DetailGroup label="การจัดสอบ">
       <ScheduleCard session={session} />
       <ExamSettingsCard session={session} />
       {rosterRows.length > 0 && <ExamSeatingCard session={session} roomPicker={(room, usedRoomIds) => <ExamRoomField session={session} room={room} usedRoomIds={usedRoomIds} />} students={rosterRows.map((r) => ({ student_id: r.student_id, name: r.name, code: r.code ?? "", avatar: rosterAvatars?.get(r.student_id) ?? null, classroom: r.room !== "—" ? r.room : "" }))} />}
+      </DetailGroup>
 
+      <DetailGroup label="เนื้อหาข้อสอบ">
+      <SessionTopicsCard session={session} />
       <SessionQuestionList session={session} sessionQuestions={sessionQuestions} />
       <PracticeQuestionsCards session={session} />
-
-      <SecurityPanel session={session} attempts={attempts} />
+      </DetailGroup>
         </>
       )}
 
@@ -1659,20 +1707,8 @@ function SessionTopicsCard({ session }: { session: ExamSession }) {
   const topics = [...new Map([...(topicsBySet?.values() ?? [])].flat().map((t) => [t.topic_id, t] as const)).values()];
   const lessons = [...Map.groupBy(topics, (t) => t.lesson)];
   return (
-    <div className="shrink-0 overflow-hidden rounded-lg border border-border">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
-      >
-        <span className="flex items-center gap-2">
-          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><ListIcon className="h-4 w-4" /></IconTile>
-          <span className="font-semibold text-foreground">หัวข้อการสอบ</span>
-        </span>
-        <span className="ml-auto rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-success">{topics.length} หัวข้อ</span>
-        <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
-      </button>
+    <div className="shrink-0 overflow-hidden rounded-xl border border-border bg-card">
+      <DetailRow icon={ListIcon} tone="content" title="หัวข้อการสอบ" open={open} onClick={() => setOpen((v) => !v)} summary={`${topics.length} หัวข้อ`} alert={topics.length === 0} />
       <Collapse open={open}>
         <div className="space-y-3 border-t border-border bg-card p-3">
           {canEdit && (
@@ -1786,22 +1822,8 @@ function ExamSettingsCard({ session }: { session: ExamSession }) {
   };
   const summary = [session.strict_mode ? "โหมดสอบจริง" : "โหมดปกติ", session.review_released ? "เปิดเฉลย" : null].filter(Boolean).join(" · ");
   return (
-    <div className="shrink-0 overflow-hidden rounded-lg border border-border">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
-      >
-        <span className="flex shrink-0 items-center gap-2">
-          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><SettingsIcon className="h-4 w-4" /></IconTile>
-          <span className="font-semibold text-foreground">ตั้งค่าห้องสอบ</span>
-        </span>
-        <span className="flex min-w-0 items-center gap-2 text-right text-foreground">
-          <span className="truncate rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">{summary}</span>
-          <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
-        </span>
-      </button>
+    <div className="shrink-0 overflow-hidden rounded-xl border border-border bg-card">
+      <DetailRow icon={SettingsIcon} tone="setup" title="ตั้งค่าห้องสอบ" open={open} onClick={() => setOpen((v) => !v)} summary={summary} />
       <Collapse open={open}>
         <div className="space-y-3 border-t border-border bg-muted/40 p-3 [&_.text-sm]:text-xs [&_input]:!h-6 [&_input]:!text-xs">
           <FormSection>
@@ -2017,18 +2039,18 @@ function SessionQuestionList({ session, sessionQuestions, practice }: { session:
     return () => clearTimeout(t);
   }, [open, mounted, chosen.length]);
   return (
-    <div className="shrink-0 overflow-hidden rounded-lg border border-border">
-      <button type="button" aria-expanded={open} onPointerEnter={() => setWarm(true)} onFocus={() => setWarm(true)} onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between min-h-11 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset">
-        <span className="flex items-center gap-2 font-semibold text-foreground">
-          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><DocumentTextIcon className="h-4 w-4" /></IconTile>
-          {practice ? "แนวข้อสอบ" : "รายการข้อสอบ"}
-        </span>
-        <span className="flex shrink-0 items-center gap-2">
-          <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", sessionQuestions.length === 0 ? "bg-destructive/15 text-destructive" : "bg-success/15 text-success")}>{sessionQuestions.length} ข้อ</span>
-          {sessionQuestions.length === 0 && <span className="flex shrink-0 text-destructive" role="img" aria-label="ยังไม่ได้ตั้งค่า"><AlertTriangle className="h-4 w-4" /></span>}
-          <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", open && "rotate-90")} />
-        </span>
-      </button>
+    <div className="shrink-0 overflow-hidden rounded-xl border border-border bg-card">
+      <DetailRow
+        icon={DocumentTextIcon}
+        tone="content"
+        title={practice ? "แนวข้อสอบ" : "รายการข้อสอบ"}
+        open={open}
+        onPointerEnter={() => setWarm(true)}
+        onFocus={() => setWarm(true)}
+        onClick={() => setOpen((v) => !v)}
+        summary={sessionQuestions.length === 0 ? (practice ? "ยังไม่มีแนวข้อสอบ" : "ยังไม่มีข้อสอบ") : `${sessionQuestions.length} ข้อ`}
+        alert={sessionQuestions.length === 0 && !practice}
+      />
       <Collapse open={open}>
         <div className="divide-y divide-border border-t border-border bg-card">
           {sessionQuestions.length === 0 && <p className="p-3 text-xs text-muted-foreground">{practice ? "ยังไม่มีแนวข้อสอบในห้องนี้" : "ยังไม่มีข้อสอบในห้องนี้"}</p>}
@@ -2063,18 +2085,7 @@ function SessionQuestionList({ session, sessionQuestions, practice }: { session:
           ))}
         </div>
       </Collapse>
-      <button
-        type="button"
-        aria-expanded={adding}
-        onClick={() => setAdding((v) => !v)}
-        className="flex w-full items-center justify-between min-h-11 border-t border-border px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
-      >
-        <span className="flex items-center gap-2 font-semibold text-foreground">
-          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25"><Plus className="h-4 w-4" /></IconTile>
-          {practice ? "เพิ่มแนวข้อสอบ" : "เพิ่มข้อสอบ"}
-        </span>
-        <ChevronForward className={cn("h-3 w-3 text-muted-foreground transition-transform", adding && "rotate-90")} />
-      </button>
+      <DetailAddRow label={practice ? "เพิ่มแนวข้อสอบ" : "เพิ่มข้อสอบ"} open={adding} onClick={() => setAdding((v) => !v)} />
       <AddSessionQuestionPanel session={session} open={adding} practice={practice} />
       {printing && <PrintExamSheet session={session} questions={chosen} subjects={printSubjects} withKey={printing === "key"} onDone={() => setPrinting(null)} />}
       {/* Keyed so the form remounts with the picked question; its state is seeded once on mount. */}
@@ -3099,12 +3110,22 @@ function AttemptRunner({
 
   const remainingMs = deadline - now;
 
+  // Shown to the student so they know it is recorded; one switch counts once (blur + hidden fire together).
+  const [leaves, setLeaves] = useState(0);
+  const lastLeave = useRef(0);
+  const noteLeave = () => {
+    const t = Date.now();
+    if (t - lastLeave.current > LEAVE_WINDOW_MS) setLeaves((n) => n + 1);
+    lastLeave.current = t;
+  };
   useEffect(() => {
     function onBlur() {
+      noteLeave();
       logEvent.mutate({ attemptId: attempt.id, eventType: "blur" });
     }
     function onVisibility() {
       if (document.hidden) {
+        noteLeave();
         logEvent.mutate({ attemptId: attempt.id, eventType: "visibility_hidden" });
         void syncRef.current();
       }
@@ -3217,7 +3238,14 @@ function AttemptRunner({
 
   return (
     <ExamPaper
-      header={<ExamHeader session={session} roomLabel={roomLabel} />}
+      header={
+        <div className="space-y-2">
+          <ExamHeader session={session} roomLabel={roomLabel} />
+          <p role="status" className={cn("rounded-lg px-3 py-2 text-xs", leaves > 0 ? "bg-warning/15 font-medium text-warning" : "bg-muted text-muted-foreground")}>
+            {leaves > 0 ? `ออกจากหน้าสอบแล้ว ${leaves} ครั้ง ครูจะเห็นรายการนี้` : "ระบบบันทึกเมื่อคุณออกจากหน้าสอบ (สลับแอปหรือหน้าจอ) และครูจะเห็นรายการนี้"}
+          </p>
+        </div>
+      }
       questions={paperQuestions}
       answers={paperAnswers}
       onChoice={(qid, cid) => setAnswer({ question_id: qid, choice_id: cid, short_answer: null })}

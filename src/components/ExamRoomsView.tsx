@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import type { ExamSession, Subject } from "@/lib/database.types";
-import { dayKey, endOf, isLive } from "@/lib/examRooms";
-import { kindTone, roundTone } from "@/lib/examKinds";
+import { clashKey, dayKey, endOf, isLive } from "@/lib/examRooms";
+import { levelTone } from "@/lib/gradeLevels";
 import { cn } from "@/lib/utils";
 
 /** "รายห้อง": pick a day, one column per physical room with that day's exams in time order. Gaps and clashes show inline; tap a card to open its seating. */
@@ -10,6 +10,8 @@ export function RoomsView({
   roomIdsOf,
   venues,
   subjectsOf,
+  levelsOf,
+  subjectTone,
   seatBadge,
   clashing,
   onOpen,
@@ -18,7 +20,12 @@ export function RoomsView({
   roomIdsOf: Map<string, string[]> | undefined;
   venues: { id: string; name: string }[];
   subjectsOf: (s: ExamSession) => Subject[];
+  /** Class labels taking the exam, e.g. "ม.2/1". */
+  levelsOf?: (s: ExamSession) => string[];
+  /** Colour classes for a subject code pill (its learning-area hue). */
+  subjectTone?: (s: Subject) => string;
   seatBadge: (s: ExamSession) => React.ReactNode;
+  /** clashKey(roomId, sessionId) entries from roomClashes. */
   clashing: Set<string>;
   onOpen: (s: ExamSession) => void;
 }) {
@@ -78,7 +85,7 @@ export function RoomsView({
                 const start = new Date(s.opens_at!).getTime();
                 const gap: [number, number] | null = i > 0 && start - latestEnd >= 15 * 60_000 ? [latestEnd, start] : null;
                 latestEnd = Math.max(latestEnd, endOf(s));
-                const bad = clashing.has(s.id) && id !== NONE;
+                const bad = clashing.has(clashKey(id, s.id));
                 return (
                   <Fragment key={s.id}>
                     {gap && <p className="px-1 text-center text-[11px] text-muted-foreground">ว่าง {hm(gap[0])} – {hm(gap[1])}</p>}
@@ -87,21 +94,40 @@ export function RoomsView({
                       tabIndex={0}
                       onClick={() => onOpen(s)}
                       onKeyDown={(e) => e.key === "Enter" && onOpen(s)}
-                      className={cn("cursor-pointer space-y-1.5 rounded-xl border bg-card p-3 text-xs hover:bg-muted", bad ? "border-destructive" : "border-border")}
+                      className={cn("cursor-pointer rounded-xl border bg-card p-3 text-xs hover:bg-muted", bad ? "border-destructive" : isLive(s, now) ? "border-success/50" : "border-border")}
                     >
-                      <p className="flex items-center justify-between gap-2 text-sm font-semibold tabular-nums">
-                        <span className="flex items-center">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="flex items-center text-sm font-semibold tabular-nums leading-6">
                           {isLive(s, now) && <span title="กำลังสอบ" className="mr-1.5 inline-block size-2 shrink-0 animate-pulse rounded-full bg-success" />}
                           {hm(start)}{s.closes_at ? ` – ${hm(endOf(s))}` : ""}
-                        </span>
-                        {bad && <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-semibold text-destructive">ซ้อนเวลา</span>}
-                      </p>
-                      <p className="flex flex-wrap items-center gap-1">
-                        {s.exam_type && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", kindTone(s.exam_type))}>{s.exam_type}</span>}
-                        {s.round && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", roundTone(s.round))}>ครั้งที่ {s.round}</span>}
-                        {seatBadge(s)}
-                      </p>
-                      <p className="line-clamp-2 text-sm font-medium">{subjectsOf(s).map((x) => x.name_th).join(", ") || s.title}</p>
+                        </p>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          {seatBadge(s)}
+                          {bad && <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-semibold text-destructive">ซ้อนเวลา</span>}
+                        </div>
+                      </div>
+                      <div className="mt-0.5 flex items-center justify-between gap-2">
+                        <p className="min-w-0 truncate text-muted-foreground">
+                          {s.exam_type ? <><span className="font-medium text-foreground">{s.exam_type}</span>{s.round ? ` · ครั้งที่ ${s.round}` : ""}</> : s.title}
+                        </p>
+                        {levelsOf && (
+                          <span className="flex shrink-0 gap-1">
+                            {levelsOf(s).map((l) => <span key={l} className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(l))}>{l}</span>)}
+                          </span>
+                        )}
+                      </div>
+                      <ul className="mt-2.5 divide-y divide-border border-t border-border">
+                        {subjectsOf(s).length > 0 ? (
+                          subjectsOf(s).map((x) => (
+                            <li key={x.id} className="flex items-center gap-2 py-1.5 last:pb-0">
+                              <span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums", subjectTone?.(x) ?? "bg-muted text-muted-foreground")}>{x.code}</span>
+                              <span className="min-w-0 flex-1 text-sm font-medium leading-5">{x.name_th}</span>
+                            </li>
+                          ))
+                        ) : (
+                          <li className="pt-1.5 text-sm font-medium">{s.title}</li>
+                        )}
+                      </ul>
                     </div>
                   </Fragment>
                 );

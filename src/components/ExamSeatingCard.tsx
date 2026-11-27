@@ -7,8 +7,8 @@ import { examLabel } from "@/lib/examKinds";
 import { Collapse } from "@/components/Collapse";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ExamSeatingPrintSheet, type PrintRoom } from "@/components/ExamSeatingPrint";
-import { AlertTriangle, ChevronForward, CopyIcon, ListIcon, PencilIcon, Plus, PrintIcon, ShuffleIcon, TimetableIcon, TrashIcon } from "@/components/icons";
-import { IconTile } from "@/components/IconTile";
+import { ChevronForward, LockIcon, CopyIcon, ListIcon, PencilIcon, Plus, PrintIcon, ShuffleIcon, TimetableIcon, TrashIcon } from "@/components/icons";
+import { DetailRow } from "@/components/DetailRow";
 import { Sheet } from "@/components/Sheet";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, Field, FormSection, Input, Select } from "@/components/ui";
@@ -240,17 +240,22 @@ export function ExamSeatingCard({
     const roomSpecials = specials.filter((x) => x.session_room_id === r.id);
     return (
       <section key={r.id} className={cn("space-y-3", rooms.length > 1 && "rounded-lg border border-border p-3")}>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-semibold text-foreground">{rooms.length > 1 ? `ห้องที่ ${index + 1}` : ""}</span>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-foreground">
+            {rooms.length > 1 ? `ห้องที่ ${index + 1}` : "ผังที่นั่ง"}
+            {r.seat_rows != null && <span className="ml-2 text-xs font-normal tabular-nums text-muted-foreground">{cols}×{rows} · {rows * cols} ที่</span>}
+          </p>
+          <div className="flex items-center gap-1.5">
             <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || templates.length === 0} onClick={() => setCopying(r)}>
               <CopyIcon className={ICON} />
               คัดลอกผังจาก…
             </Button>
-            <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={r.seat_rows == null || (!hasSeats && roomSpecials.every((x) => !x.student_id))} onClick={() => setPrinting([r.id])}>
-              <PrintIcon className={ICON} />
-              พิมพ์ผัง
-            </Button>
+            {rooms.length > 1 && (
+              <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={r.seat_rows == null || (!hasSeats && roomSpecials.every((x) => !x.student_id))} onClick={() => setPrinting([r.id])}>
+                <PrintIcon className={ICON} />
+                พิมพ์ห้องนี้
+              </Button>
+            )}
             {rooms.length > 1 && r.position > 1 && (
               <Button size="icon" variant="outline" className={ICON_BTN} aria-label="ลบห้องนี้" disabled={busy} onClick={() => setRemoving(r)}>
                 <TrashIcon className={ICON} />
@@ -258,11 +263,19 @@ export function ExamSeatingCard({
             )}
           </div>
         </div>
-        {/* One button folds the room / template / fill controls (a sheet is narrow at any viewport size); open until a template is picked. */}
-        <Button size="sm" variant="outline" className="ui-control-compact h-8 w-full justify-between" aria-expanded={setupShown} onClick={() => setSetupOpen(!setupShown)}>
-          ตั้งค่าและจัดผังที่นั่ง
-          <ChevronForward className={cn("h-3 w-3 transition-transform", setupShown ? "-rotate-90" : "rotate-90")} />
-        </Button>
+        {/* Room and template pickers fold into one row (a sheet is narrow at any viewport size); open until a template is picked. */}
+        <button
+          type="button"
+          aria-expanded={setupShown}
+          onClick={() => setSetupOpen(!setupShown)}
+          className="flex min-h-10 w-full items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-left text-xs hover:bg-muted"
+        >
+          <span className="min-w-0 truncate">
+            <span className="font-semibold text-foreground">ห้องสอบและ template ผัง</span>
+            <span className="text-muted-foreground"> · {r.seat_rows == null ? "ยังไม่ได้เลือก" : (templates.find((t) => t.id === r.template_id)?.name ?? "ผังที่เลือกไว้")}</span>
+          </span>
+          <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", setupShown ? "-rotate-90" : "rotate-90")} />
+        </button>
         <div className={cn("flex-col gap-2", setupShown ? "flex" : "hidden")}>
           <div className="flex items-center gap-2">
           {roomPicker && <div className="min-w-0 flex-1">{roomPicker(r, usedRoomIds)}</div>}
@@ -293,6 +306,23 @@ export function ExamSeatingCard({
           <p className="text-xs text-muted-foreground">{templates.length > 0 ? "เลือก template เพื่อเริ่มจัดผังที่นั่ง" : "ยังไม่มี template สร้างจาก \"จัดการ template\" ก่อน"}</p>
         ) : (
           <>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs font-medium text-muted-foreground">จัดห้องนี้ใหม่</span>
+              <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || students.length === 0} onClick={() => fillRoom(r, (l) => l)}>
+                <ListIcon className={ICON} />
+                เรียงตามลำดับ
+              </Button>
+              <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || students.length === 0} onClick={() => fillRoom(r, shuffled)}>
+                <ShuffleIcon className={ICON} />
+                สุ่ม
+              </Button>
+              <Button size="sm" variant="ghost" className="ui-control-compact ml-auto h-7 text-destructive hover:text-destructive" disabled={locked || !hasSeats} onClick={() => setClearing(r.id)}>
+                <TrashIcon className={ICON} />
+                ล้างผัง
+              </Button>
+            </div>
+            {/* Front of the room: the top row of the grid is the one nearest the board. */}
+            <div aria-hidden className="mx-auto w-1/2 min-w-32 rounded-full bg-muted py-1 text-center text-[11px] font-medium tracking-wide text-muted-foreground">หน้าห้อง</div>
             <div className="-mx-1 overflow-x-auto px-1 py-1">
               <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(6.5rem, 1fr))` }}>
                 {Array.from({ length: rows * cols }, (_, i) => {
@@ -317,13 +347,16 @@ export function ExamSeatingCard({
                       onClick={() => tapSeat(r.id, row, col)}
                       className={cn(
                         "relative flex h-14 min-w-0 items-center gap-2 rounded-lg border px-2 text-left text-[11px] leading-tight",
-                        other && !x ? "border-border bg-muted text-muted-foreground opacity-70" : st ? "border-border bg-card" : "border-dashed border-border text-muted-foreground",
+                        other && !x ? "border-border bg-muted/60 text-muted-foreground [background-image:repeating-linear-gradient(135deg,transparent_0_6px,hsl(var(--border))_6px_7px)]" : st ? "border-border bg-card" : "border-dashed border-border text-muted-foreground",
                         other && x && "border-destructive ring-1 ring-destructive",
                         isPicked && "ring-2 ring-primary",
                       )}
                     >
                       {other && !x ? (
-                        <span className="min-w-0 flex-1 font-medium tabular-nums">{other.student_code}</span>
+                        <span className="flex min-w-0 flex-1 items-center gap-1.5 font-medium tabular-nums">
+                          <LockIcon className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{other.student_code}</span>
+                        </span>
                       ) : st ? (
                         <>
                           <Avatar name={st.name} src={st.avatar} className="h-7 w-7" />
@@ -344,22 +377,19 @@ export function ExamSeatingCard({
               </div>
             </div>
 
+            <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+              <li className="flex items-center gap-1.5"><span aria-hidden className="size-3 rounded border border-border bg-card" />มีนักเรียน</li>
+              <li className="flex items-center gap-1.5"><span aria-hidden className="size-3 rounded border border-dashed border-border" />ว่าง</li>
+              {held.size > 0 && <li className="flex items-center gap-1.5"><span aria-hidden className="size-3 rounded border border-border bg-muted [background-image:repeating-linear-gradient(135deg,transparent_0_3px,hsl(var(--border))_3px_4px)]" />จองโดยรอบอื่น</li>}
+              <li className="flex items-center gap-1.5"><span aria-hidden className="size-3 rounded border-2 border-primary" />ที่เลือก</li>
+            </ul>
+
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-foreground">ที่นั่งพิเศษ</span>
-                <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || students.length === 0} onClick={() => fillRoom(r, (l) => l)}>
-                  <ListIcon className={ICON} />
-                  เรียงตามลำดับ
-                </Button>
-                <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || students.length === 0} onClick={() => fillRoom(r, shuffled)}>
-                  <ShuffleIcon className={ICON} />
-                  สุ่ม
-                </Button>
-                <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || !hasSeats} onClick={() => setClearing(r.id)}>
-                  <TrashIcon className={ICON} />
-                  ล้างผัง
-                </Button>
+                <p className="text-sm font-semibold text-foreground">
+                  ที่นั่งพิเศษ
+                  <span className="ml-2 text-xs font-normal tabular-nums text-muted-foreground">{roomSpecials.length}/10</span>
+                </p>
                 <Button
                   size="sm"
                   variant="outline"
@@ -374,7 +404,6 @@ export function ExamSeatingCard({
                 >
                   <Plus className="h-3 w-3" /> เพิ่มที่นั่งพิเศษ
                 </Button>
-                </div>
               </div>
               {roomSpecials.length > 0 && (
                 <div className="-mx-1 overflow-x-auto px-1 py-1">
@@ -442,31 +471,16 @@ export function ExamSeatingCard({
   };
 
   return (
-    <div className="shrink-0 overflow-hidden rounded-lg border border-border">
-      <button
-        type="button"
-        aria-expanded={open}
+    <div className="shrink-0 overflow-hidden rounded-xl border border-border bg-card">
+      <DetailRow
+        icon={TimetableIcon}
+        tone="setup"
+        title="ผังห้องสอบ"
+        open={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs hover:bg-muted focus-visible:outline-offset-[-2px] focus-visible:ring-inset"
-      >
-        <span className="flex items-center gap-2 font-semibold text-foreground">
-          <IconTile tone="bg-gradient-to-b from-neutral-400 to-neutral-500 text-white shadow-sm ring-1 ring-inset ring-white/25">
-            <TimetableIcon className="h-4 w-4" />
-          </IconTile>
-          ผังห้องสอบ
-        </span>
-        <span className="flex min-w-0 flex-1 items-center justify-end gap-3 text-foreground">
-          {anyGrid ? (
-            <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", students.length > 0 && placed >= students.length ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive")}>
-              จัดแล้ว {placed}/{students.length} · {rooms.length > 1 ? `${rooms.length} ห้อง` : `ผัง ${first?.seat_cols}×${first?.seat_rows}`}
-            </span>
-          ) : (
-            <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-semibold text-destructive">ยังไม่ได้เลือก template</span>
-          )}
-          {!anyGrid && <span className="flex shrink-0 text-destructive" role="img" aria-label="ยังไม่ได้ตั้งค่า"><AlertTriangle className="h-4 w-4" /></span>}
-        </span>
-        <ChevronForward className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")} />
-      </button>
+        alert={!anyGrid || !(students.length > 0 && placed >= students.length)}
+        summary={anyGrid ? `จัดแล้ว ${placed}/${students.length} · ${rooms.length > 1 ? `${rooms.length} ห้อง` : `ผัง ${first?.seat_cols}×${first?.seat_rows}`}` : "ยังไม่ได้เลือก template"}
+      />
       <Collapse open={open}>
         <div className="space-y-3 border-t border-border bg-card p-3">
           {noTime && (
@@ -501,17 +515,31 @@ export function ExamSeatingCard({
           )}
 
           {anyGrid && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold text-foreground">จัดทั้งรอบ</span>
-              <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || unseated.length === 0} onClick={() => arrangeAll("code")}>
-                <ListIcon className={ICON} />
-                เรียงตามรหัส
-              </Button>
-              <Button size="sm" variant="outline" className="ui-control-compact h-7" disabled={locked || unseated.length === 0} onClick={() => arrangeAll("shuffle")}>
-                <ShuffleIcon className={ICON} />
-                สุ่ม
-              </Button>
-              <Button size="sm" variant="outline" className="ml-auto ui-control-compact h-7" disabled={placed === 0} onClick={() => setPrinting(gridRooms.map((x) => x.id))}>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-muted px-3.5 py-3">
+              <div className="min-w-0 flex-1 basis-48">
+                <p className={cn("text-sm font-semibold leading-5", unseated.length === 0 ? "text-success" : "text-foreground")}>
+                  {unseated.length === 0 ? "ทุกคนมีที่นั่งแล้ว" : `ยังไม่มีที่นั่ง ${unseated.length} คน`}
+                </p>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
+                    <span className="block h-full rounded-full bg-success transition-[width]" style={{ width: `${students.length > 0 ? Math.min(100, (placed / students.length) * 100) : 0}%` }} />
+                  </div>
+                  <span className="text-xs tabular-nums text-muted-foreground">{placed}/{students.length}</span>
+                </div>
+              </div>
+              {unseated.length > 0 && (
+                <div className="flex items-center gap-1.5" title="จัดเฉพาะนักเรียนที่ยังไม่มีที่นั่ง">
+                  <Button size="sm" variant="outline" className="ui-control-compact h-7 bg-card" disabled={locked} onClick={() => arrangeAll("code")}>
+                    <ListIcon className={ICON} />
+                    จัดตามรหัส
+                  </Button>
+                  <Button size="sm" variant="outline" className="ui-control-compact h-7 bg-card" disabled={locked} onClick={() => arrangeAll("shuffle")}>
+                    <ShuffleIcon className={ICON} />
+                    จัดแบบสุ่ม
+                  </Button>
+                </div>
+              )}
+              <Button size="sm" variant="outline" className="ui-control-compact h-7 bg-card" disabled={placed === 0} onClick={() => setPrinting(gridRooms.map((x) => x.id))}>
                 <PrintIcon className={ICON} />
                 พิมพ์ทั้งรอบ
               </Button>

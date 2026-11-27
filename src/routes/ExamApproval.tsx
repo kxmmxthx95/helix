@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ViewToggle, defaultView } from "@/components/ViewToggle";
 import { useAuth } from "@/auth/AuthProvider";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, usePhone } from "@/components/Sheet";
 import { CheckmarkCircleIcon, ChevronBack, PencilIcon, TimeIcon, TrashIcon, X } from "@/components/icons";
 import { useToast } from "@/components/Toast";
 import { Avatar, Button, EmptyState, Field, Input, PageSpinner, Select } from "@/components/ui";
@@ -93,6 +93,8 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
     ) : null;
   };
   const [view, setView] = useState<"cards" | "table">(defaultView);
+  // Phones always show the card list; the table is desktop-only, so the switch is hidden there.
+  const mode = usePhone() ? "cards" : view;
   const scopeSelect = canSeeAll ? (
     <Select value={scope} onChange={(e) => setScope(e.target.value as "mine" | "all")} className="ui-control-compact h-8 px-2.5 pr-7 text-[13px] sm:w-64 sm:pr-8">
       <option value="mine">วิชาของฉัน</option>
@@ -102,7 +104,7 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
   const header = (
     <div className="mb-1 flex shrink-0 items-center gap-2">
       {scopeSelect}
-      <ViewToggle value={view} onChange={setView} className="ml-auto" />
+      <ViewToggle value={view} onChange={setView} className="ml-auto hidden lg:flex" />
     </div>
   );
   const { data: subjects = [], isLoading: subjectsLoading } = useSubjectsByIds([...new Set(assignments.map((a) => a.subject_id))]);
@@ -172,7 +174,7 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
   return (
     <div className="flex flex-1 flex-col gap-2">
       {header}
-      {view === "table" && (
+      {mode === "table" && (
         <div className="table-panel flex-1 rounded-none border-t border-border shadow-none">
           <div className="table-panel-scroll scrollbar-hidden">
             <table className="w-full min-w-[28rem] text-[13px]">
@@ -212,7 +214,7 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
           </div>
         </div>
       )}
-      {view === "cards" && [...groups].map(([key, members]) => {
+      {mode === "cards" && [...groups].map(([key, members]) => {
         const memberSubjects = subjectsOf(members);
         return (
           <div
@@ -225,22 +227,18 @@ export function ExamTopicsTab({ teacherId, canSeeAll = false }: { teacherId: str
                   onClick: () => setPicking(key),
                   onKeyDown: (e: React.KeyboardEvent) => e.key === "Enter" && setPicking(key),
                 })}
-            className={cn("rounded-xl border border-border bg-card p-3 text-xs", !all && "cursor-pointer hover:bg-muted active:bg-muted")}
+            className={cn("rounded-xl border border-border bg-card p-3.5 text-xs", !all && "cursor-pointer hover:bg-muted active:bg-muted")}
           >
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0 space-y-2">
-                {memberSubjects.map((x) => (
-                  <div key={x.id}>
-                    <p className="truncate text-sm font-medium">{x.name_th}</p>
-                    <p className="mt-1 flex flex-wrap items-center gap-1">
-                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(x.learning_area_id))}>{x.code}</span>
-                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabelOf(members[0]!)))}>{roomLabelOf(members[0]!)}</span>
-                    </p>
-                  </div>
-                ))}
-                {all && <div className="text-xs text-muted-foreground">{teacherChip(members[0]?.teacher_id, "h-6 w-6 text-[10px]")}</div>}
-              </div>
-            </div>
+            <ul className="divide-y divide-border">
+              {memberSubjects.map((x) => (
+                <li key={x.id} className="flex items-center gap-2.5 py-2 first:pt-0 last:pb-0">
+                  <span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(x.learning_area_id))}>{x.code}</span>
+                  <p className="min-w-0 flex-1 text-sm font-medium leading-5">{x.name_th}</p>
+                  <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(roomLabelOf(members[0]!)))}>{roomLabelOf(members[0]!)}</span>
+                </li>
+              ))}
+            </ul>
+            {all && <div className="mt-3 border-t border-border pt-3 font-medium text-foreground">{teacherChip(members[0]?.teacher_id, "h-6 w-6 text-[10px]")}</div>}
           </div>
         );
       })}
@@ -424,6 +422,8 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
   const isLoading = mineOf ? loadingMine : loadingQueue;
   const [filter, setFilter] = useState<Filter>("pending");
   const [view, setView] = useState<"cards" | "table">(defaultView);
+  // Phones always show the card list; the table is desktop-only, so the switch is hidden there.
+  const mode = usePhone() ? "cards" : view;
   const [selectedIds, setSelectedIds] = useState<string[] | null>(null);
   // "ยกเลิก" on a card opens the review sheet straight at the reason box (a rejection needs one).
   const [rejectFirst, setRejectFirst] = useState(false);
@@ -598,7 +598,7 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
           ))}
         </Select>
 
-        <ViewToggle value={view} onChange={setView} className="ml-auto" />
+        <ViewToggle value={view} onChange={setView} className="ml-auto hidden lg:flex" />
       </div>
 
       {isLoading || detailsLoading ? <PageSpinner /> : shown.length === 0 ? (
@@ -616,7 +616,7 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
             }
           />
         </div>
-      ) : view === "table" ? (
+      ) : mode === "table" ? (
         <div className="table-panel flex rounded-none border-t border-border shadow-none">
           <div className="table-panel-scroll scrollbar-hidden">
             <table className="w-full min-w-[44rem] text-[13px]">
@@ -684,34 +684,36 @@ export function ExamApprovalTab({ onCreateRoom, mineOf }: { onCreateRoom?: (sets
                   v.open();
                 }
               }}
-              className="block w-full space-y-2 rounded-xl border border-border bg-card p-3 text-left text-xs cursor-pointer hover:bg-muted"
+              className="block w-full cursor-pointer rounded-xl border border-border bg-card p-3.5 text-left text-xs hover:bg-muted"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 space-y-2">
-                  {(v.exam || v.first.no_exam || v.first.approval_status !== "approved") && (
-                    <p className="flex flex-wrap items-center gap-1">
-                      {v.exam && <span className={CHIP}>{v.exam}</span>}
-                      {v.first.no_exam && <span className={CHIP}>ไม่มีสอบ</span>}
-                      {v.first.approval_status !== "approved" && <ApprovalBadge status={v.first.approval_status} />}
-                    </p>
+              {(v.exam || v.first.no_exam || v.first.approval_status !== "approved" || v.first.approved_at) && (
+                <div className="mb-2.5 flex items-start justify-between gap-3">
+                  <p className="min-w-0 truncate text-sm leading-6 text-muted-foreground">
+                    {v.exam && <span className="font-semibold text-foreground">{v.exam}</span>}
+                    {v.exam && v.first.no_exam ? " · " : ""}
+                    {v.first.no_exam && "ไม่มีสอบ"}
+                  </p>
+                  {v.first.approval_status !== "approved" ? (
+                    <span className="shrink-0"><ApprovalBadge status={v.first.approval_status} /></span>
+                  ) : (
+                    v.first.approved_at && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", STATUS_STYLE.approved)}>อนุมัติ {thDate(v.first.approved_at)}</span>
                   )}
-                  {v.members.map((x) => (
-                    <div key={x.id}>
-                      <p className="truncate text-sm font-medium">{x.name_th}</p>
-                      <p className="mt-1 flex flex-wrap items-center gap-1">
-                        <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(x.learning_area_id))}>{x.code}</span>
-                        {v.room && <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(v.room))}>{v.room}</span>}
-                      </p>
-                    </div>
-                  ))}
                 </div>
-                {v.first.approved_at && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", STATUS_STYLE.approved)}>อนุมัติ {thDate(v.first.approved_at)}</span>}
-              </div>
+              )}
+              <ul className="divide-y divide-border border-y border-border">
+                {v.members.map((x) => (
+                  <li key={x.id} className="flex items-center gap-2.5 py-2">
+                    <span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums", colors.shade(x.learning_area_id))}>{x.code}</span>
+                    <p className="min-w-0 flex-1 text-sm font-medium leading-5">{x.name_th}</p>
+                    {v.room && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold", levelTone(v.room))}>{v.room}</span>}
+                  </li>
+                ))}
+              </ul>
               {(!mineOf || v.actions) && (
-                <div className="flex items-center justify-between gap-2 text-muted-foreground">
+                <div className="mt-3 flex items-center justify-between gap-2">
                   {!mineOf ? (
-                    <span className="flex min-w-0 items-center gap-2">
-                      <Avatar name={v.teacherName} src={v.teacher ? avatarUrl(v.teacher) : null} className="h-6 w-6 text-[10px]" />
+                    <span className="flex min-w-0 items-center gap-2 font-medium text-foreground">
+                      <Avatar name={v.teacherName} src={v.teacher ? avatarUrl(v.teacher) : null} className="h-6 w-6 shrink-0 text-[10px]" />
                       <span className="truncate">{v.teacherName}</span>
                     </span>
                   ) : (

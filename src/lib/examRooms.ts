@@ -7,8 +7,13 @@ export const endOf = (s: Timed) => new Date(s.closes_at ?? s.opens_at!).getTime(
 export const isLive = (s: Timed, now: number) =>
   !!s.opens_at && !!s.closes_at && new Date(s.opens_at).getTime() <= now && now < new Date(s.closes_at).getTime();
 
-/** Ids of sessions that overlap another session in the same physical room (a room can host one exam at a time).
- *  Sessions without an opens_at are ignored; touching windows (one ends when the next starts) do not clash. */
+/** Key for "this session clashes in this room"; a session spanning several rooms may clash in only some of them. */
+export const clashKey = (roomId: string, sessionId: string) => `${roomId}|${sessionId}`;
+
+/** clashKey()s of sessions that overlap another session in the same physical room (a room can host one exam at a time).
+ *  Sessions without an opens_at are ignored; touching windows (one ends when the next starts) do not clash.
+ *  Two exams in exactly the same window may share a room (same rule as exam_seating_status, migration 0232);
+ *  a desk claimed twice is reported by that RPC, not here. */
 export function roomClashes<T extends Timed>(sessions: T[], roomIdsOf: Map<string, string[]> | undefined): Set<string> {
   const out = new Set<string>();
   const perRoom = new Map<string, T[]>();
@@ -16,13 +21,14 @@ export function roomClashes<T extends Timed>(sessions: T[], roomIdsOf: Map<strin
     if (!s.opens_at) continue;
     for (const id of roomIdsOf?.get(s.id) ?? []) perRoom.set(id, [...(perRoom.get(id) ?? []), s]);
   }
-  for (const list of perRoom.values()) {
+  for (const [room, list] of perRoom) {
     const sorted = list.slice().sort((a, b) => a.opens_at!.localeCompare(b.opens_at!));
     sorted.forEach((a, i) => {
       for (const b of sorted.slice(i + 1)) {
         if (new Date(b.opens_at!).getTime() >= endOf(a)) break;
-        out.add(a.id);
-        out.add(b.id);
+        if (a.closes_at && a.opens_at === b.opens_at && a.closes_at === b.closes_at) continue;
+        out.add(clashKey(room, a.id));
+        out.add(clashKey(room, b.id));
       }
     });
   }

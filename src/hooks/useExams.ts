@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { countLeaves } from "@/lib/examLeaves";
 import type {
   ExamAttempt,
   ExamAttemptAnswer,
@@ -638,6 +639,24 @@ export function useAttemptEvents(attemptId: string | null) {
         .order("at", { ascending: true });
       if (error) throw error;
       return data;
+    },
+  });
+}
+
+/** Teacher: how many times each student left the exam page in this room (blur / hidden events of their attempts, one switch counted once). */
+export function useSessionLeaveCounts(attempts: { id: string; student_id: string }[], enabled: boolean) {
+  const ids = attempts.map((a) => a.id).sort();
+  return useQuery({
+    queryKey: ["exam_attempt_events", "leaves", ids],
+    enabled: enabled && ids.length > 0,
+    queryFn: async (): Promise<Map<string, number>> => {
+      const { data, error } = await supabase.from("exam_attempt_events").select("attempt_id, at").in("attempt_id", ids);
+      if (error) throw error;
+      const timesByAttempt = new Map<string, string[]>();
+      for (const e of data) timesByAttempt.set(e.attempt_id, [...(timesByAttempt.get(e.attempt_id) ?? []), e.at]);
+      const out = new Map<string, number>();
+      for (const a of attempts) out.set(a.student_id, (out.get(a.student_id) ?? 0) + countLeaves(timesByAttempt.get(a.id) ?? []));
+      return out;
     },
   });
 }
