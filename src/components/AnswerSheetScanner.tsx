@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { SheetRosterStudent } from "@/components/AnswerSheetCard";
+import { ChevronDown } from "@/components/icons";
 import { Button, CloseButton, Spinner } from "@/components/ui";
 import type { ExamQuestionWithChoices } from "@/hooks/useExamBank";
 import { answerSheetLayout, LETTERS, sheetFingerprint, type SheetRow } from "@/lib/answerSheet";
@@ -373,14 +374,24 @@ export default function AnswerSheetScanner({
       {phase === "review" && review && (
         <>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-            <section className="rounded-xl border border-border bg-card p-3.5">
-              <p className="text-xs text-muted-foreground">นักเรียน</p>
-              {student ? (
-                <p className="mt-0.5 text-sm font-semibold">{student.name} <span className="font-normal tabular-nums text-muted-foreground">{student.code} {student.room !== "—" && `· ${student.room}`}</span></p>
-              ) : (
-                <p className="mt-0.5 text-sm font-semibold text-destructive">เลือกนักเรียนของกระดาษใบนี้</p>
-              )}
-              {(!student || changing) ? (
+            <section className="rounded-2xl border border-border bg-card p-3.5">
+              <div className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-muted-foreground">นักเรียน</p>
+                  {student ? (
+                    <>
+                      <p className="mt-0.5 truncate text-base font-semibold leading-6">{student.name}</p>
+                      <p className="text-xs tabular-nums text-muted-foreground">{student.code}{student.room !== "—" && ` · ${student.room}`}</p>
+                    </>
+                  ) : (
+                    <p className="mt-0.5 text-sm font-semibold text-destructive">เลือกนักเรียนของกระดาษใบนี้</p>
+                  )}
+                </div>
+                {student && !changing && (
+                  <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => setChanging(true)}>เปลี่ยน</Button>
+                )}
+              </div>
+              {(!student || changing) && (
                 <select
                   aria-label="นักเรียน"
                   value={review.studentId ?? ""}
@@ -388,18 +399,16 @@ export default function AnswerSheetScanner({
                     setReview((r) => (r ? { ...r, studentId: e.target.value || null } : r));
                     if (e.target.value) setChanging(false);
                   }}
-                  className="mt-2 h-11 w-full rounded-lg border border-border bg-background px-2 text-sm"
+                  className="mt-3 h-11 w-full rounded-lg border border-border bg-background px-2 text-sm"
                 >
                   <option value="">— เลือก —</option>
                   {roster.map((r) => (
                     <option key={r.student_id} value={r.student_id}>{r.code} {r.name}{existing.get(r.student_id)?.kind === "scan" ? " (สแกนแล้ว)" : ""}</option>
                   ))}
                 </select>
-              ) : (
-                <button type="button" className="tappable mt-1 text-xs font-medium text-accent" onClick={() => setChanging(true)}>เปลี่ยนนักเรียน</button>
               )}
               {prior && (
-                <p className={cn("mt-2 text-xs", needsConfirm ? "text-warning" : "text-muted-foreground")}>
+                <p className={cn("mt-3 rounded-lg px-3 py-2 text-xs", needsConfirm ? "bg-warning/15 text-warning" : "bg-muted text-muted-foreground")}>
                   มีคะแนน {prior.score ?? "—"}/{totalMax} อยู่แล้ว ({prior.label}) การบันทึกนี้จะเป็นคะแนนล่าสุด{prior.kind === "scan" ? " และแทนที่ผลสแกนเดิม" : ""}
                 </p>
               )}
@@ -409,13 +418,22 @@ export default function AnswerSheetScanner({
               <p key={w} role="alert" className={cn("rounded-lg px-3 py-2 text-xs", w.includes("ห้องสอบอื่น") || w.includes("ถูกแก้ไข") ? "bg-destructive/10 text-destructive" : "bg-warning/15 text-warning")}>{w}</p>
             ))}
 
-            <section className="space-y-1">
-              <p className="text-sm font-semibold">
-                {pending.length > 0 ? `ต้องตรวจ ${pending.length} ข้อ` : flagged.length > 0 ? "ตรวจครบแล้ว" : "อ่านชัดเจนทุกข้อ"}
-                <span className="ml-2 text-xs font-normal text-muted-foreground">จากทั้งหมด {rows.length} ข้อ</span>
-              </p>
-              <p className="text-xs tabular-nums text-muted-foreground">
-                ข้อกาฝนได้ {score.got} คะแนน{extraMax > 0 ? ` · รวมข้อเติมคำตอบ ${extraOk ? score.got + extraNum : "—"}/${totalMax}` : `/${totalMax}`} (เซิร์ฟเวอร์ตรวจอีกครั้งตอนบันทึก)
+            <section className="rounded-2xl bg-muted/60 p-4">
+              <div className="flex items-end justify-between gap-3">
+                <p className="tabular-nums">
+                  <span className="text-4xl font-semibold leading-none">{extraMax > 0 ? (extraOk ? score.got + extraNum : "—") : score.got}</span>
+                  <span className="ml-1 text-base text-muted-foreground">/{totalMax}</span>
+                </p>
+                <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", pending.length > 0 ? "bg-warning/15 text-warning" : "bg-success/15 text-success")}>
+                  {pending.length > 0 ? `ต้องตรวจ ${pending.length} ข้อ` : flagged.length > 0 ? "ตรวจครบแล้ว" : "อ่านชัดเจนทุกข้อ"}
+                </span>
+              </div>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border" aria-hidden>
+                <span className="block h-full rounded-full bg-success transition-[width]" style={{ width: `${totalMax > 0 ? Math.min(100, ((extraMax > 0 ? (extraOk ? score.got + extraNum : score.got) : score.got) / totalMax) * 100) : 0}%` }} />
+              </div>
+              <p className="mt-2 text-xs tabular-nums text-muted-foreground">
+                จากทั้งหมด {rows.length} ข้อ · ข้อกาฝนได้ {score.got} คะแนน{extraMax > 0 ? ` · ข้อเติมคำตอบ ${extraOk ? extraNum : "—"}/${extraMax}` : ""}
+                <br />เซิร์ฟเวอร์ตรวจอีกครั้งตอนบันทึก
               </p>
             </section>
 
@@ -441,16 +459,19 @@ export default function AnswerSheetScanner({
               </section>
             ))}
 
-            <section>
-              <button type="button" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)} className="tappable text-sm font-medium text-accent">
-                {showAll ? "ซ่อนคำตอบทุกข้อ" : "ดูและแก้คำตอบทุกข้อ"}
+            <section className="overflow-hidden rounded-2xl border border-border bg-card">
+              <button type="button" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)} className="tappable flex min-h-12 w-full items-center justify-between gap-3 px-3.5 py-2 text-left">
+                <span className="text-sm font-semibold">{showAll ? "ซ่อนคำตอบทุกข้อ" : "ดูและแก้คำตอบทุกข้อ"}</span>
+                <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", showAll && "rotate-180")} />
               </button>
               {showAll && (
-                <ul className="mt-2 divide-y divide-border rounded-xl border border-border bg-card">
+                <ul className="divide-y divide-border border-t border-border">
                   {review.read.filter((a) => a.status === "answered").map((a) => (
-                    <li key={a.number} className="space-y-2 px-3 py-2.5">
-                      <p className="text-sm font-medium">ข้อ {a.number}</p>
-                      <ChoiceButtons choices={choicesOf(a.number)} value={review.answers[a.number] ?? null} onPick={(c) => set(a.number, c)} />
+                    <li key={a.number} className="flex items-center gap-3 px-3.5 py-2.5">
+                      <span className="w-12 shrink-0 text-sm font-medium tabular-nums">ข้อ {a.number}</span>
+                      <div className="min-w-0 flex-1">
+                        <ChoiceButtons choices={choicesOf(a.number)} value={review.answers[a.number] ?? null} onPick={(c) => set(a.number, c)} />
+                      </div>
                     </li>
                   ))}
                 </ul>

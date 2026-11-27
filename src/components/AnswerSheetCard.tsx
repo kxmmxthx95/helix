@@ -3,7 +3,7 @@ import { AnswerSheetPrint, type SheetStudent } from "@/components/AnswerSheetPri
 import { Collapse } from "@/components/Collapse";
 import { DetailRow } from "@/components/DetailRow";
 import { seatLabel } from "@/components/ExamSeatingCard";
-import { CheckmarkCircleIcon } from "@/components/icons";
+import { CheckmarkCircleIcon, Plus } from "@/components/icons";
 import { Button, Input } from "@/components/ui";
 import { useAuth } from "@/auth/AuthProvider";
 import { useAnswerSheetData } from "@/hooks/useAnswerSheetData";
@@ -63,39 +63,58 @@ export function AnswerSheetCard({
     <div className="shrink-0 overflow-hidden rounded-xl border border-border bg-card">
       <DetailRow icon={CheckmarkCircleIcon} tone="check" title="พิมพ์กระดาษคำตอบ" open={open} onClick={() => setOpen((v) => !v)} summary={summary} alert={problems.length > 0} />
       <Collapse open={open}>
-        <div className="space-y-3 border-t border-border bg-muted/40 p-3">
+        <div className="space-y-4 border-t border-border bg-card p-3.5">
           {problems.map((p) => (
             <p key={p} role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{p}</p>
           ))}
           {loaded && problems.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              พิมพ์ใบละ 1 คน มีชื่อ รหัส ชั้น/ห้อง ที่นั่ง และ QR ให้นักเรียนฝนหรือกาคำตอบ {rows.length} ข้อ
-              {manualNumbers.length > 0 && <> · ข้อเติมคำตอบ (ครูตรวจเอง) ข้อที่ {manualNumbers.join(", ")}</>}
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">ใบละ 1 คน มีชื่อ รหัส ชั้น/ห้อง ที่นั่ง และ QR ให้นักเรียนฝนหรือกาคำตอบ</p>
+              <dl className="grid grid-cols-2 divide-x divide-border overflow-hidden rounded-xl bg-muted/60">
+                <div className="px-3.5 py-2.5">
+                  <dd className="text-lg font-semibold leading-6 tabular-nums">{rows.length}</dd>
+                  <dt className="text-xs text-muted-foreground">ข้อที่กาฝนได้</dt>
+                </div>
+                <div className="px-3.5 py-2.5">
+                  <dd className="text-lg font-semibold leading-6 tabular-nums">{manualNumbers.length}</dd>
+                  <dt className="text-xs text-muted-foreground">
+                    {manualNumbers.length > 0 ? `ข้อเติมคำตอบ (ข้อ ${manualNumbers.join(", ")})` : "ข้อเติมคำตอบ"}
+                  </dt>
+                </div>
+              </dl>
+            </div>
           )}
-          <div className="flex items-center gap-2 text-xs">
-            <label htmlFor="sheet-spares" className="font-medium">ใบเปล่าสำรอง</label>
-            <Input id="sheet-spares" type="number" min={0} max={20} value={spares} onChange={(e) => setSpares(e.target.value)} className="!h-8 w-16" />
-            <span className="text-muted-foreground">ใบ (สำหรับนักเรียนที่เพิ่มเข้ามาวันสอบ)</span>
+
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <label htmlFor="sheet-spares" className="text-sm font-medium">ใบเปล่าสำรอง</label>
+              <p className="text-xs text-muted-foreground">สำหรับนักเรียนที่เพิ่มเข้ามาวันสอบ</p>
+            </div>
+            <div className="flex shrink-0 items-center overflow-hidden rounded-lg border border-border">
+              <button type="button" aria-label="ลดใบสำรอง" disabled={spareCount <= 0} onClick={() => setSpares(String(spareCount - 1))} className="tappable flex h-9 w-9 items-center justify-center text-lg text-muted-foreground hover:bg-muted disabled:opacity-40">−</button>
+              <Input id="sheet-spares" type="number" inputMode="numeric" min={0} max={20} value={spares} onChange={(e) => setSpares(e.target.value)} className="!h-9 w-12 rounded-none !border-y-0 text-center tabular-nums" />
+              <button type="button" aria-label="เพิ่มใบสำรอง" disabled={spareCount >= 20} onClick={() => setSpares(String(spareCount + 1))} className="tappable flex h-9 w-9 items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
+            </div>
           </div>
+
           {roster.length > 0 && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium">นักเรียน {chosen.length}/{roster.length} คน</span>
-                <span className="flex gap-3">
-                  <button type="button" className="text-accent" onClick={() => setPicked(null)}>เลือกทั้งหมด</button>
-                  <button type="button" className="text-accent" onClick={() => setPicked(new Set())}>ล้าง</button>
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-medium">นักเรียน <span className="tabular-nums text-muted-foreground">{chosen.length}/{roster.length} คน</span></span>
+                <span className="flex gap-1">
+                  <Button type="button" size="sm" variant="ghost" className="ui-control-compact h-7 text-accent" disabled={!picked} onClick={() => setPicked(null)}>เลือกทั้งหมด</Button>
+                  <Button type="button" size="sm" variant="ghost" className="ui-control-compact h-7 text-accent" disabled={chosen.length === 0} onClick={() => setPicked(new Set())}>ล้าง</Button>
                 </span>
               </div>
-              <ul className="max-h-56 divide-y divide-border overflow-y-auto rounded-lg border border-border bg-card">
+              <ul className="scrollbar-hidden max-h-60 divide-y divide-border overflow-y-auto rounded-xl bg-muted/40">
                 {roster.map((r) => {
                   const on = !picked || picked.has(r.student_id);
                   return (
                     <li key={r.student_id}>
-                      <label className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-xs">
-                        <input type="checkbox" checked={on} onChange={() => toggle(r.student_id)} className="size-4 accent-[hsl(var(--primary))]" />
+                      <label className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-muted">
+                        <input type="checkbox" checked={on} onChange={() => toggle(r.student_id)} className="size-4 shrink-0 accent-[hsl(var(--primary))]" />
                         <span className={cn("min-w-0 flex-1 truncate", !on && "text-muted-foreground")}>{r.name}</span>
-                        <span className="tabular-nums text-muted-foreground">{r.code}</span>
+                        <span className="text-xs tabular-nums text-muted-foreground">{r.code}</span>
                       </label>
                     </li>
                   );
@@ -103,8 +122,10 @@ export function AnswerSheetCard({
               </ul>
             </div>
           )}
-          <Button type="button" className="w-full" disabled={!loaded || problems.length > 0 || sheets.length === 0} onClick={() => setPrinting(true)}>
-            พิมพ์กระดาษคำตอบ {sheets.length} ใบ
+
+          <Button type="button" className="h-11 w-full flex-col gap-0 leading-tight" disabled={!loaded || problems.length > 0 || sheets.length === 0} onClick={() => setPrinting(true)}>
+            <span>พิมพ์กระดาษคำตอบ {sheets.length} ใบ</span>
+            {spareCount > 0 && <span className="text-[11px] font-normal opacity-80">{chosen.length} คน + ใบสำรอง {spareCount}</span>}
           </Button>
         </div>
       </Collapse>
