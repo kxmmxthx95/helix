@@ -20,7 +20,6 @@ export const BUCKETS: Record<string, BucketRule> = {
   "leave-attachments": { public: false },
   "pos-products": { public: true, upsert: true, maxBytes: 2 * MB, mimes: IMG },
   "school-assets": { public: true, upsert: true },
-  "subject-covers": { public: true, upsert: true, maxBytes: 10 * MB, mimes: IMG },
   "tuition-invoices": { public: false, maxBytes: 10 * MB, mimes: ["application/pdf"] },
 };
 

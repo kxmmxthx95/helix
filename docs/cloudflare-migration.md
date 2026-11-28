@@ -20,7 +20,7 @@ Rule: every phase ships alone and can be rolled back, except the DB cutover (pha
 |---|---|---|
 | 0 | Inventory (below), wrangler config | done |
 | 1 | Vercel → Cloudflare Workers static assets (`wrangler.jsonc`, `public/_headers`, `npm run deploy:cf`) | **deployed** at https://helix.adah.workers.dev (Vercel still serves production; DNS not moved) |
-| 2 | Storage → R2, bucket by bucket (not `subject-documents`): `worker/` (files-worker), `r2_authz` SQL fn (0237), `src/lib/storage.ts` shim, `scripts/storage-to-r2.mjs` | **deployed**: R2 `helix-files`, worker https://helix-files.adah.workers.dev, `r2_authz` applied; `subject-covers` copied (28/28 byte-identical). No app build uses it yet — all buckets still on Supabase until `VITE_R2_BUCKETS` is set |
+| 2 | Storage → R2, bucket by bucket (not `subject-documents`, not `subject-covers` — both stay on Supabase Storage by decision): `worker/` (files-worker), `r2_authz` SQL fn (0237), `src/lib/storage.ts` shim, `scripts/storage-to-r2.mjs` | **deployed**: R2 `helix-files`, worker https://helix-files.adah.workers.dev, `r2_authz` applied; a `subject-covers` trial copy (28/28 byte-identical) was deleted again. No app build uses it yet — all buckets still on Supabase until `VITE_R2_BUCKETS` is set |
 | 3 | 10 Edge Functions → Workers; `pg_cron`/`pg_net` jobs → Cron Triggers | todo |
 | 4 | Shadow D1 (nightly sync from Supabase) + Worker API + `supabase`-shaped client; port RPC/trigger/policy per domain; parity tests on real data, behind an env flag | todo |
 | 5 | Auth in Worker: PBKDF2 (WebCrypto) for new hashes, lazy bcrypt verify → rehash for imported `auth.users` hashes (no forced reset); one `/login` call returns profile + roles + student; realtime via Durable Object | todo |
@@ -53,7 +53,7 @@ and then reads/writes R2. Private files are opened through `/sign` → HMAC link
 6. After old tabs have drained (PWA update prompt), run step 4 again for that bucket to pick up files uploaded to Supabase in the gap.
 7. Rollback = remove the bucket from `VITE_R2_BUCKETS` (files uploaded to R2 meanwhile need copying back).
 
-Suggested order: `subject-covers`, `banners`, `school-assets`, `exam-question-images`, `avatars`, `pos-products` (public) → then the private ones
+Suggested order: `banners`, `school-assets`, `exam-question-images`, `avatars`, `pos-products` (public) → then the private ones
 (`leave-attachments`, `tuition-invoices`, `card-slips`, `assignment-*`, `employee-documents`). Not done: HTTP Range for large PDFs.
 
 ## Inventory

@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SubjectCoverLibrary } from "@/lib/database.types";
 import { compressImage } from "@/lib/image";
 import { supabase } from "@/lib/supabase";
-import { storage } from "@/lib/storage";
 
 export const COVER_MAX_BYTES = 10 * 1024 * 1024; // mirrors the subject-covers bucket limit (0172)
 const COVER_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -28,7 +27,7 @@ export function useSubjectCoverLibrary() {
 
 /** Cache-busted with updated_at so a replaced image shows at once. */
 export function libraryCoverUrl(c: Pick<SubjectCoverLibrary, "id" | "updated_at">): string {
-  const { data } = storage.from("subject-covers").getPublicUrl(`lib/${c.id}`);
+  const { data } = supabase.storage.from("subject-covers").getPublicUrl(`lib/${c.id}`);
   return `${data.publicUrl}?v=${encodeURIComponent(c.updated_at)}`;
 }
 
@@ -36,7 +35,7 @@ async function putImage(id: string, file: File) {
   if (!COVER_TYPES.includes(file.type)) throw new Error("รองรับเฉพาะไฟล์ JPG, PNG, WebP");
   if (file.size > COVER_MAX_BYTES) throw new Error("ไฟล์ใหญ่เกิน 10 MB");
   const blob = await compressImage(file, 1600, 0.82);
-  const { error } = await storage
+  const { error } = await supabase.storage
     .from("subject-covers")
     .upload(`lib/${id}`, blob, { upsert: true, contentType: "image/jpeg" });
   if (error) throw error;
@@ -100,7 +99,7 @@ export function useDeleteCover() {
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("subject_cover_library").delete().eq("id", id);
       if (error) throw error;
-      await storage.from("subject-covers").remove([`lib/${id}`]);
+      await supabase.storage.from("subject-covers").remove([`lib/${id}`]);
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: ["subject-cover-library"] }),
   });
