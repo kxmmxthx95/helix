@@ -83,10 +83,10 @@ export function compileSelect(req: SelectRequest, pred: Pred): { rows: Sql | nul
     // single()/maybeSingle() read 2 rows so a duplicate is detectable.
     const limit = req.single ? 2 : Math.min(int(req.limit, MAX_ROWS), MAX_ROWS);
     rows = {
-      sql: `SELECT ${cols.map(q).join(", ")} FROM ${q(table)} WHERE ${w.sql}${order.length ? ` ORDER BY ${order.join(", ")}` : ""} LIMIT ${limit} OFFSET ${int(req.offset, 0)}`,
+      sql: `SELECT ${cols.map(q).join(", ")} FROM ${q(table)} AS "__row" WHERE ${w.sql}${order.length ? ` ORDER BY ${order.join(", ")}` : ""} LIMIT ${limit} OFFSET ${int(req.offset, 0)}`,
       params: w.params,
     };
   }
-  const count = req.count || req.head ? { sql: `SELECT COUNT(*) AS c FROM ${q(table)} WHERE ${w.sql}`, params: w.params } : null;
+  const count = req.count || req.head ? { sql: `SELECT COUNT(*) AS c FROM ${q(table)} AS "__row" WHERE ${w.sql}`, params: w.params } : null;
   return { rows, count };
 }

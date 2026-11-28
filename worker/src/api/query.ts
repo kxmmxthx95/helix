@@ -1,8 +1,8 @@
 import { compileSelect } from "./compile";
 import { toApiRow } from "./convert";
-import { authenticate, loadCtx } from "./identity";
+import { authenticate } from "./identity";
 import { ApiFailure, tableColumns } from "./manifest";
-import { selectPolicy } from "./policy";
+import { selectPredicate } from "./policy";
 import type { ApiResponse, SelectRequest } from "./protocol";
 
 export interface ApiEnv {
@@ -26,16 +26,14 @@ export async function handleSelect(req: Request, env: ApiEnv, timing: Record<str
   if (!env.DB) throw new ApiFailure(503, "PGRST000", "database not configured");
   let t = Date.now();
   const lap = (name: string) => { const n = Date.now(); timing[name] = n - t; t = n; };
-  const uid = await authenticate(req, env);
+  const who = await authenticate(req, env);
   lap("auth");
   const q = parse(await req.json().catch(() => null));
   tableColumns(q.table); // 404 for unknown tables before anything else
-  const policy = selectPolicy(q.table);
-  if (!policy) throw new ApiFailure(403, "42501", `table ${q.table} is not available through the API yet`);
+  const pred = selectPredicate(q.table, who);
+  if (pred === undefined) throw new ApiFailure(403, "42501", `table ${q.table} is not available through the API yet`);
 
-  const ctx = await loadCtx(env.DB, uid);
-  lap("ctx");
-  const { rows, count } = compileSelect(q, policy(ctx));
+  const { rows, count } = compileSelect(q, pred);
   const run = (s: { sql: string; params: unknown[] }) => env.DB!.prepare(s.sql).bind(...s.params);
   const [r1, r2] = await env.DB.batch<Record<string, unknown>>([rows, count].filter((s) => s !== null).map(run));
   lap("query");

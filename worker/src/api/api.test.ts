@@ -72,8 +72,8 @@ describe("row-level policies", () => {
     expect(ids(await ask(ID.teacher, { table: "profile_roles", columns: ["profile_id"] }), "profile_id")).toEqual([ID.stuA, ID.teacher].sort());
   });
 
-  it("tables without a ported policy are not reachable", async () => {
-    const r = await ask(ID.admin, { table: "card_transactions" });
+  it("tables with no policy (Postgres: deny-all, only reachable through RPCs) are not reachable", async () => {
+    const r = await ask(ID.admin, { table: "password_reset_attempts" });
     expect(r.status).toBe(403);
     expect(await ask(ID.admin, { table: "nope" })).toMatchObject({ status: 404 });
   });
