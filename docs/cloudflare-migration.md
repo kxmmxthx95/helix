@@ -27,7 +27,19 @@ Rule: every phase ships alone and can be rolled back, except the DB cutover (pha
 | 6 | **DB cutover** outside exam weeks: freeze writes → final sync → flip flag. Rollback = flip back + replay writes made since | todo |
 | 7 | Supabase read-only 30 days → downgrade to Free (kept for `subject-documents` only) | todo |
 
-Already shipped toward the login problem: students wait a random 0–2 s before `signInWithPassword` (`AuthProvider.signIn`, `studentOnly`).
+## Login burst measurement (2026-11-28, Supabase free plan, `scripts/login-burst.mjs`, throwaway user, deleted after)
+
+| | result |
+|---|---|
+| round trip, no hashing (`/auth/v1/health`) | p50 115 ms |
+| one login, sequential | p50 166 ms → ≈ 50 ms of server work (bcrypt) |
+| 20 logins at once | min 244 / p50 1540 / max 1637 ms, all 200 |
+
+The server finishes ~1 login per 73 ms regardless of how many arrive: **~13 logins/s**, a single-core queue. A class of 200 therefore takes **~15 s to drain** (the last student
+waits ~15 s; 504s once the proxy times out). A random start delay only moves the queue: it would need a window ≥ 15 s to help, and costs every lone login. The 0–2 s
+stagger added in 6658d98 was therefore **removed**; the existing retry-with-jitter stays. The fix is capacity: auth hashing that scales out (phase 5: PBKDF2 in Workers runs
+in parallel isolates, ~50 ms each, no shared queue) or a bigger Supabase compute in the meantime. Still unchecked: the per-IP sign-in rate limit (Dashboard → Authentication →
+Rate Limits; default 30 / 5 min / IP) — a whole school behind one NAT address may hit it before CPU. The 26-call test did not trigger it.
 
 ## Phase 1 deploy
 

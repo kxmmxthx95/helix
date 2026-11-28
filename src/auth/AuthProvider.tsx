@@ -322,9 +322,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // The student login page only ever has students: one password hash per attempt instead of three.
         const candidates = opts?.studentOnly ? [`${id}@students.helix.internal`] : [`${id}@students.helix.internal`, `${id}@staff.helix.internal`, id];
 
-        // A class tapping "log in" together queues one bcrypt per student on auth. A random 0–2s head start spreads them out.
-        if (opts?.studentOnly) await new Promise((r) => setTimeout(r, Math.random() * 2000));
-
         let lastError: Error | null = null;
         for (const email of candidates) {
           // A whole class logging in at once overloads auth (504 / 5xx). Retry with random jitter so the
