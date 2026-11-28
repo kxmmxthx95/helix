@@ -1,5 +1,4 @@
--- Step 1 of 2 for the student profile leak (step 2: supabase/pending/0242_profiles_students_own_row.sql, applied once the app reads
--- teacher names/contacts from this view). profile_directory exposes safe columns only: email/phone just for people who hold a
+-- profile_directory exposes safe columns only: email/phone just for people who hold a
 -- non-student role (the "contact your teacher" card is intentional); a student sees staff of their department plus themself, never
 -- classmates; everyone else sees what profiles_read_scope already lets them see. Additive: nothing changes for the existing app.
 -- The view runs with its owner's rights (security_invoker = false) on purpose: its WHERE clause is the access rule.

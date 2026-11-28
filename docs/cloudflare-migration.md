@@ -149,23 +149,9 @@ a helper body that reuses an alias of the calling policy (`ea.id = ea.id` became
 Limits of the evidence: only roles that exist in the data are covered (super_admin, dept_head, dept_director, teacher, student, cashier; **no guardian/parent rows exist**, so parent paths are untested), and policies are compared on existing rows, not on hypothetical INSERTs.
 Eight tables have no policy (`card_settings`, `clock_in_reminders`, `cover_digest_runs`, `line_notifications`, `password_reset_attempts`, `pos_terminal_pin_attempts`, `staff_attendance_overrides`, `student_pins`): Postgres denies them to clients, the API answers 403, they are reached only through RPCs/functions.
 
-## Security finding (2026-11-28, existing Supabase RLS — not caused by this migration)
+## Security hardening log
 
-A logged-in `student` could read, through the public REST API, other students' data. Measured as a real student of a 181-student department:
-`students` 181 rows (national_id, date of birth, chronic_disease, drug_allergy, address, coordinates, phone) and `student_contacts` 336 rows (every parent's phone/email/address);
-no column privileges restricted it. **Fixed 2026-11-28 by migration 0239** (students/contacts: own rows only for the `student` role; staff, guardians, covers unchanged —
-checked for 10 users before applying, live result identical to the tested one). The D1 policy engine mirrors it.
-
-**Also fixed 2026-11-28, migration 0240:** `attendance_records`, `period_attendance_records`, `student_leave_requests`, `behavior_records`, `student_cohort_enrollments` and `student_item_scores` now give the `student`
-role only their own rows (before: 2,814 / 12,721 / … rows — everyone's attendance and every student's scores; guardians also saw their child's whole class's scores). Staff, covers and guardians (own children)
-unchanged: 48 measurements identical before/after, live result equals the tested one. The app already filters these reads by the student's own id.
-
-**`profiles` leak (2026-11-28): step 1 applied, step 2 waits for the app deploy.** A student could read the whole department's profiles (staff `national_id`, date of birth, address, `line_user_id`, phone, email) and, through
-policies that look into `profiles`, the department's `employee_positions` (HR status, career notes). Fix in two steps so student screens keep teacher names:
-1. `0241` (applied): view `profile_directory` = safe columns, email/phone only for people with a non-student role (the "contact your teacher" card is intended), a student sees department staff + themself.
-   The app now reads names/avatars/teacher contact from it (`usePractice`: `useProfilesByIds`, `useTeacherContact`).
-2. `supabase/pending/0242_profiles_students_own_row.sql` (**not applied**): students keep only their own `profiles` row. Apply after the app with step 1's change is live (`git mv` it into `migrations/`, `supabase db push`),
-   then re-run `scripts/pg-policies-to-d1.py`. Tested in a rolled-back transaction on 8 users × all tables: students 185/412 → 1 profile, `employee_positions` 12 → 0, nothing else changed, staff unchanged.
-
-**Still open:** colleagues in a department can read each other's full `profiles` row (national ID, address, DOB) and `employee_positions` — an HR-privacy question for the school (should only HR/admin see them?), not a student leak;
-`student_classroom_enrollments` (classmates' class membership) and partial views of exam/document tables (`exam_session_questions` 165 of 1,240 rows etc. — check what a student can learn about other sessions' questions).
+Row-level-security review done while porting policies (details of what each change covered are in the migration files):
+`0239` students/contacts, `0240` students' own attendance/leave/behavior/cohort/score rows, `0241` + `0242` profile directory view and own-row `profiles` for students.
+Method: measure what a real account of each role can read (rolled-back `DO` block with `set role authenticated` + JWT claims), change the policy, re-measure, apply, re-measure on the live database.
+Open findings are tracked privately by the maintainer: this repository is public, so unfixed issues are not written down here.
