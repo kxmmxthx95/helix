@@ -10,6 +10,7 @@ import type {
   Subject,
 } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
 
 // คลังข้อสอบ — the bank, owned by subject_id (any teacher teaching that
 // subject shares it). See migration 0047 for the RLS/ownership rationale.
@@ -190,9 +191,9 @@ export async function uploadExamQuestionImage(dataUrl: string, questionId: strin
   const blob = await res.blob();
   const ext = blob.type.split("/")[1] ?? "png";
   const path = `${questionId}/${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from(EXAM_IMAGES_BUCKET).upload(path, blob);
+  const { error } = await storage.from(EXAM_IMAGES_BUCKET).upload(path, blob);
   if (error) throw error;
-  return supabase.storage.from(EXAM_IMAGES_BUCKET).getPublicUrl(path).data.publicUrl;
+  return storage.from(EXAM_IMAGES_BUCKET).getPublicUrl(path).data.publicUrl;
 }
 
 export type AiChatMessage = { role: "user" | "assistant"; content: string };

@@ -59,7 +59,8 @@ export default defineConfig({
           },
           {
             // Product photos: the URL carries ?v=updated_at, so a re-upload is a new cache key.
-            urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/v1\/object\/public\/pos-products\//i,
+            // Same photos from Supabase Storage or, once the bucket is flipped, from the files-worker (/o/pos-products/…).
+            urlPattern: ({ url }) => /^\/(storage\/v1\/object\/public|o)\/pos-products\//.test(url.pathname),
             handler: "CacheFirst",
             options: {
               cacheName: "pos-product-images",

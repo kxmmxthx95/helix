@@ -23,6 +23,7 @@ import type {
 import { compressImage } from "@/lib/image";
 import { posPin } from "@/lib/posPin";
 import { supabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
 
 // บัตรเติมเงิน — see migration 0107. Money only moves through RPCs, and ONLY online:
 // nothing here touches the IndexedDB outbox, so an offline sale fails loudly instead of queuing.
@@ -172,7 +173,7 @@ export function usePosProducts() {
 /** Public URL of the product photo, cache-busted with updated_at so a re-upload shows at once. */
 export function productImageUrl(p: Pick<PosProduct, "image_path" | "updated_at">): string | null {
   if (!p.image_path) return null;
-  return `${supabase.storage.from("pos-products").getPublicUrl(p.image_path).data.publicUrl}?v=${encodeURIComponent(p.updated_at)}`;
+  return `${storage.from("pos-products").getPublicUrl(p.image_path).data.publicUrl}?v=${encodeURIComponent(p.updated_at)}`;
 }
 
 export function useSaveProduct() {
@@ -189,7 +190,7 @@ export function useSaveProduct() {
       if (image) {
         const pid = saved.data.id;
         const blob = await compressImage(image, 640, 0.82);
-        const up = await supabase.storage.from("pos-products").upload(pid, blob, { upsert: true, contentType: "image/jpeg" });
+        const up = await storage.from("pos-products").upload(pid, blob, { upsert: true, contentType: "image/jpeg" });
         if (up.error) throw up.error;
         const { error } = await supabase.from("pos_products").update({ image_path: pid }).eq("id", pid);
         if (error) throw error;
@@ -505,7 +506,7 @@ export function useSubmitSlip() {
     mutationFn: async (a: { student_id: string; requested_by: string; amount: number; transferred_at: string; file: File }) => {
       if (!navigator.onLine) throw new Error(NET_ERR);
       const path = `${a.student_id}/${crypto.randomUUID()}.jpg`;
-      const { error: upErr } = await supabase.storage
+      const { error: upErr } = await storage
         .from("card-slips")
         .upload(path, await compressImage(a.file, 1600, 0.85), { contentType: "image/jpeg" });
       if (upErr) throw upErr;
@@ -524,7 +525,7 @@ export function useSubmitSlip() {
 
 /** Private bucket — sign a short-lived URL on demand. */
 export async function slipImageUrl(path: string): Promise<string> {
-  const { data, error } = await supabase.storage.from("card-slips").createSignedUrl(path, 60);
+  const { data, error } = await storage.from("card-slips").createSignedUrl(path, 60);
   if (error) throw error;
   return data.signedUrl;
 }

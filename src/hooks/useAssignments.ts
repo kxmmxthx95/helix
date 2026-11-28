@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AssignmentSubmission, ScoreItem, SubmissionAttachment } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
 
 // Google Classroom–style student/parent side — see migration 0039 and
 // useScoreRecording.ts (teacher side: posting, attachments, grading). A
@@ -174,7 +175,7 @@ export function useSubmitAssignment() {
       for (const file of files) {
         const ext = file.name.includes(".") ? file.name.split(".").pop() : undefined;
         const path = `${scoreItemId}/${studentId}/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
-        const { error: upErr } = await supabase.storage.from(SUBMISSIONS_BUCKET).upload(path, file);
+        const { error: upErr } = await storage.from(SUBMISSIONS_BUCKET).upload(path, file);
         if (upErr) throw upErr;
         const { error: attErr } = await supabase
           .from("submission_attachments")
@@ -203,7 +204,7 @@ export function useReopenSubmission() {
 
 /** Private bucket — no public URL, sign one on demand (same pattern as Leave.tsx's openAttachment). */
 export async function signedSubmissionAttachmentUrl(path: string): Promise<string> {
-  const { data, error } = await supabase.storage.from(SUBMISSIONS_BUCKET).createSignedUrl(path, 60);
+  const { data, error } = await storage.from(SUBMISSIONS_BUCKET).createSignedUrl(path, 60);
   if (error) throw error;
   return data.signedUrl;
 }

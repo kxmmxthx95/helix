@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AcademicTerm, Student, TuitionInvoice, TuitionPayment, TuitionPaymentMethod, TuitionTermAmount } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
 
 // ค่าเทอม — see migration 0095. RLS decides what each role sees: org-wide
 // gets every invoice, a parent only their children's, so callers just pass a
@@ -51,14 +52,14 @@ export function checkInvoiceFile(file: File) {
 async function putInvoiceFile(studentId: string, file: File): Promise<string> {
   checkInvoiceFile(file);
   const path = `${studentId}/${crypto.randomUUID()}.pdf`;
-  const { error } = await supabase.storage.from(INVOICE_BUCKET).upload(path, file);
+  const { error } = await storage.from(INVOICE_BUCKET).upload(path, file);
   if (error) throw error;
   return path;
 }
 
 /** Private bucket — sign a short-lived URL on demand. */
 export async function tuitionInvoiceFileUrl(path: string): Promise<string> {
-  const { data, error } = await supabase.storage.from(INVOICE_BUCKET).createSignedUrl(path, 60);
+  const { data, error } = await storage.from(INVOICE_BUCKET).createSignedUrl(path, 60);
   if (error) throw error;
   return data.signedUrl;
 }

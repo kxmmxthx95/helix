@@ -9,6 +9,7 @@ import type {
   StudentPassFailScore,
 } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
 
 // ------------------------------------------------------------------ score_items
 // ระบบบันทึกคะแนน — คะแนนเก็บ+สอบ share one item mechanism (see migration
@@ -107,7 +108,7 @@ export function useAddAssignmentAttachment() {
     mutationFn: async ({ scoreItemId, file }: { scoreItemId: string; file: File }) => {
       const ext = file.name.includes(".") ? file.name.split(".").pop() : undefined;
       const path = `${scoreItemId}/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
-      const { error: upErr } = await supabase.storage.from(ASSIGNMENT_ATTACHMENTS_BUCKET).upload(path, file);
+      const { error: upErr } = await storage.from(ASSIGNMENT_ATTACHMENTS_BUCKET).upload(path, file);
       if (upErr) throw upErr;
       const { error } = await supabase
         .from("assignment_attachments")
@@ -122,7 +123,7 @@ export function useDeleteAssignmentAttachment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (attachment: AssignmentAttachment) => {
-      await supabase.storage.from(ASSIGNMENT_ATTACHMENTS_BUCKET).remove([attachment.storage_path]);
+      await storage.from(ASSIGNMENT_ATTACHMENTS_BUCKET).remove([attachment.storage_path]);
       const { error } = await supabase.from("assignment_attachments").delete().eq("id", attachment.id);
       if (error) throw error;
     },
@@ -132,7 +133,7 @@ export function useDeleteAssignmentAttachment() {
 
 /** Private bucket — no public URL, sign one on demand (same pattern as Leave.tsx's openAttachment). */
 export async function signedAssignmentAttachmentUrl(path: string): Promise<string> {
-  const { data, error } = await supabase.storage.from(ASSIGNMENT_ATTACHMENTS_BUCKET).createSignedUrl(path, 60);
+  const { data, error } = await storage.from(ASSIGNMENT_ATTACHMENTS_BUCKET).createSignedUrl(path, 60);
   if (error) throw error;
   return data.signedUrl;
 }

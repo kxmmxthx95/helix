@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { LeaveRequest, LeaveStatus, LeaveType, Profile } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
 
 // ------------------------------------------------------------------ leave_types
 // Lookup table, admin-managed (org-wide only) — see migration 0033.
@@ -109,7 +110,7 @@ const LEAVE_BUCKET = "leave-attachments";
 export async function uploadLeaveAttachment(ownerId: string, file: File): Promise<string> {
   const ext = file.name.includes(".") ? file.name.split(".").pop() : null;
   const path = `${ownerId}/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
-  const { error } = await supabase.storage.from(LEAVE_BUCKET).upload(path, file);
+  const { error } = await storage.from(LEAVE_BUCKET).upload(path, file);
   if (error) throw error;
   return path;
 }
@@ -175,7 +176,7 @@ export function useSetLeaveStatus() {
 
 /** Private bucket — no public URL, sign one on demand (e.g. an approver opening the attachment). */
 export async function leaveAttachmentUrl(path: string): Promise<string> {
-  const { data, error } = await supabase.storage.from(LEAVE_BUCKET).createSignedUrl(path, 60);
+  const { data, error } = await storage.from(LEAVE_BUCKET).createSignedUrl(path, 60);
   if (error) throw error;
   return data.signedUrl;
 }

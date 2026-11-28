@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Profile, Student } from "@/lib/database.types";
 import { compressImage } from "@/lib/image";
 import { supabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
 
 /**
  * Uploads to the public avatars bucket (object name = the target user's own
@@ -14,7 +15,7 @@ export function useUploadAvatar() {
   return useMutation({
     mutationFn: async ({ file, profileId }: { file: File; profileId: string }) => {
       const blob = await compressImage(file);
-      const { error: upErr } = await supabase.storage
+      const { error: upErr } = await storage
         .from("avatars")
         .upload(profileId, blob, { upsert: true, contentType: "image/jpeg" });
       if (upErr) throw upErr;
@@ -40,14 +41,14 @@ export function useRemoveAvatar() {
 /** Cache-busted with updated_at so a re-upload shows immediately, not the CDN's stale copy. */
 export function avatarUrl(profile: Pick<Profile, "avatar_path" | "updated_at">): string | null {
   if (!profile.avatar_path) return null;
-  const { data } = supabase.storage.from("avatars").getPublicUrl(profile.avatar_path);
+  const { data } = storage.from("avatars").getPublicUrl(profile.avatar_path);
   return `${data.publicUrl}?v=${encodeURIComponent(profile.updated_at)}`;
 }
 
 /** Student photo (students/<id> in the avatars bucket), cache-busted like avatarUrl. */
 export function studentAvatarUrl(student: Pick<Student, "avatar_path" | "updated_at">): string | null {
   if (!student.avatar_path) return null;
-  const { data } = supabase.storage.from("avatars").getPublicUrl(student.avatar_path);
+  const { data } = storage.from("avatars").getPublicUrl(student.avatar_path);
   return `${data.publicUrl}?v=${encodeURIComponent(student.updated_at)}`;
 }
 
@@ -62,7 +63,7 @@ export function useUploadBanner() {
       if (!BANNER_TYPES.includes(file.type)) throw new Error("รองรับเฉพาะไฟล์ JPG, PNG, WebP");
       if (file.size > BANNER_MAX_BYTES) throw new Error("ไฟล์ใหญ่เกิน 5 MB");
       const blob = await compressImage(file, 1600, 0.82);
-      const { error: upErr } = await supabase.storage
+      const { error: upErr } = await storage
         .from("banners")
         .upload(profileId, blob, { upsert: true, contentType: "image/jpeg" });
       if (upErr) throw upErr;
@@ -99,6 +100,6 @@ export function useSaveBannerFocus() {
 /** Cache-busted with updated_at, like avatarUrl. */
 export function bannerUrl(profile: Pick<Profile, "banner_path" | "updated_at">): string | null {
   if (!profile.banner_path) return null;
-  const { data } = supabase.storage.from("banners").getPublicUrl(profile.banner_path);
+  const { data } = storage.from("banners").getPublicUrl(profile.banner_path);
   return `${data.publicUrl}?v=${encodeURIComponent(profile.updated_at)}`;
 }

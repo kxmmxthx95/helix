@@ -17,7 +17,7 @@ Rule: every phase ships alone and can be rolled back, except the DB cutover (pha
 |---|---|---|
 | 0 | Inventory (below), wrangler config | done |
 | 1 | Vercel → Cloudflare Pages (`public/_headers`, `public/_redirects`, `wrangler.jsonc`, `npm run deploy:cf`) | config ready, not deployed |
-| 2 | Storage → R2, bucket by bucket (not `subject-documents`). Worker checks access, streams the object | todo |
+| 2 | Storage → R2, bucket by bucket (not `subject-documents`): `worker/` (files-worker), `r2_authz` SQL fn (0237), `src/lib/storage.ts` shim, `scripts/storage-to-r2.mjs` | code + tests done, **not deployed**; all buckets still on Supabase until `VITE_R2_BUCKETS` is set |
 | 3 | 10 Edge Functions → Workers; `pg_cron`/`pg_net` jobs → Cron Triggers | todo |
 | 4 | Shadow D1 (nightly sync from Supabase) + Worker API + `supabase`-shaped client; port RPC/trigger/policy per domain; parity tests on real data, behind an env flag | todo |
 | 5 | Auth in Worker: PBKDF2 (WebCrypto) for new hashes, lazy bcrypt verify → rehash for imported `auth.users` hashes (no forced reset); one `/login` call returns profile + roles + student; realtime via Durable Object | todo |
@@ -36,6 +36,24 @@ npm run deploy:cf                                                    # build + u
 Then: add the new origin (`https://helix.pages.dev` or the custom domain) to Supabase → Auth → URL Configuration
 (Site URL / redirect list) and to any edge-function CORS allowlist. Point the domain at Pages only after a smoke test
 of login, a POS sale (offline outbox) and PWA update on the `*.pages.dev` URL. `vercel.json` stays until DNS moves.
+
+## Phase 2 rollout (one bucket at a time; flag off = no behaviour change)
+
+How it works: the browser calls the files-worker with its Supabase JWT; the worker asks `r2_authz(bucket, path, op)` on Supabase
+(caller's JWT, so RLS applies; branches are the old storage policies, verified against them for 11 users × all 460 objects, read + write)
+and then reads/writes R2. Private files are opened through `/sign` → HMAC link (like Supabase signed URLs). Public buckets are served unauthenticated.
+
+1. `npx wrangler r2 bucket create helix-files`
+2. Apply `0237_r2_authz.sql` to Supabase (`supabase db push`).
+3. `cd worker && npx wrangler secret put SUPABASE_ANON_KEY && npx wrangler secret put SIGNING_SECRET` (random 32+ bytes), then `npx wrangler deploy`.
+   Add the real app origin(s) to `ALLOWED_ORIGINS` in `worker/wrangler.jsonc` first.
+4. Copy a bucket: `SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/storage-to-r2.mjs avatars`
+5. Set `VITE_STORAGE_URL=<worker url>` and add the bucket to `VITE_R2_BUCKETS`, deploy the app. Smoke test upload / view / (private) signed open.
+6. After old tabs have drained (PWA update prompt), run step 4 again for that bucket to pick up files uploaded to Supabase in the gap.
+7. Rollback = remove the bucket from `VITE_R2_BUCKETS` (files uploaded to R2 meanwhile need copying back).
+
+Suggested order: `subject-covers`, `banners`, `school-assets`, `exam-question-images`, `avatars`, `pos-products` (public) → then the private ones
+(`leave-attachments`, `tuition-invoices`, `card-slips`, `assignment-*`, `employee-documents`). Not done: HTTP Range for large PDFs.
 
 ## Inventory
 

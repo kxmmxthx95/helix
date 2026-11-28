@@ -11,6 +11,7 @@ import type {
   SalaryGrade,
 } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
 
 export type EmployeeFilters = {
   search: string;
@@ -269,7 +270,7 @@ export function useUploadEmployeeDocument() {
       uploadedBy: string;
     }): Promise<EmployeeDocument> => {
       const path = `${profileId}/${Date.now()}_${file.name}`;
-      const { error: upErr } = await supabase.storage.from("employee-documents").upload(path, file);
+      const { error: upErr } = await storage.from("employee-documents").upload(path, file);
       if (upErr) throw upErr;
 
       const { data, error } = await supabase
@@ -288,7 +289,7 @@ export function useDeleteEmployeeDocument() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (doc: Pick<EmployeeDocument, "id" | "file_path" | "profile_id">) => {
-      const { error: rmErr } = await supabase.storage.from("employee-documents").remove([doc.file_path]);
+      const { error: rmErr } = await storage.from("employee-documents").remove([doc.file_path]);
       if (rmErr) throw rmErr;
       const { error } = await supabase.from("documents").delete().eq("id", doc.id);
       if (error) throw error;
@@ -299,7 +300,7 @@ export function useDeleteEmployeeDocument() {
 
 /** Bucket is private — every download needs a short-lived signed URL, no public getPublicUrl(). */
 export async function employeeDocumentSignedUrl(path: string): Promise<string | null> {
-  const { data, error } = await supabase.storage.from("employee-documents").createSignedUrl(path, 5 * 60);
+  const { data, error } = await storage.from("employee-documents").createSignedUrl(path, 5 * 60);
   if (error) return null;
   return data.signedUrl;
 }

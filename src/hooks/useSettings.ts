@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DepartmentSettings, SchoolSettings } from "@/lib/database.types";
 import { supabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
 
 const LOGO_PATH = "logo"; // fixed name, no extension — always overwrites, no orphaned files
 
@@ -36,7 +37,7 @@ export function useUploadLogo() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (file: File) => {
-      const { error: upErr } = await supabase.storage
+      const { error: upErr } = await storage
         .from("school-assets")
         .upload(LOGO_PATH, file, { upsert: true });
       if (upErr) throw upErr;
@@ -55,7 +56,7 @@ export function useUploadPromptpayQr() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (file: File) => {
-      const { error: upErr } = await supabase.storage.from("school-assets").upload("promptpay-qr", file, { upsert: true });
+      const { error: upErr } = await storage.from("school-assets").upload("promptpay-qr", file, { upsert: true });
       if (upErr) throw upErr;
       const { error } = await supabase.from("school_settings").update({ promptpay_qr_path: "promptpay-qr" }).eq("id", 1);
       if (error) throw error;
@@ -67,7 +68,7 @@ export function useUploadPromptpayQr() {
 /** Cache-busted with updated_at so a re-upload shows immediately, not the CDN's stale copy. */
 export function schoolLogoUrl(settings: Pick<SchoolSettings, "logo_path" | "updated_at">): string | null {
   if (!settings.logo_path) return null;
-  const { data } = supabase.storage.from("school-assets").getPublicUrl(settings.logo_path);
+  const { data } = storage.from("school-assets").getPublicUrl(settings.logo_path);
   return `${data.publicUrl}?v=${encodeURIComponent(settings.updated_at)}`;
 }
 

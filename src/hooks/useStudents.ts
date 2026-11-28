@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Profile, Student, StudentStatus } from "@/lib/database.types";
 import { compressImage } from "@/lib/image";
 import { supabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
 
 export type StudentFilters = {
   search: string;
@@ -146,7 +147,7 @@ export function useSaveStudent() {
         return data.id;
       }
       const path = `students/${data.id}`;
-      const { error: upErr } = await supabase.storage
+      const { error: upErr } = await storage
         .from("avatars")
         .upload(path, await compressImage(avatar), { upsert: true, contentType: "image/jpeg" });
       if (upErr) throw upErr;

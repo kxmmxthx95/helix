@@ -1,0 +1,11 @@
+{
+  "name": "helix-files",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "helix-files" }],
+  "vars": {
+    "SUPABASE_URL": "https://hncabywwkvdekongabln.supabase.co",
+    "ALLOWED_ORIGINS": "https://helix.pages.dev,http://localhost:5555"
+  }
+  // Secrets (wrangler secret put): SUPABASE_ANON_KEY, SIGNING_SECRET
+}

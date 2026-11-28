@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { LearningArea, Subject, SubjectType } from "@/lib/database.types";
 import { compressImage } from "@/lib/image";
 import { supabase } from "@/lib/supabase";
+import { storage } from "@/lib/storage";
 import type { ImportOutcome } from "@/hooks/useStudents";
 
 export function useLearningAreas() {
@@ -87,7 +88,7 @@ export type SubjectDraft = Pick<
 /** Public URL of the subject cover, cache-busted with updated_at so a re-upload shows at once. */
 export function subjectCoverUrl(s: { cover_path: string | null; updated_at: string }): string | null {
   if (!s.cover_path) return null;
-  return `${supabase.storage.from("subject-covers").getPublicUrl(s.cover_path).data.publicUrl}?v=${encodeURIComponent(s.updated_at)}`;
+  return `${storage.from("subject-covers").getPublicUrl(s.cover_path).data.publicUrl}?v=${encodeURIComponent(s.updated_at)}`;
 }
 
 export function useSaveSubject() {
@@ -108,7 +109,7 @@ export function useSaveSubject() {
       if (cover) {
         const sid = saved.data.id;
         const blob = await compressImage(cover, 1600, 0.82);
-        const up = await supabase.storage.from("subject-covers").upload(sid, blob, { upsert: true, contentType: "image/jpeg" });
+        const up = await storage.from("subject-covers").upload(sid, blob, { upsert: true, contentType: "image/jpeg" });
         if (up.error) throw up.error;
         const { error } = await supabase.from("subjects").update({ cover_id: null, cover_path: sid }).eq("id", sid);
         if (error) throw error;
