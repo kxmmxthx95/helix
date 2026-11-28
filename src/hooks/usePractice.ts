@@ -66,7 +66,7 @@ export function useProfilesByIds(ids: string[]) {
       { id: string; first_name: string; last_name: string; avatar_path: string | null; updated_at: string }[]
     > => {
       const { data, error } = await supabase
-        .from("profiles")
+        .from("profile_directory")
         .select("id, first_name, last_name, avatar_path, updated_at")
         .in("id", ids);
       if (error) throw error;
@@ -451,7 +451,7 @@ export function useTeacherContact(id: string | null) {
     enabled: !!id,
     queryFn: async (): Promise<TeacherContact> => {
       const { data, error } = await supabase
-        .from("profiles")
+        .from("profile_directory")
         .select("id, prefix, first_name, last_name, email, phone, teacher_code, department_id, learning_area_id, avatar_path, updated_at")
         .eq("id", id!)
         .single();

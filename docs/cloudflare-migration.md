@@ -160,5 +160,12 @@ checked for 10 users before applying, live result identical to the tested one). 
 role only their own rows (before: 2,814 / 12,721 / … rows — everyone's attendance and every student's scores; guardians also saw their child's whole class's scores). Staff, covers and guardians (own children)
 unchanged: 48 measurements identical before/after, live result equals the tested one. The app already filters these reads by the student's own id.
 
-**Still open:** `profiles` (a student reads the department's 185 profiles incl. staff `national_id`, phone, email, `line_user_id` — the app needs teacher names, so this wants a names-only view/RPC or splitting the private columns out),
-`student_classroom_enrollments` (classmates' class membership), and partial views of exam/document tables (`exam_session_questions` 165 of 1,240 rows etc. — check what a student can learn about other sessions' questions).
+**`profiles` leak (2026-11-28): step 1 applied, step 2 waits for the app deploy.** A student could read the whole department's profiles (staff `national_id`, date of birth, address, `line_user_id`, phone, email) and, through
+policies that look into `profiles`, the department's `employee_positions` (HR status, career notes). Fix in two steps so student screens keep teacher names:
+1. `0241` (applied): view `profile_directory` = safe columns, email/phone only for people with a non-student role (the "contact your teacher" card is intended), a student sees department staff + themself.
+   The app now reads names/avatars/teacher contact from it (`usePractice`: `useProfilesByIds`, `useTeacherContact`).
+2. `supabase/pending/0242_profiles_students_own_row.sql` (**not applied**): students keep only their own `profiles` row. Apply after the app with step 1's change is live (`git mv` it into `migrations/`, `supabase db push`),
+   then re-run `scripts/pg-policies-to-d1.py`. Tested in a rolled-back transaction on 8 users × all tables: students 185/412 → 1 profile, `employee_positions` 12 → 0, nothing else changed, staff unchanged.
+
+**Still open:** colleagues in a department can read each other's full `profiles` row (national ID, address, DOB) and `employee_positions` — an HR-privacy question for the school (should only HR/admin see them?), not a student leak;
+`student_classroom_enrollments` (classmates' class membership) and partial views of exam/document tables (`exam_session_questions` 165 of 1,240 rows etc. — check what a student can learn about other sessions' questions).
