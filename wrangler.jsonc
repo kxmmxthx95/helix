@@ -1,5 +1,6 @@
 {
   "name": "helix",
-  "pages_build_output_dir": "./dist",
-  "compatibility_date": "2026-11-01"
+  "compatibility_date": "2026-11-01",
+  // Static SPA on Workers assets (Pages now delegates here). Unknown paths fall back to index.html; headers come from dist/_headers.
+  "assets": { "directory": "./dist", "not_found_handling": "single-page-application" }
 }

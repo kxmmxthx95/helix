@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "deploy:cf": "npm run build && wrangler pages deploy",
+    "deploy:cf": "npm run build && wrangler deploy",
     "test": "vitest run",
     "test:watch": "vitest"
   },

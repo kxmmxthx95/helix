@@ -19,8 +19,8 @@ Rule: every phase ships alone and can be rolled back, except the DB cutover (pha
 | # | Work | Status |
 |---|---|---|
 | 0 | Inventory (below), wrangler config | done |
-| 1 | Vercel → Cloudflare Pages (`public/_headers`, `public/_redirects`, `wrangler.jsonc`, `npm run deploy:cf`) | config ready, not deployed |
-| 2 | Storage → R2, bucket by bucket (not `subject-documents`): `worker/` (files-worker), `r2_authz` SQL fn (0237), `src/lib/storage.ts` shim, `scripts/storage-to-r2.mjs` | code + tests done, **not deployed**; all buckets still on Supabase until `VITE_R2_BUCKETS` is set |
+| 1 | Vercel → Cloudflare Workers static assets (`wrangler.jsonc`, `public/_headers`, `npm run deploy:cf`) | **deployed** at https://helix.adah.workers.dev (Vercel still serves production; DNS not moved) |
+| 2 | Storage → R2, bucket by bucket (not `subject-documents`): `worker/` (files-worker), `r2_authz` SQL fn (0237), `src/lib/storage.ts` shim, `scripts/storage-to-r2.mjs` | **deployed**: R2 `helix-files`, worker https://helix-files.adah.workers.dev, `r2_authz` applied; `subject-covers` copied (28/28 byte-identical). No app build uses it yet — all buckets still on Supabase until `VITE_R2_BUCKETS` is set |
 | 3 | 10 Edge Functions → Workers; `pg_cron`/`pg_net` jobs → Cron Triggers | todo |
 | 4 | Shadow D1 (nightly sync from Supabase) + Worker API + `supabase`-shaped client; port RPC/trigger/policy per domain; parity tests on real data, behind an env flag | todo |
 | 5 | Auth in Worker: PBKDF2 (WebCrypto) for new hashes, lazy bcrypt verify → rehash for imported `auth.users` hashes (no forced reset); one `/login` call returns profile + roles + student; realtime via Durable Object | todo |
@@ -29,16 +29,16 @@ Rule: every phase ships alone and can be rolled back, except the DB cutover (pha
 
 Already shipped toward the login problem: students wait a random 0–2 s before `signInWithPassword` (`AuthProvider.signIn`, `studentOnly`).
 
-## Phase 1 deploy (first time)
+## Phase 1 deploy
+
+Pages now delegates to Workers, so the SPA is a Worker with static assets (`not_found_handling: single-page-application`, headers from `dist/_headers`).
 
 ```sh
-npx wrangler pages project create helix --production-branch main   # once
-npm run deploy:cf                                                    # build + upload dist/
+npm run deploy:cf   # build + wrangler deploy; ~12 min the first time (148 MB, 416 files), later runs upload only changed files
 ```
 
-Then: add the new origin (`https://helix.pages.dev` or the custom domain) to Supabase → Auth → URL Configuration
-(Site URL / redirect list) and to any edge-function CORS allowlist. Point the domain at Pages only after a smoke test
-of login, a POS sale (offline outbox) and PWA update on the `*.pages.dev` URL. `vercel.json` stays until DNS moves.
+Before pointing the real domain at it: add the origin to Supabase → Auth → URL Configuration and to `ALLOWED_ORIGINS` in `worker/wrangler.jsonc`;
+smoke-test login, a POS sale (offline outbox) and the PWA update prompt on the workers.dev URL. `vercel.json` stays until DNS moves.
 
 ## Phase 2 rollout (one bucket at a time; flag off = no behaviour change)
 
@@ -46,10 +46,8 @@ How it works: the browser calls the files-worker with its Supabase JWT; the work
 (caller's JWT, so RLS applies; branches are the old storage policies, verified against them for 11 users × all 460 objects, read + write)
 and then reads/writes R2. Private files are opened through `/sign` → HMAC link (like Supabase signed URLs). Public buckets are served unauthenticated.
 
-1. `npx wrangler r2 bucket create helix-files`
-2. Apply `0237_r2_authz.sql` to Supabase (`supabase db push`).
-3. `cd worker && npx wrangler secret put SUPABASE_ANON_KEY && npx wrangler secret put SIGNING_SECRET` (random 32+ bytes), then `npx wrangler deploy`.
-   Add the real app origin(s) to `ALLOWED_ORIGINS` in `worker/wrangler.jsonc` first.
+1–3. Done 2026-11-28: R2 bucket `helix-files`, `0237_r2_authz.sql` pushed, secrets set, worker deployed.
+   New app origin → add to `ALLOWED_ORIGINS` in `worker/wrangler.jsonc`, then `cd worker && npx wrangler deploy`.
 4. Copy a bucket: `SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/storage-to-r2.mjs avatars`
 5. Set `VITE_STORAGE_URL=<worker url>` and add the bucket to `VITE_R2_BUCKETS`, deploy the app. Smoke test upload / view / (private) signed open.
 6. After old tabs have drained (PWA update prompt), run step 4 again for that bucket to pick up files uploaded to Supabase in the gap.
