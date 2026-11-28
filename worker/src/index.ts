@@ -1,5 +1,6 @@
 import { ApiFailure } from "./api/manifest";
 import { errorBody, handleSelect } from "./api/query";
+import { handleWrite } from "./api/write";
 import { login, logout, refresh } from "./auth/routes";
 import { BUCKETS, DEFAULT_MAX_BYTES, sign, validPath, verify } from "./lib";
 
@@ -154,6 +155,7 @@ export default {
       else if (req.method === "POST" && url.pathname === "/auth/login") res = await login(req, env);
       else if (req.method === "POST" && url.pathname === "/auth/refresh") res = await refresh(req, env);
       else if (req.method === "POST" && url.pathname === "/auth/logout") res = await logout(req, env);
+      else if (req.method === "POST" && url.pathname === "/w") res = Response.json(await handleWrite(req, env));
       else if (req.method === "POST" && url.pathname === "/q") {
         const timing: Record<string, number> = {};
         res = Response.json(await handleSelect(req, env, timing));

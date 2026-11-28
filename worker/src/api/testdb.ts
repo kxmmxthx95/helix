@@ -18,7 +18,19 @@ export function sqliteD1(file?: string): { d1: D1Database; raw: RawDb } {
   });
   const d1 = {
     prepare: (sql: string) => stmt(sql),
-    batch: async (list: ReturnType<typeof stmt>[]) => Promise.all(list.map((s) => s.all())),
+    // D1 runs a batch as one transaction: all statements apply or none do.
+    batch: async (list: ReturnType<typeof stmt>[]) => {
+      raw.exec("BEGIN");
+      try {
+        const out = [];
+        for (const s of list) out.push(await s.all());
+        raw.exec("COMMIT");
+        return out;
+      } catch (e) {
+        raw.exec("ROLLBACK");
+        throw e;
+      }
+    },
   };
   return { d1: d1 as unknown as D1Database, raw };
 }
@@ -28,5 +40,7 @@ export function schemaDb() {
   const t = sqliteD1();
   t.raw.exec("PRAGMA foreign_keys = OFF");
   t.raw.exec(readFileSync(new URL("../../d1/schema.sql", import.meta.url), "utf8"));
+  // As in production: triggers come after the data. Tests insert fixtures directly, so they are loaded here, before the API writes.
+  t.raw.exec(readFileSync(new URL("../../d1/triggers.sql", import.meta.url), "utf8"));
   return t;
 }

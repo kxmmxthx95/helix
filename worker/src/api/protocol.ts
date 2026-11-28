@@ -34,3 +34,19 @@ export interface ApiError {
 }
 
 export type ApiResponse<T = unknown> = { data: T; count: number | null; error: null } | { data: null; count: null; error: ApiError };
+
+export interface WriteRequest {
+  table: string;
+  op: "insert" | "update" | "delete" | "upsert";
+  /** insert/upsert: one row or many; update: the patch (one object). */
+  values?: Record<string, unknown> | Record<string, unknown>[];
+  /** update/delete targeting (required: the API never writes without a WHERE). */
+  filters: Filter[];
+  ors: Filter[][];
+  /** upsert: conflict target and whether to skip instead of update */
+  onConflict?: string[];
+  ignoreDuplicates?: boolean;
+  /** `.select(cols)` after the write: return the affected rows */
+  returning?: "*" | string[];
+  single?: "one" | "maybe";
+}

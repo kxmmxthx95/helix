@@ -53,7 +53,7 @@ function cond(table: string, f: Filter): Sql {
 
 const and = (parts: Sql[]): Sql => ({ sql: parts.length ? parts.map((p) => `(${p.sql})`).join(" AND ") : "1", params: parts.flatMap((p) => p.params) });
 
-function where(table: string, req: SelectRequest, pred: Pred): Sql {
+export function where(table: string, req: { filters: Filter[]; ors: Filter[][] }, pred: Pred): Sql {
   const parts = req.filters.map((f) => cond(table, f));
   for (const alt of req.ors) {
     if (!alt.length) continue;
@@ -90,3 +90,11 @@ export function compileSelect(req: SelectRequest, pred: Pred): { rows: Sql | nul
   const count = req.count || req.head ? { sql: `SELECT COUNT(*) AS c FROM ${q(table)} AS "__row" WHERE ${w.sql}`, params: w.params } : null;
   return { rows, count };
 }
+
+/** Pred -> SQL text with its params ("1"/"0" for the constant cases). */
+export const predSql = (p: Pred): Sql => (p === true ? { sql: "1", params: [] } : p === false ? { sql: "0", params: [] } : p);
+export const andPred = (...ps: Pred[]): Pred => {
+  if (ps.includes(false)) return false;
+  const s = ps.filter((p): p is Sql => typeof p !== "boolean");
+  return s.length ? { sql: s.map((p) => `(${p.sql})`).join(" AND "), params: s.flatMap((p) => p.params) } : true;
+};

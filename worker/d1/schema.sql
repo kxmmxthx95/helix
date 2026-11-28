@@ -1962,6 +1962,15 @@ CREATE INDEX tuition_invoices_student_idx ON tuition_invoices (student_id);
 CREATE INDEX tuition_invoices_term_idx ON tuition_invoices (term_id);
 CREATE INDEX tuition_payments_invoice_idx ON tuition_payments (invoice_id);
 
+CREATE VIEW resolved_grade_status AS SELECT ta.id AS teaching_assignment_id,
+    s.id AS student_id,
+    COALESCE(gs.status, computed_grade_status(ta.id, s.id)) AS status,
+    (gs.status IS NOT NULL) AS is_manual
+   FROM (((teaching_assignments ta
+     JOIN student_classroom_enrollments sce ON (((sce.classroom_id = ta.classroom_id) AND (sce.academic_year = ta.academic_year))))
+     JOIN students s ON ((s.id = sce.student_id)))
+     LEFT JOIN student_grade_status gs ON (((gs.teaching_assignment_id = ta.id) AND (gs.student_id = s.id))))
+  WHERE (COALESCE(gs.status, computed_grade_status(ta.id, s.id)) IS NOT NULL);
 CREATE VIEW exam_questions_for_attempt AS SELECT id,
     subject_id,
     question_type,

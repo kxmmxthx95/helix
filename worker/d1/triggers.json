@@ -1,0 +1,1114 @@
+{
+ "touch": [
+  "academic_events",
+  "academic_terms",
+  "assignment_submissions",
+  "attendance_covers",
+  "attendance_records",
+  "behavior_records",
+  "card_slip_requests",
+  "card_transactions",
+  "contracts",
+  "curriculum_cohorts",
+  "curriculum_subjects",
+  "department_settings",
+  "doc_lessons",
+  "doc_targets",
+  "doc_tasks",
+  "doc_topics",
+  "duty_assignments",
+  "duty_points",
+  "duty_transfer_requests",
+  "employee_compensation",
+  "employee_positions",
+  "exam_attempt_grants",
+  "exam_attempts",
+  "exam_questions",
+  "exam_sessions",
+  "exam_topic_sets",
+  "kg_assessment_topics",
+  "learning_units",
+  "leave_requests",
+  "period_attendance_records",
+  "plan_lessons",
+  "plan_subjects",
+  "plan_topics",
+  "pos_products",
+  "pos_terminals",
+  "practice_attempts",
+  "premises_exit_requests",
+  "profiles",
+  "school_settings",
+  "score_items",
+  "student_cards",
+  "student_grade_status",
+  "student_item_scores",
+  "student_leave_requests",
+  "student_pass_fail_scores",
+  "student_premises_exit_requests",
+  "student_wallets",
+  "students",
+  "subject_cover_library",
+  "subjects",
+  "teaching_assignments",
+  "teaching_plan_slots",
+  "teaching_plan_units",
+  "time_clock_records",
+  "tuition_invoices",
+  "tuition_payments",
+  "tuition_term_amounts"
+ ],
+ "audit": [
+  "academic_events",
+  "academic_terms",
+  "assignment_attachments",
+  "assignment_submissions",
+  "attendance_covers",
+  "attendance_records",
+  "behavior_records",
+  "card_slip_requests",
+  "card_transactions",
+  "classroom_homeroom_teachers",
+  "contracts",
+  "curriculum_subjects",
+  "doc_files",
+  "doc_lessons",
+  "doc_targets",
+  "doc_task_files",
+  "doc_tasks",
+  "doc_topics",
+  "documents",
+  "duty_assignments",
+  "duty_points",
+  "duty_transfer_requests",
+  "duty_weekly_template",
+  "employee_compensation",
+  "employee_positions",
+  "exam_attempt_grants",
+  "exam_attempts",
+  "exam_questions",
+  "exam_sessions",
+  "kg_assessment_topics",
+  "learning_units",
+  "leave_requests",
+  "period_attendance_records",
+  "pos_terminals",
+  "practice_sets",
+  "premises_exit_requests",
+  "profile_roles",
+  "profiles",
+  "schedule_entries",
+  "score_items",
+  "student_cards",
+  "student_classroom_enrollments",
+  "student_cohort_enrollments",
+  "student_contacts",
+  "student_grade_status",
+  "student_guardian_financials",
+  "student_item_scores",
+  "student_leave_requests",
+  "student_pass_fail_scores",
+  "student_premises_exit_requests",
+  "student_wallets",
+  "students",
+  "submission_attachments",
+  "teaching_assignments",
+  "time_clock_records",
+  "transfer_intakes",
+  "tuition_invoices",
+  "tuition_payments",
+  "tuition_term_amounts"
+ ],
+ "manual": [
+  {
+   "table": "assignment_submissions",
+   "trigger": "assignment_submissions_resubmit_check",
+   "function": "check_submission_resubmit",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "attendance_covers",
+   "trigger": "attendance_covers_insert_check",
+   "function": "check_attendance_cover_insert",
+   "before": true,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "attendance_covers",
+   "trigger": "attendance_covers_notify",
+   "function": "notify_attendance_cover",
+   "before": false,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "attendance_covers",
+   "trigger": "attendance_covers_transition_check",
+   "function": "check_attendance_cover_transition",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "attendance_records",
+   "trigger": "attendance_records_lock_leave",
+   "function": "lock_attendance_to_leave",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "card_transactions",
+   "trigger": "card_transactions_immutable",
+   "function": "check_card_transaction_immutable",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "card_transactions",
+   "trigger": "card_transactions_notify",
+   "function": "notify_card_topup",
+   "before": false,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "curriculum_cohorts",
+   "trigger": "curriculum_cohorts_department_check",
+   "function": "check_cohort_department",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "curriculum_subjects",
+   "trigger": "curriculum_subjects_cohort_department_check",
+   "function": "check_curriculum_cohort_department",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "curriculum_subjects",
+   "trigger": "curriculum_subjects_subject_department_check",
+   "function": "check_curriculum_subject_department",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "curriculum_subjects",
+   "trigger": "curriculum_subjects_term_check",
+   "function": "check_curriculum_term_dept",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "departments",
+   "trigger": "departments_seed_settings",
+   "function": "seed_department_settings",
+   "before": false,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "doc_files",
+   "trigger": "doc_files_review_guard",
+   "function": "doc_files_review_guard",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "doc_print_requests",
+   "trigger": "doc_print_requests_before",
+   "function": "doc_print_requests_before",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "duty_assignments",
+   "trigger": "duty_assignments_notify",
+   "function": "notify_duty_assignment",
+   "before": false,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "duty_transfer_requests",
+   "trigger": "duty_transfer_requests_apply_decision",
+   "function": "apply_duty_transfer_decision",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "duty_transfer_requests",
+   "trigger": "duty_transfer_requests_insert_check",
+   "function": "check_duty_transfer_insert",
+   "before": true,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "duty_transfer_requests",
+   "trigger": "duty_transfer_requests_notify_target",
+   "function": "notify_duty_transfer_target",
+   "before": false,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "duty_transfer_requests",
+   "trigger": "duty_transfer_requests_transition_check",
+   "function": "check_duty_transfer_transition",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "employee_status_history",
+   "trigger": "employee_status_history_sync",
+   "function": "sync_employee_status",
+   "before": false,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "exam_attempts",
+   "trigger": "exam_attempts_holder",
+   "function": "exam_attempts_set_holder",
+   "before": true,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "exam_attempts",
+   "trigger": "exam_attempts_manual_guard",
+   "function": "exam_attempts_manual_guard",
+   "before": true,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "exam_session_practice_questions",
+   "trigger": "exam_session_practice_questions_overlap",
+   "function": "check_exam_practice_overlap",
+   "before": true,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "exam_session_practice_questions",
+   "trigger": "exam_session_practice_questions_topic_check",
+   "function": "check_exam_session_question_topic",
+   "before": true,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "exam_session_questions",
+   "trigger": "exam_session_questions_practice_overlap",
+   "function": "check_exam_practice_overlap",
+   "before": true,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "exam_session_questions",
+   "trigger": "exam_session_questions_topic_check",
+   "function": "check_exam_session_question_topic",
+   "before": true,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "exam_session_rooms",
+   "trigger": "exam_session_rooms_first_sync",
+   "function": "exam_first_room_to_session",
+   "before": false,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "exam_session_rooms",
+   "trigger": "exam_session_rooms_trim",
+   "function": "trim_exam_room_seats",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "exam_session_seating",
+   "trigger": "exam_session_seating_trim",
+   "function": "trim_exam_seats_to_grid",
+   "before": false,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "exam_session_seats",
+   "trigger": "exam_session_seats_in_grid",
+   "function": "check_exam_seat_in_grid",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "exam_session_sets",
+   "trigger": "exam_session_sets_check",
+   "function": "check_exam_session_set",
+   "before": true,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "exam_session_targets",
+   "trigger": "exam_session_targets_set_check",
+   "function": "check_exam_target_matches_set",
+   "before": true,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "exam_sessions",
+   "trigger": "exam_sessions_0_close_from_duration",
+   "function": "exam_sessions_close_from_duration",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "exam_sessions",
+   "trigger": "exam_sessions_code",
+   "function": "exam_sessions_make_code",
+   "before": false,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "exam_sessions",
+   "trigger": "exam_sessions_first_room",
+   "function": "exam_sessions_first_room",
+   "before": false,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "exam_sessions",
+   "trigger": "exam_sessions_room_sync",
+   "function": "exam_sessions_room_to_first_room",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "exam_sessions",
+   "trigger": "exam_sessions_strict_log",
+   "function": "exam_sessions_log_strict_off",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "exam_sessions",
+   "trigger": "exam_sessions_topic_set_guard",
+   "function": "exam_sessions_topic_set_guard",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "exam_topic_set_topics",
+   "trigger": "exam_topic_set_topics_check",
+   "function": "check_exam_topic_set_topic",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "exam_topic_set_topics",
+   "trigger": "exam_topic_set_topics_scope",
+   "function": "exam_topic_set_scope_changed",
+   "before": false,
+   "events": [
+    "insert",
+    "update",
+    "delete"
+   ]
+  },
+  {
+   "table": "exam_topic_sets",
+   "trigger": "exam_topic_sets_guard",
+   "function": "exam_topic_sets_guard",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "exam_topic_sets",
+   "trigger": "exam_topic_sets_no_exam_guard",
+   "function": "exam_topic_sets_no_exam_guard",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "exam_topic_sets",
+   "trigger": "exam_topic_sets_notify_status",
+   "function": "notify_exam_topic_set_status",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "leave_requests",
+   "trigger": "leave_requests_attachment_check",
+   "function": "check_leave_attachment_required",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "leave_requests",
+   "trigger": "leave_requests_no_self_decision",
+   "function": "check_leave_no_self_decision",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "leave_requests",
+   "trigger": "leave_requests_notify_decision",
+   "function": "notify_leave_decision",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "leave_requests",
+   "trigger": "leave_requests_notify_submitted",
+   "function": "notify_leave_submitted",
+   "before": false,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "leave_requests",
+   "trigger": "leave_requests_overlap_check",
+   "function": "check_leave_overlap",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "leave_requests",
+   "trigger": "leave_requests_self_edit_check",
+   "function": "check_leave_self_edit",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "leave_requests",
+   "trigger": "leave_requests_sync_covers",
+   "function": "sync_covers_with_leave",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "line_notifications",
+   "trigger": "line_notifications_kick",
+   "function": "kick_line_notify",
+   "before": false,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "period_attendance_records",
+   "trigger": "period_attendance_records_lock_leave",
+   "function": "lock_period_attendance_to_leave",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "period_attendance_records",
+   "trigger": "period_attendance_records_no_future",
+   "function": "reject_future_period_attendance",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "period_attendance_records",
+   "trigger": "period_attendance_records_not_replaced",
+   "function": "reject_replaced_period_attendance",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "period_attendance_records",
+   "trigger": "period_attendance_records_sync_daily",
+   "function": "sync_period_attendance_to_daily",
+   "before": false,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "period_definitions",
+   "trigger": "period_definitions_grade_department_check",
+   "function": "check_period_definition_grade_department",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "pos_terminals",
+   "trigger": "pos_terminals_sync_active",
+   "function": "_pos_terminal_sync_active",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "practice_sets",
+   "trigger": "practice_sets_check_topic",
+   "function": "check_practice_set_topic",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "premises_exit_requests",
+   "trigger": "premises_exit_requests_no_return",
+   "function": "premises_exit_no_return_clock_out",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "premises_exit_requests",
+   "trigger": "premises_exit_requests_self_edit_check",
+   "function": "check_premises_exit_self_edit",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "profile_roles",
+   "trigger": "profile_roles_dept_check",
+   "function": "check_profile_role_dept",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "profile_roles",
+   "trigger": "profile_roles_ensure_employee_position",
+   "function": "ensure_employee_position",
+   "before": false,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "profiles",
+   "trigger": "profiles_block_student_avatar",
+   "function": "block_student_self_avatar",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "schedule_entries",
+   "trigger": "schedule_entries_check",
+   "function": "check_schedule_entry",
+   "before": true,
+   "events": [
+    "insert",
+    "update",
+    "delete"
+   ]
+  },
+  {
+   "table": "score_items",
+   "trigger": "score_items_notify_posted",
+   "function": "trigger_enqueue_assignment_notifications",
+   "before": false,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "score_items",
+   "trigger": "score_items_term_lock_check",
+   "function": "check_score_items_term_lock",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "student_cards",
+   "trigger": "student_cards_frozen_by",
+   "function": "set_card_frozen_by",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "student_classroom_enrollments",
+   "trigger": "student_classroom_enrollments_department_check",
+   "function": "check_classroom_enrollment_department",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "student_classroom_enrollments",
+   "trigger": "student_classroom_enrollments_term_lock_check",
+   "function": "check_classroom_enrollment_academic_term",
+   "before": true,
+   "events": [
+    "insert",
+    "update",
+    "delete"
+   ]
+  },
+  {
+   "table": "student_cohort_enrollments",
+   "trigger": "student_cohort_enrollments_department_check",
+   "function": "check_enrollment_department",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "student_contacts",
+   "trigger": "student_contacts_one_primary",
+   "function": "enforce_one_primary_guardian",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "student_grade_status",
+   "trigger": "student_grade_status_term_lock_check",
+   "function": "check_teaching_assignment_child_term_lock",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "student_item_scores",
+   "trigger": "student_item_scores_notify_graded",
+   "function": "enqueue_grade_notification",
+   "before": false,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "student_item_scores",
+   "trigger": "student_item_scores_write_check",
+   "function": "check_student_item_scores_write",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "student_leave_requests",
+   "trigger": "student_leave_requests_attachment_check",
+   "function": "check_student_leave_attachment_required",
+   "before": true,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "student_leave_requests",
+   "trigger": "student_leave_requests_cutoff_check",
+   "function": "check_student_leave_cutoff",
+   "before": true,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "student_leave_requests",
+   "trigger": "student_leave_requests_notify_decision",
+   "function": "notify_student_leave_decision",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "student_leave_requests",
+   "trigger": "student_leave_requests_notify_submitted",
+   "function": "notify_student_leave_submitted",
+   "before": false,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "student_leave_requests",
+   "trigger": "student_leave_requests_self_edit_check",
+   "function": "check_student_leave_self_edit",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "student_leave_requests",
+   "trigger": "student_leave_requests_sync_attendance",
+   "function": "sync_student_leave_to_attendance",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "student_leave_requests",
+   "trigger": "student_leave_requests_sync_attendance_insert",
+   "function": "sync_student_leave_to_attendance",
+   "before": false,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "student_pass_fail_scores",
+   "trigger": "student_pass_fail_scores_notify_graded",
+   "function": "enqueue_pass_fail_notification",
+   "before": false,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "student_pass_fail_scores",
+   "trigger": "student_pass_fail_scores_term_lock_check",
+   "function": "check_teaching_assignment_child_term_lock",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "student_premises_exit_requests",
+   "trigger": "student_premises_exit_requests_edit_check",
+   "function": "check_student_premises_exit_edit",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "student_premises_exit_requests",
+   "trigger": "student_premises_exit_requests_notify_decision",
+   "function": "notify_student_exit_decision",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "student_premises_exit_requests",
+   "trigger": "student_premises_exit_requests_notify_submitted",
+   "function": "notify_student_exit_submitted",
+   "before": false,
+   "events": [
+    "insert"
+   ]
+  },
+  {
+   "table": "students",
+   "trigger": "students_protect_admin_fields",
+   "function": "protect_student_admin_fields",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "students",
+   "trigger": "students_sync_avatar_to_profile",
+   "function": "sync_student_avatar_to_profile",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "study_map_assignments",
+   "trigger": "study_map_assignment_scope",
+   "function": "validate_study_map_assignment",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "subject_cover_library",
+   "trigger": "subject_cover_library_bump",
+   "function": "subject_cover_library_touch_subjects",
+   "before": false,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "subjects",
+   "trigger": "subjects_cover_id",
+   "function": "subjects_apply_cover_id",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "teaching_assignments",
+   "trigger": "teaching_assignments_department_check",
+   "function": "check_teaching_assignment_department",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "teaching_assignments",
+   "trigger": "teaching_assignments_teacher_history",
+   "function": "log_teaching_assignment_teacher",
+   "before": false,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "teaching_assignments",
+   "trigger": "teaching_assignments_teacher_pct_only",
+   "function": "check_teaching_assignment_pct_only_for_teacher",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "teaching_assignments",
+   "trigger": "teaching_assignments_term_check",
+   "function": "check_teaching_assignment_term",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  },
+  {
+   "table": "teaching_assignments",
+   "trigger": "teaching_assignments_term_lock_check",
+   "function": "check_teaching_assignment_academic_term",
+   "before": true,
+   "events": [
+    "insert",
+    "update",
+    "delete"
+   ]
+  },
+  {
+   "table": "teaching_plan_slot_topics",
+   "trigger": "teaching_plan_slot_topics_check",
+   "function": "check_teaching_plan_slot_topic",
+   "before": true,
+   "events": [
+    "insert",
+    "update",
+    "delete"
+   ]
+  },
+  {
+   "table": "teaching_plan_slot_topics",
+   "trigger": "teaching_plan_slot_topics_mirror",
+   "function": "mirror_slot_topic",
+   "before": false,
+   "events": [
+    "insert",
+    "delete"
+   ]
+  },
+  {
+   "table": "teaching_plan_slots",
+   "trigger": "teaching_plan_slots_check",
+   "function": "check_teaching_plan_slot",
+   "before": true,
+   "events": [
+    "insert",
+    "update",
+    "delete"
+   ]
+  },
+  {
+   "table": "teaching_plan_slots",
+   "trigger": "teaching_plan_slots_mirror_clear",
+   "function": "mirror_slot_clear",
+   "before": true,
+   "events": [
+    "delete"
+   ]
+  },
+  {
+   "table": "teaching_plan_units",
+   "trigger": "teaching_plan_units_mark_taught_check",
+   "function": "check_teaching_plan_unit_mark_taught",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "time_clock_records",
+   "trigger": "time_clock_records_self_edit_check",
+   "function": "check_time_clock_self_edit",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "tuition_invoices",
+   "trigger": "tuition_invoices_amount_floor",
+   "function": "check_tuition_invoice_amount",
+   "before": true,
+   "events": [
+    "update"
+   ]
+  },
+  {
+   "table": "tuition_payments",
+   "trigger": "tuition_payments_check",
+   "function": "check_tuition_payment",
+   "before": true,
+   "events": [
+    "insert",
+    "update"
+   ]
+  }
+ ]
+}

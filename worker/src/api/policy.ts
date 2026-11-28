@@ -28,15 +28,24 @@ function render(sql: string, who: Caller): Sql {
   return { sql: out, params };
 }
 
+function orOf(list: Entry[] | undefined, who: Caller): Pred {
+  if (!list?.length) return false; // RLS on, no policy for this command: Postgres denies
+  const parts = list.map((e) => render(e.sql, who));
+  return { sql: parts.map((p) => `(${p.sql})`).join(" OR "), params: parts.flatMap((p) => p.params) };
+}
+
 /**
  * Condition a caller's SELECT must satisfy on `table`: the OR of its SELECT policies.
  * `undefined` = the table is not exposed through the API (no policies known: deny by default, the API never guesses).
  */
 export function selectPredicate(table: string, who: Caller): Pred | undefined {
   const t = P[table];
+  return t ? orOf(t.select, who) : undefined;
+}
+
+/** Predicates for writes: INSERT check, UPDATE using/check, DELETE using (and the SELECT predicate for RETURNING / row visibility). */
+export function writePredicates(table: string, who: Caller) {
+  const t = P[table];
   if (!t) return undefined;
-  const list = t.select ?? [];
-  if (!list.length) return false; // RLS on, no SELECT policy: Postgres returns no rows
-  const parts = list.map((e) => render(e.sql, who));
-  return { sql: parts.map((p) => `(${p.sql})`).join(" OR "), params: parts.flatMap((p) => p.params) };
+  return { select: orOf(t.select, who), insert: orOf(t.insert, who), updateUsing: orOf(t.update_using, who), updateCheck: orOf(t.update_check, who), delete: orOf(t.delete, who) };
 }

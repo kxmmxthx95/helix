@@ -22,7 +22,8 @@
  "academic_events": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "name",
@@ -42,19 +43,23 @@
   },
   {
    "col": "students_attend",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "staff_attend",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "external_ref",
@@ -66,15 +71,18 @@
   },
   {
    "col": "show_in_schedule",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "notify_users",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "replaces_classes",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "start_time",
@@ -88,7 +96,8 @@
  "academic_terms": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "department_id",
@@ -112,21 +121,25 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'upcoming'"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "assignment_attachments": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "score_item_id",
@@ -142,13 +155,15 @@
   },
   {
    "col": "uploaded_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "assignment_submissions": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "score_item_id",
@@ -164,25 +179,30 @@
   },
   {
    "col": "submitted_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "reopened",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "attendance_covers": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "leave_request_id",
@@ -210,21 +230,25 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'pending'"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "attendance_records": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_id",
@@ -252,11 +276,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "audit_logs": [
@@ -290,13 +316,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "behavior_categories": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "label",
@@ -308,7 +336,8 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "severity",
@@ -318,7 +347,8 @@
  "behavior_records": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_id",
@@ -346,17 +376,20 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "card_sale_items": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "tx_id",
@@ -384,23 +417,27 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "card_settings": [
   {
    "col": "id",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "pin_threshold",
-   "kind": "money"
+   "kind": "money",
+   "default": "10000"
   }
  ],
  "card_slip_requests": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_id",
@@ -424,7 +461,8 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'pending'"
   },
   {
    "col": "approved_amount",
@@ -448,17 +486,20 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "card_transactions": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_id",
@@ -498,11 +539,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "client_tx_id",
@@ -516,7 +559,8 @@
  "classroom_homeroom_teachers": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "classroom_id",
@@ -532,13 +576,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "classrooms": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "grade_level_id",
@@ -550,11 +596,13 @@
   },
   {
    "col": "is_active",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "clock_in_reminders": [
@@ -570,7 +618,8 @@
  "contracts": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "profile_id",
@@ -594,11 +643,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "cover_digest_runs": [
@@ -614,7 +665,8 @@
  "curriculum_cohorts": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "department_id",
@@ -634,17 +686,20 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "curriculum_subjects": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "subject_id",
@@ -672,11 +727,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "cohort_id",
@@ -690,7 +747,8 @@
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "score_collect_pct",
@@ -748,7 +806,8 @@
  "departments": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "code",
@@ -760,7 +819,8 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "dept_overview_hidden_subjects": [
@@ -774,7 +834,8 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "classroom_id",
@@ -784,7 +845,8 @@
  "doc_files": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "topic_id",
@@ -820,7 +882,8 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "lesson_id",
@@ -828,7 +891,8 @@
   },
   {
    "col": "review_status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'pending'"
   },
   {
    "col": "review_note",
@@ -846,7 +910,8 @@
  "doc_lessons": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "subject_id",
@@ -862,25 +927,30 @@
   },
   {
    "col": "sort_order",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "created_by",
-   "kind": "text"
+   "kind": "text",
+   "default": "__UID__"
   }
  ],
  "doc_print_emails": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "request_id",
@@ -920,13 +990,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "doc_print_requests": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "doc_file_id",
@@ -938,7 +1010,8 @@
   },
   {
    "col": "copies",
-   "kind": "int"
+   "kind": "int",
+   "default": "1"
   },
   {
    "col": "note",
@@ -946,11 +1019,13 @@
   },
   {
    "col": "requested_by",
-   "kind": "text"
+   "kind": "text",
+   "default": "__UID__"
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'pending'"
   },
   {
    "col": "printed_by",
@@ -962,13 +1037,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "doc_targets": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "subject_id",
@@ -980,21 +1057,25 @@
   },
   {
    "col": "lesson_target",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "topic_target",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "doc_task_files": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "task_id",
@@ -1026,11 +1107,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "review_status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'pending'"
   },
   {
    "col": "review_note",
@@ -1048,7 +1131,8 @@
  "doc_tasks": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "title",
@@ -1080,17 +1164,20 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "doc_topics": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "lesson_id",
@@ -1102,21 +1189,25 @@
   },
   {
    "col": "sort_order",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "documents": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "profile_id",
@@ -1140,13 +1231,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "duty_assignments": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "duty_point_id",
@@ -1166,17 +1259,20 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "duty_points": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "name",
@@ -1184,19 +1280,23 @@
   },
   {
    "col": "active",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "mode",
-   "kind": "text"
+   "kind": "text",
+   "default": "'rotating'"
   },
   {
    "col": "fixed_staff_id",
@@ -1206,7 +1306,8 @@
  "duty_transfer_requests": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "assignment_id",
@@ -1230,21 +1331,25 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'pending_target'"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "duty_weekly_template": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "duty_point_id",
@@ -1264,13 +1369,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "employee_compensation": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "profile_id",
@@ -1282,17 +1389,20 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "employee_positions": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "profile_id",
@@ -1312,15 +1422,18 @@
   },
   {
    "col": "employee_status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'active'"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "end_date",
@@ -1330,7 +1443,8 @@
  "employee_status_history": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "profile_id",
@@ -1350,11 +1464,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "effective_date",
-   "kind": "date"
+   "kind": "date",
+   "default": "(date('now'))"
   }
  ],
  "exam_attempt_answers": [
@@ -1384,13 +1500,15 @@
   },
   {
    "col": "answered_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "exam_attempt_events": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "attempt_id",
@@ -1402,7 +1520,8 @@
   },
   {
    "col": "at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "exam_attempt_grants": [
@@ -1420,13 +1539,15 @@
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "exam_attempts": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "session_id",
@@ -1438,11 +1559,13 @@
   },
   {
    "col": "attempt_no",
-   "kind": "int"
+   "kind": "int",
+   "default": "1"
   },
   {
    "col": "started_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "submitted_at",
@@ -1450,11 +1573,13 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'in_progress'"
   },
   {
    "col": "question_order",
-   "kind": "json"
+   "kind": "json",
+   "default": "'[]'"
   },
   {
    "col": "score",
@@ -1462,11 +1587,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "holder_session",
@@ -1474,7 +1601,8 @@
   },
   {
    "col": "holder_seen_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "takeover_session",
@@ -1486,7 +1614,8 @@
   },
   {
    "col": "is_manual",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "manual_note",
@@ -1498,7 +1627,8 @@
   },
   {
    "col": "is_scan",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "scan_extra",
@@ -1516,21 +1646,25 @@
   },
   {
    "col": "fails",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "locked",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "passed",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   }
  ],
  "exam_question_choices": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "question_id",
@@ -1542,21 +1676,25 @@
   },
   {
    "col": "is_correct",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "position",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "label_json",
-   "kind": "json"
+   "kind": "json",
+   "default": "'[{\"type\": \"p\", \"children\": [{\"text\": \"\"}]}]'"
   }
  ],
  "exam_questions": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "subject_id",
@@ -1576,7 +1714,8 @@
   },
   {
    "col": "points",
-   "kind": "real"
+   "kind": "real",
+   "default": "1"
   },
   {
    "col": "created_by",
@@ -1584,19 +1723,23 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "prompt_json",
-   "kind": "json"
+   "kind": "json",
+   "default": "'[{\"type\": \"p\", \"children\": [{\"text\": \"\"}]}]'"
   },
   {
    "col": "difficulty",
-   "kind": "text"
+   "kind": "text",
+   "default": "'medium'"
   },
   {
    "col": "topic",
@@ -1608,13 +1751,15 @@
   },
   {
    "col": "tags",
-   "kind": "json"
+   "kind": "json",
+   "default": "'[]'"
   }
  ],
  "exam_seat_templates": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "department_id",
@@ -1634,17 +1779,20 @@
   },
   {
    "col": "created_by",
-   "kind": "text"
+   "kind": "text",
+   "default": "__UID__"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "exam_security_events": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "session_id",
@@ -1672,11 +1820,13 @@
   },
   {
    "col": "actor",
-   "kind": "text"
+   "kind": "text",
+   "default": "__UID__"
   },
   {
    "col": "at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "exam_session_codes": [
@@ -1724,7 +1874,8 @@
  "exam_session_rooms": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "session_id",
@@ -1770,7 +1921,8 @@
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "exam_session_seats": [
@@ -1816,7 +1968,8 @@
  "exam_session_special_seats": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "session_id",
@@ -1848,7 +2001,8 @@
  "exam_sessions": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "subject_id",
@@ -1876,19 +2030,23 @@
   },
   {
    "col": "max_attempts",
-   "kind": "int"
+   "kind": "int",
+   "default": "1"
   },
   {
    "col": "shuffle_questions",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "shuffle_choices",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "sync_to_gradebook",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "gradebook_item_id",
@@ -1896,19 +2054,23 @@
   },
   {
    "col": "review_released",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "strict_mode",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "topic_set_id",
@@ -1924,7 +2086,8 @@
   },
   {
    "col": "is_enabled",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "room_id",
@@ -1944,7 +2107,8 @@
  "exam_topic_sets": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "teacher_id",
@@ -1956,7 +2120,8 @@
   },
   {
    "col": "approval_status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'draft'"
   },
   {
    "col": "approval_note",
@@ -1972,11 +2137,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "teaching_assignment_id",
@@ -1984,7 +2151,8 @@
   },
   {
    "col": "no_exam",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "exam_type",
@@ -1998,7 +2166,8 @@
  "grade_levels": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "department_id",
@@ -2014,15 +2183,18 @@
   },
   {
    "col": "sort_order",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "is_entry_point",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   }
  ],
  "guardianships": [
@@ -2038,7 +2210,8 @@
  "kg_assessment_topics": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "grade_level_id",
@@ -2058,21 +2231,25 @@
   },
   {
    "col": "sort_order",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "learning_areas": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "code",
@@ -2084,7 +2261,8 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "parent_id",
@@ -2094,7 +2272,8 @@
  "learning_units": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "grade_level_id",
@@ -2114,21 +2293,25 @@
   },
   {
    "col": "sort_order",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "leave_requests": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "profile_id",
@@ -2156,7 +2339,8 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'pending'"
   },
   {
    "col": "approved_by",
@@ -2168,17 +2352,20 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "leave_types": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "code",
@@ -2198,7 +2385,8 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "line_link_codes": [
@@ -2220,13 +2408,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "line_notifications": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "profile_id",
@@ -2242,11 +2432,13 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'pending'"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "sent_at",
@@ -2264,17 +2456,20 @@
   },
   {
    "col": "attempt_count",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "first_attempt_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "period_attendance_records": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "schedule_entry_id",
@@ -2302,17 +2497,20 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "period_definitions": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "department_id",
@@ -2350,7 +2548,8 @@
  "plan_lesson_files": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "lesson_id",
@@ -2362,13 +2561,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "plan_lesson_subjects": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "lesson_id",
@@ -2380,13 +2581,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "plan_lessons": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "subject_id",
@@ -2402,21 +2605,25 @@
   },
   {
    "col": "sort_order",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "plan_subjects": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "department_id",
@@ -2428,11 +2635,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "color",
@@ -2446,7 +2655,8 @@
  "plan_topic_files": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "topic_id",
@@ -2458,13 +2668,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "plan_topics": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "lesson_id",
@@ -2476,21 +2688,25 @@
   },
   {
    "col": "sort_order",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "pos_products": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "code",
@@ -2510,15 +2726,18 @@
   },
   {
    "col": "active",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "image_path",
@@ -2532,7 +2751,8 @@
   },
   {
    "col": "failed_attempts",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "locked_until",
@@ -2542,7 +2762,8 @@
  "pos_terminals": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "name",
@@ -2550,15 +2771,18 @@
   },
   {
    "col": "active",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "profile_id",
@@ -2568,7 +2792,8 @@
  "position_titles": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "code",
@@ -2580,7 +2805,8 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "practice_attempt_answers": [
@@ -2610,13 +2836,15 @@
   },
   {
    "col": "answered_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "practice_attempts": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "set_id",
@@ -2628,7 +2856,8 @@
   },
   {
    "col": "started_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "submitted_at",
@@ -2636,11 +2865,13 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'in_progress'"
   },
   {
    "col": "question_order",
-   "kind": "json"
+   "kind": "json",
+   "default": "'[]'"
   },
   {
    "col": "score",
@@ -2648,11 +2879,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "practice_set_questions": [
@@ -2672,7 +2905,8 @@
  "practice_sets": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "subject_id",
@@ -2684,7 +2918,8 @@
   },
   {
    "col": "is_teacher_curated",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "title",
@@ -2700,7 +2935,8 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "topic_id",
@@ -2710,7 +2946,8 @@
  "premises_exit_requests": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "profile_id",
@@ -2742,7 +2979,8 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'pending'"
   },
   {
    "col": "approved_by",
@@ -2754,11 +2992,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "planned_return_time",
@@ -2766,13 +3006,15 @@
   },
   {
    "col": "no_return",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   }
  ],
  "profile_roles": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "profile_id",
@@ -2788,7 +3030,8 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "profiles": [
@@ -2826,15 +3069,18 @@
   },
   {
    "col": "is_active",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "national_id",
@@ -2854,7 +3100,8 @@
   },
   {
    "col": "must_change_password",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "avatar_path",
@@ -2898,7 +3145,8 @@
   },
   {
    "col": "line_notifications_enabled",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "banner_path",
@@ -2906,11 +3154,13 @@
   },
   {
    "col": "banner_focus_x",
-   "kind": "int"
+   "kind": "int",
+   "default": "50"
   },
   {
    "col": "banner_focus_y",
-   "kind": "int"
+   "kind": "int",
+   "default": "50"
   },
   {
    "col": "banner_colors",
@@ -2920,7 +3170,8 @@
  "push_subscriptions": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "profile_id",
@@ -2940,13 +3191,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "rooms": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "department_id",
@@ -2958,17 +3211,20 @@
   },
   {
    "col": "is_active",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "salary_grades": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "code",
@@ -2988,13 +3244,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "schedule_entries": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "teaching_assignment_id",
@@ -3010,7 +3268,8 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "room_id",
@@ -3020,11 +3279,13 @@
  "school_settings": [
   {
    "col": "id",
-   "kind": "int"
+   "kind": "int",
+   "default": "1"
   },
   {
    "col": "name_th",
-   "kind": "text"
+   "kind": "text",
+   "default": "''"
   },
   {
    "col": "name_en",
@@ -3036,11 +3297,13 @@
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "time_tracking_roles",
-   "kind": "json"
+   "kind": "json",
+   "default": "'[]'"
   },
   {
    "col": "attendance_digest_time",
@@ -3070,7 +3333,8 @@
  "score_items": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "teaching_assignment_id",
@@ -3090,11 +3354,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "description",
@@ -3106,11 +3372,13 @@
   },
   {
    "col": "publish_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "requires_submission",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "notified_at",
@@ -3140,13 +3408,15 @@
   },
   {
    "col": "set_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "student_cards": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_id",
@@ -3158,7 +3428,8 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'active'"
   },
   {
    "col": "created_by",
@@ -3166,11 +3437,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "frozen_by",
@@ -3184,7 +3457,8 @@
  "student_classroom_enrollments": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_id",
@@ -3200,13 +3474,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "student_cohort_enrollments": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_id",
@@ -3222,13 +3498,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "student_contacts": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_id",
@@ -3244,7 +3522,8 @@
   },
   {
    "col": "is_primary",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "prefix",
@@ -3268,11 +3547,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "house_no",
@@ -3322,11 +3603,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "student_guardian_financials": [
@@ -3348,13 +3631,15 @@
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "student_item_scores": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "score_item_id",
@@ -3370,11 +3655,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "feedback",
@@ -3384,7 +3671,8 @@
  "student_leave_requests": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_id",
@@ -3408,7 +3696,8 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'pending'"
   },
   {
    "col": "approved_by",
@@ -3420,11 +3709,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "leave_type_id",
@@ -3450,11 +3741,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "feedback",
@@ -3472,7 +3765,8 @@
   },
   {
    "col": "failed_attempts",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   },
   {
    "col": "locked_until",
@@ -3480,13 +3774,15 @@
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "student_premises_exit_requests": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_id",
@@ -3514,7 +3810,8 @@
   },
   {
    "col": "no_return",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "return_time",
@@ -3522,7 +3819,8 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'pending'"
   },
   {
    "col": "approved_by",
@@ -3534,17 +3832,20 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "student_wallets": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_id",
@@ -3556,17 +3857,20 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "students": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_code",
@@ -3590,7 +3894,8 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'studying'"
   },
   {
    "col": "profile_id",
@@ -3598,11 +3903,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "grade_level_id",
@@ -3710,7 +4017,8 @@
   },
   {
    "col": "theme",
-   "kind": "text"
+   "kind": "text",
+   "default": "'forest'"
   },
   {
    "col": "name",
@@ -3720,7 +4028,8 @@
  "study_plans": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "code",
@@ -3732,13 +4041,15 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "subject_cover_library": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "name",
@@ -3746,17 +4057,20 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "subjects": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "code",
@@ -3788,15 +4102,18 @@
   },
   {
    "col": "is_active",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "1"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "department_id",
@@ -3812,7 +4129,8 @@
   },
   {
    "col": "grading_method",
-   "kind": "text"
+   "kind": "text",
+   "default": "'graded'"
   },
   {
    "col": "cover_path",
@@ -3820,15 +4138,18 @@
   },
   {
    "col": "cover_focus_x",
-   "kind": "int"
+   "kind": "int",
+   "default": "50"
   },
   {
    "col": "cover_focus_y",
-   "kind": "int"
+   "kind": "int",
+   "default": "50"
   },
   {
    "col": "scene_theme",
-   "kind": "text"
+   "kind": "text",
+   "default": "'forest'"
   },
   {
    "col": "cover_id",
@@ -3838,7 +4159,8 @@
  "submission_attachments": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "submission_id",
@@ -3854,13 +4176,15 @@
   },
   {
    "col": "uploaded_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "teaching_assignment_teachers": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "assignment_id",
@@ -3882,7 +4206,8 @@
  "teaching_assignments": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "teacher_id",
@@ -3910,11 +4235,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "group_id",
@@ -3930,7 +4257,8 @@
   },
   {
    "col": "split_exam_items",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   },
   {
    "col": "plan_group_id",
@@ -3948,13 +4276,15 @@
   },
   {
    "col": "position",
-   "kind": "int"
+   "kind": "int",
+   "default": "0"
   }
  ],
  "teaching_plan_slots": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "teaching_assignment_id",
@@ -3982,17 +4312,20 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "teaching_plan_units": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "teaching_assignment_id",
@@ -4020,11 +4353,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "note",
@@ -4034,7 +4369,8 @@
  "time_clock_records": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "profile_id",
@@ -4074,21 +4410,25 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "auto_clock_out",
-   "kind": "bool"
+   "kind": "bool",
+   "default": "0"
   }
  ],
  "transfer_intakes": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_id",
@@ -4100,17 +4440,20 @@
   },
   {
    "col": "intake_date",
-   "kind": "date"
+   "kind": "date",
+   "default": "(date('now'))"
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "tuition_invoices": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "student_id",
@@ -4134,7 +4477,8 @@
   },
   {
    "col": "status",
-   "kind": "text"
+   "kind": "text",
+   "default": "'open'"
   },
   {
    "col": "file_path",
@@ -4146,17 +4490,20 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "tuition_payments": [
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   },
   {
    "col": "invoice_id",
@@ -4176,7 +4523,8 @@
   },
   {
    "col": "paid_at",
-   "kind": "date"
+   "kind": "date",
+   "default": "(date('now'))"
   },
   {
    "col": "note",
@@ -4196,11 +4544,13 @@
   },
   {
    "col": "created_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   }
  ],
  "tuition_term_amounts": [
@@ -4218,11 +4568,13 @@
   },
   {
    "col": "updated_at",
-   "kind": "ts"
+   "kind": "ts",
+   "default": "(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"
   },
   {
    "col": "id",
-   "kind": "text"
+   "kind": "text",
+   "default": "(lower(hex(randomblob(4))||'-'||hex(randomblob(2))||'-4'||substr(hex(randomblob(2)),2)||'-'||substr('89ab',1+(abs(random())%4),1)||substr(hex(randomblob(2)),2)||'-'||hex(randomblob(6))))"
   }
  ]
 }
