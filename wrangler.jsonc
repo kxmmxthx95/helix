@@ -1,0 +1,5 @@
+{
+  "name": "helix",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-11-01"
+}
