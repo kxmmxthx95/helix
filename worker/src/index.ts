@@ -148,7 +148,12 @@ export default {
       else if (req.method === "PUT" && url.pathname.startsWith("/o/")) res = await upload(req, env, url);
       else if (req.method === "POST" && url.pathname === "/remove") res = await remove(req, env);
       else if (req.method === "POST" && url.pathname === "/sign") res = await signUrl(req, env, url);
-      else if (req.method === "POST" && url.pathname === "/q") res = Response.json(await handleSelect(req, env));
+      else if (req.method === "POST" && url.pathname === "/q") {
+        const timing: Record<string, number> = {};
+        res = Response.json(await handleSelect(req, env, timing));
+        res.headers.set("server-timing", Object.entries(timing).map(([k, v]) => `${k};dur=${v}`).join(", "));
+        cors.set("access-control-expose-headers", "server-timing");
+      }
       else throw new HttpError(404, "not found");
     } catch (e) {
       if (e instanceof ApiFailure) {

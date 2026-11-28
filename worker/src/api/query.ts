@@ -21,17 +21,24 @@ function parse(body: unknown): SelectRequest {
   return b as SelectRequest;
 }
 
-export async function handleSelect(req: Request, env: ApiEnv): Promise<ApiResponse> {
+/** `timing` receives milliseconds per stage, surfaced as a Server-Timing header. */
+export async function handleSelect(req: Request, env: ApiEnv, timing: Record<string, number> = {}): Promise<ApiResponse> {
   if (!env.DB) throw new ApiFailure(503, "PGRST000", "database not configured");
+  let t = Date.now();
+  const lap = (name: string) => { const n = Date.now(); timing[name] = n - t; t = n; };
   const uid = await authenticate(req, env);
+  lap("auth");
   const q = parse(await req.json().catch(() => null));
   tableColumns(q.table); // 404 for unknown tables before anything else
   const policy = selectPolicy(q.table);
   if (!policy) throw new ApiFailure(403, "42501", `table ${q.table} is not available through the API yet`);
 
-  const { rows, count } = compileSelect(q, policy(await loadCtx(env.DB, uid)));
+  const ctx = await loadCtx(env.DB, uid);
+  lap("ctx");
+  const { rows, count } = compileSelect(q, policy(ctx));
   const run = (s: { sql: string; params: unknown[] }) => env.DB!.prepare(s.sql).bind(...s.params);
   const [r1, r2] = await env.DB.batch<Record<string, unknown>>([rows, count].filter((s) => s !== null).map(run));
+  lap("query");
   const rowRes = rows ? r1! : null;
   const total = count ? Number((rows ? r2! : r1!).results[0]?.c ?? 0) : null;
 

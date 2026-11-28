@@ -110,6 +110,24 @@ They use `auth.admin.{createUser,deleteUser,getUserById,updateUserById}` — the
 - Types: 27 enums, jsonb (265 mentions), arrays (62) → TEXT/JSON; `timestamptz` → ISO text.
 - Free Workers CPU is 10 ms/request: password hashing needs Workers Paid.
 
+## Shadow D1 and first speed test (2026-11-28)
+
+`helix-shadow` (D1, APAC, primary SIN; id in `worker/wrangler.jsonc`) holds a full copy of the live data (**real student personal data**; 128 tables, 97,293 rows, every table count verified).
+Loaded with `python3 scripts/sqlite-to-d1-sql.py <sqlite> <dir>` + `wrangler d1 execute --remote --file` (no password hashes). It is a snapshot, not synced. `POST /q` on the files worker serves it
+(same visibility rules as Supabase RLS for the 4 ported tables). Remove everything with `npx wrangler d1 delete helix-shadow` and unbind `DB`.
+
+`scripts/api-bench.mjs` (throwaway user, shadow rows removed afterwards), sequential, 20 runs, from this machine (Bangkok edge; Supabase RTT ≈ 115 ms). PostgREST was called with the service role (RLS bypassed = best case for Supabase):
+
+| case | worker + D1 p50 / p95 | PostgREST p50 / p95 |
+|---|---|---|
+| login bootstrap (4 queries in a row) | 571 / 816 ms | 432 / 567 ms |
+| list 593 students | 182 / 406 ms | 188 / 311 ms |
+| list 604 profile_roles | 147 / 249 ms | 131 / 280 ms |
+
+Reading: single reads are on par; multi-query sequences lose because each request makes **two sequential D1 round trips of ~33 ms** (`ctx` = who is asking, then the query; Server-Timing `ctx;dur=34, query;dur=33`).
+Smart Placement was enabled and made no visible difference yet (it needs a warm-up period; re-measure later). Cheap next steps: cache `ctx` per isolate (~15 s; a revoked role keeps access that long),
+fold ctx into the query batch, D1 read replicas. D1 is not faster than Supabase for plain reads; the case for phase 5 is login CPU (parallel hashing), not query latency.
+
 ## Security finding (2026-11-28, existing Supabase RLS — not caused by this migration)
 
 A logged-in `student` could read, through the public REST API, other students' data. Measured as a real student of a 181-student department:

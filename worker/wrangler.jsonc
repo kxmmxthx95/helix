@@ -2,6 +2,9 @@
   "name": "helix-files",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-01",
+  // Run near D1 (Singapore): every API request makes 1-2 sequential D1 calls, so Worker↔D1 distance costs more than user↔Worker.
+  "placement": { "mode": "smart" },
+  "d1_databases": [{ "binding": "DB", "database_name": "helix-shadow", "database_id": "7803c574-5f22-4c38-9d3c-8cb62b14d53c" }],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "helix-files" }],
   "vars": {
     "SUPABASE_URL": "https://hncabywwkvdekongabln.supabase.co",
