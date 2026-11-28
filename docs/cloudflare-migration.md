@@ -7,8 +7,11 @@ Rule: every phase ships alone and can be rolled back, except the DB cutover (pha
 ## Measured baseline (2026-11-28, Supabase free plan)
 
 - Postgres 93 MB; 599 users (593 students). Biggest: `audit_logs` 20 MB / 27.7k rows (no retention yet).
-- Storage ≈ 488 MB, of which `subject-documents` 442 MB (142 files). **Decision: `subject-documents` is NOT moved to R2.**
-  Consequence: it stays on Supabase Storage until phase 7 — decide then whether to drop it or copy it.
+- Storage ≈ 488 MB, of which `subject-documents` 442 MB (142 files). **Decision (final): `subject-documents` is NEVER moved to R2.**
+  It stays on Supabase Storage, so the Supabase project is kept (downgrade to Free; 442 MB fits the 1 GB limit) — phase 7 is "shrink", not "delete".
+  Open constraint for phase 5/6: its storage policies (`subject-documents` rows in `storage.objects`) use Supabase Auth JWTs and Postgres
+  RLS helpers. Once login/DB leave Supabase, those two hooks (`useDocuments`, `useDocTasks`) need either a Supabase session kept alive for
+  them or a Worker that checks access itself and reads the files with the service key. Decide at phase 5; nothing to do before.
 - DB queries are cheap; the CPU spike is `signInWithPassword` (bcrypt) × concurrent students.
 
 ## Phases
@@ -22,7 +25,7 @@ Rule: every phase ships alone and can be rolled back, except the DB cutover (pha
 | 4 | Shadow D1 (nightly sync from Supabase) + Worker API + `supabase`-shaped client; port RPC/trigger/policy per domain; parity tests on real data, behind an env flag | todo |
 | 5 | Auth in Worker: PBKDF2 (WebCrypto) for new hashes, lazy bcrypt verify → rehash for imported `auth.users` hashes (no forced reset); one `/login` call returns profile + roles + student; realtime via Durable Object | todo |
 | 6 | **DB cutover** outside exam weeks: freeze writes → final sync → flip flag. Rollback = flip back + replay writes made since | todo |
-| 7 | Supabase read-only 30 days → downgrade/delete | todo |
+| 7 | Supabase read-only 30 days → downgrade to Free (kept for `subject-documents` only) | todo |
 
 Already shipped toward the login problem: students wait a random 0–2 s before `signInWithPassword` (`AuthProvider.signIn`, `studentOnly`).
 
