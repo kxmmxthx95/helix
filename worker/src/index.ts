@@ -1,7 +1,11 @@
+import { ApiFailure } from "./api/manifest";
+import { errorBody, handleSelect } from "./api/query";
 import { BUCKETS, DEFAULT_MAX_BYTES, sign, validPath, verify } from "./lib";
 
 export interface Env {
   FILES: R2Bucket;
+  /** D1 shadow/primary database. Absent until it is created and bound in wrangler.jsonc. */
+  DB?: D1Database;
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   SIGNING_SECRET: string;
@@ -144,8 +148,14 @@ export default {
       else if (req.method === "PUT" && url.pathname.startsWith("/o/")) res = await upload(req, env, url);
       else if (req.method === "POST" && url.pathname === "/remove") res = await remove(req, env);
       else if (req.method === "POST" && url.pathname === "/sign") res = await signUrl(req, env, url);
+      else if (req.method === "POST" && url.pathname === "/q") res = Response.json(await handleSelect(req, env));
       else throw new HttpError(404, "not found");
     } catch (e) {
+      if (e instanceof ApiFailure) {
+        res = Response.json(errorBody(e), { status: e.status });
+        cors.forEach((v, k) => res.headers.set(k, v));
+        return res;
+      }
       if (!(e instanceof HttpError)) console.error(e);
       res = Response.json({ error: e instanceof HttpError ? e.message : "internal error" }, { status: e instanceof HttpError ? e.status : 500 });
     }
