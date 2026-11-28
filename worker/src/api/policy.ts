@@ -14,6 +14,7 @@ const orgWide = (c: Ctx) => has(c, "super_admin", "director", "staff");
 const canManage = (c: Ctx) => has(c, "super_admin", "director", "staff", "dept_head", "dept_director");
 const canManageUsers = (c: Ctx) => has(c, "super_admin");
 const isTeacher = (c: Ctx) => has(c, "teacher");
+const isStudent = (c: Ctx) => has(c, "student");
 const isDeptHead = (c: Ctx) => has(c, "dept_head", "dept_director");
 
 const sql = (s: string, ...params: unknown[]): Sql => ({ sql: s, params });
@@ -31,7 +32,8 @@ function and(...ps: Pred[]): Pred {
 }
 
 const inMyDept = (c: Ctx, col: string): Pred => (c.dept ? sql(`${col} = ?`, c.dept) : false);
-const studentsOfMyDept = (c: Ctx): Pred => (c.dept ? sql("student_id IN (SELECT id FROM students WHERE department_id = ?)", c.dept) : false);
+// Migration 0239: the department-wide clause is for staff; the `student` role only gets its own rows.
+const studentsOfMyDept = (c: Ctx): Pred => (c.dept && !isStudent(c) ? sql("student_id IN (SELECT id FROM students WHERE department_id = ?)", c.dept) : false);
 
 /** `cover_sees_student(id)`: I am today's confirmed cover for one of the student's classrooms (today = Asia/Bangkok). */
 const coverSeesStudent = (c: Ctx): Pred =>
@@ -71,7 +73,7 @@ const SELECT: Record<string, Policy> = {
     or(
       and(canManage(c), or(orgWide(c), inMyDept(c, "department_id"))),
       orgWide(c),
-      inMyDept(c, "department_id"),
+      isStudent(c) ? false : inMyDept(c, "department_id"),
       sql("profile_id = ?", c.uid),
       sql("EXISTS (SELECT 1 FROM guardianships g WHERE g.student_id = students.id AND g.parent_id = ?)", c.uid),
       coverSeesStudent(c),

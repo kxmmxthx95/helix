@@ -112,7 +112,12 @@ They use `auth.admin.{createUser,deleteUser,getUserById,updateUserById}` — the
 
 ## Security finding (2026-11-28, existing Supabase RLS — not caused by this migration)
 
-Found while porting `students`/`student_contacts` policies and confirmed against Postgres: `students_read` allows `department_id = auth_department()` and
-`student_contacts_read` allows students of the caller's department, **for every role, including `student`**. A logged-in student can therefore read, through the public REST API,
-all ~181 students of their department: `national_id`, `date_of_birth`, `chronic_disease`, `drug_allergy`, home address, `latitude/longitude`, phone, and every parent's phone/email/address
-(336 contact rows). No column-level privileges restrict it. The ported engine reproduces this on purpose (parity); the fix is a policy decision (see chat) to make in Postgres and in the new API.
+A logged-in `student` could read, through the public REST API, other students' data. Measured as a real student of a 181-student department:
+`students` 181 rows (national_id, date of birth, chronic_disease, drug_allergy, address, coordinates, phone) and `student_contacts` 336 rows (every parent's phone/email/address);
+no column privileges restricted it. **Fixed 2026-11-28 by migration 0239** (students/contacts: own rows only for the `student` role; staff, guardians, covers unchanged —
+checked for 10 users before applying, live result identical to the tested one). The D1 policy engine mirrors it.
+
+**Still open (decision needed):** the same audit shows a student can read ALL rows of `attendance_records` (2,814), `period_attendance_records` (12,721),
+`student_item_scores` (851 — every student's scores), `student_leave_requests` (165), `behavior_records` (11), `student_cohort_enrollments`, and the department's `profiles`
+(185 rows incl. staff national_id/phone/email/line_user_id), plus partial views of exam/document tables. Each needs a policy review so the app's own screens keep working;
+the new API is deny-by-default, so they get stricter policies when ported (phase 4.4) — or fix them in Postgres first.

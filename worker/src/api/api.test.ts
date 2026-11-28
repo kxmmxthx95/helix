@@ -50,12 +50,15 @@ describe("row-level policies", () => {
     expect((await ask("bad", {})).status).toBe(401);
   });
 
-  it("a student sees their department's profiles but only their own roles, student row and contacts", async () => {
+  it("a student sees their department's profiles but only their own roles, student row and contacts (0239)", async () => {
     expect(ids(await ask(ID.stuA, {}))).toEqual([ID.stuA, ID.teacher].sort()); // profiles_read_scope: same department
     expect(ids(await ask(ID.stuA, { table: "profile_roles", columns: ["role"] }), "role")).toEqual(["student"]);
-    expect(ids(await ask(ID.stuA, { table: "students" }))).toEqual([ID.sA, ID.sC].sort()); // same department
+    // migration 0239: a classmate (sC, same department) and their contacts are NOT visible to a student
+    expect(ids(await ask(ID.stuA, { table: "students" }))).toEqual([ID.sA]);
     expect(ids(await ask(ID.stuA, { table: "student_contacts" }))).toEqual(["c-a"]);
     expect(ids(await ask(ID.stuB, { table: "student_contacts" }))).toEqual(["c-b"]);
+    // ...while a teacher of that department still sees the whole department
+    expect(ids(await ask(ID.teacher, { table: "students" }))).toEqual([ID.sA, ID.sC].sort());
   });
 
   it("org-wide staff sees everything; a parent sees only their child", async () => {
