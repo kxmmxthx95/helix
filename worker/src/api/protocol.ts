@@ -10,10 +10,23 @@ export interface Filter {
   neg?: boolean;
 }
 
+/** `alias:table!hint!inner(columns, nested…)`; `columns: "count"` is `table(count)`. Filters apply to the embedded rows. */
+export interface Embed {
+  alias: string;
+  table: string;
+  hint?: string;
+  inner?: boolean;
+  columns: "*" | string[] | "count";
+  embeds?: Embed[];
+  filters?: Filter[];
+  ors?: Filter[][];
+}
+
 export interface SelectRequest {
   table: string;
   /** "*" or plain column names (embedded selects are not supported yet). */
   columns: "*" | string[];
+  embeds?: Embed[];
   filters: Filter[];
   /** Each entry is one `.or(...)`: rows matching ANY filter in it. */
   ors: Filter[][];

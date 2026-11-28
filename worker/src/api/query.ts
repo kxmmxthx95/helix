@@ -33,14 +33,18 @@ export async function handleSelect(req: Request, env: ApiEnv, timing: Record<str
   const pred = selectPredicate(q.table, who);
   if (pred === undefined) throw new ApiFailure(403, "42501", `table ${q.table} is not available through the API yet`);
 
-  const { rows, count } = compileSelect(q, pred);
+  const { rows, count } = compileSelect(q, pred, who);
   const run = (s: { sql: string; params: unknown[] }) => env.DB!.prepare(s.sql).bind(...s.params);
   const [r1, r2] = await env.DB.batch<Record<string, unknown>>([rows, count].filter((s) => s !== null).map(run));
   lap("query");
   const rowRes = rows ? r1! : null;
   const total = count ? Number((rows ? r2! : r1!).results[0]?.c ?? 0) : null;
 
-  const data = (rowRes?.results ?? []).map((r) => toApiRow(q.table, r));
+  const data = (rowRes?.results ?? []).map((r) => {
+    const out = toApiRow(q.table, r);
+    for (const e of q.embeds ?? []) out[e.alias] = typeof r[e.alias] === "string" ? JSON.parse(r[e.alias] as string) : null; // already API-shaped by the SQL
+    return out;
+  });
   if (q.single) {
     if (data.length === 1) return { data: data[0], count: total, error: null };
     if (data.length === 0 && q.single === "maybe") return { data: null as never, count: total, error: null };

@@ -1,4 +1,6 @@
+import { embedSelect, innerExists } from "./embed";
 import { ApiFailure, columnKind, tableColumns } from "./manifest";
+import type { Caller } from "./policy";
 import type { Filter, Scalar, SelectRequest } from "./protocol";
 
 export interface Sql {
@@ -65,10 +67,13 @@ export function where(table: string, req: { filters: Filter[]; ors: Filter[][] }
   return and(parts);
 }
 
-export function compileSelect(req: SelectRequest, pred: Pred): { rows: Sql | null; count: Sql | null } {
+export function compileSelect(req: SelectRequest, pred: Pred, who?: Caller): { rows: Sql | null; count: Sql | null } {
   const table = req.table;
   const known = tableColumns(table);
-  const w = where(table, req, pred);
+  const base = where(table, req, pred);
+  // `!inner` embeds also filter the parent rows (and the count).
+  const inner = who ? (req.embeds ?? []).filter((e) => e.inner).map((e) => innerExists(table, '"__row"', e, who)) : [];
+  const w: Sql = inner.length ? { sql: [`(${base.sql})`, ...inner.map((i) => i.sql)].join(" AND "), params: [...base.params, ...inner.flatMap((i) => i.params)] } : base;
 
   let rows: Sql | null = null;
   if (!req.head) {
@@ -82,9 +87,12 @@ export function compileSelect(req: SelectRequest, pred: Pred): { rows: Sql | nul
     const int = (n: number | undefined, d: number) => (n === undefined ? d : Number.isInteger(n) && n >= 0 ? n : (() => { throw new ApiFailure(400, "22023", "bad limit/offset"); })());
     // single()/maybeSingle() read 2 rows so a duplicate is detectable.
     const limit = req.single ? 2 : Math.min(int(req.limit, MAX_ROWS), MAX_ROWS);
+    const embeds = who ? (req.embeds ?? []).map((e) => ({ alias: e.alias, ...embedSelect(table, '"__row"', e, who) })) : [];
+    if (req.embeds?.length && !who) throw new ApiFailure(400, "PGRST100", "embeds need a caller");
+    if (!cols.length && !embeds.length) throw new ApiFailure(400, "PGRST100", "nothing to select");
     rows = {
-      sql: `SELECT ${cols.map(q).join(", ")} FROM ${q(table)} AS "__row" WHERE ${w.sql}${order.length ? ` ORDER BY ${order.join(", ")}` : ""} LIMIT ${limit} OFFSET ${int(req.offset, 0)}`,
-      params: w.params,
+      sql: `SELECT ${[...cols.map(q), ...embeds.map((e) => `${e.sql} AS ${q(e.alias)}`)].join(", ")} FROM ${q(table)} AS "__row" WHERE ${w.sql}${order.length ? ` ORDER BY ${order.join(", ")}` : ""} LIMIT ${limit} OFFSET ${int(req.offset, 0)}`,
+      params: [...embeds.flatMap((e) => e.params), ...w.params],
     };
   }
   const count = req.count || req.head ? { sql: `SELECT COUNT(*) AS c FROM ${q(table)} AS "__row" WHERE ${w.sql}`, params: w.params } : null;

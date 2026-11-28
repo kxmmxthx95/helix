@@ -2686,7 +2686,7 @@
    },
    {
     "policy": "profiles_read_scope",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1294 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((department_id IS NOT NULL) AND (department_id = (SELECT department_id FROM profiles AS profiles__h1295 WHERE id = __UID__))))"
+    "sql": "((NOT (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1294 WHERE profile_id = __UID__ AND role = 'student'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1295 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((department_id IS NOT NULL) AND (department_id = (SELECT department_id FROM profiles AS profiles__h1296 WHERE id = __UID__)))))"
    },
    {
     "policy": "profiles_read_self",
@@ -2716,7 +2716,7 @@
    },
    {
     "policy": "profiles_update_self",
-    "sql": "((id = __UID__) AND (NOT (department_id IS NOT (SELECT department_id FROM profiles AS profiles__h1296 WHERE id = __UID__))))"
+    "sql": "((id = __UID__) AND (NOT (department_id IS NOT (SELECT department_id FROM profiles AS profiles__h1297 WHERE id = __UID__))))"
    }
   ],
   "delete": [
@@ -2747,39 +2747,39 @@
   "select": [
    {
     "policy": "rooms_read",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1297 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1298 WHERE id = __UID__)))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1298 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1299 WHERE id = __UID__)))"
    },
    {
     "policy": "rooms_read_exam",
-    "sql": "(EXISTS(SELECT 1 FROM exam_session_rooms AS r WHERE ((r.room_id = __row.id) AND (SELECT (SELECT EXISTS(SELECT 1 FROM exam_sessions AS es__h1306 WHERE es__h1306.id = r.session_id AND (es__h1306.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1309 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1310 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR EXISTS(SELECT 1 FROM curriculum_subjects AS cs__h1307 JOIN grade_levels AS gl__h1308 ON gl__h1308.id = cs__h1307.grade_level_id WHERE cs__h1307.subject_id = es__h1306.subject_id AND gl__h1308.department_id = (SELECT department_id FROM profiles AS profiles__h1311 WHERE id = __UID__))))))) OR EXISTS(SELECT 1 FROM exam_sessions AS es__h1299 JOIN exam_topic_sets AS ts__h1300 ON ts__h1300.id = es__h1299.topic_set_id AND ts__h1300.approval_status = 'approved' JOIN exam_session_targets AS est__h1301 ON est__h1301.session_id = es__h1299.id JOIN teaching_assignments AS ta__h1302 ON ta__h1302.id = est__h1301.teaching_assignment_id JOIN student_classroom_enrollments AS sce__h1303 ON sce__h1303.classroom_id = ta__h1302.classroom_id AND sce__h1303.academic_year = ta__h1302.academic_year JOIN students AS s__h1304 ON s__h1304.id = sce__h1303.student_id WHERE es__h1299.id = r.session_id AND es__h1299.is_enabled AND (s__h1304.profile_id = __UID__ OR s__h1304.id IN (SELECT student_id FROM guardianships AS guardianships__h1305 WHERE parent_id = __UID__)))))))"
+    "sql": "(EXISTS(SELECT 1 FROM exam_session_rooms AS r WHERE ((r.room_id = __row.id) AND (SELECT (SELECT EXISTS(SELECT 1 FROM exam_sessions AS es__h1307 WHERE es__h1307.id = r.session_id AND (es__h1307.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1310 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1311 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR EXISTS(SELECT 1 FROM curriculum_subjects AS cs__h1308 JOIN grade_levels AS gl__h1309 ON gl__h1309.id = cs__h1308.grade_level_id WHERE cs__h1308.subject_id = es__h1307.subject_id AND gl__h1309.department_id = (SELECT department_id FROM profiles AS profiles__h1312 WHERE id = __UID__))))))) OR EXISTS(SELECT 1 FROM exam_sessions AS es__h1300 JOIN exam_topic_sets AS ts__h1301 ON ts__h1301.id = es__h1300.topic_set_id AND ts__h1301.approval_status = 'approved' JOIN exam_session_targets AS est__h1302 ON est__h1302.session_id = es__h1300.id JOIN teaching_assignments AS ta__h1303 ON ta__h1303.id = est__h1302.teaching_assignment_id JOIN student_classroom_enrollments AS sce__h1304 ON sce__h1304.classroom_id = ta__h1303.classroom_id AND sce__h1304.academic_year = ta__h1303.academic_year JOIN students AS s__h1305 ON s__h1305.id = sce__h1304.student_id WHERE es__h1300.id = r.session_id AND es__h1300.is_enabled AND (s__h1305.profile_id = __UID__ OR s__h1305.id IN (SELECT student_id FROM guardianships AS guardianships__h1306 WHERE parent_id = __UID__)))))))"
    },
    {
     "policy": "rooms_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1312 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1313 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1314 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1313 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1314 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1315 WHERE id = __UID__))))"
    }
   ],
   "insert": [
    {
     "policy": "rooms_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1315 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1316 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1317 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1316 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1317 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1318 WHERE id = __UID__))))"
    }
   ],
   "update_using": [
    {
     "policy": "rooms_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1312 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1313 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1314 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1313 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1314 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1315 WHERE id = __UID__))))"
    }
   ],
   "update_check": [
    {
     "policy": "rooms_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1315 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1316 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1317 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1316 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1317 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1318 WHERE id = __UID__))))"
    }
   ],
   "delete": [
    {
     "policy": "rooms_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1312 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1313 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1314 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1313 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1314 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1315 WHERE id = __UID__))))"
    }
   ]
  },
@@ -2791,31 +2791,31 @@
    },
    {
     "policy": "salary_grades_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1318 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1319 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director')))"
    }
   ],
   "insert": [
    {
     "policy": "salary_grades_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1319 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1320 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director')))"
    }
   ],
   "update_using": [
    {
     "policy": "salary_grades_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1318 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1319 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director')))"
    }
   ],
   "update_check": [
    {
     "policy": "salary_grades_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1319 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1320 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director')))"
    }
   ],
   "delete": [
    {
     "policy": "salary_grades_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1318 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1319 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director')))"
    }
   ]
  },
@@ -2823,35 +2823,35 @@
   "select": [
    {
     "policy": "schedule_entries_read",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1320 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1321 WHERE id = __UID__)))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1321 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1322 WHERE id = __UID__)))))"
    },
    {
     "policy": "schedule_entries_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1322 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1323 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1324 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1323 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1324 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1325 WHERE id = __UID__))))))"
    }
   ],
   "insert": [
    {
     "policy": "schedule_entries_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1325 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1326 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1327 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1326 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1327 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1328 WHERE id = __UID__))))))"
    }
   ],
   "update_using": [
    {
     "policy": "schedule_entries_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1322 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1323 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1324 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1323 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1324 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1325 WHERE id = __UID__))))))"
    }
   ],
   "update_check": [
    {
     "policy": "schedule_entries_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1325 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1326 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1327 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1326 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1327 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1328 WHERE id = __UID__))))))"
    }
   ],
   "delete": [
    {
     "policy": "schedule_entries_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1322 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1323 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1324 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1323 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1324 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1325 WHERE id = __UID__))))))"
    }
   ]
  },
@@ -2866,13 +2866,13 @@
   "update_using": [
    {
     "policy": "school_settings_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1328 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1329 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "update_check": [
    {
     "policy": "school_settings_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1329 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1330 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "delete": []
@@ -2881,35 +2881,35 @@
   "select": [
    {
     "policy": "score_items_read",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1330 WHERE ta__h1330.id = __row.teaching_assignment_id AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1336 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1330.classroom_id IN (SELECT c__h1331.id FROM classrooms AS c__h1331 JOIN grade_levels AS gl__h1332 ON gl__h1332.id = c__h1331.grade_level_id WHERE gl__h1332.department_id = (SELECT department_id FROM profiles AS profiles__h1337 WHERE id = __UID__)) OR ta__h1330.teacher_id = __UID__ OR EXISTS(SELECT 1 FROM student_classroom_enrollments AS sce__h1333 JOIN students AS s__h1334 ON s__h1334.id = sce__h1333.student_id WHERE sce__h1333.classroom_id = ta__h1330.classroom_id AND sce__h1333.academic_year = ta__h1330.academic_year AND (s__h1334.profile_id = __UID__ OR s__h1334.id IN (SELECT student_id FROM guardianships AS guardianships__h1335 WHERE parent_id = __UID__))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1331 WHERE ta__h1331.id = __row.teaching_assignment_id AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1337 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1331.classroom_id IN (SELECT c__h1332.id FROM classrooms AS c__h1332 JOIN grade_levels AS gl__h1333 ON gl__h1333.id = c__h1332.grade_level_id WHERE gl__h1333.department_id = (SELECT department_id FROM profiles AS profiles__h1338 WHERE id = __UID__)) OR ta__h1331.teacher_id = __UID__ OR EXISTS(SELECT 1 FROM student_classroom_enrollments AS sce__h1334 JOIN students AS s__h1335 ON s__h1335.id = sce__h1334.student_id WHERE sce__h1334.classroom_id = ta__h1331.classroom_id AND sce__h1334.academic_year = ta__h1331.academic_year AND (s__h1335.profile_id = __UID__ OR s__h1335.id IN (SELECT student_id FROM guardianships AS guardianships__h1336 WHERE parent_id = __UID__))))))"
    },
    {
     "policy": "score_items_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1338 WHERE ta__h1338.id = __row.teaching_assignment_id AND (ta__h1338.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1341 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1338.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1342 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1343 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1338.classroom_id IN (SELECT c__h1339.id FROM classrooms AS c__h1339 JOIN grade_levels AS gl__h1340 ON gl__h1340.id = c__h1339.grade_level_id WHERE gl__h1340.department_id = (SELECT department_id FROM profiles AS profiles__h1344 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1339 WHERE ta__h1339.id = __row.teaching_assignment_id AND (ta__h1339.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1342 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1339.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1343 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1344 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1339.classroom_id IN (SELECT c__h1340.id FROM classrooms AS c__h1340 JOIN grade_levels AS gl__h1341 ON gl__h1341.id = c__h1340.grade_level_id WHERE gl__h1341.department_id = (SELECT department_id FROM profiles AS profiles__h1345 WHERE id = __UID__)))))))"
    }
   ],
   "insert": [
    {
     "policy": "score_items_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1345 WHERE ta__h1345.id = __row.teaching_assignment_id AND (ta__h1345.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1348 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1345.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1349 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1350 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1345.classroom_id IN (SELECT c__h1346.id FROM classrooms AS c__h1346 JOIN grade_levels AS gl__h1347 ON gl__h1347.id = c__h1346.grade_level_id WHERE gl__h1347.department_id = (SELECT department_id FROM profiles AS profiles__h1351 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1346 WHERE ta__h1346.id = __row.teaching_assignment_id AND (ta__h1346.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1349 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1346.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1350 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1351 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1346.classroom_id IN (SELECT c__h1347.id FROM classrooms AS c__h1347 JOIN grade_levels AS gl__h1348 ON gl__h1348.id = c__h1347.grade_level_id WHERE gl__h1348.department_id = (SELECT department_id FROM profiles AS profiles__h1352 WHERE id = __UID__)))))))"
    }
   ],
   "update_using": [
    {
     "policy": "score_items_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1338 WHERE ta__h1338.id = __row.teaching_assignment_id AND (ta__h1338.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1341 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1338.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1342 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1343 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1338.classroom_id IN (SELECT c__h1339.id FROM classrooms AS c__h1339 JOIN grade_levels AS gl__h1340 ON gl__h1340.id = c__h1339.grade_level_id WHERE gl__h1340.department_id = (SELECT department_id FROM profiles AS profiles__h1344 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1339 WHERE ta__h1339.id = __row.teaching_assignment_id AND (ta__h1339.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1342 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1339.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1343 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1344 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1339.classroom_id IN (SELECT c__h1340.id FROM classrooms AS c__h1340 JOIN grade_levels AS gl__h1341 ON gl__h1341.id = c__h1340.grade_level_id WHERE gl__h1341.department_id = (SELECT department_id FROM profiles AS profiles__h1345 WHERE id = __UID__)))))))"
    }
   ],
   "update_check": [
    {
     "policy": "score_items_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1345 WHERE ta__h1345.id = __row.teaching_assignment_id AND (ta__h1345.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1348 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1345.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1349 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1350 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1345.classroom_id IN (SELECT c__h1346.id FROM classrooms AS c__h1346 JOIN grade_levels AS gl__h1347 ON gl__h1347.id = c__h1346.grade_level_id WHERE gl__h1347.department_id = (SELECT department_id FROM profiles AS profiles__h1351 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1346 WHERE ta__h1346.id = __row.teaching_assignment_id AND (ta__h1346.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1349 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1346.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1350 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1351 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1346.classroom_id IN (SELECT c__h1347.id FROM classrooms AS c__h1347 JOIN grade_levels AS gl__h1348 ON gl__h1348.id = c__h1347.grade_level_id WHERE gl__h1348.department_id = (SELECT department_id FROM profiles AS profiles__h1352 WHERE id = __UID__)))))))"
    }
   ],
   "delete": [
    {
     "policy": "score_items_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1338 WHERE ta__h1338.id = __row.teaching_assignment_id AND (ta__h1338.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1341 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1338.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1342 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1343 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1338.classroom_id IN (SELECT c__h1339.id FROM classrooms AS c__h1339 JOIN grade_levels AS gl__h1340 ON gl__h1340.id = c__h1339.grade_level_id WHERE gl__h1340.department_id = (SELECT department_id FROM profiles AS profiles__h1344 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1339 WHERE ta__h1339.id = __row.teaching_assignment_id AND (ta__h1339.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1342 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1339.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1343 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1344 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1339.classroom_id IN (SELECT c__h1340.id FROM classrooms AS c__h1340 JOIN grade_levels AS gl__h1341 ON gl__h1341.id = c__h1340.grade_level_id WHERE gl__h1341.department_id = (SELECT department_id FROM profiles AS profiles__h1345 WHERE id = __UID__)))))))"
    }
   ]
  },
@@ -2917,20 +2917,20 @@
   "select": [
    {
     "policy": "student_cards_read",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1352 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1353 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "insert": [],
   "update_using": [
    {
     "policy": "student_cards_update",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1353 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1354 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "update_check": [
    {
     "policy": "student_cards_update",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1354 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1355 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "delete": []
@@ -2939,39 +2939,39 @@
   "select": [
    {
     "policy": "student_classroom_enrollments_cover_read",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM attendance_covers AS ac__h1355 JOIN leave_requests AS lr__h1356 ON lr__h1356.id = ac__h1355.leave_request_id LEFT JOIN schedule_entries AS se__h1357 ON se__h1357.id = ac__h1355.schedule_entry_id LEFT JOIN teaching_assignments AS ta__h1358 ON ta__h1358.id = se__h1357.teaching_assignment_id WHERE ac__h1355.cover_staff_id = __UID__ AND ac__h1355.status = 'confirmed' AND lr__h1356.status = 'approved' AND ac__h1355.date = DATE('now', '+7 hours') AND COALESCE(ac__h1355.classroom_id, ta__h1358.classroom_id) = __row.classroom_id))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM attendance_covers AS ac__h1356 JOIN leave_requests AS lr__h1357 ON lr__h1357.id = ac__h1356.leave_request_id LEFT JOIN schedule_entries AS se__h1358 ON se__h1358.id = ac__h1356.schedule_entry_id LEFT JOIN teaching_assignments AS ta__h1359 ON ta__h1359.id = se__h1358.teaching_assignment_id WHERE ac__h1356.cover_staff_id = __UID__ AND ac__h1356.status = 'confirmed' AND lr__h1357.status = 'approved' AND ac__h1356.date = DATE('now', '+7 hours') AND COALESCE(ac__h1356.classroom_id, ta__h1359.classroom_id) = __row.classroom_id))"
    },
    {
     "policy": "student_classroom_enrollments_read",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1359 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1360 WHERE id = __UID__)))) OR (student_id = (SELECT id FROM students AS students__h1361 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1360 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1361 WHERE id = __UID__)))) OR (student_id = (SELECT id FROM students AS students__h1362 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))"
    },
    {
     "policy": "student_classroom_enrollments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1362 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1363 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1364 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1363 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1364 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1365 WHERE id = __UID__))))))"
    }
   ],
   "insert": [
    {
     "policy": "student_classroom_enrollments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1365 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1366 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1367 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1366 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1367 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1368 WHERE id = __UID__))))))"
    }
   ],
   "update_using": [
    {
     "policy": "student_classroom_enrollments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1362 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1363 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1364 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1363 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1364 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1365 WHERE id = __UID__))))))"
    }
   ],
   "update_check": [
    {
     "policy": "student_classroom_enrollments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1365 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1366 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1367 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1366 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1367 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1368 WHERE id = __UID__))))))"
    }
   ],
   "delete": [
    {
     "policy": "student_classroom_enrollments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1362 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1363 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1364 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1363 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1364 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1365 WHERE id = __UID__))))))"
    }
   ]
  },
@@ -2979,35 +2979,35 @@
   "select": [
    {
     "policy": "student_cohort_enrollments_read",
-    "sql": "(((NOT (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1368 WHERE profile_id = __UID__ AND role = 'student'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1369 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (cohort_id IN (SELECT curriculum_cohorts.id FROM curriculum_cohorts WHERE (curriculum_cohorts.department_id = (SELECT department_id FROM profiles AS profiles__h1370 WHERE id = __UID__)))) OR (student_id = (SELECT id FROM students AS students__h1371 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))) OR (student_id = (SELECT id FROM students AS students__h1372 WHERE profile_id = __UID__)))"
+    "sql": "(((NOT (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1369 WHERE profile_id = __UID__ AND role = 'student'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1370 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (cohort_id IN (SELECT curriculum_cohorts.id FROM curriculum_cohorts WHERE (curriculum_cohorts.department_id = (SELECT department_id FROM profiles AS profiles__h1371 WHERE id = __UID__)))) OR (student_id = (SELECT id FROM students AS students__h1372 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))) OR (student_id = (SELECT id FROM students AS students__h1373 WHERE profile_id = __UID__)))"
    },
    {
     "policy": "student_cohort_enrollments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1373 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1374 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (cohort_id IN (SELECT curriculum_cohorts.id FROM curriculum_cohorts WHERE (curriculum_cohorts.department_id = (SELECT department_id FROM profiles AS profiles__h1375 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1374 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1375 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (cohort_id IN (SELECT curriculum_cohorts.id FROM curriculum_cohorts WHERE (curriculum_cohorts.department_id = (SELECT department_id FROM profiles AS profiles__h1376 WHERE id = __UID__))))))"
    }
   ],
   "insert": [
    {
     "policy": "student_cohort_enrollments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1376 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1377 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (cohort_id IN (SELECT curriculum_cohorts.id FROM curriculum_cohorts WHERE (curriculum_cohorts.department_id = (SELECT department_id FROM profiles AS profiles__h1378 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1377 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1378 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (cohort_id IN (SELECT curriculum_cohorts.id FROM curriculum_cohorts WHERE (curriculum_cohorts.department_id = (SELECT department_id FROM profiles AS profiles__h1379 WHERE id = __UID__))))))"
    }
   ],
   "update_using": [
    {
     "policy": "student_cohort_enrollments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1373 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1374 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (cohort_id IN (SELECT curriculum_cohorts.id FROM curriculum_cohorts WHERE (curriculum_cohorts.department_id = (SELECT department_id FROM profiles AS profiles__h1375 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1374 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1375 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (cohort_id IN (SELECT curriculum_cohorts.id FROM curriculum_cohorts WHERE (curriculum_cohorts.department_id = (SELECT department_id FROM profiles AS profiles__h1376 WHERE id = __UID__))))))"
    }
   ],
   "update_check": [
    {
     "policy": "student_cohort_enrollments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1376 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1377 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (cohort_id IN (SELECT curriculum_cohorts.id FROM curriculum_cohorts WHERE (curriculum_cohorts.department_id = (SELECT department_id FROM profiles AS profiles__h1378 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1377 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1378 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (cohort_id IN (SELECT curriculum_cohorts.id FROM curriculum_cohorts WHERE (curriculum_cohorts.department_id = (SELECT department_id FROM profiles AS profiles__h1379 WHERE id = __UID__))))))"
    }
   ],
   "delete": [
    {
     "policy": "student_cohort_enrollments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1373 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1374 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (cohort_id IN (SELECT curriculum_cohorts.id FROM curriculum_cohorts WHERE (curriculum_cohorts.department_id = (SELECT department_id FROM profiles AS profiles__h1375 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1374 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1375 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (cohort_id IN (SELECT curriculum_cohorts.id FROM curriculum_cohorts WHERE (curriculum_cohorts.department_id = (SELECT department_id FROM profiles AS profiles__h1376 WHERE id = __UID__))))))"
    }
   ]
  },
@@ -3015,55 +3015,55 @@
   "select": [
    {
     "policy": "student_contacts_manage",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1379 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1380 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1381 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1380 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1381 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1382 WHERE id = __UID__))))))"
    },
    {
     "policy": "student_contacts_manage_self",
-    "sql": "(student_id = (SELECT id FROM students AS students__h1385 WHERE profile_id = __UID__))"
+    "sql": "(student_id = (SELECT id FROM students AS students__h1386 WHERE profile_id = __UID__))"
    },
    {
     "policy": "student_contacts_read",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1387 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((NOT (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1388 WHERE profile_id = __UID__ AND role = 'student'))) AND (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1389 WHERE id = __UID__))))) OR (student_id = (SELECT id FROM students AS students__h1390 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1388 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((NOT (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1389 WHERE profile_id = __UID__ AND role = 'student'))) AND (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1390 WHERE id = __UID__))))) OR (student_id = (SELECT id FROM students AS students__h1391 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))"
    }
   ],
   "insert": [
    {
     "policy": "student_contacts_manage",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1382 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1383 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1384 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1383 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1384 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1385 WHERE id = __UID__))))))"
    },
    {
     "policy": "student_contacts_manage_self",
-    "sql": "(student_id = (SELECT id FROM students AS students__h1386 WHERE profile_id = __UID__))"
+    "sql": "(student_id = (SELECT id FROM students AS students__h1387 WHERE profile_id = __UID__))"
    }
   ],
   "update_using": [
    {
     "policy": "student_contacts_manage",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1379 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1380 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1381 WHERE id = __UID__))))))"
-   },
-   {
-    "policy": "student_contacts_manage_self",
-    "sql": "(student_id = (SELECT id FROM students AS students__h1385 WHERE profile_id = __UID__))"
-   }
-  ],
-  "update_check": [
-   {
-    "policy": "student_contacts_manage",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1382 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1383 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1384 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1380 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1381 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1382 WHERE id = __UID__))))))"
    },
    {
     "policy": "student_contacts_manage_self",
     "sql": "(student_id = (SELECT id FROM students AS students__h1386 WHERE profile_id = __UID__))"
    }
   ],
-  "delete": [
+  "update_check": [
    {
     "policy": "student_contacts_manage",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1379 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1380 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1381 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1383 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1384 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1385 WHERE id = __UID__))))))"
    },
    {
     "policy": "student_contacts_manage_self",
-    "sql": "(student_id = (SELECT id FROM students AS students__h1385 WHERE profile_id = __UID__))"
+    "sql": "(student_id = (SELECT id FROM students AS students__h1387 WHERE profile_id = __UID__))"
+   }
+  ],
+  "delete": [
+   {
+    "policy": "student_contacts_manage",
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1380 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1381 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1382 WHERE id = __UID__))))))"
+   },
+   {
+    "policy": "student_contacts_manage_self",
+    "sql": "(student_id = (SELECT id FROM students AS students__h1386 WHERE profile_id = __UID__))"
    }
   ]
  },
@@ -3071,35 +3071,35 @@
   "select": [
    {
     "policy": "student_grade_status_read",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1391 WHERE ta__h1391.id = __row.teaching_assignment_id AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1397 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1391.classroom_id IN (SELECT c__h1392.id FROM classrooms AS c__h1392 JOIN grade_levels AS gl__h1393 ON gl__h1393.id = c__h1392.grade_level_id WHERE gl__h1393.department_id = (SELECT department_id FROM profiles AS profiles__h1398 WHERE id = __UID__)) OR ta__h1391.teacher_id = __UID__ OR EXISTS(SELECT 1 FROM student_classroom_enrollments AS sce__h1394 JOIN students AS s__h1395 ON s__h1395.id = sce__h1394.student_id WHERE sce__h1394.classroom_id = ta__h1391.classroom_id AND sce__h1394.academic_year = ta__h1391.academic_year AND (s__h1395.profile_id = __UID__ OR s__h1395.id IN (SELECT student_id FROM guardianships AS guardianships__h1396 WHERE parent_id = __UID__))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1392 WHERE ta__h1392.id = __row.teaching_assignment_id AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1398 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1392.classroom_id IN (SELECT c__h1393.id FROM classrooms AS c__h1393 JOIN grade_levels AS gl__h1394 ON gl__h1394.id = c__h1393.grade_level_id WHERE gl__h1394.department_id = (SELECT department_id FROM profiles AS profiles__h1399 WHERE id = __UID__)) OR ta__h1392.teacher_id = __UID__ OR EXISTS(SELECT 1 FROM student_classroom_enrollments AS sce__h1395 JOIN students AS s__h1396 ON s__h1396.id = sce__h1395.student_id WHERE sce__h1395.classroom_id = ta__h1392.classroom_id AND sce__h1395.academic_year = ta__h1392.academic_year AND (s__h1396.profile_id = __UID__ OR s__h1396.id IN (SELECT student_id FROM guardianships AS guardianships__h1397 WHERE parent_id = __UID__))))))"
    },
    {
     "policy": "student_grade_status_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1399 WHERE ta__h1399.id = __row.teaching_assignment_id AND (ta__h1399.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1402 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1399.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1403 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1404 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1399.classroom_id IN (SELECT c__h1400.id FROM classrooms AS c__h1400 JOIN grade_levels AS gl__h1401 ON gl__h1401.id = c__h1400.grade_level_id WHERE gl__h1401.department_id = (SELECT department_id FROM profiles AS profiles__h1405 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1400 WHERE ta__h1400.id = __row.teaching_assignment_id AND (ta__h1400.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1403 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1400.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1404 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1405 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1400.classroom_id IN (SELECT c__h1401.id FROM classrooms AS c__h1401 JOIN grade_levels AS gl__h1402 ON gl__h1402.id = c__h1401.grade_level_id WHERE gl__h1402.department_id = (SELECT department_id FROM profiles AS profiles__h1406 WHERE id = __UID__)))))))"
    }
   ],
   "insert": [
    {
     "policy": "student_grade_status_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1406 WHERE ta__h1406.id = __row.teaching_assignment_id AND (ta__h1406.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1409 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1406.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1410 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1411 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1406.classroom_id IN (SELECT c__h1407.id FROM classrooms AS c__h1407 JOIN grade_levels AS gl__h1408 ON gl__h1408.id = c__h1407.grade_level_id WHERE gl__h1408.department_id = (SELECT department_id FROM profiles AS profiles__h1412 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1407 WHERE ta__h1407.id = __row.teaching_assignment_id AND (ta__h1407.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1410 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1407.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1411 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1412 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1407.classroom_id IN (SELECT c__h1408.id FROM classrooms AS c__h1408 JOIN grade_levels AS gl__h1409 ON gl__h1409.id = c__h1408.grade_level_id WHERE gl__h1409.department_id = (SELECT department_id FROM profiles AS profiles__h1413 WHERE id = __UID__)))))))"
    }
   ],
   "update_using": [
    {
     "policy": "student_grade_status_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1399 WHERE ta__h1399.id = __row.teaching_assignment_id AND (ta__h1399.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1402 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1399.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1403 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1404 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1399.classroom_id IN (SELECT c__h1400.id FROM classrooms AS c__h1400 JOIN grade_levels AS gl__h1401 ON gl__h1401.id = c__h1400.grade_level_id WHERE gl__h1401.department_id = (SELECT department_id FROM profiles AS profiles__h1405 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1400 WHERE ta__h1400.id = __row.teaching_assignment_id AND (ta__h1400.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1403 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1400.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1404 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1405 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1400.classroom_id IN (SELECT c__h1401.id FROM classrooms AS c__h1401 JOIN grade_levels AS gl__h1402 ON gl__h1402.id = c__h1401.grade_level_id WHERE gl__h1402.department_id = (SELECT department_id FROM profiles AS profiles__h1406 WHERE id = __UID__)))))))"
    }
   ],
   "update_check": [
    {
     "policy": "student_grade_status_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1406 WHERE ta__h1406.id = __row.teaching_assignment_id AND (ta__h1406.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1409 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1406.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1410 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1411 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1406.classroom_id IN (SELECT c__h1407.id FROM classrooms AS c__h1407 JOIN grade_levels AS gl__h1408 ON gl__h1408.id = c__h1407.grade_level_id WHERE gl__h1408.department_id = (SELECT department_id FROM profiles AS profiles__h1412 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1407 WHERE ta__h1407.id = __row.teaching_assignment_id AND (ta__h1407.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1410 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1407.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1411 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1412 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1407.classroom_id IN (SELECT c__h1408.id FROM classrooms AS c__h1408 JOIN grade_levels AS gl__h1409 ON gl__h1409.id = c__h1408.grade_level_id WHERE gl__h1409.department_id = (SELECT department_id FROM profiles AS profiles__h1413 WHERE id = __UID__)))))))"
    }
   ],
   "delete": [
    {
     "policy": "student_grade_status_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1399 WHERE ta__h1399.id = __row.teaching_assignment_id AND (ta__h1399.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1402 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1399.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1403 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1404 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1399.classroom_id IN (SELECT c__h1400.id FROM classrooms AS c__h1400 JOIN grade_levels AS gl__h1401 ON gl__h1401.id = c__h1400.grade_level_id WHERE gl__h1401.department_id = (SELECT department_id FROM profiles AS profiles__h1405 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1400 WHERE ta__h1400.id = __row.teaching_assignment_id AND (ta__h1400.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1403 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1400.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1404 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1405 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1400.classroom_id IN (SELECT c__h1401.id FROM classrooms AS c__h1401 JOIN grade_levels AS gl__h1402 ON gl__h1402.id = c__h1401.grade_level_id WHERE gl__h1402.department_id = (SELECT department_id FROM profiles AS profiles__h1406 WHERE id = __UID__)))))))"
    }
   ]
  },
@@ -3107,31 +3107,31 @@
   "select": [
    {
     "policy": "student_guardian_financials_all",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1413 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1414 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (contact_id IN (SELECT c.id FROM (student_contacts AS c JOIN students AS s ON ((s.id = c.student_id))) WHERE (s.department_id = (SELECT department_id FROM profiles AS profiles__h1415 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1414 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1415 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (contact_id IN (SELECT c.id FROM (student_contacts AS c JOIN students AS s ON ((s.id = c.student_id))) WHERE (s.department_id = (SELECT department_id FROM profiles AS profiles__h1416 WHERE id = __UID__))))))"
    }
   ],
   "insert": [
    {
     "policy": "student_guardian_financials_all",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1416 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1417 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (contact_id IN (SELECT c.id FROM (student_contacts AS c JOIN students AS s ON ((s.id = c.student_id))) WHERE (s.department_id = (SELECT department_id FROM profiles AS profiles__h1418 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1417 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1418 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (contact_id IN (SELECT c.id FROM (student_contacts AS c JOIN students AS s ON ((s.id = c.student_id))) WHERE (s.department_id = (SELECT department_id FROM profiles AS profiles__h1419 WHERE id = __UID__))))))"
    }
   ],
   "update_using": [
    {
     "policy": "student_guardian_financials_all",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1413 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1414 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (contact_id IN (SELECT c.id FROM (student_contacts AS c JOIN students AS s ON ((s.id = c.student_id))) WHERE (s.department_id = (SELECT department_id FROM profiles AS profiles__h1415 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1414 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1415 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (contact_id IN (SELECT c.id FROM (student_contacts AS c JOIN students AS s ON ((s.id = c.student_id))) WHERE (s.department_id = (SELECT department_id FROM profiles AS profiles__h1416 WHERE id = __UID__))))))"
    }
   ],
   "update_check": [
    {
     "policy": "student_guardian_financials_all",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1416 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1417 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (contact_id IN (SELECT c.id FROM (student_contacts AS c JOIN students AS s ON ((s.id = c.student_id))) WHERE (s.department_id = (SELECT department_id FROM profiles AS profiles__h1418 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1417 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1418 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (contact_id IN (SELECT c.id FROM (student_contacts AS c JOIN students AS s ON ((s.id = c.student_id))) WHERE (s.department_id = (SELECT department_id FROM profiles AS profiles__h1419 WHERE id = __UID__))))))"
    }
   ],
   "delete": [
    {
     "policy": "student_guardian_financials_all",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1413 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1414 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (contact_id IN (SELECT c.id FROM (student_contacts AS c JOIN students AS s ON ((s.id = c.student_id))) WHERE (s.department_id = (SELECT department_id FROM profiles AS profiles__h1415 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1414 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1415 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (contact_id IN (SELECT c.id FROM (student_contacts AS c JOIN students AS s ON ((s.id = c.student_id))) WHERE (s.department_id = (SELECT department_id FROM profiles AS profiles__h1416 WHERE id = __UID__))))))"
    }
   ]
  },
@@ -3139,35 +3139,35 @@
   "select": [
    {
     "policy": "student_item_scores_read",
-    "sql": "((student_id = (SELECT id FROM students AS students__h1419 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))) OR (EXISTS(SELECT 1 FROM score_items AS si WHERE ((si.id = __row.score_item_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1420 WHERE ta__h1420.id = si.teaching_assignment_id AND NOT (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1423 WHERE profile_id = __UID__ AND role = 'student')) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1424 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1420.classroom_id IN (SELECT c__h1421.id FROM classrooms AS c__h1421 JOIN grade_levels AS gl__h1422 ON gl__h1422.id = c__h1421.grade_level_id WHERE gl__h1422.department_id = (SELECT department_id FROM profiles AS profiles__h1425 WHERE id = __UID__)) OR ta__h1420.teacher_id = __UID__)))))))"
+    "sql": "((student_id = (SELECT id FROM students AS students__h1420 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))) OR (EXISTS(SELECT 1 FROM score_items AS si WHERE ((si.id = __row.score_item_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1421 WHERE ta__h1421.id = si.teaching_assignment_id AND NOT (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1424 WHERE profile_id = __UID__ AND role = 'student')) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1425 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1421.classroom_id IN (SELECT c__h1422.id FROM classrooms AS c__h1422 JOIN grade_levels AS gl__h1423 ON gl__h1423.id = c__h1422.grade_level_id WHERE gl__h1423.department_id = (SELECT department_id FROM profiles AS profiles__h1426 WHERE id = __UID__)) OR ta__h1421.teacher_id = __UID__)))))))"
    },
    {
     "policy": "student_item_scores_write",
-    "sql": "(EXISTS(SELECT 1 FROM score_items AS si WHERE ((si.id = __row.score_item_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1426 WHERE ta__h1426.id = si.teaching_assignment_id AND (ta__h1426.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1429 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1426.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1430 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1431 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1426.classroom_id IN (SELECT c__h1427.id FROM classrooms AS c__h1427 JOIN grade_levels AS gl__h1428 ON gl__h1428.id = c__h1427.grade_level_id WHERE gl__h1428.department_id = (SELECT department_id FROM profiles AS profiles__h1432 WHERE id = __UID__))))))))))"
+    "sql": "(EXISTS(SELECT 1 FROM score_items AS si WHERE ((si.id = __row.score_item_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1427 WHERE ta__h1427.id = si.teaching_assignment_id AND (ta__h1427.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1430 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1427.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1431 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1432 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1427.classroom_id IN (SELECT c__h1428.id FROM classrooms AS c__h1428 JOIN grade_levels AS gl__h1429 ON gl__h1429.id = c__h1428.grade_level_id WHERE gl__h1429.department_id = (SELECT department_id FROM profiles AS profiles__h1433 WHERE id = __UID__))))))))))"
    }
   ],
   "insert": [
    {
     "policy": "student_item_scores_write",
-    "sql": "(EXISTS(SELECT 1 FROM score_items AS si WHERE ((si.id = __row.score_item_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1433 WHERE ta__h1433.id = si.teaching_assignment_id AND (ta__h1433.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1436 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1433.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1437 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1438 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1433.classroom_id IN (SELECT c__h1434.id FROM classrooms AS c__h1434 JOIN grade_levels AS gl__h1435 ON gl__h1435.id = c__h1434.grade_level_id WHERE gl__h1435.department_id = (SELECT department_id FROM profiles AS profiles__h1439 WHERE id = __UID__))))))))))"
+    "sql": "(EXISTS(SELECT 1 FROM score_items AS si WHERE ((si.id = __row.score_item_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1434 WHERE ta__h1434.id = si.teaching_assignment_id AND (ta__h1434.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1437 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1434.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1438 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1439 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1434.classroom_id IN (SELECT c__h1435.id FROM classrooms AS c__h1435 JOIN grade_levels AS gl__h1436 ON gl__h1436.id = c__h1435.grade_level_id WHERE gl__h1436.department_id = (SELECT department_id FROM profiles AS profiles__h1440 WHERE id = __UID__))))))))))"
    }
   ],
   "update_using": [
    {
     "policy": "student_item_scores_write",
-    "sql": "(EXISTS(SELECT 1 FROM score_items AS si WHERE ((si.id = __row.score_item_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1426 WHERE ta__h1426.id = si.teaching_assignment_id AND (ta__h1426.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1429 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1426.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1430 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1431 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1426.classroom_id IN (SELECT c__h1427.id FROM classrooms AS c__h1427 JOIN grade_levels AS gl__h1428 ON gl__h1428.id = c__h1427.grade_level_id WHERE gl__h1428.department_id = (SELECT department_id FROM profiles AS profiles__h1432 WHERE id = __UID__))))))))))"
+    "sql": "(EXISTS(SELECT 1 FROM score_items AS si WHERE ((si.id = __row.score_item_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1427 WHERE ta__h1427.id = si.teaching_assignment_id AND (ta__h1427.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1430 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1427.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1431 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1432 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1427.classroom_id IN (SELECT c__h1428.id FROM classrooms AS c__h1428 JOIN grade_levels AS gl__h1429 ON gl__h1429.id = c__h1428.grade_level_id WHERE gl__h1429.department_id = (SELECT department_id FROM profiles AS profiles__h1433 WHERE id = __UID__))))))))))"
    }
   ],
   "update_check": [
    {
     "policy": "student_item_scores_write",
-    "sql": "(EXISTS(SELECT 1 FROM score_items AS si WHERE ((si.id = __row.score_item_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1433 WHERE ta__h1433.id = si.teaching_assignment_id AND (ta__h1433.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1436 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1433.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1437 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1438 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1433.classroom_id IN (SELECT c__h1434.id FROM classrooms AS c__h1434 JOIN grade_levels AS gl__h1435 ON gl__h1435.id = c__h1434.grade_level_id WHERE gl__h1435.department_id = (SELECT department_id FROM profiles AS profiles__h1439 WHERE id = __UID__))))))))))"
+    "sql": "(EXISTS(SELECT 1 FROM score_items AS si WHERE ((si.id = __row.score_item_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1434 WHERE ta__h1434.id = si.teaching_assignment_id AND (ta__h1434.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1437 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1434.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1438 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1439 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1434.classroom_id IN (SELECT c__h1435.id FROM classrooms AS c__h1435 JOIN grade_levels AS gl__h1436 ON gl__h1436.id = c__h1435.grade_level_id WHERE gl__h1436.department_id = (SELECT department_id FROM profiles AS profiles__h1440 WHERE id = __UID__))))))))))"
    }
   ],
   "delete": [
    {
     "policy": "student_item_scores_write",
-    "sql": "(EXISTS(SELECT 1 FROM score_items AS si WHERE ((si.id = __row.score_item_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1426 WHERE ta__h1426.id = si.teaching_assignment_id AND (ta__h1426.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1429 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1426.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1430 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1431 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1426.classroom_id IN (SELECT c__h1427.id FROM classrooms AS c__h1427 JOIN grade_levels AS gl__h1428 ON gl__h1428.id = c__h1427.grade_level_id WHERE gl__h1428.department_id = (SELECT department_id FROM profiles AS profiles__h1432 WHERE id = __UID__))))))))))"
+    "sql": "(EXISTS(SELECT 1 FROM score_items AS si WHERE ((si.id = __row.score_item_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1427 WHERE ta__h1427.id = si.teaching_assignment_id AND (ta__h1427.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1430 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1427.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1431 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1432 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1427.classroom_id IN (SELECT c__h1428.id FROM classrooms AS c__h1428 JOIN grade_levels AS gl__h1429 ON gl__h1429.id = c__h1428.grade_level_id WHERE gl__h1429.department_id = (SELECT department_id FROM profiles AS profiles__h1433 WHERE id = __UID__))))))))))"
    }
   ]
  },
@@ -3175,25 +3175,25 @@
   "select": [
    {
     "policy": "student_leave_requests_read",
-    "sql": "(((NOT (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1448 WHERE profile_id = __UID__ AND role = 'student'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1449 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT s.id FROM (students AS s JOIN grade_levels AS gl ON ((gl.id = s.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1450 WHERE id = __UID__)))) OR ((SELECT sce__h1451.classroom_id FROM student_classroom_enrollments AS sce__h1451 WHERE sce__h1451.student_id = __row.student_id AND sce__h1451.academic_year = COALESCE((SELECT at__h1452.academic_year FROM academic_terms AS at__h1452 JOIN students AS s__h1453 ON s__h1453.id = __row.student_id JOIN grade_levels AS gl__h1454 ON gl__h1454.id = s__h1453.grade_level_id WHERE at__h1452.department_id = gl__h1454.department_id AND at__h1452.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1451.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht.classroom_id FROM classroom_homeroom_teachers AS cht WHERE (cht.teacher_id = __UID__))) OR (student_id = (SELECT id FROM students AS students__h1455 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))) OR (student_id = (SELECT id FROM students AS students__h1456 WHERE profile_id = __UID__)))"
+    "sql": "(((NOT (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1449 WHERE profile_id = __UID__ AND role = 'student'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1450 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT s.id FROM (students AS s JOIN grade_levels AS gl ON ((gl.id = s.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1451 WHERE id = __UID__)))) OR ((SELECT sce__h1452.classroom_id FROM student_classroom_enrollments AS sce__h1452 WHERE sce__h1452.student_id = __row.student_id AND sce__h1452.academic_year = COALESCE((SELECT at__h1453.academic_year FROM academic_terms AS at__h1453 JOIN students AS s__h1454 ON s__h1454.id = __row.student_id JOIN grade_levels AS gl__h1455 ON gl__h1455.id = s__h1454.grade_level_id WHERE at__h1453.department_id = gl__h1455.department_id AND at__h1453.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1452.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht.classroom_id FROM classroom_homeroom_teachers AS cht WHERE (cht.teacher_id = __UID__))) OR (student_id = (SELECT id FROM students AS students__h1456 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))) OR (student_id = (SELECT id FROM students AS students__h1457 WHERE profile_id = __UID__)))"
    }
   ],
   "insert": [
    {
     "policy": "student_leave_requests_insert",
-    "sql": "((submitted_by = __UID__) AND (((status = 'pending') AND ((student_id = (SELECT id FROM students AS students__h1440 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))) OR ((status = 'approved') AND (approved_by = __UID__) AND (((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1441 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1442 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT s.id FROM (students AS s JOIN grade_levels AS gl ON ((gl.id = s.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1443 WHERE id = __UID__)))))) OR ((SELECT sce__h1444.classroom_id FROM student_classroom_enrollments AS sce__h1444 WHERE sce__h1444.student_id = __row.student_id AND sce__h1444.academic_year = COALESCE((SELECT at__h1445.academic_year FROM academic_terms AS at__h1445 JOIN students AS s__h1446 ON s__h1446.id = __row.student_id JOIN grade_levels AS gl__h1447 ON gl__h1447.id = s__h1446.grade_level_id WHERE at__h1445.department_id = gl__h1447.department_id AND at__h1445.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1444.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht.classroom_id FROM classroom_homeroom_teachers AS cht WHERE (cht.teacher_id = __UID__)))))))"
+    "sql": "((submitted_by = __UID__) AND (((status = 'pending') AND ((student_id = (SELECT id FROM students AS students__h1441 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))) OR ((status = 'approved') AND (approved_by = __UID__) AND (((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1442 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1443 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT s.id FROM (students AS s JOIN grade_levels AS gl ON ((gl.id = s.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1444 WHERE id = __UID__)))))) OR ((SELECT sce__h1445.classroom_id FROM student_classroom_enrollments AS sce__h1445 WHERE sce__h1445.student_id = __row.student_id AND sce__h1445.academic_year = COALESCE((SELECT at__h1446.academic_year FROM academic_terms AS at__h1446 JOIN students AS s__h1447 ON s__h1447.id = __row.student_id JOIN grade_levels AS gl__h1448 ON gl__h1448.id = s__h1447.grade_level_id WHERE at__h1446.department_id = gl__h1448.department_id AND at__h1446.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1445.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht.classroom_id FROM classroom_homeroom_teachers AS cht WHERE (cht.teacher_id = __UID__)))))))"
    }
   ],
   "update_using": [
    {
     "policy": "student_leave_requests_update",
-    "sql": "(((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1457 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1458 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT s.id FROM (students AS s JOIN grade_levels AS gl ON ((gl.id = s.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1459 WHERE id = __UID__)))))) OR ((SELECT sce__h1460.classroom_id FROM student_classroom_enrollments AS sce__h1460 WHERE sce__h1460.student_id = __row.student_id AND sce__h1460.academic_year = COALESCE((SELECT at__h1461.academic_year FROM academic_terms AS at__h1461 JOIN students AS s__h1462 ON s__h1462.id = __row.student_id JOIN grade_levels AS gl__h1463 ON gl__h1463.id = s__h1462.grade_level_id WHERE at__h1461.department_id = gl__h1463.department_id AND at__h1461.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1460.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht.classroom_id FROM classroom_homeroom_teachers AS cht WHERE (cht.teacher_id = __UID__))) OR (submitted_by = __UID__))"
+    "sql": "(((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1458 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1459 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT s.id FROM (students AS s JOIN grade_levels AS gl ON ((gl.id = s.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1460 WHERE id = __UID__)))))) OR ((SELECT sce__h1461.classroom_id FROM student_classroom_enrollments AS sce__h1461 WHERE sce__h1461.student_id = __row.student_id AND sce__h1461.academic_year = COALESCE((SELECT at__h1462.academic_year FROM academic_terms AS at__h1462 JOIN students AS s__h1463 ON s__h1463.id = __row.student_id JOIN grade_levels AS gl__h1464 ON gl__h1464.id = s__h1463.grade_level_id WHERE at__h1462.department_id = gl__h1464.department_id AND at__h1462.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1461.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht.classroom_id FROM classroom_homeroom_teachers AS cht WHERE (cht.teacher_id = __UID__))) OR (submitted_by = __UID__))"
    }
   ],
   "update_check": [
    {
     "policy": "student_leave_requests_update",
-    "sql": "(((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1464 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1465 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT s.id FROM (students AS s JOIN grade_levels AS gl ON ((gl.id = s.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1466 WHERE id = __UID__)))))) OR ((SELECT sce__h1467.classroom_id FROM student_classroom_enrollments AS sce__h1467 WHERE sce__h1467.student_id = __row.student_id AND sce__h1467.academic_year = COALESCE((SELECT at__h1468.academic_year FROM academic_terms AS at__h1468 JOIN students AS s__h1469 ON s__h1469.id = __row.student_id JOIN grade_levels AS gl__h1470 ON gl__h1470.id = s__h1469.grade_level_id WHERE at__h1468.department_id = gl__h1470.department_id AND at__h1468.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1467.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht.classroom_id FROM classroom_homeroom_teachers AS cht WHERE (cht.teacher_id = __UID__))) OR (submitted_by = __UID__))"
+    "sql": "(((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1465 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1466 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id IN (SELECT s.id FROM (students AS s JOIN grade_levels AS gl ON ((gl.id = s.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1467 WHERE id = __UID__)))))) OR ((SELECT sce__h1468.classroom_id FROM student_classroom_enrollments AS sce__h1468 WHERE sce__h1468.student_id = __row.student_id AND sce__h1468.academic_year = COALESCE((SELECT at__h1469.academic_year FROM academic_terms AS at__h1469 JOIN students AS s__h1470 ON s__h1470.id = __row.student_id JOIN grade_levels AS gl__h1471 ON gl__h1471.id = s__h1470.grade_level_id WHERE at__h1469.department_id = gl__h1471.department_id AND at__h1469.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1468.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht.classroom_id FROM classroom_homeroom_teachers AS cht WHERE (cht.teacher_id = __UID__))) OR (submitted_by = __UID__))"
    }
   ],
   "delete": []
@@ -3202,35 +3202,35 @@
   "select": [
    {
     "policy": "student_pass_fail_scores_read",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1471 WHERE ta__h1471.id = __row.teaching_assignment_id AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1477 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1471.classroom_id IN (SELECT c__h1472.id FROM classrooms AS c__h1472 JOIN grade_levels AS gl__h1473 ON gl__h1473.id = c__h1472.grade_level_id WHERE gl__h1473.department_id = (SELECT department_id FROM profiles AS profiles__h1478 WHERE id = __UID__)) OR ta__h1471.teacher_id = __UID__ OR EXISTS(SELECT 1 FROM student_classroom_enrollments AS sce__h1474 JOIN students AS s__h1475 ON s__h1475.id = sce__h1474.student_id WHERE sce__h1474.classroom_id = ta__h1471.classroom_id AND sce__h1474.academic_year = ta__h1471.academic_year AND (s__h1475.profile_id = __UID__ OR s__h1475.id IN (SELECT student_id FROM guardianships AS guardianships__h1476 WHERE parent_id = __UID__))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1472 WHERE ta__h1472.id = __row.teaching_assignment_id AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1478 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1472.classroom_id IN (SELECT c__h1473.id FROM classrooms AS c__h1473 JOIN grade_levels AS gl__h1474 ON gl__h1474.id = c__h1473.grade_level_id WHERE gl__h1474.department_id = (SELECT department_id FROM profiles AS profiles__h1479 WHERE id = __UID__)) OR ta__h1472.teacher_id = __UID__ OR EXISTS(SELECT 1 FROM student_classroom_enrollments AS sce__h1475 JOIN students AS s__h1476 ON s__h1476.id = sce__h1475.student_id WHERE sce__h1475.classroom_id = ta__h1472.classroom_id AND sce__h1475.academic_year = ta__h1472.academic_year AND (s__h1476.profile_id = __UID__ OR s__h1476.id IN (SELECT student_id FROM guardianships AS guardianships__h1477 WHERE parent_id = __UID__))))))"
    },
    {
     "policy": "student_pass_fail_scores_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1479 WHERE ta__h1479.id = __row.teaching_assignment_id AND (ta__h1479.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1482 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1479.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1483 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1484 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1479.classroom_id IN (SELECT c__h1480.id FROM classrooms AS c__h1480 JOIN grade_levels AS gl__h1481 ON gl__h1481.id = c__h1480.grade_level_id WHERE gl__h1481.department_id = (SELECT department_id FROM profiles AS profiles__h1485 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1480 WHERE ta__h1480.id = __row.teaching_assignment_id AND (ta__h1480.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1483 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1480.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1484 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1485 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1480.classroom_id IN (SELECT c__h1481.id FROM classrooms AS c__h1481 JOIN grade_levels AS gl__h1482 ON gl__h1482.id = c__h1481.grade_level_id WHERE gl__h1482.department_id = (SELECT department_id FROM profiles AS profiles__h1486 WHERE id = __UID__)))))))"
    }
   ],
   "insert": [
    {
     "policy": "student_pass_fail_scores_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1486 WHERE ta__h1486.id = __row.teaching_assignment_id AND (ta__h1486.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1489 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1486.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1490 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1491 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1486.classroom_id IN (SELECT c__h1487.id FROM classrooms AS c__h1487 JOIN grade_levels AS gl__h1488 ON gl__h1488.id = c__h1487.grade_level_id WHERE gl__h1488.department_id = (SELECT department_id FROM profiles AS profiles__h1492 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1487 WHERE ta__h1487.id = __row.teaching_assignment_id AND (ta__h1487.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1490 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1487.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1491 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1492 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1487.classroom_id IN (SELECT c__h1488.id FROM classrooms AS c__h1488 JOIN grade_levels AS gl__h1489 ON gl__h1489.id = c__h1488.grade_level_id WHERE gl__h1489.department_id = (SELECT department_id FROM profiles AS profiles__h1493 WHERE id = __UID__)))))))"
    }
   ],
   "update_using": [
    {
     "policy": "student_pass_fail_scores_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1479 WHERE ta__h1479.id = __row.teaching_assignment_id AND (ta__h1479.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1482 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1479.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1483 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1484 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1479.classroom_id IN (SELECT c__h1480.id FROM classrooms AS c__h1480 JOIN grade_levels AS gl__h1481 ON gl__h1481.id = c__h1480.grade_level_id WHERE gl__h1481.department_id = (SELECT department_id FROM profiles AS profiles__h1485 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1480 WHERE ta__h1480.id = __row.teaching_assignment_id AND (ta__h1480.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1483 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1480.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1484 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1485 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1480.classroom_id IN (SELECT c__h1481.id FROM classrooms AS c__h1481 JOIN grade_levels AS gl__h1482 ON gl__h1482.id = c__h1481.grade_level_id WHERE gl__h1482.department_id = (SELECT department_id FROM profiles AS profiles__h1486 WHERE id = __UID__)))))))"
    }
   ],
   "update_check": [
    {
     "policy": "student_pass_fail_scores_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1486 WHERE ta__h1486.id = __row.teaching_assignment_id AND (ta__h1486.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1489 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1486.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1490 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1491 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1486.classroom_id IN (SELECT c__h1487.id FROM classrooms AS c__h1487 JOIN grade_levels AS gl__h1488 ON gl__h1488.id = c__h1487.grade_level_id WHERE gl__h1488.department_id = (SELECT department_id FROM profiles AS profiles__h1492 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1487 WHERE ta__h1487.id = __row.teaching_assignment_id AND (ta__h1487.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1490 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1487.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1491 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1492 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1487.classroom_id IN (SELECT c__h1488.id FROM classrooms AS c__h1488 JOIN grade_levels AS gl__h1489 ON gl__h1489.id = c__h1488.grade_level_id WHERE gl__h1489.department_id = (SELECT department_id FROM profiles AS profiles__h1493 WHERE id = __UID__)))))))"
    }
   ],
   "delete": [
    {
     "policy": "student_pass_fail_scores_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1479 WHERE ta__h1479.id = __row.teaching_assignment_id AND (ta__h1479.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1482 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1479.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1483 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1484 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1479.classroom_id IN (SELECT c__h1480.id FROM classrooms AS c__h1480 JOIN grade_levels AS gl__h1481 ON gl__h1481.id = c__h1480.grade_level_id WHERE gl__h1481.department_id = (SELECT department_id FROM profiles AS profiles__h1485 WHERE id = __UID__)))))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1480 WHERE ta__h1480.id = __row.teaching_assignment_id AND (ta__h1480.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1483 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1480.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1484 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1485 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1480.classroom_id IN (SELECT c__h1481.id FROM classrooms AS c__h1481 JOIN grade_levels AS gl__h1482 ON gl__h1482.id = c__h1481.grade_level_id WHERE gl__h1482.department_id = (SELECT department_id FROM profiles AS profiles__h1486 WHERE id = __UID__)))))))"
    }
   ]
  },
@@ -3238,25 +3238,25 @@
   "select": [
    {
     "policy": "student_premises_exit_requests_read",
-    "sql": "((SELECT ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1497 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1498 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR __row.student_id IN (SELECT s__h1494.id FROM students AS s__h1494 JOIN grade_levels AS gl__h1495 ON gl__h1495.id = s__h1494.grade_level_id WHERE gl__h1495.department_id = (SELECT department_id FROM profiles AS profiles__h1499 WHERE id = __UID__)))) OR (SELECT sce__h1500.classroom_id FROM student_classroom_enrollments AS sce__h1500 WHERE sce__h1500.student_id = __row.student_id AND sce__h1500.academic_year = COALESCE((SELECT at__h1501.academic_year FROM academic_terms AS at__h1501 JOIN students AS s__h1502 ON s__h1502.id = __row.student_id JOIN grade_levels AS gl__h1503 ON gl__h1503.id = s__h1502.grade_level_id WHERE at__h1501.department_id = gl__h1503.department_id AND at__h1501.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1500.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht__h1496.classroom_id FROM classroom_homeroom_teachers AS cht__h1496 WHERE cht__h1496.teacher_id = __UID__)) OR (student_id = (SELECT id FROM students AS students__h1504 WHERE profile_id = __UID__)))"
+    "sql": "((SELECT ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1498 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1499 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR __row.student_id IN (SELECT s__h1495.id FROM students AS s__h1495 JOIN grade_levels AS gl__h1496 ON gl__h1496.id = s__h1495.grade_level_id WHERE gl__h1496.department_id = (SELECT department_id FROM profiles AS profiles__h1500 WHERE id = __UID__)))) OR (SELECT sce__h1501.classroom_id FROM student_classroom_enrollments AS sce__h1501 WHERE sce__h1501.student_id = __row.student_id AND sce__h1501.academic_year = COALESCE((SELECT at__h1502.academic_year FROM academic_terms AS at__h1502 JOIN students AS s__h1503 ON s__h1503.id = __row.student_id JOIN grade_levels AS gl__h1504 ON gl__h1504.id = s__h1503.grade_level_id WHERE at__h1502.department_id = gl__h1504.department_id AND at__h1502.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1501.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht__h1497.classroom_id FROM classroom_homeroom_teachers AS cht__h1497 WHERE cht__h1497.teacher_id = __UID__)) OR (student_id = (SELECT id FROM students AS students__h1505 WHERE profile_id = __UID__)))"
    }
   ],
   "insert": [
    {
     "policy": "student_premises_exit_requests_insert",
-    "sql": "((submitted_by = __UID__) AND (student_id = (SELECT id FROM students AS students__h1493 WHERE profile_id = __UID__)) AND (date = DATE('now', '+7 hours')) AND (status = 'pending') AND (approved_by IS NULL) AND (approved_at IS NULL) AND (return_time IS NULL))"
+    "sql": "((submitted_by = __UID__) AND (student_id = (SELECT id FROM students AS students__h1494 WHERE profile_id = __UID__)) AND (date = DATE('now', '+7 hours')) AND (status = 'pending') AND (approved_by IS NULL) AND (approved_at IS NULL) AND (return_time IS NULL))"
    }
   ],
   "update_using": [
    {
     "policy": "student_premises_exit_requests_update",
-    "sql": "(SELECT ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1508 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1509 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR __row.student_id IN (SELECT s__h1505.id FROM students AS s__h1505 JOIN grade_levels AS gl__h1506 ON gl__h1506.id = s__h1505.grade_level_id WHERE gl__h1506.department_id = (SELECT department_id FROM profiles AS profiles__h1510 WHERE id = __UID__)))) OR (SELECT sce__h1511.classroom_id FROM student_classroom_enrollments AS sce__h1511 WHERE sce__h1511.student_id = __row.student_id AND sce__h1511.academic_year = COALESCE((SELECT at__h1512.academic_year FROM academic_terms AS at__h1512 JOIN students AS s__h1513 ON s__h1513.id = __row.student_id JOIN grade_levels AS gl__h1514 ON gl__h1514.id = s__h1513.grade_level_id WHERE at__h1512.department_id = gl__h1514.department_id AND at__h1512.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1511.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht__h1507.classroom_id FROM classroom_homeroom_teachers AS cht__h1507 WHERE cht__h1507.teacher_id = __UID__))"
+    "sql": "(SELECT ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1509 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1510 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR __row.student_id IN (SELECT s__h1506.id FROM students AS s__h1506 JOIN grade_levels AS gl__h1507 ON gl__h1507.id = s__h1506.grade_level_id WHERE gl__h1507.department_id = (SELECT department_id FROM profiles AS profiles__h1511 WHERE id = __UID__)))) OR (SELECT sce__h1512.classroom_id FROM student_classroom_enrollments AS sce__h1512 WHERE sce__h1512.student_id = __row.student_id AND sce__h1512.academic_year = COALESCE((SELECT at__h1513.academic_year FROM academic_terms AS at__h1513 JOIN students AS s__h1514 ON s__h1514.id = __row.student_id JOIN grade_levels AS gl__h1515 ON gl__h1515.id = s__h1514.grade_level_id WHERE at__h1513.department_id = gl__h1515.department_id AND at__h1513.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1512.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht__h1508.classroom_id FROM classroom_homeroom_teachers AS cht__h1508 WHERE cht__h1508.teacher_id = __UID__))"
    }
   ],
   "update_check": [
    {
     "policy": "student_premises_exit_requests_update",
-    "sql": "(SELECT ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1518 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1519 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR __row.student_id IN (SELECT s__h1515.id FROM students AS s__h1515 JOIN grade_levels AS gl__h1516 ON gl__h1516.id = s__h1515.grade_level_id WHERE gl__h1516.department_id = (SELECT department_id FROM profiles AS profiles__h1520 WHERE id = __UID__)))) OR (SELECT sce__h1521.classroom_id FROM student_classroom_enrollments AS sce__h1521 WHERE sce__h1521.student_id = __row.student_id AND sce__h1521.academic_year = COALESCE((SELECT at__h1522.academic_year FROM academic_terms AS at__h1522 JOIN students AS s__h1523 ON s__h1523.id = __row.student_id JOIN grade_levels AS gl__h1524 ON gl__h1524.id = s__h1523.grade_level_id WHERE at__h1522.department_id = gl__h1524.department_id AND at__h1522.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1521.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht__h1517.classroom_id FROM classroom_homeroom_teachers AS cht__h1517 WHERE cht__h1517.teacher_id = __UID__))"
+    "sql": "(SELECT ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1519 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1520 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR __row.student_id IN (SELECT s__h1516.id FROM students AS s__h1516 JOIN grade_levels AS gl__h1517 ON gl__h1517.id = s__h1516.grade_level_id WHERE gl__h1517.department_id = (SELECT department_id FROM profiles AS profiles__h1521 WHERE id = __UID__)))) OR (SELECT sce__h1522.classroom_id FROM student_classroom_enrollments AS sce__h1522 WHERE sce__h1522.student_id = __row.student_id AND sce__h1522.academic_year = COALESCE((SELECT at__h1523.academic_year FROM academic_terms AS at__h1523 JOIN students AS s__h1524 ON s__h1524.id = __row.student_id JOIN grade_levels AS gl__h1525 ON gl__h1525.id = s__h1524.grade_level_id WHERE at__h1523.department_id = gl__h1525.department_id AND at__h1523.status = 'active'), STRFTIME('%Y', STRFTIME('%Y-%m-%dT%H:%M:%fZ', DATETIME('now', '+7 hours'))) + 543) ORDER BY sce__h1522.created_at DESC NULLS FIRST LIMIT 1) IN (SELECT cht__h1518.classroom_id FROM classroom_homeroom_teachers AS cht__h1518 WHERE cht__h1518.teacher_id = __UID__))"
    }
   ],
   "delete": []
@@ -3265,25 +3265,25 @@
   "select": [
    {
     "policy": "student_wallets_read",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1526 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id = (SELECT id FROM students AS students__h1527 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1527 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id = (SELECT id FROM students AS students__h1528 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))"
    }
   ],
   "insert": [
    {
     "policy": "student_wallets_insert",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1525 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1526 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "update_using": [
    {
     "policy": "student_wallets_update",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1528 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1529 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "update_check": [
    {
     "policy": "student_wallets_update",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1529 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1530 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "delete": []
@@ -3292,27 +3292,27 @@
   "select": [
    {
     "policy": "students_cover_read",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM student_classroom_enrollments AS sce__h1530 WHERE sce__h1530.student_id = __row.id AND (SELECT EXISTS(SELECT 1 FROM attendance_covers AS ac__h1531 JOIN leave_requests AS lr__h1532 ON lr__h1532.id = ac__h1531.leave_request_id LEFT JOIN schedule_entries AS se__h1533 ON se__h1533.id = ac__h1531.schedule_entry_id LEFT JOIN teaching_assignments AS ta__h1534 ON ta__h1534.id = se__h1533.teaching_assignment_id WHERE ac__h1531.cover_staff_id = __UID__ AND ac__h1531.status = 'confirmed' AND lr__h1532.status = 'approved' AND ac__h1531.date = DATE('now', '+7 hours') AND COALESCE(ac__h1531.classroom_id, ta__h1534.classroom_id) = sce__h1530.classroom_id))))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM student_classroom_enrollments AS sce__h1531 WHERE sce__h1531.student_id = __row.id AND (SELECT EXISTS(SELECT 1 FROM attendance_covers AS ac__h1532 JOIN leave_requests AS lr__h1533 ON lr__h1533.id = ac__h1532.leave_request_id LEFT JOIN schedule_entries AS se__h1534 ON se__h1534.id = ac__h1532.schedule_entry_id LEFT JOIN teaching_assignments AS ta__h1535 ON ta__h1535.id = se__h1534.teaching_assignment_id WHERE ac__h1532.cover_staff_id = __UID__ AND ac__h1532.status = 'confirmed' AND lr__h1533.status = 'approved' AND ac__h1532.date = DATE('now', '+7 hours') AND COALESCE(ac__h1532.classroom_id, ta__h1535.classroom_id) = sce__h1531.classroom_id))))"
    },
    {
     "policy": "students_manage",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1535 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1536 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1537 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1536 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1537 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1538 WHERE id = __UID__))))"
    },
    {
     "policy": "students_read",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1541 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((department_id = (SELECT department_id FROM profiles AS profiles__h1542 WHERE id = __UID__)) AND (NOT (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1543 WHERE profile_id = __UID__ AND role = 'student')))) OR (profile_id = __UID__) OR (EXISTS(SELECT 1 FROM guardianships AS g WHERE ((g.student_id = __row.id) AND (g.parent_id = __UID__)))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1542 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((department_id = (SELECT department_id FROM profiles AS profiles__h1543 WHERE id = __UID__)) AND (NOT (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1544 WHERE profile_id = __UID__ AND role = 'student')))) OR (profile_id = __UID__) OR (EXISTS(SELECT 1 FROM guardianships AS g WHERE ((g.student_id = __row.id) AND (g.parent_id = __UID__)))))"
    }
   ],
   "insert": [
    {
     "policy": "students_manage",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1538 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1539 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1540 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1539 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1540 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1541 WHERE id = __UID__))))"
    }
   ],
   "update_using": [
    {
     "policy": "students_manage",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1535 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1536 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1537 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1536 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1537 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1538 WHERE id = __UID__))))"
    },
    {
     "policy": "students_update_self",
@@ -3322,7 +3322,7 @@
   "update_check": [
    {
     "policy": "students_manage",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1538 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1539 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1540 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1539 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1540 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1541 WHERE id = __UID__))))"
    },
    {
     "policy": "students_update_self",
@@ -3332,7 +3332,7 @@
   "delete": [
    {
     "policy": "students_manage",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1535 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1536 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1537 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1536 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1537 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1538 WHERE id = __UID__))))"
    }
   ]
  },
@@ -3340,31 +3340,31 @@
   "select": [
    {
     "policy": "study_map_assignment_admin",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1544 WHERE profile_id = __UID__ AND role = 'super_admin'))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1545 WHERE profile_id = __UID__ AND role = 'super_admin'))"
    }
   ],
   "insert": [
    {
     "policy": "study_map_assignment_admin",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1545 WHERE profile_id = __UID__ AND role = 'super_admin'))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1546 WHERE profile_id = __UID__ AND role = 'super_admin'))"
    }
   ],
   "update_using": [
    {
     "policy": "study_map_assignment_admin",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1544 WHERE profile_id = __UID__ AND role = 'super_admin'))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1545 WHERE profile_id = __UID__ AND role = 'super_admin'))"
    }
   ],
   "update_check": [
    {
     "policy": "study_map_assignment_admin",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1545 WHERE profile_id = __UID__ AND role = 'super_admin'))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1546 WHERE profile_id = __UID__ AND role = 'super_admin'))"
    }
   ],
   "delete": [
    {
     "policy": "study_map_assignment_admin",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1544 WHERE profile_id = __UID__ AND role = 'super_admin'))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1545 WHERE profile_id = __UID__ AND role = 'super_admin'))"
    }
   ]
  },
@@ -3372,20 +3372,20 @@
   "select": [
    {
     "policy": "study_map_library_read",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1546 WHERE profile_id = __UID__ AND role = 'super_admin'))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1547 WHERE profile_id = __UID__ AND role = 'super_admin'))"
    }
   ],
   "insert": [],
   "update_using": [
    {
     "policy": "study_map_library_rename",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1547 WHERE profile_id = __UID__ AND role = 'super_admin'))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1548 WHERE profile_id = __UID__ AND role = 'super_admin'))"
    }
   ],
   "update_check": [
    {
     "policy": "study_map_library_rename",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1548 WHERE profile_id = __UID__ AND role = 'super_admin'))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1549 WHERE profile_id = __UID__ AND role = 'super_admin'))"
    }
   ],
   "delete": []
@@ -3398,31 +3398,31 @@
    },
    {
     "policy": "study_plans_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1549 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1550 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "insert": [
    {
     "policy": "study_plans_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1550 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1551 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "update_using": [
    {
     "policy": "study_plans_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1549 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1550 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "update_check": [
    {
     "policy": "study_plans_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1550 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1551 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "delete": [
    {
     "policy": "study_plans_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1549 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1550 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ]
  },
@@ -3434,31 +3434,31 @@
    },
    {
     "policy": "subject_cover_library_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1551 WHERE profile_id = __UID__ AND role = 'super_admin'))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1552 WHERE profile_id = __UID__ AND role = 'super_admin'))"
    }
   ],
   "insert": [
    {
     "policy": "subject_cover_library_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1552 WHERE profile_id = __UID__ AND role = 'super_admin'))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1553 WHERE profile_id = __UID__ AND role = 'super_admin'))"
    }
   ],
   "update_using": [
    {
     "policy": "subject_cover_library_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1551 WHERE profile_id = __UID__ AND role = 'super_admin'))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1552 WHERE profile_id = __UID__ AND role = 'super_admin'))"
    }
   ],
   "update_check": [
    {
     "policy": "subject_cover_library_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1552 WHERE profile_id = __UID__ AND role = 'super_admin'))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1553 WHERE profile_id = __UID__ AND role = 'super_admin'))"
    }
   ],
   "delete": [
    {
     "policy": "subject_cover_library_write",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1551 WHERE profile_id = __UID__ AND role = 'super_admin'))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1552 WHERE profile_id = __UID__ AND role = 'super_admin'))"
    }
   ]
  },
@@ -3466,35 +3466,35 @@
   "select": [
    {
     "policy": "subjects_read",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1553 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1554 WHERE id = __UID__)))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1554 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1555 WHERE id = __UID__)))"
    },
    {
     "policy": "subjects_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1555 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1556 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1557 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1556 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1557 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1558 WHERE id = __UID__))))"
    }
   ],
   "insert": [
    {
     "policy": "subjects_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1558 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1559 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1560 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1559 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1560 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1561 WHERE id = __UID__))))"
    }
   ],
   "update_using": [
    {
     "policy": "subjects_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1555 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1556 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1557 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1556 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1557 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1558 WHERE id = __UID__))))"
    }
   ],
   "update_check": [
    {
     "policy": "subjects_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1558 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1559 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1560 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1559 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1560 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1561 WHERE id = __UID__))))"
    }
   ],
   "delete": [
    {
     "policy": "subjects_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1555 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1556 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1557 WHERE id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1556 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1557 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (department_id = (SELECT department_id FROM profiles AS profiles__h1558 WHERE id = __UID__))))"
    }
   ]
  },
@@ -3502,35 +3502,35 @@
   "select": [
    {
     "policy": "submission_attachments_read",
-    "sql": "(EXISTS(SELECT 1 FROM (assignment_submissions AS asub JOIN score_items AS si ON ((si.id = asub.score_item_id))) WHERE ((asub.id = __row.submission_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1561 WHERE ta__h1561.id = si.teaching_assignment_id AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1567 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1561.classroom_id IN (SELECT c__h1562.id FROM classrooms AS c__h1562 JOIN grade_levels AS gl__h1563 ON gl__h1563.id = c__h1562.grade_level_id WHERE gl__h1563.department_id = (SELECT department_id FROM profiles AS profiles__h1568 WHERE id = __UID__)) OR ta__h1561.teacher_id = __UID__ OR EXISTS(SELECT 1 FROM student_classroom_enrollments AS sce__h1564 JOIN students AS s__h1565 ON s__h1565.id = sce__h1564.student_id WHERE sce__h1564.classroom_id = ta__h1561.classroom_id AND sce__h1564.academic_year = ta__h1561.academic_year AND (s__h1565.profile_id = __UID__ OR s__h1565.id IN (SELECT student_id FROM guardianships AS guardianships__h1566 WHERE parent_id = __UID__)))))))))"
+    "sql": "(EXISTS(SELECT 1 FROM (assignment_submissions AS asub JOIN score_items AS si ON ((si.id = asub.score_item_id))) WHERE ((asub.id = __row.submission_id) AND (SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1562 WHERE ta__h1562.id = si.teaching_assignment_id AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1568 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1562.classroom_id IN (SELECT c__h1563.id FROM classrooms AS c__h1563 JOIN grade_levels AS gl__h1564 ON gl__h1564.id = c__h1563.grade_level_id WHERE gl__h1564.department_id = (SELECT department_id FROM profiles AS profiles__h1569 WHERE id = __UID__)) OR ta__h1562.teacher_id = __UID__ OR EXISTS(SELECT 1 FROM student_classroom_enrollments AS sce__h1565 JOIN students AS s__h1566 ON s__h1566.id = sce__h1565.student_id WHERE sce__h1565.classroom_id = ta__h1562.classroom_id AND sce__h1565.academic_year = ta__h1562.academic_year AND (s__h1566.profile_id = __UID__ OR s__h1566.id IN (SELECT student_id FROM guardianships AS guardianships__h1567 WHERE parent_id = __UID__)))))))))"
    },
    {
     "policy": "submission_attachments_write",
-    "sql": "(EXISTS(SELECT 1 FROM (assignment_submissions AS asub JOIN score_items AS si ON ((si.id = asub.score_item_id))) WHERE ((asub.id = __row.submission_id) AND ((SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1569 WHERE ta__h1569.id = si.teaching_assignment_id AND (ta__h1569.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1572 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1569.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1573 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1574 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1569.classroom_id IN (SELECT c__h1570.id FROM classrooms AS c__h1570 JOIN grade_levels AS gl__h1571 ON gl__h1571.id = c__h1570.grade_level_id WHERE gl__h1571.department_id = (SELECT department_id FROM profiles AS profiles__h1575 WHERE id = __UID__))))))) OR (asub.student_id = (SELECT id FROM students AS students__h1576 WHERE profile_id = __UID__))))))"
+    "sql": "(EXISTS(SELECT 1 FROM (assignment_submissions AS asub JOIN score_items AS si ON ((si.id = asub.score_item_id))) WHERE ((asub.id = __row.submission_id) AND ((SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1570 WHERE ta__h1570.id = si.teaching_assignment_id AND (ta__h1570.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1573 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1570.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1574 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1575 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1570.classroom_id IN (SELECT c__h1571.id FROM classrooms AS c__h1571 JOIN grade_levels AS gl__h1572 ON gl__h1572.id = c__h1571.grade_level_id WHERE gl__h1572.department_id = (SELECT department_id FROM profiles AS profiles__h1576 WHERE id = __UID__))))))) OR (asub.student_id = (SELECT id FROM students AS students__h1577 WHERE profile_id = __UID__))))))"
    }
   ],
   "insert": [
    {
     "policy": "submission_attachments_write",
-    "sql": "(EXISTS(SELECT 1 FROM (assignment_submissions AS asub JOIN score_items AS si ON ((si.id = asub.score_item_id))) WHERE ((asub.id = __row.submission_id) AND ((SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1577 WHERE ta__h1577.id = si.teaching_assignment_id AND (ta__h1577.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1580 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1577.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1581 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1582 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1577.classroom_id IN (SELECT c__h1578.id FROM classrooms AS c__h1578 JOIN grade_levels AS gl__h1579 ON gl__h1579.id = c__h1578.grade_level_id WHERE gl__h1579.department_id = (SELECT department_id FROM profiles AS profiles__h1583 WHERE id = __UID__))))))) OR (asub.student_id = (SELECT id FROM students AS students__h1584 WHERE profile_id = __UID__))))))"
+    "sql": "(EXISTS(SELECT 1 FROM (assignment_submissions AS asub JOIN score_items AS si ON ((si.id = asub.score_item_id))) WHERE ((asub.id = __row.submission_id) AND ((SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1578 WHERE ta__h1578.id = si.teaching_assignment_id AND (ta__h1578.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1581 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1578.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1582 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1583 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1578.classroom_id IN (SELECT c__h1579.id FROM classrooms AS c__h1579 JOIN grade_levels AS gl__h1580 ON gl__h1580.id = c__h1579.grade_level_id WHERE gl__h1580.department_id = (SELECT department_id FROM profiles AS profiles__h1584 WHERE id = __UID__))))))) OR (asub.student_id = (SELECT id FROM students AS students__h1585 WHERE profile_id = __UID__))))))"
    }
   ],
   "update_using": [
    {
     "policy": "submission_attachments_write",
-    "sql": "(EXISTS(SELECT 1 FROM (assignment_submissions AS asub JOIN score_items AS si ON ((si.id = asub.score_item_id))) WHERE ((asub.id = __row.submission_id) AND ((SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1569 WHERE ta__h1569.id = si.teaching_assignment_id AND (ta__h1569.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1572 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1569.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1573 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1574 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1569.classroom_id IN (SELECT c__h1570.id FROM classrooms AS c__h1570 JOIN grade_levels AS gl__h1571 ON gl__h1571.id = c__h1570.grade_level_id WHERE gl__h1571.department_id = (SELECT department_id FROM profiles AS profiles__h1575 WHERE id = __UID__))))))) OR (asub.student_id = (SELECT id FROM students AS students__h1576 WHERE profile_id = __UID__))))))"
+    "sql": "(EXISTS(SELECT 1 FROM (assignment_submissions AS asub JOIN score_items AS si ON ((si.id = asub.score_item_id))) WHERE ((asub.id = __row.submission_id) AND ((SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1570 WHERE ta__h1570.id = si.teaching_assignment_id AND (ta__h1570.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1573 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1570.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1574 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1575 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1570.classroom_id IN (SELECT c__h1571.id FROM classrooms AS c__h1571 JOIN grade_levels AS gl__h1572 ON gl__h1572.id = c__h1571.grade_level_id WHERE gl__h1572.department_id = (SELECT department_id FROM profiles AS profiles__h1576 WHERE id = __UID__))))))) OR (asub.student_id = (SELECT id FROM students AS students__h1577 WHERE profile_id = __UID__))))))"
    }
   ],
   "update_check": [
    {
     "policy": "submission_attachments_write",
-    "sql": "(EXISTS(SELECT 1 FROM (assignment_submissions AS asub JOIN score_items AS si ON ((si.id = asub.score_item_id))) WHERE ((asub.id = __row.submission_id) AND ((SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1577 WHERE ta__h1577.id = si.teaching_assignment_id AND (ta__h1577.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1580 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1577.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1581 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1582 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1577.classroom_id IN (SELECT c__h1578.id FROM classrooms AS c__h1578 JOIN grade_levels AS gl__h1579 ON gl__h1579.id = c__h1578.grade_level_id WHERE gl__h1579.department_id = (SELECT department_id FROM profiles AS profiles__h1583 WHERE id = __UID__))))))) OR (asub.student_id = (SELECT id FROM students AS students__h1584 WHERE profile_id = __UID__))))))"
+    "sql": "(EXISTS(SELECT 1 FROM (assignment_submissions AS asub JOIN score_items AS si ON ((si.id = asub.score_item_id))) WHERE ((asub.id = __row.submission_id) AND ((SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1578 WHERE ta__h1578.id = si.teaching_assignment_id AND (ta__h1578.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1581 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1578.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1582 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1583 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1578.classroom_id IN (SELECT c__h1579.id FROM classrooms AS c__h1579 JOIN grade_levels AS gl__h1580 ON gl__h1580.id = c__h1579.grade_level_id WHERE gl__h1580.department_id = (SELECT department_id FROM profiles AS profiles__h1584 WHERE id = __UID__))))))) OR (asub.student_id = (SELECT id FROM students AS students__h1585 WHERE profile_id = __UID__))))))"
    }
   ],
   "delete": [
    {
     "policy": "submission_attachments_write",
-    "sql": "(EXISTS(SELECT 1 FROM (assignment_submissions AS asub JOIN score_items AS si ON ((si.id = asub.score_item_id))) WHERE ((asub.id = __row.submission_id) AND ((SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1569 WHERE ta__h1569.id = si.teaching_assignment_id AND (ta__h1569.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1572 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1569.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1573 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1574 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1569.classroom_id IN (SELECT c__h1570.id FROM classrooms AS c__h1570 JOIN grade_levels AS gl__h1571 ON gl__h1571.id = c__h1570.grade_level_id WHERE gl__h1571.department_id = (SELECT department_id FROM profiles AS profiles__h1575 WHERE id = __UID__))))))) OR (asub.student_id = (SELECT id FROM students AS students__h1576 WHERE profile_id = __UID__))))))"
+    "sql": "(EXISTS(SELECT 1 FROM (assignment_submissions AS asub JOIN score_items AS si ON ((si.id = asub.score_item_id))) WHERE ((asub.id = __row.submission_id) AND ((SELECT EXISTS(SELECT 1 FROM teaching_assignments AS ta__h1570 WHERE ta__h1570.id = si.teaching_assignment_id AND (ta__h1570.teacher_id = __UID__ OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1573 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (ta__h1570.teacher_id IS NOT NULL OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1574 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1575 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ta__h1570.classroom_id IN (SELECT c__h1571.id FROM classrooms AS c__h1571 JOIN grade_levels AS gl__h1572 ON gl__h1572.id = c__h1571.grade_level_id WHERE gl__h1572.department_id = (SELECT department_id FROM profiles AS profiles__h1576 WHERE id = __UID__))))))) OR (asub.student_id = (SELECT id FROM students AS students__h1577 WHERE profile_id = __UID__))))))"
    }
   ]
  },
@@ -3550,23 +3550,23 @@
   "select": [
    {
     "policy": "teaching_assignments_read",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1585 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1586 WHERE id = __UID__)))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1586 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1587 WHERE id = __UID__)))))"
    },
    {
     "policy": "teaching_assignments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1587 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((teacher_id IS NOT NULL) OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1588 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1589 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1590 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1588 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((teacher_id IS NOT NULL) OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1589 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1590 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1591 WHERE id = __UID__))))))"
    }
   ],
   "insert": [
    {
     "policy": "teaching_assignments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1591 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((teacher_id IS NOT NULL) OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1592 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1593 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1594 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1592 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((teacher_id IS NOT NULL) OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1593 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1594 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1595 WHERE id = __UID__))))))"
    }
   ],
   "update_using": [
    {
     "policy": "teaching_assignments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1587 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((teacher_id IS NOT NULL) OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1588 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1589 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1590 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1588 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((teacher_id IS NOT NULL) OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1589 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1590 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1591 WHERE id = __UID__))))))"
    },
    {
     "policy": "teaching_assignments_write_own_pct",
@@ -3576,7 +3576,7 @@
   "update_check": [
    {
     "policy": "teaching_assignments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1591 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((teacher_id IS NOT NULL) OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1592 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1593 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1594 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1592 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((teacher_id IS NOT NULL) OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1593 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1594 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1595 WHERE id = __UID__))))))"
    },
    {
     "policy": "teaching_assignments_write_own_pct",
@@ -3586,7 +3586,7 @@
   "delete": [
    {
     "policy": "teaching_assignments_write",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1587 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((teacher_id IS NOT NULL) OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1588 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1589 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1590 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1588 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((teacher_id IS NOT NULL) OR (SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1589 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director')))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1590 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (classroom_id IN (SELECT c.id FROM (classrooms AS c JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1591 WHERE id = __UID__))))))"
    }
   ]
  },
@@ -3630,7 +3630,7 @@
   "select": [
    {
     "policy": "teaching_plan_slots_read",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1595 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1596 WHERE id = __UID__)))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1596 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1597 WHERE id = __UID__)))))"
    },
    {
     "policy": "teaching_plan_slots_write",
@@ -3666,35 +3666,35 @@
   "select": [
    {
     "policy": "teaching_plan_units_read",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1597 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1598 WHERE id = __UID__)))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1598 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1599 WHERE id = __UID__)))))"
    },
    {
     "policy": "teaching_plan_units_write",
-    "sql": "((teaching_assignment_id IN (SELECT teaching_assignments.id FROM teaching_assignments WHERE (teaching_assignments.teacher_id = __UID__))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1599 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director'))) AND (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1600 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1601 WHERE id = __UID__)))))))"
+    "sql": "((teaching_assignment_id IN (SELECT teaching_assignments.id FROM teaching_assignments WHERE (teaching_assignments.teacher_id = __UID__))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1600 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director'))) AND (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1601 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1602 WHERE id = __UID__)))))))"
    }
   ],
   "insert": [
    {
     "policy": "teaching_plan_units_write",
-    "sql": "((teaching_assignment_id IN (SELECT teaching_assignments.id FROM teaching_assignments WHERE (teaching_assignments.teacher_id = __UID__))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1602 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director'))) AND (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1603 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1604 WHERE id = __UID__)))))))"
+    "sql": "((teaching_assignment_id IN (SELECT teaching_assignments.id FROM teaching_assignments WHERE (teaching_assignments.teacher_id = __UID__))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1603 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director'))) AND (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1604 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1605 WHERE id = __UID__)))))))"
    }
   ],
   "update_using": [
    {
     "policy": "teaching_plan_units_write",
-    "sql": "((teaching_assignment_id IN (SELECT teaching_assignments.id FROM teaching_assignments WHERE (teaching_assignments.teacher_id = __UID__))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1599 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director'))) AND (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1600 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1601 WHERE id = __UID__)))))))"
+    "sql": "((teaching_assignment_id IN (SELECT teaching_assignments.id FROM teaching_assignments WHERE (teaching_assignments.teacher_id = __UID__))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1600 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director'))) AND (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1601 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1602 WHERE id = __UID__)))))))"
    }
   ],
   "update_check": [
    {
     "policy": "teaching_plan_units_write",
-    "sql": "((teaching_assignment_id IN (SELECT teaching_assignments.id FROM teaching_assignments WHERE (teaching_assignments.teacher_id = __UID__))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1602 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director'))) AND (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1603 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1604 WHERE id = __UID__)))))))"
+    "sql": "((teaching_assignment_id IN (SELECT teaching_assignments.id FROM teaching_assignments WHERE (teaching_assignments.teacher_id = __UID__))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1603 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director'))) AND (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1604 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1605 WHERE id = __UID__)))))))"
    }
   ],
   "delete": [
    {
     "policy": "teaching_plan_units_write",
-    "sql": "((teaching_assignment_id IN (SELECT teaching_assignments.id FROM teaching_assignments WHERE (teaching_assignments.teacher_id = __UID__))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1599 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director'))) AND (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1600 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1601 WHERE id = __UID__)))))))"
+    "sql": "((teaching_assignment_id IN (SELECT teaching_assignments.id FROM teaching_assignments WHERE (teaching_assignments.teacher_id = __UID__))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1600 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'dept_head', 'dept_director'))) AND (teaching_assignment_id IN (SELECT ta.id FROM ((teaching_assignments AS ta JOIN classrooms AS c ON ((c.id = ta.classroom_id))) JOIN grade_levels AS gl ON ((gl.id = c.grade_level_id))) WHERE ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1601 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director'))) OR (gl.department_id = (SELECT department_id FROM profiles AS profiles__h1602 WHERE id = __UID__)))))))"
    }
   ]
  },
@@ -3702,31 +3702,31 @@
   "select": [
    {
     "policy": "time_clock_records_rw",
-    "sql": "((profile_id = __UID__) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1605 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1606 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (profile_id IN (SELECT profiles.id FROM profiles WHERE (profiles.department_id = (SELECT department_id FROM profiles AS profiles__h1607 WHERE id = __UID__)))))))"
+    "sql": "((profile_id = __UID__) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1606 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1607 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (profile_id IN (SELECT profiles.id FROM profiles WHERE (profiles.department_id = (SELECT department_id FROM profiles AS profiles__h1608 WHERE id = __UID__)))))))"
    }
   ],
   "insert": [
    {
     "policy": "time_clock_records_rw",
-    "sql": "((profile_id = __UID__) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1608 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1609 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (profile_id IN (SELECT profiles.id FROM profiles WHERE (profiles.department_id = (SELECT department_id FROM profiles AS profiles__h1610 WHERE id = __UID__)))))))"
+    "sql": "((profile_id = __UID__) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1609 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1610 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (profile_id IN (SELECT profiles.id FROM profiles WHERE (profiles.department_id = (SELECT department_id FROM profiles AS profiles__h1611 WHERE id = __UID__)))))))"
    }
   ],
   "update_using": [
    {
     "policy": "time_clock_records_rw",
-    "sql": "((profile_id = __UID__) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1605 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1606 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (profile_id IN (SELECT profiles.id FROM profiles WHERE (profiles.department_id = (SELECT department_id FROM profiles AS profiles__h1607 WHERE id = __UID__)))))))"
+    "sql": "((profile_id = __UID__) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1606 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1607 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (profile_id IN (SELECT profiles.id FROM profiles WHERE (profiles.department_id = (SELECT department_id FROM profiles AS profiles__h1608 WHERE id = __UID__)))))))"
    }
   ],
   "update_check": [
    {
     "policy": "time_clock_records_rw",
-    "sql": "((profile_id = __UID__) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1608 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1609 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (profile_id IN (SELECT profiles.id FROM profiles WHERE (profiles.department_id = (SELECT department_id FROM profiles AS profiles__h1610 WHERE id = __UID__)))))))"
+    "sql": "((profile_id = __UID__) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1609 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1610 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (profile_id IN (SELECT profiles.id FROM profiles WHERE (profiles.department_id = (SELECT department_id FROM profiles AS profiles__h1611 WHERE id = __UID__)))))))"
    }
   ],
   "delete": [
    {
     "policy": "time_clock_records_rw",
-    "sql": "((profile_id = __UID__) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1605 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1606 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (profile_id IN (SELECT profiles.id FROM profiles WHERE (profiles.department_id = (SELECT department_id FROM profiles AS profiles__h1607 WHERE id = __UID__)))))))"
+    "sql": "((profile_id = __UID__) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1606 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1607 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (profile_id IN (SELECT profiles.id FROM profiles WHERE (profiles.department_id = (SELECT department_id FROM profiles AS profiles__h1608 WHERE id = __UID__)))))))"
    }
   ]
  },
@@ -3734,31 +3734,31 @@
   "select": [
    {
     "policy": "transfer_intakes_all",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1611 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1612 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1613 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1612 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1613 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1614 WHERE id = __UID__))))))"
    }
   ],
   "insert": [
    {
     "policy": "transfer_intakes_all",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1614 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1615 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1616 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1615 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1616 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1617 WHERE id = __UID__))))))"
    }
   ],
   "update_using": [
    {
     "policy": "transfer_intakes_all",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1611 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1612 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1613 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1612 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1613 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1614 WHERE id = __UID__))))))"
    }
   ],
   "update_check": [
    {
     "policy": "transfer_intakes_all",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1614 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1615 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1616 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1615 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1616 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1617 WHERE id = __UID__))))))"
    }
   ],
   "delete": [
    {
     "policy": "transfer_intakes_all",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1611 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1612 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1613 WHERE id = __UID__))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1612 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR ((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1613 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff', 'dept_head', 'dept_director'))) AND (student_id IN (SELECT students.id FROM students WHERE (students.department_id = (SELECT department_id FROM profiles AS profiles__h1614 WHERE id = __UID__))))))"
    }
   ]
  },
@@ -3766,25 +3766,25 @@
   "select": [
    {
     "policy": "tuition_invoices_read",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1618 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id = (SELECT id FROM students AS students__h1619 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1619 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (student_id = (SELECT id FROM students AS students__h1620 WHERE profile_id = __UID__)) OR (student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__))))"
    }
   ],
   "insert": [
    {
     "policy": "tuition_invoices_insert",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1617 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1618 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "update_using": [
    {
     "policy": "tuition_invoices_update",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1620 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1621 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "update_check": [
    {
     "policy": "tuition_invoices_update",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1621 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1622 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "delete": []
@@ -3793,25 +3793,25 @@
   "select": [
    {
     "policy": "tuition_payments_read",
-    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1623 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (invoice_id IN (SELECT tuition_invoices.id FROM tuition_invoices WHERE ((tuition_invoices.student_id = (SELECT id FROM students AS students__h1624 WHERE profile_id = __UID__)) OR (tuition_invoices.student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__)))))))"
+    "sql": "((SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1624 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff'))) OR (invoice_id IN (SELECT tuition_invoices.id FROM tuition_invoices WHERE ((tuition_invoices.student_id = (SELECT id FROM students AS students__h1625 WHERE profile_id = __UID__)) OR (tuition_invoices.student_id IN (SELECT guardianships.student_id FROM guardianships WHERE (guardianships.parent_id = __UID__)))))))"
    }
   ],
   "insert": [
    {
     "policy": "tuition_payments_insert",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1622 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1623 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "update_using": [
    {
     "policy": "tuition_payments_update",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1625 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1626 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "update_check": [
    {
     "policy": "tuition_payments_update",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1626 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1627 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "delete": []
@@ -3820,31 +3820,31 @@
   "select": [
    {
     "policy": "tuition_term_amounts_all",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1627 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1628 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "insert": [
    {
     "policy": "tuition_term_amounts_all",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1628 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1629 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "update_using": [
    {
     "policy": "tuition_term_amounts_all",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1627 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1628 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "update_check": [
    {
     "policy": "tuition_term_amounts_all",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1628 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1629 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ],
   "delete": [
    {
     "policy": "tuition_term_amounts_all",
-    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1627 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
+    "sql": "(SELECT EXISTS(SELECT 1 FROM profile_roles AS profile_roles__h1628 WHERE profile_id = __UID__ AND role IN ('super_admin', 'director', 'staff')))"
    }
   ]
  }

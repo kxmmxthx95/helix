@@ -2330,6 +2330,11 @@
    "kind": "date"
   },
   {
+   "col": "days",
+   "kind": "int",
+   "gen": true
+  },
+  {
    "col": "reason",
    "kind": "text"
   },
@@ -3689,6 +3694,11 @@
   {
    "col": "end_date",
    "kind": "date"
+  },
+  {
+   "col": "days",
+   "kind": "int",
+   "gen": true
   },
   {
    "col": "reason",

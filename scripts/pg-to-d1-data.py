@@ -13,7 +13,7 @@ from decimal import Decimal
 from pathlib import Path
 
 D1 = Path(__file__).resolve().parent.parent / "worker" / "d1"
-manifest = json.loads((D1 / "columns.json").read_text())
+manifest = {t: [c for c in cols if not c.get("gen")] for t, cols in json.loads((D1 / "columns.json").read_text()).items()}  # generated columns are computed by SQLite
 PAGE, GROUP_ROWS = 1000, 3000
 
 

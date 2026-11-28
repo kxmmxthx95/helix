@@ -1,11 +1,11 @@
 import type { Database } from "@/lib/database.types";
-import type { ApiResponse, Filter, Op, Scalar, SelectRequest } from "../../worker/src/api/protocol";
+import type { ApiResponse, Embed, Filter, Op, Scalar, SelectRequest } from "../../worker/src/api/protocol";
 
 /**
  * supabase-js-shaped client for the Cloudflare API worker (docs/cloudflare-migration.md, phase 4.3).
  * Read-only for now, on the tables the worker has policies for; anything else is rejected by the worker (403).
- * Unsupported syntax throws at call time instead of silently returning different data:
- * embedded selects (`rel(cols)`), aliases, nested or(and(...)).
+ * Embedded selects (`alias:rel!fk!inner(cols, nested(...))`, `rel(count)`) and filters on embedded columns (`.eq("rel.col", v)`) are supported.
+ * Unsupported syntax throws at call time instead of silently returning different data: column aliases, nested or(and(...)), order on embeds.
  */
 type Tables = Database["public"]["Tables"];
 type TableName = keyof Tables & string;
@@ -13,7 +13,10 @@ type Row<T extends TableName> = Tables[T]["Row"];
 
 type Trim<S extends string> = S extends ` ${infer R}` ? Trim<R> : S extends `${infer R} ` ? Trim<R> : S;
 type Split<S extends string> = S extends `${infer A},${infer B}` ? Trim<A> | Split<B> : Trim<S>;
-type Picked<T extends TableName, C extends string> = C extends "*" ? Row<T> : Pick<Row<T>, Extract<Split<C>, keyof Row<T>>>;
+// An embed (`rel(...)`) makes the result shape depend on the select string; supabase-js derives it at the type level, here it is `any` (call sites annotate).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Picked<T extends TableName, C extends string> = C extends `${string}(${string}` ? any : C extends "*" ? Row<T> : Pick<Row<T>, Extract<Split<C>, keyof Row<T>>>;
+type Col<T extends TableName> = (keyof Row<T> & string) | (string & {}); // plain column or `embed.column` path
 
 export interface DbError {
   message: string;
@@ -53,31 +56,72 @@ export function parseOr(expr: string): Filter[] {
   });
 }
 
+function splitTop(s: string): string[] {
+  const out: string[] = [];
+  let depth = 0, cur = "";
+  for (const ch of s) {
+    if (ch === "(") depth++;
+    if (ch === ")") depth--;
+    if (ch === "," && depth === 0) { out.push(cur); cur = ""; } else cur += ch;
+  }
+  if (cur.trim()) out.push(cur);
+  return out.map((x) => x.trim()).filter(Boolean);
+}
+
+/** `*, topics:teaching_plan_slot_topics(topic_id, position)` -> parent columns + embed tree. */
+export function parseSelect(select: string, table = "?"): { columns: "*" | string[]; embeds: Embed[] } {
+  const cols: string[] = [];
+  const embeds: Embed[] = [];
+  let star = false;
+  for (const item of splitTop(select)) {
+    const m = /^(?:(\w+):)?(\w+)((?:![\w]+)*)\((.*)\)$/s.exec(item);
+    if (m) {
+      const bangs = m[3] ? m[3].split("!").filter(Boolean) : [];
+      const inner = bangs.includes("inner");
+      const hint = bangs.find((b) => b !== "inner");
+      const body = m[4]!.trim();
+      const sub = body === "count" ? null : parseSelect(body, m[2]);
+      embeds.push({ alias: m[1] ?? m[2]!, table: m[2]!, ...(hint ? { hint } : {}), ...(inner ? { inner } : {}), columns: sub ? sub.columns : "count", ...(sub?.embeds.length ? { embeds: sub.embeds } : {}) });
+    } else if (item === "*") star = true;
+    else if (/^\w+$/.test(item)) cols.push(item);
+    else throw new Error(`db: unsupported select item "${item}" (table ${table}); column aliases and casts are not supported`);
+  }
+  if (star && cols.length) throw new Error(`db: "*" combined with named columns is not supported (table ${table})`);
+  return { columns: star ? "*" : cols, embeds };
+}
+
 class Select<T extends TableName, D> implements PromiseLike<DbResult<D>> {
   private readonly req: SelectRequest;
   constructor(private readonly opts: DbOptions, table: T, columns: string, o?: { count?: "exact"; head?: boolean }) {
-    const cols = columns.trim() === "*" ? "*" : columns.split(",").map((c) => c.trim());
-    if (cols !== "*") for (const c of cols) if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(c)) throw new Error(`db: embedded/aliased select is not supported yet: "${c}" (table ${table})`);
-    this.req = { table, columns: cols, filters: [], ors: [], order: [], ...(o?.count ? { count: true } : {}), ...(o?.head ? { head: true } : {}) };
+    const { columns: cols, embeds } = parseSelect(columns, table);
+    this.req = { table, columns: cols, ...(embeds.length ? { embeds } : {}), filters: [], ors: [], order: [], ...(o?.count ? { count: true } : {}), ...(o?.head ? { head: true } : {}) };
   }
 
   private f(col: string, op: Op, val: Filter["val"], neg?: boolean): this {
-    this.req.filters.push({ col, op, val, ...(neg ? { neg } : {}) });
+    const path = col.split(".");
+    const name = path.pop()!;
+    let target: { filters?: Filter[]; embeds?: Embed[] } = this.req;
+    for (const seg of path) {
+      const e: Embed | undefined = target.embeds?.find((x) => x.alias === seg);
+      if (!e) throw new Error(`db: filter on "${col}" but the select has no embed "${seg}" (table ${this.req.table})`);
+      target = e;
+    }
+    (target.filters ??= []).push({ col: name, op, val, ...(neg ? { neg } : {}) });
     return this;
   }
-  eq(col: keyof Row<T> & string, v: Scalar) { return this.f(col, "eq", v); }
-  neq(col: keyof Row<T> & string, v: Scalar) { return this.f(col, "neq", v); }
-  gt(col: keyof Row<T> & string, v: Scalar) { return this.f(col, "gt", v); }
-  gte(col: keyof Row<T> & string, v: Scalar) { return this.f(col, "gte", v); }
-  lt(col: keyof Row<T> & string, v: Scalar) { return this.f(col, "lt", v); }
-  lte(col: keyof Row<T> & string, v: Scalar) { return this.f(col, "lte", v); }
-  like(col: keyof Row<T> & string, v: string) { return this.f(col, "like", v); }
-  ilike(col: keyof Row<T> & string, v: string) { return this.f(col, "ilike", v); }
-  is(col: keyof Row<T> & string, v: boolean | null) { return this.f(col, "is", v); }
-  in(col: keyof Row<T> & string, v: readonly Scalar[]) { return this.f(col, "in", [...v]); }
-  not(col: keyof Row<T> & string, op: Op, v: Filter["val"]) { return this.f(col, op, v, true); }
+  eq(col: Col<T>, v: Scalar) { return this.f(col, "eq", v); }
+  neq(col: Col<T>, v: Scalar) { return this.f(col, "neq", v); }
+  gt(col: Col<T>, v: Scalar) { return this.f(col, "gt", v); }
+  gte(col: Col<T>, v: Scalar) { return this.f(col, "gte", v); }
+  lt(col: Col<T>, v: Scalar) { return this.f(col, "lt", v); }
+  lte(col: Col<T>, v: Scalar) { return this.f(col, "lte", v); }
+  like(col: Col<T>, v: string) { return this.f(col, "like", v); }
+  ilike(col: Col<T>, v: string) { return this.f(col, "ilike", v); }
+  is(col: Col<T>, v: boolean | null) { return this.f(col, "is", v); }
+  in(col: Col<T>, v: readonly Scalar[]) { return this.f(col, "in", [...v]); }
+  not(col: Col<T>, op: Op, v: Filter["val"]) { return this.f(col, op, v, true); }
   or(expr: string) { this.req.ors.push(parseOr(expr)); return this; }
-  order(col: keyof Row<T> & string, o?: { ascending?: boolean; nullsFirst?: boolean }) {
+  order(col: Col<T>, o?: { ascending?: boolean; nullsFirst?: boolean }) {
     this.req.order.push({ col, asc: o?.ascending ?? true, ...(o?.nullsFirst === undefined ? {} : { nullsFirst: o.nullsFirst }) });
     return this;
   }

@@ -63,7 +63,12 @@ function toDb(kind: Kind, v: unknown, col: string): unknown {
 function rowValues(table: string, row: unknown): Map<string, unknown> {
   if (!row || typeof row !== "object" || Array.isArray(row)) throw new ApiFailure(400, "PGRST102", "values must be objects");
   const out = new Map<string, unknown>();
-  for (const [c, v] of Object.entries(row)) out.set(c, toDb(columnKind(table, c), v, c));
+  const generated = new Set(tableColumns(table).keys());
+  for (const d of tableDefs(table)) generated.delete(d.col); // what remains are the generated columns
+  for (const [c, v] of Object.entries(row)) {
+    if (generated.has(c)) throw new ApiFailure(400, "428C9", `column "${c}" can only be updated to DEFAULT (generated)`);
+    out.set(c, toDb(columnKind(table, c), v, c));
+  }
   return out;
 }
 

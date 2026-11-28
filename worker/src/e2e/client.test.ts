@@ -48,7 +48,7 @@ describe("client ↔ worker, end to end", () => {
     const miss = await db.from("profiles").select("*").eq("id", "nobody").single();
     expect(miss.data).toBeNull();
     expect(miss.error).toMatchObject({ code: "PGRST116" });
-    expect(() => db.from("profiles").select("id, departments(name)")).toThrow(/embedded/);
+    expect(() => db.from("profiles").select("id, n:first_name")).toThrow(/unsupported/);
     const off = createDb({ baseUrl: undefined, getToken: async () => "me" });
     expect((await off.from("profiles").select("*")).error?.message).toMatch(/VITE_API_URL/);
   });

@@ -2,7 +2,7 @@ import columns from "../../d1/columns.json";
 
 export type Kind = "text" | "ts" | "date" | "time" | "bool" | "json" | "int" | "real" | "money";
 
-export interface ColumnDef { col: string; kind: Kind; /** SQLite default expression; `__UID__` = the caller */ default?: string }
+export interface ColumnDef { col: string; kind: Kind; /** computed by the database: readable, never written */ gen?: boolean; /** SQLite default expression; `__UID__` = the caller */ default?: string }
 const tables = columns as unknown as Record<string, ColumnDef[]>;
 const index = new Map(Object.entries(tables).map(([t, cols]) => [t, new Map(cols.map((c) => [c.col, c.kind]))]));
 
@@ -32,5 +32,5 @@ export function columnKind(table: string, col: string): Kind {
 /** Every non-generated column of a table, in order, with its default (the INSERT candidate row is built from this). */
 export function tableDefs(table: string): ColumnDef[] {
   tableColumns(table);
-  return tables[table]!;
+  return tables[table]!.filter((c) => !c.gen);
 }

@@ -1,0 +1,2752 @@
+[
+ {
+  "name": "academic_event_departments_department_id_fkey",
+  "table": "academic_event_departments",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "academic_event_departments_event_id_fkey",
+  "table": "academic_event_departments",
+  "cols": [
+   "event_id"
+  ],
+  "ref": "academic_events",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "academic_event_grade_levels_event_id_fkey",
+  "table": "academic_event_grade_levels",
+  "cols": [
+   "event_id"
+  ],
+  "ref": "academic_events",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "academic_event_grade_levels_grade_level_id_fkey",
+  "table": "academic_event_grade_levels",
+  "cols": [
+   "grade_level_id"
+  ],
+  "ref": "grade_levels",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "academic_terms_department_id_fkey",
+  "table": "academic_terms",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "assignment_attachments_score_item_id_fkey",
+  "table": "assignment_attachments",
+  "cols": [
+   "score_item_id"
+  ],
+  "ref": "score_items",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "assignment_submissions_score_item_id_fkey",
+  "table": "assignment_submissions",
+  "cols": [
+   "score_item_id"
+  ],
+  "ref": "score_items",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "assignment_submissions_student_id_fkey",
+  "table": "assignment_submissions",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "attendance_covers_classroom_id_fkey",
+  "table": "attendance_covers",
+  "cols": [
+   "classroom_id"
+  ],
+  "ref": "classrooms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "attendance_covers_cover_staff_id_fkey",
+  "table": "attendance_covers",
+  "cols": [
+   "cover_staff_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "attendance_covers_leave_request_id_fkey",
+  "table": "attendance_covers",
+  "cols": [
+   "leave_request_id"
+  ],
+  "ref": "leave_requests",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "attendance_covers_proposed_by_fkey",
+  "table": "attendance_covers",
+  "cols": [
+   "proposed_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "attendance_covers_schedule_entry_id_fkey",
+  "table": "attendance_covers",
+  "cols": [
+   "schedule_entry_id"
+  ],
+  "ref": "schedule_entries",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "attendance_records_classroom_id_fkey",
+  "table": "attendance_records",
+  "cols": [
+   "classroom_id"
+  ],
+  "ref": "classrooms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "attendance_records_recorded_by_fkey",
+  "table": "attendance_records",
+  "cols": [
+   "recorded_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "attendance_records_student_id_fkey",
+  "table": "attendance_records",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "audit_logs_actor_id_fkey",
+  "table": "audit_logs",
+  "cols": [
+   "actor_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "behavior_records_classroom_id_fkey",
+  "table": "behavior_records",
+  "cols": [
+   "classroom_id"
+  ],
+  "ref": "classrooms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "behavior_records_recorded_by_fkey",
+  "table": "behavior_records",
+  "cols": [
+   "recorded_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "behavior_records_student_id_fkey",
+  "table": "behavior_records",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "card_sale_items_product_id_fkey",
+  "table": "card_sale_items",
+  "cols": [
+   "product_id"
+  ],
+  "ref": "pos_products",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "card_sale_items_tx_id_fkey",
+  "table": "card_sale_items",
+  "cols": [
+   "tx_id"
+  ],
+  "ref": "card_transactions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "card_slip_requests_requested_by_fkey",
+  "table": "card_slip_requests",
+  "cols": [
+   "requested_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "card_slip_requests_reviewed_by_fkey",
+  "table": "card_slip_requests",
+  "cols": [
+   "reviewed_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "card_slip_requests_student_id_fkey",
+  "table": "card_slip_requests",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "card_slip_requests_tx_id_fkey",
+  "table": "card_slip_requests",
+  "cols": [
+   "tx_id"
+  ],
+  "ref": "card_transactions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "card_transactions_card_id_fkey",
+  "table": "card_transactions",
+  "cols": [
+   "card_id"
+  ],
+  "ref": "student_cards",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "card_transactions_recorded_by_fkey",
+  "table": "card_transactions",
+  "cols": [
+   "recorded_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "card_transactions_student_id_fkey",
+  "table": "card_transactions",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "card_transactions_terminal_id_fkey",
+  "table": "card_transactions",
+  "cols": [
+   "terminal_id"
+  ],
+  "ref": "pos_terminals",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "card_transactions_voided_by_fkey",
+  "table": "card_transactions",
+  "cols": [
+   "voided_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "classroom_homeroom_teachers_classroom_id_fkey",
+  "table": "classroom_homeroom_teachers",
+  "cols": [
+   "classroom_id"
+  ],
+  "ref": "classrooms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "classroom_homeroom_teachers_teacher_id_fkey",
+  "table": "classroom_homeroom_teachers",
+  "cols": [
+   "teacher_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "classrooms_grade_level_id_fkey",
+  "table": "classrooms",
+  "cols": [
+   "grade_level_id"
+  ],
+  "ref": "grade_levels",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "clock_in_reminders_profile_id_fkey",
+  "table": "clock_in_reminders",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "contracts_document_id_fkey",
+  "table": "contracts",
+  "cols": [
+   "document_id"
+  ],
+  "ref": "documents",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "contracts_profile_id_fkey",
+  "table": "contracts",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "curriculum_cohorts_department_id_fkey",
+  "table": "curriculum_cohorts",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "curriculum_cohorts_entry_grade_level_id_fkey",
+  "table": "curriculum_cohorts",
+  "cols": [
+   "entry_grade_level_id"
+  ],
+  "ref": "grade_levels",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "curriculum_subjects_cohort_id_fkey",
+  "table": "curriculum_subjects",
+  "cols": [
+   "cohort_id"
+  ],
+  "ref": "curriculum_cohorts",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "curriculum_subjects_grade_level_id_fkey",
+  "table": "curriculum_subjects",
+  "cols": [
+   "grade_level_id"
+  ],
+  "ref": "grade_levels",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "curriculum_subjects_study_plan_id_fkey",
+  "table": "curriculum_subjects",
+  "cols": [
+   "study_plan_id"
+  ],
+  "ref": "study_plans",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "curriculum_subjects_subject_id_fkey",
+  "table": "curriculum_subjects",
+  "cols": [
+   "subject_id"
+  ],
+  "ref": "subjects",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "department_settings_department_id_fkey",
+  "table": "department_settings",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "dept_overview_hidden_subjects_classroom_id_fkey",
+  "table": "dept_overview_hidden_subjects",
+  "cols": [
+   "classroom_id"
+  ],
+  "ref": "classrooms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "dept_overview_hidden_subjects_profile_id_fkey",
+  "table": "dept_overview_hidden_subjects",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "dept_overview_hidden_subjects_subject_id_fkey",
+  "table": "dept_overview_hidden_subjects",
+  "cols": [
+   "subject_id"
+  ],
+  "ref": "subjects",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_files_lesson_id_fkey",
+  "table": "doc_files",
+  "cols": [
+   "lesson_id"
+  ],
+  "ref": "doc_lessons",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_files_reviewed_by_fkey",
+  "table": "doc_files",
+  "cols": [
+   "reviewed_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_files_topic_id_fkey",
+  "table": "doc_files",
+  "cols": [
+   "topic_id"
+  ],
+  "ref": "doc_topics",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_files_uploaded_by_fkey",
+  "table": "doc_files",
+  "cols": [
+   "uploaded_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_lessons_created_by_fkey",
+  "table": "doc_lessons",
+  "cols": [
+   "created_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_lessons_grade_level_id_fkey",
+  "table": "doc_lessons",
+  "cols": [
+   "grade_level_id"
+  ],
+  "ref": "grade_levels",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_lessons_subject_id_fkey",
+  "table": "doc_lessons",
+  "cols": [
+   "subject_id"
+  ],
+  "ref": "subjects",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_print_emails_department_id_fkey",
+  "table": "doc_print_emails",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_print_emails_request_id_fkey",
+  "table": "doc_print_emails",
+  "cols": [
+   "request_id"
+  ],
+  "ref": "doc_print_requests",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_print_emails_sent_by_fkey",
+  "table": "doc_print_emails",
+  "cols": [
+   "sent_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_print_requests_department_id_fkey",
+  "table": "doc_print_requests",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_print_requests_doc_file_id_fkey",
+  "table": "doc_print_requests",
+  "cols": [
+   "doc_file_id"
+  ],
+  "ref": "doc_files",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_print_requests_printed_by_fkey",
+  "table": "doc_print_requests",
+  "cols": [
+   "printed_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_print_requests_requested_by_fkey",
+  "table": "doc_print_requests",
+  "cols": [
+   "requested_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_targets_grade_level_id_fkey",
+  "table": "doc_targets",
+  "cols": [
+   "grade_level_id"
+  ],
+  "ref": "grade_levels",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_targets_subject_id_fkey",
+  "table": "doc_targets",
+  "cols": [
+   "subject_id"
+  ],
+  "ref": "subjects",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_task_files_reviewed_by_fkey",
+  "table": "doc_task_files",
+  "cols": [
+   "reviewed_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_task_files_task_id_fkey",
+  "table": "doc_task_files",
+  "cols": [
+   "task_id"
+  ],
+  "ref": "doc_tasks",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_task_files_teacher_id_fkey",
+  "table": "doc_task_files",
+  "cols": [
+   "teacher_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_tasks_created_by_fkey",
+  "table": "doc_tasks",
+  "cols": [
+   "created_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_tasks_department_id_fkey",
+  "table": "doc_tasks",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_tasks_learning_area_id_fkey",
+  "table": "doc_tasks",
+  "cols": [
+   "learning_area_id"
+  ],
+  "ref": "learning_areas",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "doc_topics_lesson_id_fkey",
+  "table": "doc_topics",
+  "cols": [
+   "lesson_id"
+  ],
+  "ref": "doc_lessons",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "documents_profile_id_fkey",
+  "table": "documents",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "documents_uploaded_by_fkey",
+  "table": "documents",
+  "cols": [
+   "uploaded_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "duty_assignments_created_by_fkey",
+  "table": "duty_assignments",
+  "cols": [
+   "created_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "duty_assignments_duty_point_id_fkey",
+  "table": "duty_assignments",
+  "cols": [
+   "duty_point_id"
+  ],
+  "ref": "duty_points",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "duty_assignments_staff_id_fkey",
+  "table": "duty_assignments",
+  "cols": [
+   "staff_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "duty_points_fixed_staff_id_fkey",
+  "table": "duty_points",
+  "cols": [
+   "fixed_staff_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "duty_transfer_requests_assignment_id_fkey",
+  "table": "duty_transfer_requests",
+  "cols": [
+   "assignment_id"
+  ],
+  "ref": "duty_assignments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "duty_transfer_requests_duty_point_id_fkey",
+  "table": "duty_transfer_requests",
+  "cols": [
+   "duty_point_id"
+  ],
+  "ref": "duty_points",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "duty_transfer_requests_requester_id_fkey",
+  "table": "duty_transfer_requests",
+  "cols": [
+   "requester_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "duty_transfer_requests_target_staff_id_fkey",
+  "table": "duty_transfer_requests",
+  "cols": [
+   "target_staff_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "duty_weekly_template_created_by_fkey",
+  "table": "duty_weekly_template",
+  "cols": [
+   "created_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "duty_weekly_template_duty_point_id_fkey",
+  "table": "duty_weekly_template",
+  "cols": [
+   "duty_point_id"
+  ],
+  "ref": "duty_points",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "duty_weekly_template_staff_id_fkey",
+  "table": "duty_weekly_template",
+  "cols": [
+   "staff_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "employee_compensation_profile_id_fkey",
+  "table": "employee_compensation",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "employee_compensation_salary_grade_id_fkey",
+  "table": "employee_compensation",
+  "cols": [
+   "salary_grade_id"
+  ],
+  "ref": "salary_grades",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "employee_positions_job_title_id_fkey",
+  "table": "employee_positions",
+  "cols": [
+   "job_title_id"
+  ],
+  "ref": "position_titles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "employee_positions_manager_id_fkey",
+  "table": "employee_positions",
+  "cols": [
+   "manager_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "employee_positions_profile_id_fkey",
+  "table": "employee_positions",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "employee_status_history_changed_by_fkey",
+  "table": "employee_status_history",
+  "cols": [
+   "changed_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "employee_status_history_profile_id_fkey",
+  "table": "employee_status_history",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_attempt_answers_attempt_id_fkey",
+  "table": "exam_attempt_answers",
+  "cols": [
+   "attempt_id"
+  ],
+  "ref": "exam_attempts",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_attempt_answers_choice_id_fkey",
+  "table": "exam_attempt_answers",
+  "cols": [
+   "choice_id"
+  ],
+  "ref": "exam_question_choices",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_attempt_answers_question_id_fkey",
+  "table": "exam_attempt_answers",
+  "cols": [
+   "question_id"
+  ],
+  "ref": "exam_questions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_attempt_events_attempt_id_fkey",
+  "table": "exam_attempt_events",
+  "cols": [
+   "attempt_id"
+  ],
+  "ref": "exam_attempts",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_attempt_grants_session_id_fkey",
+  "table": "exam_attempt_grants",
+  "cols": [
+   "session_id"
+  ],
+  "ref": "exam_sessions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_attempt_grants_student_id_fkey",
+  "table": "exam_attempt_grants",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_attempts_manual_by_fkey",
+  "table": "exam_attempts",
+  "cols": [
+   "manual_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_attempts_session_id_fkey",
+  "table": "exam_attempts",
+  "cols": [
+   "session_id"
+  ],
+  "ref": "exam_sessions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_attempts_student_id_fkey",
+  "table": "exam_attempts",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_code_state_session_id_fkey",
+  "table": "exam_code_state",
+  "cols": [
+   "session_id"
+  ],
+  "ref": "exam_sessions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_code_state_student_id_fkey",
+  "table": "exam_code_state",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_question_choices_question_id_fkey",
+  "table": "exam_question_choices",
+  "cols": [
+   "question_id"
+  ],
+  "ref": "exam_questions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_questions_created_by_fkey",
+  "table": "exam_questions",
+  "cols": [
+   "created_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_questions_plan_topic_id_fkey",
+  "table": "exam_questions",
+  "cols": [
+   "plan_topic_id"
+  ],
+  "ref": "plan_topics",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_questions_subject_id_fkey",
+  "table": "exam_questions",
+  "cols": [
+   "subject_id"
+  ],
+  "ref": "subjects",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_seat_templates_created_by_fkey",
+  "table": "exam_seat_templates",
+  "cols": [
+   "created_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_seat_templates_department_id_fkey",
+  "table": "exam_seat_templates",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_security_events_attempt_id_fkey",
+  "table": "exam_security_events",
+  "cols": [
+   "attempt_id"
+  ],
+  "ref": "exam_attempts",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_security_events_session_id_fkey",
+  "table": "exam_security_events",
+  "cols": [
+   "session_id"
+  ],
+  "ref": "exam_sessions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_security_events_student_id_fkey",
+  "table": "exam_security_events",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_codes_session_id_fkey",
+  "table": "exam_session_codes",
+  "cols": [
+   "session_id"
+  ],
+  "ref": "exam_sessions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_practice_questions_question_id_fkey",
+  "table": "exam_session_practice_questions",
+  "cols": [
+   "question_id"
+  ],
+  "ref": "exam_questions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_practice_questions_session_id_fkey",
+  "table": "exam_session_practice_questions",
+  "cols": [
+   "session_id"
+  ],
+  "ref": "exam_sessions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_questions_question_id_fkey",
+  "table": "exam_session_questions",
+  "cols": [
+   "question_id"
+  ],
+  "ref": "exam_questions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_questions_session_id_fkey",
+  "table": "exam_session_questions",
+  "cols": [
+   "session_id"
+  ],
+  "ref": "exam_sessions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_rooms_room_id_fkey",
+  "table": "exam_session_rooms",
+  "cols": [
+   "room_id"
+  ],
+  "ref": "rooms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_rooms_session_id_fkey",
+  "table": "exam_session_rooms",
+  "cols": [
+   "session_id"
+  ],
+  "ref": "exam_sessions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_rooms_template_id_fkey",
+  "table": "exam_session_rooms",
+  "cols": [
+   "template_id"
+  ],
+  "ref": "exam_seat_templates",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_seating_session_id_fkey",
+  "table": "exam_session_seating",
+  "cols": [
+   "session_id"
+  ],
+  "ref": "exam_sessions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_seating_template_id_fkey",
+  "table": "exam_session_seating",
+  "cols": [
+   "template_id"
+  ],
+  "ref": "exam_seat_templates",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_seats_session_id_fkey",
+  "table": "exam_session_seats",
+  "cols": [
+   "session_id"
+  ],
+  "ref": "exam_sessions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_seats_session_room_id_fkey",
+  "table": "exam_session_seats",
+  "cols": [
+   "session_room_id"
+  ],
+  "ref": "exam_session_rooms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_seats_student_id_fkey",
+  "table": "exam_session_seats",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_sets_gradebook_item_id_fkey",
+  "table": "exam_session_sets",
+  "cols": [
+   "gradebook_item_id"
+  ],
+  "ref": "score_items",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_sets_session_id_fkey",
+  "table": "exam_session_sets",
+  "cols": [
+   "session_id"
+  ],
+  "ref": "exam_sessions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_sets_subject_id_fkey",
+  "table": "exam_session_sets",
+  "cols": [
+   "subject_id"
+  ],
+  "ref": "subjects",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_sets_topic_set_id_fkey",
+  "table": "exam_session_sets",
+  "cols": [
+   "topic_set_id"
+  ],
+  "ref": "exam_topic_sets",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_special_seats_session_id_fkey",
+  "table": "exam_session_special_seats",
+  "cols": [
+   "session_id"
+  ],
+  "ref": "exam_sessions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_special_seats_session_room_id_fkey",
+  "table": "exam_session_special_seats",
+  "cols": [
+   "session_room_id"
+  ],
+  "ref": "exam_session_rooms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_special_seats_student_id_fkey",
+  "table": "exam_session_special_seats",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_targets_session_id_fkey",
+  "table": "exam_session_targets",
+  "cols": [
+   "session_id"
+  ],
+  "ref": "exam_sessions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_session_targets_teaching_assignment_id_fkey",
+  "table": "exam_session_targets",
+  "cols": [
+   "teaching_assignment_id"
+  ],
+  "ref": "teaching_assignments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_sessions_gradebook_item_id_fkey",
+  "table": "exam_sessions",
+  "cols": [
+   "gradebook_item_id"
+  ],
+  "ref": "score_items",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_sessions_room_id_fkey",
+  "table": "exam_sessions",
+  "cols": [
+   "room_id"
+  ],
+  "ref": "rooms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_sessions_subject_id_fkey",
+  "table": "exam_sessions",
+  "cols": [
+   "subject_id"
+  ],
+  "ref": "subjects",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_sessions_teacher_id_fkey",
+  "table": "exam_sessions",
+  "cols": [
+   "teacher_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_sessions_topic_set_id_fkey",
+  "table": "exam_sessions",
+  "cols": [
+   "topic_set_id"
+  ],
+  "ref": "exam_topic_sets",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_topic_set_topics_set_id_fkey",
+  "table": "exam_topic_set_topics",
+  "cols": [
+   "set_id"
+  ],
+  "ref": "exam_topic_sets",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_topic_set_topics_topic_id_fkey",
+  "table": "exam_topic_set_topics",
+  "cols": [
+   "topic_id"
+  ],
+  "ref": "plan_topics",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_topic_sets_approved_by_fkey",
+  "table": "exam_topic_sets",
+  "cols": [
+   "approved_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_topic_sets_subject_id_fkey",
+  "table": "exam_topic_sets",
+  "cols": [
+   "subject_id"
+  ],
+  "ref": "subjects",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_topic_sets_teacher_id_fkey",
+  "table": "exam_topic_sets",
+  "cols": [
+   "teacher_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "exam_topic_sets_teaching_assignment_id_fkey",
+  "table": "exam_topic_sets",
+  "cols": [
+   "teaching_assignment_id"
+  ],
+  "ref": "teaching_assignments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "grade_levels_department_id_fkey",
+  "table": "grade_levels",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "guardianships_parent_id_fkey",
+  "table": "guardianships",
+  "cols": [
+   "parent_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "guardianships_student_id_fkey",
+  "table": "guardianships",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "kg_assessment_topics_grade_level_id_fkey",
+  "table": "kg_assessment_topics",
+  "cols": [
+   "grade_level_id"
+  ],
+  "ref": "grade_levels",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "learning_areas_parent_id_fkey",
+  "table": "learning_areas",
+  "cols": [
+   "parent_id"
+  ],
+  "ref": "learning_areas",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "learning_units_grade_level_id_fkey",
+  "table": "learning_units",
+  "cols": [
+   "grade_level_id"
+  ],
+  "ref": "grade_levels",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "leave_requests_approved_by_fkey",
+  "table": "leave_requests",
+  "cols": [
+   "approved_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "leave_requests_leave_type_id_fkey",
+  "table": "leave_requests",
+  "cols": [
+   "leave_type_id"
+  ],
+  "ref": "leave_types",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "leave_requests_profile_id_fkey",
+  "table": "leave_requests",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "line_link_codes_profile_id_fkey",
+  "table": "line_link_codes",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "line_notifications_profile_id_fkey",
+  "table": "line_notifications",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "line_notifications_score_item_id_fkey",
+  "table": "line_notifications",
+  "cols": [
+   "score_item_id"
+  ],
+  "ref": "score_items",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "period_attendance_records_recorded_by_fkey",
+  "table": "period_attendance_records",
+  "cols": [
+   "recorded_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "period_attendance_records_schedule_entry_id_fkey",
+  "table": "period_attendance_records",
+  "cols": [
+   "schedule_entry_id"
+  ],
+  "ref": "schedule_entries",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "period_attendance_records_student_id_fkey",
+  "table": "period_attendance_records",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "period_definitions_department_id_fkey",
+  "table": "period_definitions",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "period_definitions_grade_level_id_fkey",
+  "table": "period_definitions",
+  "cols": [
+   "grade_level_id"
+  ],
+  "ref": "grade_levels",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "plan_lesson_files_doc_file_id_fkey",
+  "table": "plan_lesson_files",
+  "cols": [
+   "doc_file_id"
+  ],
+  "ref": "doc_files",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "plan_lesson_files_lesson_id_fkey",
+  "table": "plan_lesson_files",
+  "cols": [
+   "lesson_id"
+  ],
+  "ref": "plan_lessons",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "plan_lesson_subjects_lesson_id_fkey",
+  "table": "plan_lesson_subjects",
+  "cols": [
+   "lesson_id"
+  ],
+  "ref": "plan_lessons",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "plan_lesson_subjects_subject_id_fkey",
+  "table": "plan_lesson_subjects",
+  "cols": [
+   "subject_id"
+  ],
+  "ref": "subjects",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "plan_lessons_grade_level_id_fkey",
+  "table": "plan_lessons",
+  "cols": [
+   "grade_level_id"
+  ],
+  "ref": "grade_levels",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "plan_lessons_subject_id_fkey",
+  "table": "plan_lessons",
+  "cols": [
+   "subject_id"
+  ],
+  "ref": "plan_subjects",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "plan_subjects_department_id_fkey",
+  "table": "plan_subjects",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "plan_topic_files_doc_file_id_fkey",
+  "table": "plan_topic_files",
+  "cols": [
+   "doc_file_id"
+  ],
+  "ref": "doc_files",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "plan_topic_files_topic_id_fkey",
+  "table": "plan_topic_files",
+  "cols": [
+   "topic_id"
+  ],
+  "ref": "plan_topics",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "plan_topics_lesson_id_fkey",
+  "table": "plan_topics",
+  "cols": [
+   "lesson_id"
+  ],
+  "ref": "plan_lessons",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "pos_terminal_pin_attempts_terminal_id_fkey",
+  "table": "pos_terminal_pin_attempts",
+  "cols": [
+   "terminal_id"
+  ],
+  "ref": "pos_terminals",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "pos_terminals_profile_id_fkey",
+  "table": "pos_terminals",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "practice_attempt_answers_attempt_id_fkey",
+  "table": "practice_attempt_answers",
+  "cols": [
+   "attempt_id"
+  ],
+  "ref": "practice_attempts",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "practice_attempt_answers_choice_id_fkey",
+  "table": "practice_attempt_answers",
+  "cols": [
+   "choice_id"
+  ],
+  "ref": "exam_question_choices",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "practice_attempt_answers_question_id_fkey",
+  "table": "practice_attempt_answers",
+  "cols": [
+   "question_id"
+  ],
+  "ref": "exam_questions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "practice_attempts_set_id_fkey",
+  "table": "practice_attempts",
+  "cols": [
+   "set_id"
+  ],
+  "ref": "practice_sets",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "practice_attempts_student_id_fkey",
+  "table": "practice_attempts",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "practice_set_questions_question_id_fkey",
+  "table": "practice_set_questions",
+  "cols": [
+   "question_id"
+  ],
+  "ref": "exam_questions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "practice_set_questions_set_id_fkey",
+  "table": "practice_set_questions",
+  "cols": [
+   "set_id"
+  ],
+  "ref": "practice_sets",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "practice_sets_created_by_fkey",
+  "table": "practice_sets",
+  "cols": [
+   "created_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "practice_sets_subject_id_fkey",
+  "table": "practice_sets",
+  "cols": [
+   "subject_id"
+  ],
+  "ref": "subjects",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "practice_sets_topic_id_fkey",
+  "table": "practice_sets",
+  "cols": [
+   "topic_id"
+  ],
+  "ref": "plan_topics",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "premises_exit_requests_approved_by_fkey",
+  "table": "premises_exit_requests",
+  "cols": [
+   "approved_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "premises_exit_requests_profile_id_fkey",
+  "table": "premises_exit_requests",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "profile_roles_position_title_id_fkey",
+  "table": "profile_roles",
+  "cols": [
+   "position_title_id"
+  ],
+  "ref": "position_titles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "profile_roles_profile_id_fkey",
+  "table": "profile_roles",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "profiles_department_id_fkey",
+  "table": "profiles",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "profiles_id_fkey",
+  "table": "profiles",
+  "cols": [
+   "id"
+  ],
+  "ref": "users",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "profiles_learning_area_id_fkey",
+  "table": "profiles",
+  "cols": [
+   "learning_area_id"
+  ],
+  "ref": "learning_areas",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "push_subscriptions_profile_id_fkey",
+  "table": "push_subscriptions",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "rooms_department_id_fkey",
+  "table": "rooms",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "schedule_entries_room_id_fkey",
+  "table": "schedule_entries",
+  "cols": [
+   "room_id"
+  ],
+  "ref": "rooms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "schedule_entries_teaching_assignment_id_fkey",
+  "table": "schedule_entries",
+  "cols": [
+   "teaching_assignment_id"
+  ],
+  "ref": "teaching_assignments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "score_items_teaching_assignment_id_fkey",
+  "table": "score_items",
+  "cols": [
+   "teaching_assignment_id"
+  ],
+  "ref": "teaching_assignments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "staff_attendance_overrides_profile_id_fkey",
+  "table": "staff_attendance_overrides",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "staff_attendance_overrides_set_by_fkey",
+  "table": "staff_attendance_overrides",
+  "cols": [
+   "set_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_cards_created_by_fkey",
+  "table": "student_cards",
+  "cols": [
+   "created_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_cards_student_id_fkey",
+  "table": "student_cards",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_classroom_enrollments_classroom_id_fkey",
+  "table": "student_classroom_enrollments",
+  "cols": [
+   "classroom_id"
+  ],
+  "ref": "classrooms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_classroom_enrollments_student_id_fkey",
+  "table": "student_classroom_enrollments",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_cohort_enrollments_cohort_id_fkey",
+  "table": "student_cohort_enrollments",
+  "cols": [
+   "cohort_id"
+  ],
+  "ref": "curriculum_cohorts",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_cohort_enrollments_student_id_fkey",
+  "table": "student_cohort_enrollments",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_cohort_enrollments_study_plan_id_fkey",
+  "table": "student_cohort_enrollments",
+  "cols": [
+   "study_plan_id"
+  ],
+  "ref": "study_plans",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_contacts_student_id_fkey",
+  "table": "student_contacts",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_grade_status_student_id_fkey",
+  "table": "student_grade_status",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_grade_status_teaching_assignment_id_fkey",
+  "table": "student_grade_status",
+  "cols": [
+   "teaching_assignment_id"
+  ],
+  "ref": "teaching_assignments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_guardian_financials_contact_id_fkey",
+  "table": "student_guardian_financials",
+  "cols": [
+   "contact_id"
+  ],
+  "ref": "student_contacts",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_item_scores_score_item_id_fkey",
+  "table": "student_item_scores",
+  "cols": [
+   "score_item_id"
+  ],
+  "ref": "score_items",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_item_scores_student_id_fkey",
+  "table": "student_item_scores",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_leave_requests_approved_by_fkey",
+  "table": "student_leave_requests",
+  "cols": [
+   "approved_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_leave_requests_leave_type_id_fkey",
+  "table": "student_leave_requests",
+  "cols": [
+   "leave_type_id"
+  ],
+  "ref": "leave_types",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_leave_requests_student_id_fkey",
+  "table": "student_leave_requests",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_leave_requests_submitted_by_fkey",
+  "table": "student_leave_requests",
+  "cols": [
+   "submitted_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_pass_fail_scores_student_id_fkey",
+  "table": "student_pass_fail_scores",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_pass_fail_scores_teaching_assignment_id_fkey",
+  "table": "student_pass_fail_scores",
+  "cols": [
+   "teaching_assignment_id"
+  ],
+  "ref": "teaching_assignments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_pins_student_id_fkey",
+  "table": "student_pins",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_premises_exit_requests_approved_by_fkey",
+  "table": "student_premises_exit_requests",
+  "cols": [
+   "approved_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_premises_exit_requests_student_id_fkey",
+  "table": "student_premises_exit_requests",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_premises_exit_requests_submitted_by_fkey",
+  "table": "student_premises_exit_requests",
+  "cols": [
+   "submitted_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "student_wallets_student_id_fkey",
+  "table": "student_wallets",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "students_department_id_fkey",
+  "table": "students",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "students_grade_level_id_fkey",
+  "table": "students",
+  "cols": [
+   "grade_level_id"
+  ],
+  "ref": "grade_levels",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "students_profile_id_fkey",
+  "table": "students",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "study_map_assignments_grade_level_id_fkey",
+  "table": "study_map_assignments",
+  "cols": [
+   "grade_level_id"
+  ],
+  "ref": "grade_levels",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "study_map_assignments_map_id_fkey",
+  "table": "study_map_assignments",
+  "cols": [
+   "map_id"
+  ],
+  "ref": "study_map_library",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "study_map_assignments_plan_subject_id_fkey",
+  "table": "study_map_assignments",
+  "cols": [
+   "plan_subject_id"
+  ],
+  "ref": "plan_subjects",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "subjects_cover_id_fkey",
+  "table": "subjects",
+  "cols": [
+   "cover_id"
+  ],
+  "ref": "subject_cover_library",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "subjects_department_id_fkey",
+  "table": "subjects",
+  "cols": [
+   "department_id"
+  ],
+  "ref": "departments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "subjects_learning_area_id_fkey",
+  "table": "subjects",
+  "cols": [
+   "learning_area_id"
+  ],
+  "ref": "learning_areas",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "subjects_suggested_grade_level_id_fkey",
+  "table": "subjects",
+  "cols": [
+   "suggested_grade_level_id"
+  ],
+  "ref": "grade_levels",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "submission_attachments_submission_id_fkey",
+  "table": "submission_attachments",
+  "cols": [
+   "submission_id"
+  ],
+  "ref": "assignment_submissions",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "teaching_assignment_teachers_assignment_id_fkey",
+  "table": "teaching_assignment_teachers",
+  "cols": [
+   "assignment_id"
+  ],
+  "ref": "teaching_assignments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "teaching_assignment_teachers_teacher_id_fkey",
+  "table": "teaching_assignment_teachers",
+  "cols": [
+   "teacher_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "teaching_assignments_classroom_id_fkey",
+  "table": "teaching_assignments",
+  "cols": [
+   "classroom_id"
+  ],
+  "ref": "classrooms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "teaching_assignments_subject_id_fkey",
+  "table": "teaching_assignments",
+  "cols": [
+   "subject_id"
+  ],
+  "ref": "subjects",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "teaching_assignments_teacher_id_fkey",
+  "table": "teaching_assignments",
+  "cols": [
+   "teacher_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "teaching_plan_slot_topics_slot_id_fkey",
+  "table": "teaching_plan_slot_topics",
+  "cols": [
+   "slot_id"
+  ],
+  "ref": "teaching_plan_slots",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "teaching_plan_slot_topics_topic_id_fkey",
+  "table": "teaching_plan_slot_topics",
+  "cols": [
+   "topic_id"
+  ],
+  "ref": "plan_topics",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "teaching_plan_slots_teaching_assignment_id_fkey",
+  "table": "teaching_plan_slots",
+  "cols": [
+   "teaching_assignment_id"
+  ],
+  "ref": "teaching_assignments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "teaching_plan_units_teaching_assignment_id_fkey",
+  "table": "teaching_plan_units",
+  "cols": [
+   "teaching_assignment_id"
+  ],
+  "ref": "teaching_assignments",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "time_clock_records_profile_id_fkey",
+  "table": "time_clock_records",
+  "cols": [
+   "profile_id"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "time_clock_records_recorded_by_fkey",
+  "table": "time_clock_records",
+  "cols": [
+   "recorded_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "transfer_intakes_student_id_fkey",
+  "table": "transfer_intakes",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "tuition_invoices_created_by_fkey",
+  "table": "tuition_invoices",
+  "cols": [
+   "created_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "tuition_invoices_student_id_fkey",
+  "table": "tuition_invoices",
+  "cols": [
+   "student_id"
+  ],
+  "ref": "students",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "tuition_invoices_term_id_fkey",
+  "table": "tuition_invoices",
+  "cols": [
+   "term_id"
+  ],
+  "ref": "academic_terms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "tuition_payments_invoice_id_fkey",
+  "table": "tuition_payments",
+  "cols": [
+   "invoice_id"
+  ],
+  "ref": "tuition_invoices",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "tuition_payments_recorded_by_fkey",
+  "table": "tuition_payments",
+  "cols": [
+   "recorded_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "tuition_term_amounts_term_id_fkey",
+  "table": "tuition_term_amounts",
+  "cols": [
+   "term_id"
+  ],
+  "ref": "academic_terms",
+  "refCols": [
+   "id"
+  ]
+ },
+ {
+  "name": "tuition_term_amounts_updated_by_fkey",
+  "table": "tuition_term_amounts",
+  "cols": [
+   "updated_by"
+  ],
+  "ref": "profiles",
+  "refCols": [
+   "id"
+  ]
+ }
+]
