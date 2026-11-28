@@ -135,7 +135,9 @@ A logged-in `student` could read, through the public REST API, other students' d
 no column privileges restricted it. **Fixed 2026-11-28 by migration 0239** (students/contacts: own rows only for the `student` role; staff, guardians, covers unchanged —
 checked for 10 users before applying, live result identical to the tested one). The D1 policy engine mirrors it.
 
-**Still open (decision needed):** the same audit shows a student can read ALL rows of `attendance_records` (2,814), `period_attendance_records` (12,721),
-`student_item_scores` (851 — every student's scores), `student_leave_requests` (165), `behavior_records` (11), `student_cohort_enrollments`, and the department's `profiles`
-(185 rows incl. staff national_id/phone/email/line_user_id), plus partial views of exam/document tables. Each needs a policy review so the app's own screens keep working;
-the new API is deny-by-default, so they get stricter policies when ported (phase 4.4) — or fix them in Postgres first.
+**Also fixed 2026-11-28, migration 0240:** `attendance_records`, `period_attendance_records`, `student_leave_requests`, `behavior_records`, `student_cohort_enrollments` and `student_item_scores` now give the `student`
+role only their own rows (before: 2,814 / 12,721 / … rows — everyone's attendance and every student's scores; guardians also saw their child's whole class's scores). Staff, covers and guardians (own children)
+unchanged: 48 measurements identical before/after, live result equals the tested one. The app already filters these reads by the student's own id.
+
+**Still open:** `profiles` (a student reads the department's 185 profiles incl. staff `national_id`, phone, email, `line_user_id` — the app needs teacher names, so this wants a names-only view/RPC or splitting the private columns out),
+`student_classroom_enrollments` (classmates' class membership), and partial views of exam/document tables (`exam_session_questions` 165 of 1,240 rows etc. — check what a student can learn about other sessions' questions).
