@@ -20,9 +20,9 @@ Rule: every phase ships alone and can be rolled back, except the DB cutover (pha
 |---|---|---|
 | 0 | Inventory (below), wrangler config | done |
 | 1 | Vercel → Cloudflare Workers static assets (`wrangler.jsonc`, `public/_headers`, `npm run deploy:cf`) | **deployed** at https://helix.adah.workers.dev (Vercel still serves production; DNS not moved) |
-| 2 | Storage → R2, bucket by bucket (not `subject-documents`, not `subject-covers` — both stay on Supabase Storage by decision): `worker/` (files-worker), `r2_authz` SQL fn (0237), `src/lib/storage.ts` shim, `scripts/storage-to-r2.mjs` | **deployed**: R2 `helix-files`, worker https://helix-files.adah.workers.dev, `r2_authz` applied; a `subject-covers` trial copy (28/28 byte-identical) was deleted again. No app build uses it yet — all buckets still on Supabase until `VITE_R2_BUCKETS` is set |
-| 3 | 10 Edge Functions → Workers; `pg_cron`/`pg_net` jobs → Cron Triggers | todo |
-| 4 | Shadow D1 (nightly sync from Supabase) + Worker API + `supabase`-shaped client; port RPC/trigger/policy per domain; parity tests on real data, behind an env flag | todo |
+| 2 | Storage → R2. **Parked (2026-11-28):** the user keeps `subject-documents`, `subject-covers` and all public buckets (`avatars banners exam-question-images pos-products school-assets`) on Supabase. Built + deployed (worker https://helix-files.adah.workers.dev, R2 `helix-files`, `r2_authz` 0237/0238, `src/lib/storage.ts`) but no bucket is flipped (`VITE_R2_BUCKETS` empty). Only the 6 private buckets (~25 MB) remain candidates; moving them saves almost nothing, so do it only if Supabase Storage is ever dropped | parked |
+| 3 | ~~10 Edge Functions → Workers~~ **Folded into phase 4/5** (decided 2026-11-28): every function uses the service role, `auth.admin.*`, vault secrets or `pg_net` cron against Supabase, so porting them first means rewriting them again when auth/DB move; they save no money (invocations are inside the plan). `send-print-email` needs a new mail path anyway (nodemailer SMTP does not run on Workers) | merged |
+| 4 | Shadow D1 + Worker API + `supabase`-shaped client; port RPC/trigger/policy per domain; parity tests on real data, behind an env flag. **4.1 done:** `scripts/pg-to-d1.py` → `worker/d1/schema.sql` (127 tables, 153 indexes, 2 views; loads in local D1). Next: 4.2 data export/import + row-count verification; 4.3 Worker API skeleton + client; 4.4 per-domain ports | in progress |
 | 5 | Auth in Worker: PBKDF2 (WebCrypto) for new hashes, lazy bcrypt verify → rehash for imported `auth.users` hashes (no forced reset); one `/login` call returns profile + roles + student; realtime via Durable Object | todo |
 | 6 | **DB cutover** outside exam weeks: freeze writes → final sync → flip flag. Rollback = flip back + replay writes made since | todo |
 | 7 | Supabase read-only 30 days → downgrade to Free (kept for `subject-documents` only) | todo |
@@ -40,7 +40,15 @@ npm run deploy:cf   # build + wrangler deploy; ~12 min the first time (148 MB, 4
 Before pointing the real domain at it: add the origin to Supabase → Auth → URL Configuration and to `ALLOWED_ORIGINS` in `worker/wrangler.jsonc`;
 smoke-test login, a POS sale (offline outbox) and the PWA update prompt on the workers.dev URL. `vercel.json` stays until DNS moves.
 
-## Phase 2 rollout (one bucket at a time; flag off = no behaviour change)
+## Phase 4.1 findings (schema → D1)
+
+Mechanical, no blockers: types (uuid/enum/jsonb/arrays/timestamptz → TEXT, boolean → 0/1, enums → CHECK), `now()`/`gen_random_uuid()` defaults, 2 generated
+columns, 37 partial/unique indexes, 124 CHECKs, 250 FKs. Regenerate with `python3 scripts/pg-to-d1.py` (read-only against Postgres).
+Needs a human decision / port later: money columns are `numeric` (`card_*`, `tuition_*`, `student_wallets`, salaries) — **store as integer satang**
+when their RPCs are ported (REAL drifts); 4 `default auth.uid()` + `pos_products.code` sequence → set in the API; FTS index `students_search_idx`
+→ `LIKE` or FTS5; view `resolved_grade_status` needs `computed_grade_status()` ported; `pos_products.code` regex check weakened to GLOB.
+
+## Phase 2 rollout (parked — see above) (one bucket at a time; flag off = no behaviour change)
 
 How it works: the browser calls the files-worker with its Supabase JWT; the worker asks `r2_authz(bucket, path, op)` on Supabase
 (caller's JWT, so RLS applies; branches are the old storage policies, verified against them for 11 users × all 460 objects, read + write)
