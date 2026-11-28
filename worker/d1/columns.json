@@ -1,0 +1,4228 @@
+{
+ "academic_event_departments": [
+  {
+   "col": "event_id",
+   "kind": "text"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  }
+ ],
+ "academic_event_grade_levels": [
+  {
+   "col": "event_id",
+   "kind": "text"
+  },
+  {
+   "col": "grade_level_id",
+   "kind": "text"
+  }
+ ],
+ "academic_events": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "event_type",
+   "kind": "text"
+  },
+  {
+   "col": "start_date",
+   "kind": "date"
+  },
+  {
+   "col": "end_date",
+   "kind": "date"
+  },
+  {
+   "col": "students_attend",
+   "kind": "bool"
+  },
+  {
+   "col": "staff_attend",
+   "kind": "bool"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "external_ref",
+   "kind": "text"
+  },
+  {
+   "col": "description",
+   "kind": "text"
+  },
+  {
+   "col": "show_in_schedule",
+   "kind": "bool"
+  },
+  {
+   "col": "notify_users",
+   "kind": "bool"
+  },
+  {
+   "col": "replaces_classes",
+   "kind": "bool"
+  },
+  {
+   "col": "start_time",
+   "kind": "time"
+  },
+  {
+   "col": "end_time",
+   "kind": "time"
+  }
+ ],
+ "academic_terms": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "academic_year",
+   "kind": "int"
+  },
+  {
+   "col": "term_type",
+   "kind": "text"
+  },
+  {
+   "col": "start_date",
+   "kind": "date"
+  },
+  {
+   "col": "end_date",
+   "kind": "date"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "assignment_attachments": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "score_item_id",
+   "kind": "text"
+  },
+  {
+   "col": "storage_path",
+   "kind": "text"
+  },
+  {
+   "col": "file_name",
+   "kind": "text"
+  },
+  {
+   "col": "uploaded_at",
+   "kind": "ts"
+  }
+ ],
+ "assignment_submissions": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "score_item_id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "content",
+   "kind": "text"
+  },
+  {
+   "col": "submitted_at",
+   "kind": "ts"
+  },
+  {
+   "col": "reopened",
+   "kind": "bool"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "attendance_covers": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "leave_request_id",
+   "kind": "text"
+  },
+  {
+   "col": "date",
+   "kind": "date"
+  },
+  {
+   "col": "classroom_id",
+   "kind": "text"
+  },
+  {
+   "col": "schedule_entry_id",
+   "kind": "text"
+  },
+  {
+   "col": "cover_staff_id",
+   "kind": "text"
+  },
+  {
+   "col": "proposed_by",
+   "kind": "text"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "attendance_records": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "classroom_id",
+   "kind": "text"
+  },
+  {
+   "col": "date",
+   "kind": "date"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "note",
+   "kind": "text"
+  },
+  {
+   "col": "recorded_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "audit_logs": [
+  {
+   "col": "id",
+   "kind": "int"
+  },
+  {
+   "col": "actor_id",
+   "kind": "text"
+  },
+  {
+   "col": "actor_roles",
+   "kind": "json"
+  },
+  {
+   "col": "action",
+   "kind": "text"
+  },
+  {
+   "col": "table_name",
+   "kind": "text"
+  },
+  {
+   "col": "record_id",
+   "kind": "text"
+  },
+  {
+   "col": "changes",
+   "kind": "json"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "behavior_categories": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "label",
+   "kind": "text"
+  },
+  {
+   "col": "points",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "severity",
+   "kind": "text"
+  }
+ ],
+ "behavior_records": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "classroom_id",
+   "kind": "text"
+  },
+  {
+   "col": "date",
+   "kind": "date"
+  },
+  {
+   "col": "points",
+   "kind": "int"
+  },
+  {
+   "col": "reason",
+   "kind": "text"
+  },
+  {
+   "col": "recorded_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "card_sale_items": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "tx_id",
+   "kind": "text"
+  },
+  {
+   "col": "product_id",
+   "kind": "text"
+  },
+  {
+   "col": "code",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "price",
+   "kind": "int"
+  },
+  {
+   "col": "qty",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "card_settings": [
+  {
+   "col": "id",
+   "kind": "bool"
+  },
+  {
+   "col": "pin_threshold",
+   "kind": "money"
+  }
+ ],
+ "card_slip_requests": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "requested_by",
+   "kind": "text"
+  },
+  {
+   "col": "amount",
+   "kind": "money"
+  },
+  {
+   "col": "transferred_at",
+   "kind": "ts"
+  },
+  {
+   "col": "slip_path",
+   "kind": "text"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "approved_amount",
+   "kind": "money"
+  },
+  {
+   "col": "reject_reason",
+   "kind": "text"
+  },
+  {
+   "col": "reviewed_by",
+   "kind": "text"
+  },
+  {
+   "col": "reviewed_at",
+   "kind": "ts"
+  },
+  {
+   "col": "tx_id",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "card_transactions": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "card_id",
+   "kind": "text"
+  },
+  {
+   "col": "type",
+   "kind": "text"
+  },
+  {
+   "col": "amount",
+   "kind": "money"
+  },
+  {
+   "col": "terminal_id",
+   "kind": "text"
+  },
+  {
+   "col": "note",
+   "kind": "text"
+  },
+  {
+   "col": "voided_at",
+   "kind": "ts"
+  },
+  {
+   "col": "void_reason",
+   "kind": "text"
+  },
+  {
+   "col": "recorded_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "client_tx_id",
+   "kind": "text"
+  },
+  {
+   "col": "voided_by",
+   "kind": "text"
+  }
+ ],
+ "classroom_homeroom_teachers": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "classroom_id",
+   "kind": "text"
+  },
+  {
+   "col": "teacher_id",
+   "kind": "text"
+  },
+  {
+   "col": "academic_year",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "classrooms": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "grade_level_id",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "is_active",
+   "kind": "bool"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "clock_in_reminders": [
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "date",
+   "kind": "date"
+  }
+ ],
+ "contracts": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "contract_type",
+   "kind": "text"
+  },
+  {
+   "col": "start_date",
+   "kind": "date"
+  },
+  {
+   "col": "end_date",
+   "kind": "date"
+  },
+  {
+   "col": "document_id",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "cover_digest_runs": [
+  {
+   "col": "run_date",
+   "kind": "date"
+  },
+  {
+   "col": "slot",
+   "kind": "text"
+  }
+ ],
+ "curriculum_cohorts": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "entry_grade_level_id",
+   "kind": "text"
+  },
+  {
+   "col": "entry_year",
+   "kind": "int"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "curriculum_subjects": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "subject_id",
+   "kind": "text"
+  },
+  {
+   "col": "grade_level_id",
+   "kind": "text"
+  },
+  {
+   "col": "study_plan_id",
+   "kind": "text"
+  },
+  {
+   "col": "term",
+   "kind": "int"
+  },
+  {
+   "col": "score_collect_pct",
+   "kind": "int"
+  },
+  {
+   "col": "score_exam_pct",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "cohort_id",
+   "kind": "text"
+  }
+ ],
+ "department_settings": [
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "score_collect_pct",
+   "kind": "int"
+  },
+  {
+   "col": "score_exam_pct",
+   "kind": "int"
+  },
+  {
+   "col": "min_periods_per_week",
+   "kind": "int"
+  },
+  {
+   "col": "max_periods_per_week",
+   "kind": "int"
+  },
+  {
+   "col": "work_start_time",
+   "kind": "time"
+  },
+  {
+   "col": "checkin_lat",
+   "kind": "real"
+  },
+  {
+   "col": "checkin_lng",
+   "kind": "real"
+  },
+  {
+   "col": "checkin_radius_m",
+   "kind": "int"
+  },
+  {
+   "col": "attendance_digest_time",
+   "kind": "time"
+  },
+  {
+   "col": "attendance_digest_last_sent",
+   "kind": "date"
+  },
+  {
+   "col": "staff_attendance_digest_time",
+   "kind": "time"
+  },
+  {
+   "col": "staff_attendance_digest_last_sent",
+   "kind": "date"
+  },
+  {
+   "col": "work_end_time",
+   "kind": "time"
+  }
+ ],
+ "departments": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "code",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "dept_overview_hidden_subjects": [
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "subject_id",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "classroom_id",
+   "kind": "text"
+  }
+ ],
+ "doc_files": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "topic_id",
+   "kind": "text"
+  },
+  {
+   "col": "title",
+   "kind": "text"
+  },
+  {
+   "col": "description",
+   "kind": "text"
+  },
+  {
+   "col": "file_path",
+   "kind": "text"
+  },
+  {
+   "col": "file_name",
+   "kind": "text"
+  },
+  {
+   "col": "mime_type",
+   "kind": "text"
+  },
+  {
+   "col": "size_bytes",
+   "kind": "int"
+  },
+  {
+   "col": "uploaded_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "lesson_id",
+   "kind": "text"
+  },
+  {
+   "col": "review_status",
+   "kind": "text"
+  },
+  {
+   "col": "review_note",
+   "kind": "text"
+  },
+  {
+   "col": "reviewed_by",
+   "kind": "text"
+  },
+  {
+   "col": "reviewed_at",
+   "kind": "ts"
+  }
+ ],
+ "doc_lessons": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "subject_id",
+   "kind": "text"
+  },
+  {
+   "col": "grade_level_id",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "sort_order",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "created_by",
+   "kind": "text"
+  }
+ ],
+ "doc_print_emails": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "request_id",
+   "kind": "text"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "doc_title",
+   "kind": "text"
+  },
+  {
+   "col": "file_name",
+   "kind": "text"
+  },
+  {
+   "col": "copies",
+   "kind": "int"
+  },
+  {
+   "col": "recipients",
+   "kind": "json"
+  },
+  {
+   "col": "sent_by",
+   "kind": "text"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "error",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "doc_print_requests": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "doc_file_id",
+   "kind": "text"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "copies",
+   "kind": "int"
+  },
+  {
+   "col": "note",
+   "kind": "text"
+  },
+  {
+   "col": "requested_by",
+   "kind": "text"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "printed_by",
+   "kind": "text"
+  },
+  {
+   "col": "printed_at",
+   "kind": "ts"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "doc_targets": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "subject_id",
+   "kind": "text"
+  },
+  {
+   "col": "grade_level_id",
+   "kind": "text"
+  },
+  {
+   "col": "lesson_target",
+   "kind": "int"
+  },
+  {
+   "col": "topic_target",
+   "kind": "int"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "doc_task_files": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "task_id",
+   "kind": "text"
+  },
+  {
+   "col": "teacher_id",
+   "kind": "text"
+  },
+  {
+   "col": "title",
+   "kind": "text"
+  },
+  {
+   "col": "file_path",
+   "kind": "text"
+  },
+  {
+   "col": "file_name",
+   "kind": "text"
+  },
+  {
+   "col": "mime_type",
+   "kind": "text"
+  },
+  {
+   "col": "size_bytes",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "review_status",
+   "kind": "text"
+  },
+  {
+   "col": "review_note",
+   "kind": "text"
+  },
+  {
+   "col": "reviewed_by",
+   "kind": "text"
+  },
+  {
+   "col": "reviewed_at",
+   "kind": "ts"
+  }
+ ],
+ "doc_tasks": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "title",
+   "kind": "text"
+  },
+  {
+   "col": "description",
+   "kind": "text"
+  },
+  {
+   "col": "doc_type",
+   "kind": "text"
+  },
+  {
+   "col": "due_date",
+   "kind": "date"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "learning_area_id",
+   "kind": "text"
+  },
+  {
+   "col": "created_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "doc_topics": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "lesson_id",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "sort_order",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "documents": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "category",
+   "kind": "text"
+  },
+  {
+   "col": "file_path",
+   "kind": "text"
+  },
+  {
+   "col": "file_name",
+   "kind": "text"
+  },
+  {
+   "col": "uploaded_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "duty_assignments": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "duty_point_id",
+   "kind": "text"
+  },
+  {
+   "col": "staff_id",
+   "kind": "text"
+  },
+  {
+   "col": "date",
+   "kind": "date"
+  },
+  {
+   "col": "created_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "duty_points": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "active",
+   "kind": "bool"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "mode",
+   "kind": "text"
+  },
+  {
+   "col": "fixed_staff_id",
+   "kind": "text"
+  }
+ ],
+ "duty_transfer_requests": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "assignment_id",
+   "kind": "text"
+  },
+  {
+   "col": "requester_id",
+   "kind": "text"
+  },
+  {
+   "col": "target_staff_id",
+   "kind": "text"
+  },
+  {
+   "col": "duty_point_id",
+   "kind": "text"
+  },
+  {
+   "col": "date",
+   "kind": "date"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "duty_weekly_template": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "duty_point_id",
+   "kind": "text"
+  },
+  {
+   "col": "weekday",
+   "kind": "int"
+  },
+  {
+   "col": "staff_id",
+   "kind": "text"
+  },
+  {
+   "col": "created_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "employee_compensation": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "salary_grade_id",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "employee_positions": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "manager_id",
+   "kind": "text"
+  },
+  {
+   "col": "job_title_id",
+   "kind": "text"
+  },
+  {
+   "col": "career_path_notes",
+   "kind": "text"
+  },
+  {
+   "col": "employee_status",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "end_date",
+   "kind": "date"
+  }
+ ],
+ "employee_status_history": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "reason",
+   "kind": "text"
+  },
+  {
+   "col": "changed_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "effective_date",
+   "kind": "date"
+  }
+ ],
+ "exam_attempt_answers": [
+  {
+   "col": "attempt_id",
+   "kind": "text"
+  },
+  {
+   "col": "question_id",
+   "kind": "text"
+  },
+  {
+   "col": "choice_id",
+   "kind": "text"
+  },
+  {
+   "col": "short_answer",
+   "kind": "text"
+  },
+  {
+   "col": "is_correct",
+   "kind": "bool"
+  },
+  {
+   "col": "points_awarded",
+   "kind": "real"
+  },
+  {
+   "col": "answered_at",
+   "kind": "ts"
+  }
+ ],
+ "exam_attempt_events": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "attempt_id",
+   "kind": "text"
+  },
+  {
+   "col": "event_type",
+   "kind": "text"
+  },
+  {
+   "col": "at",
+   "kind": "ts"
+  }
+ ],
+ "exam_attempt_grants": [
+  {
+   "col": "session_id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "extra",
+   "kind": "int"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "exam_attempts": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "session_id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "attempt_no",
+   "kind": "int"
+  },
+  {
+   "col": "started_at",
+   "kind": "ts"
+  },
+  {
+   "col": "submitted_at",
+   "kind": "ts"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "question_order",
+   "kind": "json"
+  },
+  {
+   "col": "score",
+   "kind": "real"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "holder_session",
+   "kind": "text"
+  },
+  {
+   "col": "holder_seen_at",
+   "kind": "ts"
+  },
+  {
+   "col": "takeover_session",
+   "kind": "text"
+  },
+  {
+   "col": "takeover_requested_at",
+   "kind": "ts"
+  },
+  {
+   "col": "is_manual",
+   "kind": "bool"
+  },
+  {
+   "col": "manual_note",
+   "kind": "text"
+  },
+  {
+   "col": "manual_by",
+   "kind": "text"
+  },
+  {
+   "col": "is_scan",
+   "kind": "bool"
+  },
+  {
+   "col": "scan_extra",
+   "kind": "real"
+  }
+ ],
+ "exam_code_state": [
+  {
+   "col": "session_id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "fails",
+   "kind": "int"
+  },
+  {
+   "col": "locked",
+   "kind": "bool"
+  },
+  {
+   "col": "passed",
+   "kind": "bool"
+  }
+ ],
+ "exam_question_choices": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "question_id",
+   "kind": "text"
+  },
+  {
+   "col": "label",
+   "kind": "text"
+  },
+  {
+   "col": "is_correct",
+   "kind": "bool"
+  },
+  {
+   "col": "position",
+   "kind": "int"
+  },
+  {
+   "col": "label_json",
+   "kind": "json"
+  }
+ ],
+ "exam_questions": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "subject_id",
+   "kind": "text"
+  },
+  {
+   "col": "question_type",
+   "kind": "text"
+  },
+  {
+   "col": "prompt",
+   "kind": "text"
+  },
+  {
+   "col": "correct_answer",
+   "kind": "text"
+  },
+  {
+   "col": "points",
+   "kind": "real"
+  },
+  {
+   "col": "created_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "prompt_json",
+   "kind": "json"
+  },
+  {
+   "col": "difficulty",
+   "kind": "text"
+  },
+  {
+   "col": "topic",
+   "kind": "text"
+  },
+  {
+   "col": "plan_topic_id",
+   "kind": "text"
+  },
+  {
+   "col": "tags",
+   "kind": "json"
+  }
+ ],
+ "exam_seat_templates": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "seat_rows",
+   "kind": "int"
+  },
+  {
+   "col": "seat_cols",
+   "kind": "int"
+  },
+  {
+   "col": "created_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "exam_security_events": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "session_id",
+   "kind": "text"
+  },
+  {
+   "col": "attempt_id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "event_type",
+   "kind": "text"
+  },
+  {
+   "col": "device",
+   "kind": "text"
+  },
+  {
+   "col": "ip",
+   "kind": "text"
+  },
+  {
+   "col": "actor",
+   "kind": "text"
+  },
+  {
+   "col": "at",
+   "kind": "ts"
+  }
+ ],
+ "exam_session_codes": [
+  {
+   "col": "session_id",
+   "kind": "text"
+  },
+  {
+   "col": "code",
+   "kind": "text"
+  }
+ ],
+ "exam_session_practice_questions": [
+  {
+   "col": "session_id",
+   "kind": "text"
+  },
+  {
+   "col": "question_id",
+   "kind": "text"
+  },
+  {
+   "col": "position",
+   "kind": "int"
+  }
+ ],
+ "exam_session_questions": [
+  {
+   "col": "session_id",
+   "kind": "text"
+  },
+  {
+   "col": "question_id",
+   "kind": "text"
+  },
+  {
+   "col": "position",
+   "kind": "int"
+  },
+  {
+   "col": "points",
+   "kind": "real"
+  }
+ ],
+ "exam_session_rooms": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "session_id",
+   "kind": "text"
+  },
+  {
+   "col": "position",
+   "kind": "int"
+  },
+  {
+   "col": "room_id",
+   "kind": "text"
+  },
+  {
+   "col": "seat_rows",
+   "kind": "int"
+  },
+  {
+   "col": "seat_cols",
+   "kind": "int"
+  },
+  {
+   "col": "template_id",
+   "kind": "text"
+  }
+ ],
+ "exam_session_seating": [
+  {
+   "col": "session_id",
+   "kind": "text"
+  },
+  {
+   "col": "seat_rows",
+   "kind": "int"
+  },
+  {
+   "col": "seat_cols",
+   "kind": "int"
+  },
+  {
+   "col": "template_id",
+   "kind": "text"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "exam_session_seats": [
+  {
+   "col": "session_id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "seat_row",
+   "kind": "int"
+  },
+  {
+   "col": "seat_col",
+   "kind": "int"
+  },
+  {
+   "col": "session_room_id",
+   "kind": "text"
+  }
+ ],
+ "exam_session_sets": [
+  {
+   "col": "session_id",
+   "kind": "text"
+  },
+  {
+   "col": "topic_set_id",
+   "kind": "text"
+  },
+  {
+   "col": "subject_id",
+   "kind": "text"
+  },
+  {
+   "col": "gradebook_item_id",
+   "kind": "text"
+  }
+ ],
+ "exam_session_special_seats": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "session_id",
+   "kind": "text"
+  },
+  {
+   "col": "session_room_id",
+   "kind": "text"
+  },
+  {
+   "col": "special_no",
+   "kind": "int"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  }
+ ],
+ "exam_session_targets": [
+  {
+   "col": "session_id",
+   "kind": "text"
+  },
+  {
+   "col": "teaching_assignment_id",
+   "kind": "text"
+  }
+ ],
+ "exam_sessions": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "subject_id",
+   "kind": "text"
+  },
+  {
+   "col": "teacher_id",
+   "kind": "text"
+  },
+  {
+   "col": "title",
+   "kind": "text"
+  },
+  {
+   "col": "opens_at",
+   "kind": "ts"
+  },
+  {
+   "col": "closes_at",
+   "kind": "ts"
+  },
+  {
+   "col": "duration_minutes",
+   "kind": "int"
+  },
+  {
+   "col": "max_attempts",
+   "kind": "int"
+  },
+  {
+   "col": "shuffle_questions",
+   "kind": "bool"
+  },
+  {
+   "col": "shuffle_choices",
+   "kind": "bool"
+  },
+  {
+   "col": "sync_to_gradebook",
+   "kind": "bool"
+  },
+  {
+   "col": "gradebook_item_id",
+   "kind": "text"
+  },
+  {
+   "col": "review_released",
+   "kind": "bool"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "strict_mode",
+   "kind": "bool"
+  },
+  {
+   "col": "topic_set_id",
+   "kind": "text"
+  },
+  {
+   "col": "exam_type",
+   "kind": "text"
+  },
+  {
+   "col": "round",
+   "kind": "int"
+  },
+  {
+   "col": "is_enabled",
+   "kind": "bool"
+  },
+  {
+   "col": "room_id",
+   "kind": "text"
+  }
+ ],
+ "exam_topic_set_topics": [
+  {
+   "col": "set_id",
+   "kind": "text"
+  },
+  {
+   "col": "topic_id",
+   "kind": "text"
+  }
+ ],
+ "exam_topic_sets": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "teacher_id",
+   "kind": "text"
+  },
+  {
+   "col": "subject_id",
+   "kind": "text"
+  },
+  {
+   "col": "approval_status",
+   "kind": "text"
+  },
+  {
+   "col": "approval_note",
+   "kind": "text"
+  },
+  {
+   "col": "approved_by",
+   "kind": "text"
+  },
+  {
+   "col": "approved_at",
+   "kind": "ts"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "teaching_assignment_id",
+   "kind": "text"
+  },
+  {
+   "col": "no_exam",
+   "kind": "bool"
+  },
+  {
+   "col": "exam_type",
+   "kind": "text"
+  },
+  {
+   "col": "round",
+   "kind": "int"
+  }
+ ],
+ "grade_levels": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "code",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "sort_order",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "is_entry_point",
+   "kind": "bool"
+  }
+ ],
+ "guardianships": [
+  {
+   "col": "parent_id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  }
+ ],
+ "kg_assessment_topics": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "grade_level_id",
+   "kind": "text"
+  },
+  {
+   "col": "domain",
+   "kind": "text"
+  },
+  {
+   "col": "academic_year",
+   "kind": "int"
+  },
+  {
+   "col": "name_th",
+   "kind": "text"
+  },
+  {
+   "col": "sort_order",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "learning_areas": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "code",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "parent_id",
+   "kind": "text"
+  }
+ ],
+ "learning_units": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "grade_level_id",
+   "kind": "text"
+  },
+  {
+   "col": "academic_year",
+   "kind": "int"
+  },
+  {
+   "col": "name_th",
+   "kind": "text"
+  },
+  {
+   "col": "name_en",
+   "kind": "text"
+  },
+  {
+   "col": "sort_order",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "leave_requests": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "leave_type_id",
+   "kind": "text"
+  },
+  {
+   "col": "start_date",
+   "kind": "date"
+  },
+  {
+   "col": "end_date",
+   "kind": "date"
+  },
+  {
+   "col": "reason",
+   "kind": "text"
+  },
+  {
+   "col": "attachment_path",
+   "kind": "text"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "approved_by",
+   "kind": "text"
+  },
+  {
+   "col": "approved_at",
+   "kind": "ts"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "leave_types": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "code",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "max_days_per_year",
+   "kind": "int"
+  },
+  {
+   "col": "requires_attachment_after_days",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "line_link_codes": [
+  {
+   "col": "code",
+   "kind": "text"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "expires_at",
+   "kind": "ts"
+  },
+  {
+   "col": "used_at",
+   "kind": "ts"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "line_notifications": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "message",
+   "kind": "text"
+  },
+  {
+   "col": "score_item_id",
+   "kind": "text"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "sent_at",
+   "kind": "ts"
+  },
+  {
+   "col": "error",
+   "kind": "text"
+  }
+ ],
+ "password_reset_attempts": [
+  {
+   "col": "login_id",
+   "kind": "text"
+  },
+  {
+   "col": "attempt_count",
+   "kind": "int"
+  },
+  {
+   "col": "first_attempt_at",
+   "kind": "ts"
+  }
+ ],
+ "period_attendance_records": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "schedule_entry_id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "date",
+   "kind": "date"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "note",
+   "kind": "text"
+  },
+  {
+   "col": "recorded_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "period_definitions": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "day_of_week",
+   "kind": "int"
+  },
+  {
+   "col": "period_no",
+   "kind": "int"
+  },
+  {
+   "col": "period_type",
+   "kind": "text"
+  },
+  {
+   "col": "label",
+   "kind": "text"
+  },
+  {
+   "col": "start_time",
+   "kind": "time"
+  },
+  {
+   "col": "end_time",
+   "kind": "time"
+  },
+  {
+   "col": "grade_level_id",
+   "kind": "text"
+  }
+ ],
+ "plan_lesson_files": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "lesson_id",
+   "kind": "text"
+  },
+  {
+   "col": "doc_file_id",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "plan_lesson_subjects": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "lesson_id",
+   "kind": "text"
+  },
+  {
+   "col": "subject_id",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "plan_lessons": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "subject_id",
+   "kind": "text"
+  },
+  {
+   "col": "grade_level_id",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "sort_order",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "plan_subjects": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "color",
+   "kind": "text"
+  },
+  {
+   "col": "icon",
+   "kind": "text"
+  }
+ ],
+ "plan_topic_files": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "topic_id",
+   "kind": "text"
+  },
+  {
+   "col": "doc_file_id",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "plan_topics": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "lesson_id",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "sort_order",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "pos_products": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "code",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "price",
+   "kind": "int"
+  },
+  {
+   "col": "category",
+   "kind": "text"
+  },
+  {
+   "col": "active",
+   "kind": "bool"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "image_path",
+   "kind": "text"
+  }
+ ],
+ "pos_terminal_pin_attempts": [
+  {
+   "col": "terminal_id",
+   "kind": "text"
+  },
+  {
+   "col": "failed_attempts",
+   "kind": "int"
+  },
+  {
+   "col": "locked_until",
+   "kind": "ts"
+  }
+ ],
+ "pos_terminals": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "active",
+   "kind": "bool"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  }
+ ],
+ "position_titles": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "code",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "practice_attempt_answers": [
+  {
+   "col": "attempt_id",
+   "kind": "text"
+  },
+  {
+   "col": "question_id",
+   "kind": "text"
+  },
+  {
+   "col": "choice_id",
+   "kind": "text"
+  },
+  {
+   "col": "short_answer",
+   "kind": "text"
+  },
+  {
+   "col": "is_correct",
+   "kind": "bool"
+  },
+  {
+   "col": "points_awarded",
+   "kind": "real"
+  },
+  {
+   "col": "answered_at",
+   "kind": "ts"
+  }
+ ],
+ "practice_attempts": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "set_id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "started_at",
+   "kind": "ts"
+  },
+  {
+   "col": "submitted_at",
+   "kind": "ts"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "question_order",
+   "kind": "json"
+  },
+  {
+   "col": "score",
+   "kind": "real"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "practice_set_questions": [
+  {
+   "col": "set_id",
+   "kind": "text"
+  },
+  {
+   "col": "question_id",
+   "kind": "text"
+  },
+  {
+   "col": "position",
+   "kind": "int"
+  }
+ ],
+ "practice_sets": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "subject_id",
+   "kind": "text"
+  },
+  {
+   "col": "created_by",
+   "kind": "text"
+  },
+  {
+   "col": "is_teacher_curated",
+   "kind": "bool"
+  },
+  {
+   "col": "title",
+   "kind": "text"
+  },
+  {
+   "col": "topic",
+   "kind": "text"
+  },
+  {
+   "col": "difficulty",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "topic_id",
+   "kind": "text"
+  }
+ ],
+ "premises_exit_requests": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "date",
+   "kind": "date"
+  },
+  {
+   "col": "reason",
+   "kind": "text"
+  },
+  {
+   "col": "exit_time",
+   "kind": "ts"
+  },
+  {
+   "col": "exit_lat",
+   "kind": "real"
+  },
+  {
+   "col": "exit_lng",
+   "kind": "real"
+  },
+  {
+   "col": "return_time",
+   "kind": "ts"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "approved_by",
+   "kind": "text"
+  },
+  {
+   "col": "approved_at",
+   "kind": "ts"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "planned_return_time",
+   "kind": "ts"
+  },
+  {
+   "col": "no_return",
+   "kind": "bool"
+  }
+ ],
+ "profile_roles": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "role",
+   "kind": "text"
+  },
+  {
+   "col": "position_title_id",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "profiles": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "prefix",
+   "kind": "text"
+  },
+  {
+   "col": "first_name",
+   "kind": "text"
+  },
+  {
+   "col": "last_name",
+   "kind": "text"
+  },
+  {
+   "col": "email",
+   "kind": "text"
+  },
+  {
+   "col": "phone",
+   "kind": "text"
+  },
+  {
+   "col": "line_user_id",
+   "kind": "text"
+  },
+  {
+   "col": "is_active",
+   "kind": "bool"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "national_id",
+   "kind": "text"
+  },
+  {
+   "col": "date_of_birth",
+   "kind": "date"
+  },
+  {
+   "col": "teacher_code",
+   "kind": "text"
+  },
+  {
+   "col": "learning_area_id",
+   "kind": "text"
+  },
+  {
+   "col": "must_change_password",
+   "kind": "bool"
+  },
+  {
+   "col": "avatar_path",
+   "kind": "text"
+  },
+  {
+   "col": "character_options",
+   "kind": "json"
+  },
+  {
+   "col": "house_no",
+   "kind": "text"
+  },
+  {
+   "col": "village_no",
+   "kind": "text"
+  },
+  {
+   "col": "alley",
+   "kind": "text"
+  },
+  {
+   "col": "road",
+   "kind": "text"
+  },
+  {
+   "col": "subdistrict",
+   "kind": "text"
+  },
+  {
+   "col": "district",
+   "kind": "text"
+  },
+  {
+   "col": "province",
+   "kind": "text"
+  },
+  {
+   "col": "postal_code",
+   "kind": "text"
+  },
+  {
+   "col": "line_notifications_enabled",
+   "kind": "bool"
+  },
+  {
+   "col": "banner_path",
+   "kind": "text"
+  },
+  {
+   "col": "banner_focus_x",
+   "kind": "int"
+  },
+  {
+   "col": "banner_focus_y",
+   "kind": "int"
+  },
+  {
+   "col": "banner_colors",
+   "kind": "json"
+  }
+ ],
+ "push_subscriptions": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "endpoint",
+   "kind": "text"
+  },
+  {
+   "col": "p256dh",
+   "kind": "text"
+  },
+  {
+   "col": "auth",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "rooms": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "is_active",
+   "kind": "bool"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "salary_grades": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "code",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "min_salary",
+   "kind": "money"
+  },
+  {
+   "col": "max_salary",
+   "kind": "money"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "schedule_entries": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "teaching_assignment_id",
+   "kind": "text"
+  },
+  {
+   "col": "day_of_week",
+   "kind": "int"
+  },
+  {
+   "col": "period_no",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "room_id",
+   "kind": "text"
+  }
+ ],
+ "school_settings": [
+  {
+   "col": "id",
+   "kind": "int"
+  },
+  {
+   "col": "name_th",
+   "kind": "text"
+  },
+  {
+   "col": "name_en",
+   "kind": "text"
+  },
+  {
+   "col": "logo_path",
+   "kind": "text"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "time_tracking_roles",
+   "kind": "json"
+  },
+  {
+   "col": "attendance_digest_time",
+   "kind": "time"
+  },
+  {
+   "col": "attendance_digest_last_sent",
+   "kind": "date"
+  },
+  {
+   "col": "staff_attendance_digest_time",
+   "kind": "time"
+  },
+  {
+   "col": "staff_attendance_digest_last_sent",
+   "kind": "date"
+  },
+  {
+   "col": "promptpay_id",
+   "kind": "text"
+  },
+  {
+   "col": "promptpay_qr_path",
+   "kind": "text"
+  }
+ ],
+ "score_items": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "teaching_assignment_id",
+   "kind": "text"
+  },
+  {
+   "col": "kind",
+   "kind": "text"
+  },
+  {
+   "col": "label",
+   "kind": "text"
+  },
+  {
+   "col": "max_score",
+   "kind": "real"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "description",
+   "kind": "text"
+  },
+  {
+   "col": "due_date",
+   "kind": "date"
+  },
+  {
+   "col": "publish_at",
+   "kind": "ts"
+  },
+  {
+   "col": "requires_submission",
+   "kind": "bool"
+  },
+  {
+   "col": "notified_at",
+   "kind": "ts"
+  }
+ ],
+ "staff_attendance_overrides": [
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "date",
+   "kind": "date"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "reason",
+   "kind": "text"
+  },
+  {
+   "col": "set_by",
+   "kind": "text"
+  },
+  {
+   "col": "set_at",
+   "kind": "ts"
+  }
+ ],
+ "student_cards": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "card_uid",
+   "kind": "text"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "created_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "frozen_by",
+   "kind": "text"
+  },
+  {
+   "col": "kind",
+   "kind": "text"
+  }
+ ],
+ "student_classroom_enrollments": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "classroom_id",
+   "kind": "text"
+  },
+  {
+   "col": "academic_year",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "student_cohort_enrollments": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "cohort_id",
+   "kind": "text"
+  },
+  {
+   "col": "study_plan_id",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "student_contacts": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "relationship",
+   "kind": "text"
+  },
+  {
+   "col": "relationship_note",
+   "kind": "text"
+  },
+  {
+   "col": "is_primary",
+   "kind": "bool"
+  },
+  {
+   "col": "prefix",
+   "kind": "text"
+  },
+  {
+   "col": "first_name",
+   "kind": "text"
+  },
+  {
+   "col": "last_name",
+   "kind": "text"
+  },
+  {
+   "col": "phone",
+   "kind": "text"
+  },
+  {
+   "col": "email",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "house_no",
+   "kind": "text"
+  },
+  {
+   "col": "village_no",
+   "kind": "text"
+  },
+  {
+   "col": "alley",
+   "kind": "text"
+  },
+  {
+   "col": "road",
+   "kind": "text"
+  },
+  {
+   "col": "subdistrict",
+   "kind": "text"
+  },
+  {
+   "col": "district",
+   "kind": "text"
+  },
+  {
+   "col": "province",
+   "kind": "text"
+  },
+  {
+   "col": "postal_code",
+   "kind": "text"
+  }
+ ],
+ "student_grade_status": [
+  {
+   "col": "teaching_assignment_id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "student_guardian_financials": [
+  {
+   "col": "contact_id",
+   "kind": "text"
+  },
+  {
+   "col": "occupation",
+   "kind": "text"
+  },
+  {
+   "col": "workplace",
+   "kind": "text"
+  },
+  {
+   "col": "monthly_income",
+   "kind": "money"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "student_item_scores": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "score_item_id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "score",
+   "kind": "real"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "feedback",
+   "kind": "text"
+  }
+ ],
+ "student_leave_requests": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "submitted_by",
+   "kind": "text"
+  },
+  {
+   "col": "start_date",
+   "kind": "date"
+  },
+  {
+   "col": "end_date",
+   "kind": "date"
+  },
+  {
+   "col": "reason",
+   "kind": "text"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "approved_by",
+   "kind": "text"
+  },
+  {
+   "col": "approved_at",
+   "kind": "ts"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "leave_type_id",
+   "kind": "text"
+  },
+  {
+   "col": "attachment_path",
+   "kind": "text"
+  }
+ ],
+ "student_pass_fail_scores": [
+  {
+   "col": "teaching_assignment_id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "passed",
+   "kind": "bool"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "feedback",
+   "kind": "text"
+  }
+ ],
+ "student_pins": [
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "pin_hash",
+   "kind": "text"
+  },
+  {
+   "col": "failed_attempts",
+   "kind": "int"
+  },
+  {
+   "col": "locked_until",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "student_premises_exit_requests": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "submitted_by",
+   "kind": "text"
+  },
+  {
+   "col": "date",
+   "kind": "date"
+  },
+  {
+   "col": "reason",
+   "kind": "text"
+  },
+  {
+   "col": "exit_time",
+   "kind": "ts"
+  },
+  {
+   "col": "planned_return_time",
+   "kind": "ts"
+  },
+  {
+   "col": "no_return",
+   "kind": "bool"
+  },
+  {
+   "col": "return_time",
+   "kind": "ts"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "approved_by",
+   "kind": "text"
+  },
+  {
+   "col": "approved_at",
+   "kind": "ts"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "student_wallets": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "daily_limit",
+   "kind": "money"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "students": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_code",
+   "kind": "text"
+  },
+  {
+   "col": "national_id",
+   "kind": "text"
+  },
+  {
+   "col": "first_name",
+   "kind": "text"
+  },
+  {
+   "col": "last_name",
+   "kind": "text"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "grade_level_id",
+   "kind": "text"
+  },
+  {
+   "col": "prefix",
+   "kind": "text"
+  },
+  {
+   "col": "phone",
+   "kind": "text"
+  },
+  {
+   "col": "email",
+   "kind": "text"
+  },
+  {
+   "col": "family_status",
+   "kind": "text"
+  },
+  {
+   "col": "chronic_disease",
+   "kind": "text"
+  },
+  {
+   "col": "drug_allergy",
+   "kind": "text"
+  },
+  {
+   "col": "food_allergy",
+   "kind": "text"
+  },
+  {
+   "col": "blood_type",
+   "kind": "text"
+  },
+  {
+   "col": "house_no",
+   "kind": "text"
+  },
+  {
+   "col": "village_no",
+   "kind": "text"
+  },
+  {
+   "col": "alley",
+   "kind": "text"
+  },
+  {
+   "col": "road",
+   "kind": "text"
+  },
+  {
+   "col": "subdistrict",
+   "kind": "text"
+  },
+  {
+   "col": "district",
+   "kind": "text"
+  },
+  {
+   "col": "province",
+   "kind": "text"
+  },
+  {
+   "col": "postal_code",
+   "kind": "text"
+  },
+  {
+   "col": "date_of_birth",
+   "kind": "date"
+  },
+  {
+   "col": "avatar_path",
+   "kind": "text"
+  },
+  {
+   "col": "latitude",
+   "kind": "real"
+  },
+  {
+   "col": "longitude",
+   "kind": "real"
+  }
+ ],
+ "study_map_assignments": [
+  {
+   "col": "plan_subject_id",
+   "kind": "text"
+  },
+  {
+   "col": "grade_level_id",
+   "kind": "text"
+  },
+  {
+   "col": "map_id",
+   "kind": "text"
+  }
+ ],
+ "study_map_library": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "theme",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  }
+ ],
+ "study_plans": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "code",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "subject_cover_library": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "name",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "subjects": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "code",
+   "kind": "text"
+  },
+  {
+   "col": "name_th",
+   "kind": "text"
+  },
+  {
+   "col": "name_en",
+   "kind": "text"
+  },
+  {
+   "col": "learning_area_id",
+   "kind": "text"
+  },
+  {
+   "col": "subject_type",
+   "kind": "text"
+  },
+  {
+   "col": "credits",
+   "kind": "real"
+  },
+  {
+   "col": "hours_per_week",
+   "kind": "int"
+  },
+  {
+   "col": "is_active",
+   "kind": "bool"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "department_id",
+   "kind": "text"
+  },
+  {
+   "col": "suggested_grade_level_id",
+   "kind": "text"
+  },
+  {
+   "col": "suggested_term",
+   "kind": "int"
+  },
+  {
+   "col": "grading_method",
+   "kind": "text"
+  },
+  {
+   "col": "cover_path",
+   "kind": "text"
+  },
+  {
+   "col": "cover_focus_x",
+   "kind": "int"
+  },
+  {
+   "col": "cover_focus_y",
+   "kind": "int"
+  },
+  {
+   "col": "scene_theme",
+   "kind": "text"
+  },
+  {
+   "col": "cover_id",
+   "kind": "text"
+  }
+ ],
+ "submission_attachments": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "submission_id",
+   "kind": "text"
+  },
+  {
+   "col": "storage_path",
+   "kind": "text"
+  },
+  {
+   "col": "file_name",
+   "kind": "text"
+  },
+  {
+   "col": "uploaded_at",
+   "kind": "ts"
+  }
+ ],
+ "teaching_assignment_teachers": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "assignment_id",
+   "kind": "text"
+  },
+  {
+   "col": "teacher_id",
+   "kind": "text"
+  },
+  {
+   "col": "from_date",
+   "kind": "date"
+  },
+  {
+   "col": "to_date",
+   "kind": "date"
+  }
+ ],
+ "teaching_assignments": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "teacher_id",
+   "kind": "text"
+  },
+  {
+   "col": "subject_id",
+   "kind": "text"
+  },
+  {
+   "col": "classroom_id",
+   "kind": "text"
+  },
+  {
+   "col": "academic_year",
+   "kind": "int"
+  },
+  {
+   "col": "term",
+   "kind": "int"
+  },
+  {
+   "col": "periods_per_week",
+   "kind": "int"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "group_id",
+   "kind": "text"
+  },
+  {
+   "col": "score_collect_pct",
+   "kind": "int"
+  },
+  {
+   "col": "score_exam_pct",
+   "kind": "int"
+  },
+  {
+   "col": "split_exam_items",
+   "kind": "bool"
+  },
+  {
+   "col": "plan_group_id",
+   "kind": "text"
+  }
+ ],
+ "teaching_plan_slot_topics": [
+  {
+   "col": "slot_id",
+   "kind": "text"
+  },
+  {
+   "col": "topic_id",
+   "kind": "text"
+  },
+  {
+   "col": "position",
+   "kind": "int"
+  }
+ ],
+ "teaching_plan_slots": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "teaching_assignment_id",
+   "kind": "text"
+  },
+  {
+   "col": "slot_date",
+   "kind": "date"
+  },
+  {
+   "col": "period_no",
+   "kind": "int"
+  },
+  {
+   "col": "completed_at",
+   "kind": "ts"
+  },
+  {
+   "col": "completed_on_plan",
+   "kind": "bool"
+  },
+  {
+   "col": "note",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "teaching_plan_units": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "teaching_assignment_id",
+   "kind": "text"
+  },
+  {
+   "col": "unit_no",
+   "kind": "int"
+  },
+  {
+   "col": "title",
+   "kind": "text"
+  },
+  {
+   "col": "description",
+   "kind": "text"
+  },
+  {
+   "col": "completed_at",
+   "kind": "ts"
+  },
+  {
+   "col": "completed_on_plan",
+   "kind": "bool"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "note",
+   "kind": "text"
+  }
+ ],
+ "time_clock_records": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "profile_id",
+   "kind": "text"
+  },
+  {
+   "col": "date",
+   "kind": "date"
+  },
+  {
+   "col": "clock_in_time",
+   "kind": "ts"
+  },
+  {
+   "col": "clock_in_lat",
+   "kind": "real"
+  },
+  {
+   "col": "clock_in_lng",
+   "kind": "real"
+  },
+  {
+   "col": "clock_out_time",
+   "kind": "ts"
+  },
+  {
+   "col": "clock_out_lat",
+   "kind": "real"
+  },
+  {
+   "col": "clock_out_lng",
+   "kind": "real"
+  },
+  {
+   "col": "recorded_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "auto_clock_out",
+   "kind": "bool"
+  }
+ ],
+ "transfer_intakes": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "source_school",
+   "kind": "text"
+  },
+  {
+   "col": "intake_date",
+   "kind": "date"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  }
+ ],
+ "tuition_invoices": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "student_id",
+   "kind": "text"
+  },
+  {
+   "col": "term_id",
+   "kind": "text"
+  },
+  {
+   "col": "title",
+   "kind": "text"
+  },
+  {
+   "col": "amount",
+   "kind": "money"
+  },
+  {
+   "col": "due_date",
+   "kind": "date"
+  },
+  {
+   "col": "status",
+   "kind": "text"
+  },
+  {
+   "col": "file_path",
+   "kind": "text"
+  },
+  {
+   "col": "created_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "tuition_payments": [
+  {
+   "col": "id",
+   "kind": "text"
+  },
+  {
+   "col": "invoice_id",
+   "kind": "text"
+  },
+  {
+   "col": "receipt_no",
+   "kind": "int"
+  },
+  {
+   "col": "amount",
+   "kind": "money"
+  },
+  {
+   "col": "method",
+   "kind": "text"
+  },
+  {
+   "col": "paid_at",
+   "kind": "date"
+  },
+  {
+   "col": "note",
+   "kind": "text"
+  },
+  {
+   "col": "voided_at",
+   "kind": "ts"
+  },
+  {
+   "col": "void_reason",
+   "kind": "text"
+  },
+  {
+   "col": "recorded_by",
+   "kind": "text"
+  },
+  {
+   "col": "created_at",
+   "kind": "ts"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  }
+ ],
+ "tuition_term_amounts": [
+  {
+   "col": "term_id",
+   "kind": "text"
+  },
+  {
+   "col": "amount",
+   "kind": "money"
+  },
+  {
+   "col": "updated_by",
+   "kind": "text"
+  },
+  {
+   "col": "updated_at",
+   "kind": "ts"
+  },
+  {
+   "col": "id",
+   "kind": "text"
+  }
+ ]
+}
