@@ -1,5 +1,6 @@
 import { ApiFailure } from "./api/manifest";
 import { errorBody, handleSelect } from "./api/query";
+import { login, logout, refresh } from "./auth/routes";
 import { BUCKETS, DEFAULT_MAX_BYTES, sign, validPath, verify } from "./lib";
 
 export interface Env {
@@ -9,6 +10,8 @@ export interface Env {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
   SIGNING_SECRET: string;
+  /** HMAC key for access tokens issued by /auth/login (wrangler secret put AUTH_JWT_SECRET). */
+  AUTH_JWT_SECRET?: string;
   /** Comma-separated browser origins allowed to call the API. */
   ALLOWED_ORIGINS: string;
 }
@@ -148,6 +151,9 @@ export default {
       else if (req.method === "PUT" && url.pathname.startsWith("/o/")) res = await upload(req, env, url);
       else if (req.method === "POST" && url.pathname === "/remove") res = await remove(req, env);
       else if (req.method === "POST" && url.pathname === "/sign") res = await signUrl(req, env, url);
+      else if (req.method === "POST" && url.pathname === "/auth/login") res = await login(req, env);
+      else if (req.method === "POST" && url.pathname === "/auth/refresh") res = await refresh(req, env);
+      else if (req.method === "POST" && url.pathname === "/auth/logout") res = await logout(req, env);
       else if (req.method === "POST" && url.pathname === "/q") {
         const timing: Record<string, number> = {};
         res = Response.json(await handleSelect(req, env, timing));

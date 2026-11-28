@@ -1,21 +1,28 @@
+import { verifyAccessToken } from "../auth/token";
 import { ApiFailure } from "./manifest";
 import type { Ctx } from "./policy";
 
 interface IdentityEnv {
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
+  /** When set, tokens issued by /auth/login are accepted (checked locally, no network). */
+  AUTH_JWT_SECRET?: string;
 }
 
 const cache = new Map<string, { uid: string; exp: number }>();
 
 /**
- * Interim (shadow mode): the session is still a Supabase Auth JWT, so GoTrue validates it for us (cached 30 s per isolate).
- * Phase 5 replaces this function with local verification of our own token; nothing else here changes.
+ * Our own access tokens (phase 5) are verified locally. Anything else is treated as a Supabase Auth JWT and validated by GoTrue
+ * (cached 30 s per isolate) until the cutover removes that path.
  */
 export async function authenticate(req: Request, env: IdentityEnv): Promise<string> {
   const m = /^Bearer (.+)$/.exec(req.headers.get("authorization") ?? "");
   if (!m) throw new ApiFailure(401, "PGRST301", "missing bearer token");
   const token = m[1]!;
+  if (env.AUTH_JWT_SECRET) {
+    const own = await verifyAccessToken(env.AUTH_JWT_SECRET, token);
+    if (own) return own.sub;
+  }
   const hit = cache.get(token);
   if (hit && hit.exp > Date.now()) return hit.uid;
   const res = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, { headers: { apikey: env.SUPABASE_ANON_KEY, authorization: `Bearer ${token}` } });

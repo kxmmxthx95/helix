@@ -23,7 +23,7 @@ Rule: every phase ships alone and can be rolled back, except the DB cutover (pha
 | 2 | Storage → R2. **Parked (2026-11-28):** the user keeps `subject-documents`, `subject-covers` and all public buckets (`avatars banners exam-question-images pos-products school-assets`) on Supabase. Built + deployed (worker https://helix-files.adah.workers.dev, R2 `helix-files`, `r2_authz` 0237/0238, `src/lib/storage.ts`) but no bucket is flipped (`VITE_R2_BUCKETS` empty). Only the 6 private buckets (~25 MB) remain candidates; moving them saves almost nothing, so do it only if Supabase Storage is ever dropped | parked |
 | 3 | ~~10 Edge Functions → Workers~~ **Folded into phase 4/5** (decided 2026-11-28): every function uses the service role, `auth.admin.*`, vault secrets or `pg_net` cron against Supabase, so porting them first means rewriting them again when auth/DB move; they save no money (invocations are inside the plan). `send-print-email` needs a new mail path anyway (nodemailer SMTP does not run on Workers) | merged |
 | 4 | Shadow D1 + Worker API + `supabase`-shaped client; port RPC/trigger/policy per domain; parity tests on real data, behind an env flag. **4.1 done:** `scripts/pg-to-d1.py` → `worker/d1/schema.sql` (127 tables, 153 indexes, 2 views; loads in local D1). **4.2 done:** `scripts/pg-to-d1-data.py <file.sqlite>` copies all live data (127 tables, 96,694 rows, 599 users; 52 MB in SQLite vs 93 MB in Postgres) and verifies row counts, money totals, foreign keys and integrity — all match. **4.3 slice done (read-only, 4 tables):** `worker/src/api/` (`POST /q`: validated query descriptor → parameterised SQL on D1, deny-by-default policy map, 1000-row cap like PostgREST), `src/lib/db.ts` (supabase-js-shaped `from().select().eq()/in()/or()/order()/single()…`, nothing imports it yet). Policies ported: `profiles`, `profile_roles`, `students`, `student_contacts`; **parity-tested against Postgres RLS on real data (10 users × 4 tables, identical row sets)**. Not deployed: no remote D1 exists yet. Next: 4.4 per-domain ports (writes, embeds, more tables), remote shadow D1 + nightly sync | in progress |
-| 5 | Auth in Worker: PBKDF2 (WebCrypto) for new hashes, lazy bcrypt verify → rehash for imported `auth.users` hashes (no forced reset); one `/login` call returns profile + roles + student; realtime via Durable Object | todo |
+| 5 | Auth on the Worker. **Built, tested, not wired to the app:** `worker/src/auth/` (`POST /auth/login|refresh|logout`, PBKDF2 hashes, lazy bcrypt import, HS256 access tokens with `sub`/`sid`, rotating refresh tokens with reuse detection, `sessions` table), login returns the post-login data (profile, roles, student, contact count) in the same response. 11 tests. 200-login burst: see below. **Needs Workers Paid** (free plan: 10 ms CPU → `Worker exceeded resource limits` on ~15% of requests). Remaining: client switch (`AuthProvider`), real hash import at cutover, port the 10 edge functions that call `auth.admin.*`, WAF rate-limit rule on `/auth/login` | in progress |
 | 6 | **DB cutover** outside exam weeks: freeze writes → final sync → flip flag. Rollback = flip back + replay writes made since | todo |
 | 7 | Supabase read-only 30 days → downgrade to Free (kept for `subject-documents` only) | todo |
 
@@ -127,6 +127,19 @@ Loaded with `python3 scripts/sqlite-to-d1-sql.py <sqlite> <dir>` + `wrangler d1 
 Reading: single reads are on par; multi-query sequences lose because each request makes **two sequential D1 round trips of ~33 ms** (`ctx` = who is asking, then the query; Server-Timing `ctx;dur=34, query;dur=33`).
 Smart Placement was enabled and made no visible difference yet (it needs a warm-up period; re-measure later). Cheap next steps: cache `ctx` per isolate (~15 s; a revoked role keeps access that long),
 fold ctx into the query batch, D1 read replicas. D1 is not faster than Supabase for plain reads; the case for phase 5 is login CPU (parallel hashing), not query latency.
+
+## Phase 5 measurement: 200 students log in at once (2026-11-28)
+
+`scripts/auth-burst.mjs`: 200 synthetic users in the shadow D1 (bcrypt cost 10 = what GoTrue stores), all logging in simultaneously from this machine, twice.
+
+| | Supabase Auth (measured earlier) | Worker + D1, free plan |
+|---|---|---|
+| 200 simultaneous first logins | ≈ 15 s to drain the queue (13 logins/s) | 1.4–2.7 s total, p50 0.7–1.5 s, **but 8–15% got 503 `Worker exceeded resource limits`** |
+| steady state (PBKDF2) | same bcrypt every time | 0.7–1.4 s total, p50 0.6–0.8 s, 0–15% 503 |
+
+Workers run each request in whichever isolate is free, so CPU work spreads out instead of queueing behind one core. The 503s are the free plan's 10 ms CPU cap (bcrypt ≈ 50 ms, PBKDF2 ≈ 8 ms + overhead);
+the paid plan's 30 s cap removes that class of failure (not re-measured: the account is on free). So phase 5 is the real fix for login, and it costs the $5/mo Workers Paid plan.
+Safety notes: the shadow D1 `users` rows carry **no password hashes** (real users cannot log in through the Worker); the burst used synthetic users and removed them. `AUTH_JWT_SECRET` is a Worker secret unrelated to Supabase's.
 
 ## Security finding (2026-11-28, existing Supabase RLS — not caused by this migration)
 

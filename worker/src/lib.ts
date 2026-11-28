@@ -35,11 +35,11 @@ export function validPath(p: string): boolean {
 
 const enc = new TextEncoder();
 
-function b64url(buf: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+export function b64url(buf: ArrayBuffer | Uint8Array): string {
+  return btoa(String.fromCharCode(...new Uint8Array(buf as ArrayBuffer))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function fromB64url(s: string): Uint8Array<ArrayBuffer> {
+export function fromB64url(s: string): Uint8Array<ArrayBuffer> {
   const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
   return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }
